@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 class User extends Authenticatable
 {
     protected $table = 'm_user';
+    protected $primaryKey = 'id';
      protected $connection= 'mysqlhris';
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
@@ -23,11 +24,15 @@ class User extends Authenticatable
      * @var array<int, string>
      */
     protected $fillable = [
-        'name',
-        'username',
-        'email',
+       'username',
         'password',
-        'api_token', // jangan lupa kalau mau simpan token plain
+        'full_name',
+        'email',
+        'role_id',
+        'branch_id',
+        'is_active',
+        'created_by',
+        'updated_by', // jangan lupa kalau mau simpan token plain
     ];
 
     /**
@@ -51,5 +56,22 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+     // Relasi ke role
+    public function role()
+    {
+        return $this->belongsTo(Role::class, 'role_id', 'id');
+    }
+
+    // Relasi ke branch
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class, 'branch_id', 'id');
+    }
+
+    // Relasi ke tim sales detail
+    public function timSalesDetails()
+    {
+        return $this->hasMany(TimSalesDetail::class, 'user_id', 'id');
     }
 }
