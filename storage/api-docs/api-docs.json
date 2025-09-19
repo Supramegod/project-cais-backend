@@ -13,7 +13,7 @@
                 ],
                 "summary": "Login user dengan username dan password",
                 "description": "Melakukan autentikasi user dan mengembalikan plain token dari Laravel Sanctum",
-                "operationId": "dd51a484b7fa0f97c7680fdbde14cf5f",
+                "operationId": "8dcb70df1020986038d098cc08d05dae",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -149,7 +149,7 @@
                 ],
                 "summary": "Logout user",
                 "description": "Menghapus token aktif user dan melakukan logout",
-                "operationId": "df9bdc6c7a6d9f20b983526b2ec0f698",
+                "operationId": "69281b12abb272c76871f19cb17ca563",
                 "responses": {
                     "200": {
                         "description": "Logout berhasil",
@@ -205,7 +205,7 @@
                     "Authentication"
                 ],
                 "summary": "Dapatkan data pengguna yang sedang terautentikasi",
-                "operationId": "015ae3b99f0678ec8fe0a02409751660",
+                "operationId": "e23e5f9b32cba7953a224624a2a16544",
                 "responses": {
                     "200": {
                         "description": "Sukses",
@@ -297,6 +297,430 @@
                     }
                 ]
             }
+        },
+        "/api/jenis-perusahaan/list": {
+            "get": {
+                "tags": [
+                    "Jenis Perusahaan"
+                ],
+                "summary": "List semua jenis perusahaan",
+                "operationId": "128f60eaa186edd4c041868682352802",
+                "responses": {
+                    "200": {
+                        "description": "Daftar jenis perusahaan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "PT"
+                                                    },
+                                                    "resiko": {
+                                                        "type": "string",
+                                                        "example": "Rendah"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    },
+                                                    "updated_by": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    },
+                                                    "deleted_by": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-perusahaan/save": {
+            "post": {
+                "tags": [
+                    "Jenis Perusahaan"
+                ],
+                "summary": "Tambah jenis perusahaan baru",
+                "operationId": "9866da9cb052694121ec3fa0bcb8868d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "resiko"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "CV"
+                                    },
+                                    "resiko": {
+                                        "type": "string",
+                                        "example": "Tinggi"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Jenis perusahaan berhasil ditambahkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "CV"
+                                                },
+                                                "resiko": {
+                                                    "type": "string",
+                                                    "example": "Tinggi"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi gagal",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The nama field is required."
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-perusahaan/update/{id}": {
+            "put": {
+                "tags": [
+                    "Jenis Perusahaan"
+                ],
+                "summary": "Update jenis perusahaan",
+                "operationId": "4b2a4ba916cfa756332ffe9343b4de4c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "resiko"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "PT"
+                                    },
+                                    "resiko": {
+                                        "type": "string",
+                                        "example": "Rendah"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Jenis perusahaan berhasil diperbarui",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil diperbarui"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "PT"
+                                                },
+                                                "resiko": {
+                                                    "type": "string",
+                                                    "example": "Rendah"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-perusahaan/view/{id}": {
+            "get": {
+                "tags": [
+                    "Jenis Perusahaan"
+                ],
+                "summary": "Lihat detail jenis perusahaan",
+                "operationId": "8e7481b78bda12c27615f0ba5952d6aa",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Detail jenis perusahaan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "PT"
+                                                },
+                                                "resiko": {
+                                                    "type": "string",
+                                                    "example": "Sedang"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-perusahaan/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Jenis Perusahaan"
+                ],
+                "summary": "Hapus jenis perusahaan",
+                "operationId": "a1d9f27648078ad746dfdbc03382680a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Jenis perusahaan berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -312,6 +736,10 @@
         {
             "name": "Authentication",
             "description": "Authentication"
+        },
+        {
+            "name": "Jenis Perusahaan",
+            "description": "Jenis Perusahaan"
         }
     ]
 }
