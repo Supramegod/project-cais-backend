@@ -5,6 +5,7 @@ use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
 use App\Http\Controllers\KebutuhanController;
+use App\Http\Controllers\PositionController; // Tambahkan ini
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -55,7 +56,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/add-detail-requirement', 'addDetailRequirement');
         Route::delete('/delete-detail-requirement/{id}', 'deleteDetailRequirement');
     });
-     // Training
+    
+    // Training
     Route::prefix('training')->controller(TrainingController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view'); 
@@ -64,4 +66,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/delete/{id}', 'delete');
     });
 
+    // Position - Tambahkan route ini
+    Route::prefix('position')->controller(PositionController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'save');
+        Route::put('/edit/{id}', 'edit');
+        Route::delete('/delete/{id}', 'delete');
+        
+        // Position Requirements
+        Route::get('/requirement/list/{position_id}', 'requirementList');
+        Route::post('/requirement/add', 'addRequirement');
+        Route::put('/requirement/edit', 'requirementEdit');
+        Route::delete('/requirement/delete/{id}', 'requirementDelete');
+    });
 });

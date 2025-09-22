@@ -10,40 +10,13 @@ class Position extends Model
 {
     use HasFactory;
 
-    /**
-     * Nama tabel yang digunakan oleh model ini
-     */
-    protected $table = 'm_position';
-
-    /**
-     * Koneksi database yang digunakan
-     * Sesuai dengan controller asli yang menggunakan connection('mysqlhris')
-     */
     protected $connection = 'mysqlhris';
-
-    /**
-     * Primary key untuk tabel
-     */
+    protected $table = 'm_position';
     protected $primaryKey = 'id';
-
-    /**
-     * Menentukan apakah primary key auto increment
-     */
     public $incrementing = true;
-
-    /**
-     * Tipe data primary key
-     */
     protected $keyType = 'int';
-
-    /**
-     * Menentukan apakah model menggunakan timestamps
-     */
     public $timestamps = true;
 
-    /**
-     * Field yang dapat diisi secara mass assignment
-     */
     protected $fillable = [
         'name',
         'description',
@@ -54,99 +27,64 @@ class Position extends Model
         'updated_by',
     ];
 
-    /**
-     * Casting atribut ke tipe data tertentu
-     */
     protected $casts = [
         'is_active' => 'boolean',
         'layanan_id' => 'integer',
         'company_id' => 'integer',
+        'created_by' => 'integer', // Cast sebagai integer
+        'updated_by' => 'integer', // Cast sebagai integer
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+    // Relasi dengan company
+    public function company()
+    {
+        return $this->belongsTo(Company::class, 'company_id');
+    }
 
-    /**
-     * Scope untuk mengambil position yang aktif
-     */
+    // Relasi dengan kebutuhan
+    public function kebutuhan()
+    {
+        return $this->belongsTo(Kebutuhan::class, 'layanan_id');
+    }
+
+    // Relasi dengan requirements
+    public function requirements()
+    {
+        return $this->hasMany(RequirementPosisi::class, 'position_id');
+    }
+
+    // HAPUS relasi dengan users karena tidak ada kolom position_id di m_user
+    // public function users()
+    // {
+    //     return $this->hasMany(User::class, 'position_id');
+    // }
+
+    // Scope untuk position aktif
     public function scopeActive($query)
     {
         return $query->where('is_active', 1);
     }
 
-    /**
-     * Scope untuk mengambil position berdasarkan department
-     */
-    public function scopeByDepartment($query, $departmentId)
-    {
-        return $query->where('department_id', $departmentId);
-    }
-
-    /**
-     * Scope untuk mengambil position berdasarkan level
-     */
-    public function scopeByLevel($query, $level)
-    {
-        return $query->where('level', $level);
-    }
-
-    /**
-     * Relasi dengan department (jika ada)
-     * Uncomment jika Anda memiliki model Department
-     */
-    // public function department()
-    // {
-    //     return $this->belongsTo(Department::class, 'department_id');
-    // }
-
-    /**
-     * Relasi dengan kebutuhan detail tunjangan
-     */
-    public function kebutuhanDetailTunjangan()
-    {
-        return $this->hasMany(KebutuhanDetailTunjangan::class, 'position_id');
-    }
-
-    /**
-     * Relasi dengan kebutuhan detail requirement
-     */
-    public function kebutuhanDetailRequirement()
-    {
-        return $this->hasMany(KebutuhanDetailRequirement::class, 'position_id');
-    }
-
-    /**
-     * Accessor untuk mendapatkan status aktif dalam bentuk text
-     */
-    public function getStatusTextAttribute()
-    {
-        return $this->is_active ? 'Aktif' : 'Tidak Aktif';
-    }
-
-    /**
-     * Mutator untuk mengset created_by dan updated_by saat data dibuat/diperbarui
-     */
+    // Accessor untuk status text
     public static function boot()
     {
         parent::boot();
 
         static::creating(function ($model) {
             if (auth()->check() && !$model->created_by) {
-                $model->created_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
+                $model->created_by = auth()->id(); // Gunakan ID, bukan name
+            } else if (!$model->created_by) {
+                $model->created_by = 0; // Default value jika tidak ada user
             }
         });
 
         static::updating(function ($model) {
             if (auth()->check()) {
-                $model->updated_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
+                $model->updated_by = auth()->id(); // Gunakan ID, bukan name
+            } else {
+                $model->updated_by = 0; // Default value jika tidak ada user
             }
         });
-
-        // Hapus callback deleting karena tidak lagi menggunakan SoftDeletes
-        // static::deleting(function ($model) {
-        //     if (auth()->check()) {
-        //         $model->deleted_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
-        //         $model->save();
-        //     }
-        // });
     }
 }
