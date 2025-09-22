@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
@@ -53,6 +54,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/list-detail-requirement/{id}', 'listDetailRequirement');
         Route::post('/add-detail-requirement', 'addDetailRequirement');
         Route::delete('/delete-detail-requirement/{id}', 'deleteDetailRequirement');
+    });
+     // Training
+    Route::prefix('training')->controller(TrainingController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view'); 
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
     });
 
 });
