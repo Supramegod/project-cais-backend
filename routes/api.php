@@ -5,7 +5,13 @@ use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
 use App\Http\Controllers\KebutuhanController;
-use App\Http\Controllers\PositionController; // Tambahkan ini
+use App\Http\Controllers\PositionController;
+use App\Http\Controllers\KaporlapController;
+use App\Http\Controllers\DevicesController;
+use App\Http\Controllers\OhcController;
+use App\Http\Controllers\ChemicalController;
+use App\Http\Controllers\BarangController;
+use App\Http\Controllers\JenisBarangController; 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -24,6 +30,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+
+    // ===== ROUTE UNTUK JENIS BARANG =====
+    Route::prefix('jenis-barang')->controller(JenisBarangController::class)->group(function () {
+        Route::get('/list', 'list'); // GET /api/jenis-barang
+        Route::get('/view/{id}', 'view'); // GET /api/jenis-barang/{id}
+        Route::get('/list-detail/{id}', 'listdetail'); // GET /api/jenis-barang/{id}/barang
+        Route::post('/add', 'add'); // POST /api/jenis-barang
+        Route::put('/update/{id}', 'update'); // PUT /api/jenis-barang/{id}
+        Route::delete('/delete/{id}', 'delete'); // DELETE /api/jenis-barang/{id}
     });
 
     // Tim Sales
@@ -66,7 +82,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/delete/{id}', 'delete');
     });
 
-    // Position - Tambahkan route ini
+    // Position
     Route::prefix('position')->controller(PositionController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
@@ -79,5 +95,36 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requirement/add', 'addRequirement');
         Route::put('/requirement/edit', 'requirementEdit');
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
+    });
+
+    // ===== ROUTE BARU UNTUK MASTER BARANG =====
+    
+    // Barang Utama (CRUD lengkap)
+    Route::prefix('barang')->controller(BarangController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'Delete');
+    });
+
+    // Kaporlap (hanya index)
+    Route::prefix('kaporlap')->controller(KaporlapController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // Devices (hanya index)
+    Route::prefix('devices')->controller(DevicesController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // OHC (hanya index)
+    Route::prefix('ohc')->controller(OhcController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // Chemical (hanya index)
+    Route::prefix('chemical')->controller(ChemicalController::class)->group(function () {
+        Route::get('/list', 'list');
     });
 });
