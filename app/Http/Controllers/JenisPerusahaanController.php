@@ -37,7 +37,8 @@ class JenisPerusahaanController extends Controller
      */
     public function list()
     {
-        $data = JenisPerusahaan::all();
+        $data = JenisPerusahaan::with(['creator', 'updater', 'deleter'])->get();
+
         return response()->json(['success' => true, 'data' => $data]);
     }
 
@@ -84,18 +85,18 @@ class JenisPerusahaanController extends Controller
     public function save(Request $request)
     {
         $validated = $request->validate([
-            'nama'   => 'required|string|max:255',
+            'nama' => 'required|string|max:255',
             'resiko' => 'required|string|max:100',
         ]);
 
-        $validated['created_by'] = Auth::user()->full_name ?? 'system';
+        // $validated['created_by'] = Auth::user()->full_name ?? 'system';
 
         $data = JenisPerusahaan::create($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Berhasil ditambahkan',
-            'data'    => $data
+            'data' => $data
         ], 200);
     }
 
@@ -143,7 +144,7 @@ class JenisPerusahaanController extends Controller
     public function update(Request $request, $id)
     {
         $validated = $request->validate([
-            'nama'   => 'required|string|max:255',
+            'nama' => 'required|string|max:255',
             'resiko' => 'required|string|max:100',
         ]);
 
@@ -156,14 +157,14 @@ class JenisPerusahaanController extends Controller
             ], 404);
         }
 
-        $validated['updated_by'] = Auth::user()->full_name ?? 'system';
+        // $validated['updated_by'] = Auth::user()->full_name ?? 'system';
 
         $data->update($validated);
 
         return response()->json([
             'success' => true,
             'message' => 'Berhasil diperbarui',
-            'data'    => $data
+            'data' => $data
         ], 200);
     }
 
@@ -243,8 +244,8 @@ class JenisPerusahaanController extends Controller
             ], 404);
         }
 
-        $data->deleted_by = Auth::user()->full_name ?? 'system';
-        $data->save();
+        // $data->deleted_by = Auth::user()->full_name ?? 'system';
+        // $data->save();
 
         $data->delete();
 

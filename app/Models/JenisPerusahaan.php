@@ -115,27 +115,30 @@ class JenisPerusahaan extends Model
     /**
      * Relasi ke user untuk created_by
      */
-    // public function creator()
-    // {
-    //     return $this->belongsTo(User::class, 'created_by', 'id');
-    // }
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
 
-    // public function updater()
-    // {
-    //     return $this->belongsTo(User::class, 'updated_by', 'id');
-    // }
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
 
-    // public function deleter()
-    // {
-    //     return $this->belongsTo(User::class, 'deleted_by', 'id');
-    // }
+    public function deleter()
+    {
+        return $this->belongsTo(User::class, 'deleted_by', 'id');
+    }
 
     /**
      * Ganti created_by id dengan full_name
      */
     public function getCreatedByAttribute($value)
     {
-        return $this->creator ? $this->creator->full_name : null;
+        if ($this->relationLoaded('creator') && $this->creator) {
+            return $this->creator->full_name;
+        }
+        return $value;
     }
 
     /**
@@ -143,7 +146,10 @@ class JenisPerusahaan extends Model
      */
     public function getUpdatedByAttribute($value)
     {
-        return $this->updater ? $this->updater->full_name : null;
+        if ($this->relationLoaded('updater') && $this->updater) {
+            return $this->updater->full_name;
+        }
+        return $value;
     }
 
     /**
@@ -151,6 +157,9 @@ class JenisPerusahaan extends Model
      */
     public function getDeletedByAttribute($value)
     {
-        return $this->deleter ? $this->deleter->full_name : null;
+        if ($this->relationLoaded('deleter') && $this->deleter) {
+            return $this->deleter->full_name;
+        }
+        return $value;
     }
 }

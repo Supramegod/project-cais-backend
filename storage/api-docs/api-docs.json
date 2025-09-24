@@ -2484,6 +2484,782 @@
                 ]
             }
         },
+        "/api/customer-activities/send-email": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Send email notification",
+                "description": "Mengirim email notifikasi terkait customer activity",
+                "operationId": "075717d714fe38302a4787bfe54e4b40",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "subject",
+                                    "body",
+                                    "recipients"
+                                ],
+                                "properties": {
+                                    "subject": {
+                                        "type": "string",
+                                        "example": "Update Customer Activity"
+                                    },
+                                    "body": {
+                                        "type": "string",
+                                        "example": "Customer activity telah diupdate"
+                                    },
+                                    "recipients": {
+                                        "description": "Array email penerima",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "email",
+                                            "example": "customer@example.com"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Email berhasil dikirim",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Email berhasil dikirim"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/tim-sales/{timSalesId}/members": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get tim sales members",
+                "description": "Mengambil daftar member dari tim sales berdasarkan ID tim sales",
+                "operationId": "efd7bdbdcc0163f0f64e44a7284064d9",
+                "parameters": [
+                    {
+                        "name": "timSalesId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "tim_sales_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/contract/add": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Create contract activity",
+                "description": "Membuat aktivitas untuk kontrak (PKS)",
+                "operationId": "a14358025e5ab502c7fce291b4e9f1e3",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pks_id",
+                                    "tgl_activity",
+                                    "tipe"
+                                ],
+                                "properties": {
+                                    "pks_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tgl_activity": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-07-01"
+                                    },
+                                    "tipe": {
+                                        "type": "string",
+                                        "example": "Meeting"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Meeting kontrak"
+                                    },
+                                    "start": {
+                                        "type": "string",
+                                        "example": "09:00"
+                                    },
+                                    "end": {
+                                        "type": "string",
+                                        "example": "10:00"
+                                    },
+                                    "durasi": {
+                                        "type": "integer",
+                                        "example": 60
+                                    },
+                                    "notulen": {
+                                        "type": "string",
+                                        "example": "Hasil meeting kontrak"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Contract Activity berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/contract/{pksId}/list": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get contract activities",
+                "description": "Mengambil daftar aktivitas untuk kontrak tertentu",
+                "operationId": "014c5f091a0c657ab4294bea05d49842",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "CAT/LS/LS001-092024-00001"
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-09-23"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "example": "Meeting"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Meeting kontrak"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "files": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 1
+                                                                },
+                                                                "nama_file": {
+                                                                    "type": "string",
+                                                                    "example": "Dokumen Meeting"
+                                                                },
+                                                                "url_file": {
+                                                                    "type": "string",
+                                                                    "example": "http://example.com/file.pdf"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/assign-ro": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Assign RO to leads",
+                "description": "Menugaskan RO ke leads melalui customer activity",
+                "operationId": "4d8f1057c7bc827cce053799a20d66e5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "ro_id",
+                                    "notes"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "pks_id": {
+                                        "description": "Optional: untuk kontrak",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "ro_id": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "ro_team": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            124,
+                                            125
+                                        ]
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Penugasan RO untuk leads ini"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "RO berhasil ditugaskan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/assign-crm": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Assign CRM to leads",
+                "description": "Menugaskan CRM ke leads melalui customer activity",
+                "operationId": "27320cfb7562d04226473a0202b56e7b",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "crm_id",
+                                    "notes"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "pks_id": {
+                                        "description": "Optional: untuk kontrak",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "crm_id": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "crm_team": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            124,
+                                            125
+                                        ]
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Penugasan CRM untuk leads ini"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "CRM berhasil ditugaskan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/update-contract-status": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Update contract status",
+                "description": "Update status kontrak PKS melalui customer activity",
+                "operationId": "55e5c4dd789c9ea5787cbb671fbadb68",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pks_id",
+                                    "status_pks_id",
+                                    "notes"
+                                ],
+                                "properties": {
+                                    "pks_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "status_pks_id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Update status kontrak"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Status kontrak berhasil diupdate"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/issues/{pksId}": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get contract issues",
+                "description": "Mengambil daftar issue untuk kontrak tertentu",
+                "operationId": "3cfa85ab0bd58ca4654701be0425f7a7",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "judul": {
+                                                        "type": "string",
+                                                        "example": "Issue Kontrak"
+                                                    },
+                                                    "jenis_keluhan": {
+                                                        "type": "string",
+                                                        "example": "Teknis"
+                                                    },
+                                                    "kolaborator": {
+                                                        "type": "string",
+                                                        "example": "Tim Support"
+                                                    },
+                                                    "deskripsi": {
+                                                        "type": "string",
+                                                        "example": "Deskripsi masalah"
+                                                    },
+                                                    "url_lampiran": {
+                                                        "type": "string",
+                                                        "example": "http://example.com/file.pdf"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "example": "Open"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "updated_by": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/paginated": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get paginated customer activities",
+                "description": "Mengambil daftar customer activities dengan pagination untuk feed",
+                "operationId": "e94cd37c0cff6881eb63c2efde93ced6",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Halaman",
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman",
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "CAT/LS/LS001-092024-00001"
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-09-23"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "example": "Telepon"
+                                                    },
+                                                    "keterangan": {
+                                                        "type": "string",
+                                                        "example": "Follow up customer"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Perusahaan"
+                                                    },
+                                                    "sales": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "type": "string",
+                                                        "example": "Laboratory Service"
+                                                    },
+                                                    "status_leads": {
+                                                        "type": "string",
+                                                        "example": "Follow Up"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "current_page": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "per_page": {
+                                            "type": "integer",
+                                            "example": 10
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 50
+                                        },
+                                        "last_page": {
+                                            "type": "integer",
+                                            "example": 5
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/devices/list": {
             "get": {
                 "tags": [
