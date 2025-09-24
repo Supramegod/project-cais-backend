@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
@@ -31,11 +32,12 @@ class Position extends Model
         'is_active' => 'boolean',
         'layanan_id' => 'integer',
         'company_id' => 'integer',
-        'created_by' => 'integer', // Cast sebagai integer
-        'updated_by' => 'integer', // Cast sebagai integer
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
     // Relasi dengan company
     public function company()
     {
@@ -54,37 +56,58 @@ class Position extends Model
         return $this->hasMany(RequirementPosisi::class, 'position_id');
     }
 
-    // HAPUS relasi dengan users karena tidak ada kolom position_id di m_user
-    // public function users()
-    // {
-    //     return $this->hasMany(User::class, 'position_id');
-    // }
-
-    // Scope untuk position aktif
-    public function scopeActive($query)
+    // Relasi ke user untuk created_by dan updated_by
+    public function creator()
     {
-        return $query->where('is_active', 1);
+        return $this->belongsTo(User::class, 'created_by');
     }
 
-    // Accessor untuk status text
-    public static function boot()
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    // Mutator untuk memastikan created_by/updated_by diisi secara otomatis
+    protected static function booted()
     {
         parent::boot();
 
         static::creating(function ($model) {
-            if (auth()->check() && !$model->created_by) {
-                $model->created_by = auth()->id(); // Gunakan ID, bukan name
-            } else if (!$model->created_by) {
-                $model->created_by = 0; // Default value jika tidak ada user
-            }
+            $model->created_by = Auth::id();
         });
 
         static::updating(function ($model) {
-            if (auth()->check()) {
-                $model->updated_by = auth()->id(); // Gunakan ID, bukan name
-            } else {
-                $model->updated_by = 0; // Default value jika tidak ada user
-            }
+            $model->updated_by = Auth::id();
         });
+    }
+
+    // Accessor untuk mendapatkan nama pengguna dari relasi
+public function getCreatedByAttribute($value)
+{
+    // Jika relasi creator dimuat dan ada, kembalikan nama lengkap.
+    if ($this->relationLoaded('creator') && $this->creator) {
+        return $this->creator->full_name;
+    }
+    // Jika tidak, kembalikan nilai ID aslinya.
+    return $value;
+}
+
+public function getUpdatedByAttribute($value)
+{
+    // Jika relasi updater dimuat dan ada, kembalikan nama lengkap.
+    if ($this->relationLoaded('updater') && $this->updater) {
+        return $this->updater->full_name;
+    }
+    // Jika tidak, kembalikan nilai ID aslinya.
+    return $value;
+}
+    public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
     }
 }

@@ -298,6 +298,3029 @@
                 ]
             }
         },
+        "/api/barang/list": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get semua data barang",
+                "description": "Mengambil semua data barang yang aktif (belum dihapus) dengan informasi jenis barang",
+                "operationId": "d8d9d98c61f10028a03d968ede9c818c",
+                "responses": {
+                    "200": {
+                        "description": "Data berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Barang Contoh"
+                                                    },
+                                                    "jenis_barang_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "jenis_barang": {
+                                                        "type": "string",
+                                                        "example": "Kaporlap"
+                                                    },
+                                                    "harga": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 100000
+                                                    },
+                                                    "satuan": {
+                                                        "type": "string",
+                                                        "example": "pcs"
+                                                    },
+                                                    "masa_pakai": {
+                                                        "type": "integer",
+                                                        "example": 12
+                                                    },
+                                                    "merk": {
+                                                        "type": "string",
+                                                        "example": "Merk Contoh"
+                                                    },
+                                                    "jumlah_default": {
+                                                        "type": "integer",
+                                                        "example": 10
+                                                    },
+                                                    "urutan": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Admin User"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2023-01-01T00:00:00.000000Z"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2023-01-01T00:00:00.000000Z"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid atau tidak ada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error: Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/barang/view/{id}": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get detail barang",
+                "description": "Mengambil detail barang berdasarkan ID dengan informasi jenis barang dan default quantity",
+                "operationId": "1fa20645be531af7520707b9ff5d72cc",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID barang yang ingin dilihat",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data barang berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Barang Contoh"
+                                                },
+                                                "jenis_barang_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "jenis_barang": {
+                                                    "type": "string",
+                                                    "example": "Kaporlap"
+                                                },
+                                                "harga": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 100000
+                                                },
+                                                "satuan": {
+                                                    "type": "string",
+                                                    "example": "pcs"
+                                                },
+                                                "masa_pakai": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                },
+                                                "merk": {
+                                                    "type": "string",
+                                                    "example": "Merk Contoh"
+                                                },
+                                                "jumlah_default": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "urutan": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin User"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin User"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "default_qty": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error: Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/barang/add": {
+            "post": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Tambah barang baru",
+                "description": "Menambahkan data barang baru ke dalam sistem",
+                "operationId": "494c118eaa6069d9993eb707ac09d235",
+                "requestBody": {
+                    "description": "Data barang yang akan ditambahkan",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "jenis_barang_id",
+                                    "harga"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama barang",
+                                        "type": "string",
+                                        "example": "Barang Baru"
+                                    },
+                                    "jenis_barang_id": {
+                                        "description": "ID jenis barang",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "harga": {
+                                        "description": "Harga barang (bisa dengan koma sebagai pemisah ribuan)",
+                                        "type": "string",
+                                        "example": "150,000"
+                                    },
+                                    "satuan": {
+                                        "description": "Satuan barang",
+                                        "type": "string",
+                                        "example": "pcs"
+                                    },
+                                    "masa_pakai": {
+                                        "description": "Masa pakai dalam bulan",
+                                        "type": "integer",
+                                        "example": 12
+                                    },
+                                    "merk": {
+                                        "description": "Merk barang",
+                                        "type": "string",
+                                        "example": "Merk Baru"
+                                    },
+                                    "jumlah_default": {
+                                        "description": "Jumlah default barang",
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "urutan": {
+                                        "description": "Urutan barang",
+                                        "type": "integer",
+                                        "example": 2
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Barang berhasil ditambahkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Barang berhasil disimpan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Jenis barang tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jenis barang tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi gagal",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The nama field is required."
+                                                    }
+                                                },
+                                                "jenis_barang_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The jenis barang id field is required."
+                                                    }
+                                                },
+                                                "harga": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The harga field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error: Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/barang/update/{id}": {
+            "put": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Update data barang",
+                "description": "Mengupdate data barang berdasarkan ID",
+                "operationId": "c1473e58233820558af1f31d3e7d8596",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID barang yang ingin diupdate",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data barang yang akan diupdate",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "jenis_barang_id",
+                                    "harga"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama barang",
+                                        "type": "string",
+                                        "example": "Barang Updated"
+                                    },
+                                    "jenis_barang_id": {
+                                        "description": "ID jenis barang",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "harga": {
+                                        "description": "Harga barang (bisa dengan koma sebagai pemisah ribuan)",
+                                        "type": "string",
+                                        "example": "200,000"
+                                    },
+                                    "satuan": {
+                                        "description": "Satuan barang",
+                                        "type": "string",
+                                        "example": "pcs"
+                                    },
+                                    "masa_pakai": {
+                                        "description": "Masa pakai dalam bulan",
+                                        "type": "integer",
+                                        "example": 24
+                                    },
+                                    "merk": {
+                                        "description": "Merk barang",
+                                        "type": "string",
+                                        "example": "Merk Updated"
+                                    },
+                                    "jumlah_default": {
+                                        "description": "Jumlah default barang",
+                                        "type": "integer",
+                                        "example": 8
+                                    },
+                                    "urutan": {
+                                        "description": "Urutan barang",
+                                        "type": "integer",
+                                        "example": 3
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Barang berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Barang berhasil diupdate"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi gagal",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The nama field is required."
+                                                    }
+                                                },
+                                                "jenis_barang_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The jenis barang id field is required."
+                                                    }
+                                                },
+                                                "harga": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The harga field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error: Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/barang/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Hapus data barang",
+                "description": "Menghapus data barang berdasarkan ID (soft delete)",
+                "operationId": "6d12b55831924f21fc97b16b8781503f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID barang yang ingin dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Barang berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Barang berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error: Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/chemical/list": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get semua data barang Chemical",
+                "operationId": "b108194c36e447b13f390f480a9ed461",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/list": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get list customer activities dengan filter",
+                "description": "Mengambil daftar aktivitas customer dengan berbagai filter dan pagination",
+                "operationId": "3d12fde9b0621892456fbc5a560a42e0",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Tanggal dari (format: Y-m-d), default: 3 bulan yang lalu",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "2024-01-01"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "Tanggal sampai (format: Y-m-d), default: hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "2024-12-31"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter by branch ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "user",
+                        "in": "query",
+                        "description": "Filter by user ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "kebutuhan",
+                        "in": "query",
+                        "description": "Filter by kebutuhan ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "tipe",
+                        "in": "query",
+                        "description": "Filter by tipe activity (Telepon, Email, Meeting, Visit)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Telepon"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Data aktivitas customer berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "CAT/LS/LS001-092024-00001"
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-09-23"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "example": "Telepon"
+                                                    },
+                                                    "leads_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Perusahaan"
+                                                    },
+                                                    "branch": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Pusat"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "type": "string",
+                                                        "example": "Laboratory Service"
+                                                    },
+                                                    "sales": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "keterangan": {
+                                                        "type": "string",
+                                                        "example": "Follow up penawaran"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Customer tertarik dengan penawaran"
+                                                    },
+                                                    "status_leads_id": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-09-23T10:30:00.000000Z"
+                                                    },
+                                                    "leads": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_perusahaan": {
+                                                                "type": "string",
+                                                                "example": "PT. Contoh Perusahaan"
+                                                            },
+                                                            "branch": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Jakarta Pusat"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "kebutuhan": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Laboratory Service"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error - Tanggal tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tanggal dari tidak boleh melebihi tanggal sampai."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/view/{id}": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Get detail customer activity",
+                "description": "Mengambil detail aktivitas customer berdasarkan ID termasuk file dan status leads",
+                "operationId": "068237f0e4b02bd13bb8f8a79b9167ba",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID aktivitas customer",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Detail aktivitas customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "CAT/LS/LS001-092024-00001"
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2024-09-23"
+                                                },
+                                                "tipe": {
+                                                    "type": "string",
+                                                    "example": "Telepon"
+                                                },
+                                                "notes": {
+                                                    "type": "string",
+                                                    "example": "Customer tertarik dengan penawaran"
+                                                },
+                                                "start": {
+                                                    "type": "string",
+                                                    "example": "09:00"
+                                                },
+                                                "end": {
+                                                    "type": "string",
+                                                    "example": "10:00"
+                                                },
+                                                "durasi": {
+                                                    "type": "integer",
+                                                    "example": 60
+                                                },
+                                                "tgl_realisasi": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2024-09-23"
+                                                },
+                                                "jam_realisasi": {
+                                                    "type": "string",
+                                                    "example": "09:30"
+                                                },
+                                                "notulen": {
+                                                    "type": "string",
+                                                    "example": "Notulen meeting dengan customer"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "customer@example.com"
+                                                },
+                                                "leads": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        },
+                                                        "contact_person": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "john@example.com"
+                                                        },
+                                                        "phone": {
+                                                            "type": "string",
+                                                            "example": "021-12345678"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "files": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_file": {
+                                                                "type": "string",
+                                                                "example": "Notulen Meeting"
+                                                            },
+                                                            "url_file": {
+                                                                "type": "string",
+                                                                "example": "http://example.com/uploads/customer-activity/file.pdf"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "status_leads": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 2
+                                                        },
+                                                        "nama": {
+                                                            "type": "string",
+                                                            "example": "Follow Up"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/add": {
+            "post": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Create new customer activity",
+                "description": "Membuat aktivitas customer baru dengan opsi upload file",
+                "operationId": "b69355c3025deb644bc19da5cdc53b10",
+                "requestBody": {
+                    "description": "Data aktivitas customer baru",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "tgl_activity",
+                                    "tipe"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "description": "ID leads yang terkait",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tgl_activity": {
+                                        "description": "Tanggal aktivitas",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-07-01"
+                                    },
+                                    "tipe": {
+                                        "description": "Tipe aktivitas: Telepon, Email, Meeting, Visit",
+                                        "type": "string",
+                                        "example": "Telepon"
+                                    },
+                                    "notes": {
+                                        "description": "Catatan atau keterangan aktivitas",
+                                        "type": "string",
+                                        "example": "Catatan aktivitas"
+                                    },
+                                    "tim_sales_id": {
+                                        "description": "ID tim sales",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tim_sales_d_id": {
+                                        "description": "ID detail tim sales",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "status_leads_id": {
+                                        "description": "ID status leads yang akan diupdate",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "start": {
+                                        "description": "Jam mulai aktivitas",
+                                        "type": "string",
+                                        "example": "09:00"
+                                    },
+                                    "end": {
+                                        "description": "Jam selesai aktivitas",
+                                        "type": "string",
+                                        "example": "10:00"
+                                    },
+                                    "durasi": {
+                                        "description": "Durasi aktivitas dalam menit",
+                                        "type": "integer",
+                                        "example": 60
+                                    },
+                                    "tgl_realisasi": {
+                                        "description": "Tanggal realisasi",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-07-01"
+                                    },
+                                    "jam_realisasi": {
+                                        "description": "Jam realisasi",
+                                        "type": "string",
+                                        "example": "09:30"
+                                    },
+                                    "jenis_visit_id": {
+                                        "description": "ID jenis visit (jika tipe = Visit)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "notulen": {
+                                        "description": "Notulen atau hasil meeting",
+                                        "type": "string",
+                                        "example": "Notulen meeting"
+                                    },
+                                    "email": {
+                                        "description": "Email customer",
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "email@example.com"
+                                    },
+                                    "files": {
+                                        "description": "Array file yang akan diupload",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "nama_file": {
+                                                    "type": "string",
+                                                    "example": "Notulen Meeting"
+                                                },
+                                                "file_content": {
+                                                    "description": "File content dalam format base64",
+                                                    "type": "string",
+                                                    "example": "base64EncodedFileContent"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success - Customer Activity berhasil dibuat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Customer Activity berhasil dibuat dengan nomor: CAT/LS/LS001-092024-00001"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "CAT/LS/LS001-092024-00001"
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2024-07-01"
+                                                },
+                                                "tipe": {
+                                                    "type": "string",
+                                                    "example": "Telepon"
+                                                },
+                                                "notes": {
+                                                    "type": "string",
+                                                    "example": "Catatan aktivitas"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error - Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "leads_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The leads id field is required."
+                                                    }
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The tgl activity field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/update/{id}": {
+            "put": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Update customer activity",
+                "description": "Mengupdate aktivitas customer berdasarkan ID",
+                "operationId": "7eefe24d6e2b3feab0d5ebde120502fb",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID aktivitas customer yang akan diupdate",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data yang akan diupdate",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "tgl_activity": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-07-01"
+                                    },
+                                    "tipe": {
+                                        "type": "string",
+                                        "example": "Email"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Catatan aktivitas updated"
+                                    },
+                                    "tim_sales_id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "tim_sales_d_id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "status_leads_id": {
+                                        "type": "integer",
+                                        "example": 3
+                                    },
+                                    "start": {
+                                        "type": "string",
+                                        "example": "10:00"
+                                    },
+                                    "end": {
+                                        "type": "string",
+                                        "example": "11:00"
+                                    },
+                                    "durasi": {
+                                        "type": "integer",
+                                        "example": 60
+                                    },
+                                    "tgl_realisasi": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-07-02"
+                                    },
+                                    "jam_realisasi": {
+                                        "type": "string",
+                                        "example": "10:30"
+                                    },
+                                    "jenis_visit_id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "notulen": {
+                                        "type": "string",
+                                        "example": "Updated notulen"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "newemail@example.com"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success - Customer Activity berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Customer Activity berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "CAT/LS/LS001-092024-00001"
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2024-07-01"
+                                                },
+                                                "tipe": {
+                                                    "type": "string",
+                                                    "example": "Email"
+                                                },
+                                                "notes": {
+                                                    "type": "string",
+                                                    "example": "Catatan aktivitas updated"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Delete customer activity",
+                "description": "Menghapus aktivitas customer (soft delete)",
+                "operationId": "a144fc54b2f215b61d883706efa2fa5a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID aktivitas customer yang akan dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Customer Activity berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Customer Activity berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer-activities/leads/{leadsId}/track": {
+            "get": {
+                "tags": [
+                    "Customer Activity"
+                ],
+                "summary": "Track activities by leads ID",
+                "description": "Mengambil riwayat aktivitas customer berdasarkan leads ID untuk tracking progress",
+                "operationId": "d3951b3209b24c7b082513636fad7afd",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "description": "ID leads yang akan di-track aktivitasnya",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Data tracking aktivitas leads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "leads": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        },
+                                                        "contact_person": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "john@example.com"
+                                                        },
+                                                        "phone": {
+                                                            "type": "string",
+                                                            "example": "021-12345678"
+                                                        },
+                                                        "alamat": {
+                                                            "type": "string",
+                                                            "example": "Jl. Contoh No. 123"
+                                                        },
+                                                        "kebutuhan": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 1
+                                                                },
+                                                                "nama": {
+                                                                    "type": "string",
+                                                                    "example": "Laboratory Service"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        },
+                                                        "branch": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 1
+                                                                },
+                                                                "nama": {
+                                                                    "type": "string",
+                                                                    "example": "Jakarta Pusat"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "activities": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nomor": {
+                                                                "type": "string",
+                                                                "example": "CAT/LS/LS001-092024-00001"
+                                                            },
+                                                            "tgl_activity": {
+                                                                "type": "string",
+                                                                "format": "date",
+                                                                "example": "2024-09-23"
+                                                            },
+                                                            "tipe": {
+                                                                "type": "string",
+                                                                "example": "Telepon"
+                                                            },
+                                                            "notes": {
+                                                                "type": "string",
+                                                                "example": "Customer tertarik dengan penawaran"
+                                                            },
+                                                            "start": {
+                                                                "type": "string",
+                                                                "example": "09:00"
+                                                            },
+                                                            "end": {
+                                                                "type": "string",
+                                                                "example": "10:00"
+                                                            },
+                                                            "durasi": {
+                                                                "type": "integer",
+                                                                "example": 60
+                                                            },
+                                                            "tgl_realisasi": {
+                                                                "type": "string",
+                                                                "format": "date",
+                                                                "example": "2024-09-23"
+                                                            },
+                                                            "jam_realisasi": {
+                                                                "type": "string",
+                                                                "example": "09:30"
+                                                            },
+                                                            "notulen": {
+                                                                "type": "string",
+                                                                "example": "Customer menunjukkan minat tinggi"
+                                                            },
+                                                            "email": {
+                                                                "type": "string",
+                                                                "example": "customer@example.com"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2024-09-23T10:30:00.000000Z"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "Sales Manager"
+                                                            },
+                                                            "files": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "properties": {
+                                                                        "id": {
+                                                                            "type": "integer",
+                                                                            "example": 1
+                                                                        },
+                                                                        "nama_file": {
+                                                                            "type": "string",
+                                                                            "example": "Proposal Penawaran"
+                                                                        },
+                                                                        "url_file": {
+                                                                            "type": "string",
+                                                                            "example": "http://example.com/uploads/customer-activity/proposal.pdf"
+                                                                        },
+                                                                        "created_at": {
+                                                                            "type": "string",
+                                                                            "format": "date-time"
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            },
+                                                            "status_leads": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 2
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Follow Up"
+                                                                    },
+                                                                    "keterangan": {
+                                                                        "type": "string",
+                                                                        "example": "Menunggu keputusan customer"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Leads tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Leads tidak ditemukan."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/devices/list": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get semua data barang Devices",
+                "operationId": "b9b408b714b05805ed240284861c196e",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/list": {
+            "get": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Get all jenis barang",
+                "description": "Menampilkan daftar semua jenis barang yang aktif",
+                "operationId": "f4592cce19eff5ebc6aefbd469c94d3a",
+                "responses": {
+                    "200": {
+                        "description": "Success - Data berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Elektronik"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-01T00:00:00.000000Z"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-01T00:00:00.000000Z",
+                                                        "nullable": true
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    },
+                                                    "updated_by": {
+                                                        "type": "string",
+                                                        "example": "Admin",
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/view/{id}": {
+            "get": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Get detail jenis barang",
+                "description": "Menampilkan detail jenis barang berdasarkan ID",
+                "operationId": "47f66ff2eb02a395d039796ed14dd7b0",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID jenis barang",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Data berhasil ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Elektronik"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T00:00:00.000000Z"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T00:00:00.000000Z",
+                                                    "nullable": true
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/list-detail/{id}": {
+            "get": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Get list barang by jenis barang",
+                "description": "Menampilkan daftar barang berdasarkan jenis barang tertentu",
+                "operationId": "7ed3af36ff36a18467b83099dbdf686d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID jenis barang",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Data berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "jenis_barang": {
+                                                        "type": "string",
+                                                        "example": "Elektronik"
+                                                    },
+                                                    "nama_barang": {
+                                                        "type": "string",
+                                                        "example": "Laptop"
+                                                    },
+                                                    "harga": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 15000000
+                                                    },
+                                                    "satuan": {
+                                                        "type": "string",
+                                                        "example": "Unit"
+                                                    },
+                                                    "masa_pakai": {
+                                                        "type": "integer",
+                                                        "example": 5
+                                                    },
+                                                    "merk": {
+                                                        "type": "string",
+                                                        "example": "Dell"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/add": {
+            "post": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Create new jenis barang",
+                "description": "Menambahkan jenis barang baru ke dalam sistem",
+                "operationId": "7bff166784239c3dd7506c93554b8599",
+                "requestBody": {
+                    "description": "Data jenis barang yang akan ditambahkan",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama jenis barang",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Elektronik"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Success - Jenis barang berhasil ditambahkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jenis Barang berhasil disimpan"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Elektronik"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T00:00:00.000000Z"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error - Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Nama jenis barang harus diisi"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/update/{id}": {
+            "put": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Update jenis barang",
+                "description": "Memperbarui data jenis barang berdasarkan ID",
+                "operationId": "af5391c5eb05199798f18087ce4eec78",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID jenis barang yang akan diupdate",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data jenis barang yang akan diperbarui",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama jenis barang",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Elektronik Updated"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success - Jenis barang berhasil diperbarui",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jenis Barang berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Elektronik Updated"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T00:00:00.000000Z"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T12:00:00.000000Z"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error - Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Nama jenis barang harus diisi"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jenis-barang/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Jenis Barang"
+                ],
+                "summary": "Delete jenis barang",
+                "description": "Menghapus jenis barang berdasarkan ID (soft delete)",
+                "operationId": "2eaf143553e316750751e6b2c861056c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID jenis barang yang akan dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Jenis barang berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jenis Barang berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "error"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/jenis-perusahaan/list": {
             "get": {
                 "tags": [
@@ -707,6 +3730,42 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Data tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/kaporlap/list": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get semua data barang Kaporlap",
+                "operationId": "2855d1b610595d1a0070e4e16f97276b",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
                                         }
                                     },
                                     "type": "object"
@@ -1763,6 +4822,42 @@
                                             "items": {
                                                 "type": "object"
                                             }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ohc/list": {
+            "get": {
+                "tags": [
+                    "Barang"
+                ],
+                "summary": "Get semua data barang OHC",
+                "operationId": "4ce006fd5c8b27307a135e7c60e70043",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {}
                                         }
                                     },
                                     "type": "object"
@@ -5381,6 +8476,18 @@
         }
     },
     "tags": [
+        {
+            "name": "Barang",
+            "description": "API untuk manajemen data barang"
+        },
+        {
+            "name": "Customer Activity",
+            "description": "Endpoints untuk manajemen aktivitas customer"
+        },
+        {
+            "name": "Jenis Barang",
+            "description": "API Endpoints untuk Master Jenis Barang"
+        },
         {
             "name": "Kebutuhan",
             "description": "API untuk mengelola master data kebutuhan"

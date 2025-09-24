@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth; // Tambahkan ini
+use App\Models\User; // Tambahkan ini
 
 class Company extends Model
 {
@@ -28,25 +31,70 @@ class Company extends Model
         'is_active' => 'boolean',
     ];
 
-    public function positions()
-    {
-        return $this->hasMany(Position::class, 'company_id');
-    }
-
     public static function boot()
     {
         parent::boot();
 
+        // Menggunakan event Eloquent untuk mengotomatiskan pengisian user ID
         static::creating(function ($model) {
-            if (auth()->check() && !$model->created_by) {
-                $model->created_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
+            if (Auth::check()) {
+                $model->created_by = Auth::id();
+            } else {
+                $model->created_by = 0; // Default jika tidak ada user
             }
         });
 
         static::updating(function ($model) {
-            if (auth()->check()) {
-                $model->updated_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
+            if (Auth::check()) {
+                $model->updated_by = Auth::id();
+            } else {
+                $model->updated_by = 0; // Default jika tidak ada user
             }
         });
+    }
+
+    // Relasi untuk mendapatkan user
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    // Accessors untuk menampilkan nama
+    public function getCreatedByAttribute($value)
+    {
+        // Pastikan relasi sudah dimuat sebelum diakses
+        if ($this->relationLoaded('creator')) {
+            return $this->creator ? $this->creator->full_name : $value;
+        }
+        return $value;
+    }
+
+    public function getUpdatedByAttribute($value)
+    {
+        // Pastikan relasi sudah dimuat sebelum diakses
+        if ($this->relationLoaded('updater')) {
+            return $this->updater ? $this->updater->full_name : $value;
+        }
+        return $value;
+    }
+    /**
+     * Format created_at jadi dd-mm-YYYY
+     */
+    public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+    /**
+     * Format updated_at jadi dd-mm-YYYY
+     */
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
     }
 }

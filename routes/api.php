@@ -1,11 +1,18 @@
 <?php
 
+use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
 use App\Http\Controllers\KebutuhanController;
-use App\Http\Controllers\PositionController; // Tambahkan ini
+use App\Http\Controllers\PositionController;
+use App\Http\Controllers\KaporlapController;
+use App\Http\Controllers\DevicesController;
+use App\Http\Controllers\OhcController;
+use App\Http\Controllers\ChemicalController;
+use App\Http\Controllers\BarangController;
+use App\Http\Controllers\JenisBarangController; 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -24,6 +31,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+
+    // Jenis Barang
+    Route::prefix('jenis-barang')->controller(JenisBarangController::class)->group(function () {
+        Route::get('/list', 'list'); 
+        Route::get('/view/{id}', 'view'); 
+        Route::get('/list-detail/{id}', 'listdetail');
+        Route::post('/add', 'add'); 
+        Route::put('/update/{id}', 'update'); 
+        Route::delete('/delete/{id}', 'delete'); 
     });
 
     // Tim Sales
@@ -66,7 +83,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/delete/{id}', 'delete');
     });
 
-    // Position - Tambahkan route ini
+    // Position
     Route::prefix('position')->controller(PositionController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
@@ -80,4 +97,43 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/requirement/edit', 'requirementEdit');
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
     });
+
+
+    
+    // Barang Utama
+    Route::prefix('barang')->controller(BarangController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'Delete');
+    });
+
+    // Kaporlap (hanya index)
+    Route::prefix('kaporlap')->controller(KaporlapController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // Devices (hanya index)
+    Route::prefix('devices')->controller(DevicesController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // OHC (hanya index)
+    Route::prefix('ohc')->controller(OhcController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+
+    // Chemical (hanya index)
+    Route::prefix('chemical')->controller(ChemicalController::class)->group(function () {
+        Route::get('/list', 'list');
+    });
+    Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
+    Route::get('/list', 'list');                           
+    Route::get('/view/{id}', 'view');                     
+    Route::post('/add', 'add');                           
+    Route::put('/update/{id}', 'update');                 
+    Route::delete('/delete/{id}', 'delete');               
+    Route::get('/leads/{leadsId}/track', 'trackActivity'); 
+});
 });
