@@ -3,6 +3,7 @@
 // app/Models/KebutuhanDetailTunjangan.php
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -41,6 +42,18 @@ class KebutuhanDetailTunjangan extends Model
     public function position()
     {
         return $this->belongsTo(Position::class, 'position_id');
+    }
+     public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+    /**
+     * Format updated_at jadi dd-mm-YYYY
+     */
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
     }
 
     // Auto-fill creator

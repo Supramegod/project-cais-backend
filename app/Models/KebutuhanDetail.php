@@ -2,6 +2,7 @@
 // app/Models/KebutuhanDetail.php
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -33,5 +34,17 @@ class KebutuhanDetail extends Model
     public function requirement()
     {
         return $this->hasMany(KebutuhanDetailRequirement::class, 'kebutuhan_id', 'kebutuhan_id');
+    }
+    public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+    /**
+     * Format updated_at jadi dd-mm-YYYY
+     */
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
     }
 }

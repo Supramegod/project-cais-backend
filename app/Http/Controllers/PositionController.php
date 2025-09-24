@@ -97,7 +97,7 @@ class PositionController extends Controller
     {
         try {
             // Start with base query - gets ALL active positions by default
-            $query = Position::with(['company', 'kebutuhan'])
+            $query = Position::with(['company.creator', 'company.updater', 'kebutuhan','creator', 'updater'])
                 ->where('is_active', true);
 
             // Apply optional filters only if provided
@@ -221,7 +221,7 @@ class PositionController extends Controller
                 ], 400);
             }
 
-            $data = Position::with(['company', 'kebutuhan', 'requirements'])
+            $data = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'requirements','creator', 'updater'])
                 ->find($id);
 
             if (!$data) {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
@@ -32,14 +33,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/delete/{id}', 'delete');
     });
 
-    // ===== ROUTE UNTUK JENIS BARANG =====
+    // Jenis Barang
     Route::prefix('jenis-barang')->controller(JenisBarangController::class)->group(function () {
-        Route::get('/list', 'list'); // GET /api/jenis-barang
-        Route::get('/view/{id}', 'view'); // GET /api/jenis-barang/{id}
-        Route::get('/list-detail/{id}', 'listdetail'); // GET /api/jenis-barang/{id}/barang
-        Route::post('/add', 'add'); // POST /api/jenis-barang
-        Route::put('/update/{id}', 'update'); // PUT /api/jenis-barang/{id}
-        Route::delete('/delete/{id}', 'delete'); // DELETE /api/jenis-barang/{id}
+        Route::get('/list', 'list'); 
+        Route::get('/view/{id}', 'view'); 
+        Route::get('/list-detail/{id}', 'listdetail');
+        Route::post('/add', 'add'); 
+        Route::put('/update/{id}', 'update'); 
+        Route::delete('/delete/{id}', 'delete'); 
     });
 
     // Tim Sales
@@ -97,9 +98,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
     });
 
-    // ===== ROUTE BARU UNTUK MASTER BARANG =====
+
     
-    // Barang Utama (CRUD lengkap)
+    // Barang Utama
     Route::prefix('barang')->controller(BarangController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
@@ -127,4 +128,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('chemical')->controller(ChemicalController::class)->group(function () {
         Route::get('/list', 'list');
     });
+    Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
+    Route::get('/list', 'list');                           
+    Route::get('/view/{id}', 'view');                     
+    Route::post('/add', 'add');                           
+    Route::put('/update/{id}', 'update');                 
+    Route::delete('/delete/{id}', 'delete');               
+    Route::get('/leads/{leadsId}/track', 'trackActivity'); 
+});
 });
