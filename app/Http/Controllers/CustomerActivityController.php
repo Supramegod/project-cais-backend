@@ -1022,7 +1022,7 @@ class CustomerActivityController extends Controller
             }
 
             foreach ($request->recipients as $recipient) {
-                Mail::to($recipient)->send(new CustomerActivityEmail($request->subject, $request->body));
+                // Mail::to($recipient)->send(new CustomerActivityEmail($request->subject, $request->body));
             }
 
             return response()->json([
