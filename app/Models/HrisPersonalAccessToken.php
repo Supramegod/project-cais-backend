@@ -18,5 +18,5 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
      *
      * @var string
      */
-    protected $connection = 'mysqlhris';
+    protected $connection = 'mysql';
 }
