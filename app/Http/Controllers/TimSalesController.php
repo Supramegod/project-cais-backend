@@ -886,7 +886,7 @@ class TimSalesController extends Controller
             }
 
             $member = $timSales->details()
-                ->where('id', $request->member_id)
+                ->where('id', $request->member_id) 
                 ->first();
 
             if (!$member) {
@@ -896,13 +896,16 @@ class TimSalesController extends Controller
                 ], 404);
             }
 
-            // Reset all leaders in this team
-            $timSales->details()->update([
-                'is_leader' => 0,
-                'updated_by' => Auth::user()->full_name
-            ]);
+            // Cek leader lama
+            $oldLeader = $timSales->details()->where('is_leader', 1)->first();
+            if ($oldLeader && $oldLeader->id !== $member->id) {
+                $oldLeader->update([
+                    'is_leader' => 0,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
 
-            // Set new leader
+            // Set leader baru
             $member->update([
                 'is_leader' => 1,
                 'updated_by' => Auth::user()->full_name
@@ -925,6 +928,7 @@ class TimSalesController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Get(
