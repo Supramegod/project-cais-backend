@@ -4794,7 +4794,7 @@
                     "Kebutuhan"
                 ],
                 "summary": "Get kebutuhan detail tunjangan",
-                "description": "Mengambil daftar tunjangan berdasarkan kebutuhan_id",
+                "description": "Mengambil daftar tunjangan berdasarkan kebutuhan_id dan position_id (opsional)",
                 "operationId": "getKebutuhanDetailTunjangan",
                 "parameters": [
                     {
@@ -4805,6 +4805,16 @@
                         "schema": {
                             "type": "integer",
                             "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "position_id",
+                        "in": "query",
+                        "description": "ID posisi untuk filter tunjangan (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
                             "example": 1
                         }
                     }
@@ -4833,6 +4843,10 @@
                                                         "example": 1
                                                     },
                                                     "kebutuhan_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "position_id": {
                                                         "type": "integer",
                                                         "example": 1
                                                     },
@@ -4939,6 +4953,11 @@
                                         "type": "integer",
                                         "example": 1
                                     },
+                                    "position_id": {
+                                        "description": "ID posisi (opsional, default: 0)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
                                     "nama": {
                                         "description": "Nama tunjangan",
                                         "type": "string",
@@ -4978,6 +4997,10 @@
                                                     "example": 1
                                                 },
                                                 "kebutuhan_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "position_id": {
                                                     "type": "integer",
                                                     "example": 1
                                                 },
@@ -5214,7 +5237,7 @@
                     "Kebutuhan"
                 ],
                 "summary": "Get kebutuhan detail requirement",
-                "description": "Mengambil daftar requirement berdasarkan kebutuhan_id",
+                "description": "Mengambil daftar requirement berdasarkan kebutuhan_id dan position_id (opsional)",
                 "operationId": "getKebutuhanDetailRequirement",
                 "parameters": [
                     {
@@ -5225,6 +5248,16 @@
                         "schema": {
                             "type": "integer",
                             "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "position_id",
+                        "in": "query",
+                        "description": "ID posisi untuk filter requirement (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
                             "example": 1
                         }
                     }
@@ -5253,6 +5286,10 @@
                                                         "example": 1
                                                     },
                                                     "kebutuhan_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "position_id": {
                                                         "type": "integer",
                                                         "example": 1
                                                     },
@@ -5354,6 +5391,11 @@
                                         "type": "integer",
                                         "example": 1
                                     },
+                                    "position_id": {
+                                        "description": "ID posisi (opsional, default: 0)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
                                     "requirement": {
                                         "description": "Deskripsi requirement atau persyaratan",
                                         "type": "string",
@@ -5387,6 +5429,10 @@
                                                     "example": 1
                                                 },
                                                 "kebutuhan_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "position_id": {
                                                     "type": "integer",
                                                     "example": 1
                                                 },
