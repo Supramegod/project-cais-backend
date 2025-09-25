@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -65,4 +66,54 @@ class Training extends Model
             $this->attributes['total'] = $this->attributes['jp'] * $this->attributes['menit'];
         }
     }
+    public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
+
+    public function deleter()
+    {
+        return $this->belongsTo(User::class, 'deleted_by', 'id');
+    }
+
+    public function getCreatedByAttribute($value)
+    {
+        if ($this->relationLoaded('creator') && $this->creator) {
+            return $this->creator->is_active ? $this->creator->full_name : null;
+        }
+        return null;
+    }
+
+
+    public function getUpdatedByAttribute($value)
+    {
+        if ($this->relationLoaded('updater') && $this->updater) {
+            return $this->updater->is_active ? $this->updater->full_name : null;
+        }
+        return null;
+    }
+
+    public function getDeletedByAttribute($value)
+    {
+        if ($this->relationLoaded('deleter') && $this->deleter) {
+            return $this->deleter->is_active ? $this->deleter->full_name : null;
+        }
+        return null;
+    }
+
 }

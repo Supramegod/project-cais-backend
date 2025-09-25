@@ -26,20 +26,6 @@ class TrainingController extends Controller
      *     description="Retrieve all training records with pagination",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Number of items per page",
-     *         required=false,
-     *         @OA\Schema(type="integer", default=10)
-     *     ),
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Page number",
-     *         required=false,
-     *         @OA\Schema(type="integer", default=1)
-     *     ),
-     *     @OA\Parameter(
      *         name="search",
      *         in="query",
      *         description="Search by training name",
@@ -98,23 +84,18 @@ class TrainingController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            $perPage = $request->get('per_page', 10);
             $search = $request->get('search');
 
-            $query = Training::query();
-
+            $query = Training::with(['creator', 'updater'])->get();
             if ($search) {
                 $query->where('nama', 'LIKE', "%{$search}%")
                     ->orWhere('jenis', 'LIKE', "%{$search}%");
             }
 
-            $trainings = $query->orderBy('created_at', 'desc')
-                ->paginate($perPage);
-
             return response()->json([
                 'success' => true,
                 'message' => 'Data retrieved successfully',
-                'data' => $trainings
+                'data' => $query
             ], 200);
 
         } catch (Exception $e) {

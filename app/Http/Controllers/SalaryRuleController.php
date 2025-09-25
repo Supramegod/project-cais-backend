@@ -22,20 +22,6 @@ class SalaryRuleController extends Controller
      *     summary="Get list of salary rules",
      *     tags={"Salary Rule"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         required=false,
-     *         description="Page number for pagination",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         required=false,
-     *         description="Number of items per page",
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
@@ -84,8 +70,7 @@ class SalaryRuleController extends Controller
     public function list(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $data = SalaryRule::paginate($perPage);
+            $data = SalaryRule::all();
 
             return response()->json([
                 'success' => true,

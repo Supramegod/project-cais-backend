@@ -23,20 +23,6 @@ class ManagementFeeController extends Controller
      *     summary="Get all management fees ",
      *     tags={"Management Fee"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         required=false,
-     *         description="Page number for pagination",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         required=false,
-     *         description="Number of items per page",
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
@@ -81,8 +67,7 @@ class ManagementFeeController extends Controller
     public function list(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $data = ManagementFee::paginate($perPage);
+            $data = ManagementFee::all();
 
             return response()->json([
                 'success' => true,
