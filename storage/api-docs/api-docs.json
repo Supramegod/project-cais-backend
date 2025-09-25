@@ -7756,6 +7756,556 @@
                 ]
             }
         },
+        "/api/salary-rule/list": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get list of salary rules",
+                "operationId": "e6e6c1412e1404a3f6f69cf2fb309b2c",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_salary_rule": {
+                                                                "type": "string",
+                                                                "example": "Salary Rule January 2024"
+                                                            },
+                                                            "cutoff": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 1 - 15"
+                                                            },
+                                                            "cutoff_awal": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "cutoff_akhir": {
+                                                                "type": "integer",
+                                                                "example": 15
+                                                            },
+                                                            "crosscheck_absen": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 16 - 20"
+                                                            },
+                                                            "crosscheck_absen_awal": {
+                                                                "type": "integer",
+                                                                "example": 16
+                                                            },
+                                                            "crosscheck_absen_akhir": {
+                                                                "type": "integer",
+                                                                "example": 20
+                                                            },
+                                                            "pengiriman_invoice": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 21 - 25"
+                                                            },
+                                                            "pengiriman_invoice_awal": {
+                                                                "type": "integer",
+                                                                "example": 21
+                                                            },
+                                                            "pengiriman_invoice_akhir": {
+                                                                "type": "integer",
+                                                                "example": 25
+                                                            },
+                                                            "perkiraan_invoice_diterima": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 26 - 30"
+                                                            },
+                                                            "perkiraan_invoice_diterima_awal": {
+                                                                "type": "integer",
+                                                                "example": 26
+                                                            },
+                                                            "perkiraan_invoice_diterima_akhir": {
+                                                                "type": "integer",
+                                                                "example": 30
+                                                            },
+                                                            "pembayaran_invoice": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 5 bulan berikutnya"
+                                                            },
+                                                            "tgl_pembayaran_invoice": {
+                                                                "type": "integer",
+                                                                "example": 5
+                                                            },
+                                                            "rilis_payroll": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 10 bulan berikutnya"
+                                                            },
+                                                            "tgl_rilis_payroll": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/add": {
+            "post": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Create a new salary rule",
+                "operationId": "828dc84c026db8dc8721ee99b46a952c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_salary_rule",
+                                    "cutoff_awal",
+                                    "cutoff_akhir",
+                                    "crosscheck_absen_awal",
+                                    "crosscheck_absen_akhir",
+                                    "pengiriman_invoice_awal",
+                                    "pengiriman_invoice_akhir",
+                                    "perkiraan_invoice_diterima_awal",
+                                    "perkiraan_invoice_diterima_akhir",
+                                    "pembayaran_invoice",
+                                    "rilis_payroll"
+                                ],
+                                "properties": {
+                                    "nama_salary_rule": {
+                                        "type": "string",
+                                        "example": "Salary Rule January 2024"
+                                    },
+                                    "cutoff_awal": {
+                                        "description": "Tanggal awal cutoff",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cutoff_akhir": {
+                                        "description": "Tanggal akhir cutoff",
+                                        "type": "integer",
+                                        "example": 15
+                                    },
+                                    "crosscheck_absen_awal": {
+                                        "description": "Tanggal awal crosscheck absen",
+                                        "type": "integer",
+                                        "example": 16
+                                    },
+                                    "crosscheck_absen_akhir": {
+                                        "description": "Tanggal akhir crosscheck absen",
+                                        "type": "integer",
+                                        "example": 20
+                                    },
+                                    "pengiriman_invoice_awal": {
+                                        "description": "Tanggal awal pengiriman invoice",
+                                        "type": "integer",
+                                        "example": 21
+                                    },
+                                    "pengiriman_invoice_akhir": {
+                                        "description": "Tanggal akhir pengiriman invoice",
+                                        "type": "integer",
+                                        "example": 25
+                                    },
+                                    "perkiraan_invoice_diterima_awal": {
+                                        "description": "Tanggal awal perkiraan invoice diterima",
+                                        "type": "integer",
+                                        "example": 26
+                                    },
+                                    "perkiraan_invoice_diterima_akhir": {
+                                        "description": "Tanggal akhir perkiraan invoice diterima",
+                                        "type": "integer",
+                                        "example": 30
+                                    },
+                                    "pembayaran_invoice": {
+                                        "description": "Tanggal pembayaran invoice bulan berikutnya",
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "rilis_payroll": {
+                                        "description": "Tanggal rilis payroll bulan berikutnya",
+                                        "type": "integer",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Salary rule created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/view/{id}": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get salary rule by ID",
+                "operationId": "2fec6885390d6ebb20c5d1d929dff9bf",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/update/{id}": {
+            "put": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Update salary rule",
+                "operationId": "ae64fe7fae44002ed015c75c368ee118",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_salary_rule",
+                                    "cutoff_awal",
+                                    "cutoff_akhir",
+                                    "crosscheck_absen_awal",
+                                    "crosscheck_absen_akhir",
+                                    "pengiriman_invoice_awal",
+                                    "pengiriman_invoice_akhir",
+                                    "perkiraan_invoice_diterima_awal",
+                                    "perkiraan_invoice_diterima_akhir",
+                                    "pembayaran_invoice",
+                                    "rilis_payroll"
+                                ],
+                                "properties": {
+                                    "nama_salary_rule": {
+                                        "type": "string",
+                                        "example": "Salary Rule Updated"
+                                    },
+                                    "cutoff_awal": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cutoff_akhir": {
+                                        "type": "integer",
+                                        "example": 15
+                                    },
+                                    "crosscheck_absen_awal": {
+                                        "type": "integer",
+                                        "example": 16
+                                    },
+                                    "crosscheck_absen_akhir": {
+                                        "type": "integer",
+                                        "example": 20
+                                    },
+                                    "pengiriman_invoice_awal": {
+                                        "type": "integer",
+                                        "example": 21
+                                    },
+                                    "pengiriman_invoice_akhir": {
+                                        "type": "integer",
+                                        "example": 25
+                                    },
+                                    "perkiraan_invoice_diterima_awal": {
+                                        "type": "integer",
+                                        "example": 26
+                                    },
+                                    "perkiraan_invoice_diterima_akhir": {
+                                        "type": "integer",
+                                        "example": 30
+                                    },
+                                    "pembayaran_invoice": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "rilis_payroll": {
+                                        "type": "integer",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Salary rule updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Delete salary rule",
+                "operationId": "ad812df152a780a4b5e100ef8f34539a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Salary rule deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/list-all": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get all salary rules without pagination (optional)",
+                "operationId": "7ebb0d398fb032173eead23488b88697",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_salary_rule": {
+                                                        "type": "string",
+                                                        "example": "Salary Rule January 2024"
+                                                    },
+                                                    "cutoff": {
+                                                        "type": "string",
+                                                        "example": "Tanggal 1 - 15"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -10568,6 +11118,10 @@
         {
             "name": "Position",
             "description": "API endpoints for Position management"
+        },
+        {
+            "name": "Salary Rule",
+            "description": "API Endpoints untuk Management Salary Rule"
         },
         {
             "name": "Tim Sales",
