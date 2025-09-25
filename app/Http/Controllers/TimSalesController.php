@@ -99,10 +99,10 @@ class TimSalesController extends Controller
                 $query->where('nama', 'like', '%' . $search . '%');
             }
 
-            $timSales = $query->paginate($perPage);
+            // $timSales = $query->paginate($perPage);
 
             // Transform data to include jumlah_anggota
-            $timSales->getCollection()->transform(function ($item) {
+            $query->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nama' => $item->nama,
@@ -119,7 +119,7 @@ class TimSalesController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data tim sales berhasil diambil',
-                'data' => $timSales
+                'data' => $query
             ], 200);
 
         } catch (\Exception $e) {

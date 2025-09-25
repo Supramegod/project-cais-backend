@@ -5666,28 +5666,6 @@
                 ],
                 "summary": "Get all management fees ",
                 "operationId": "2bd5742dda157b312a8f9721709481f3",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number for pagination",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of items per page",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Successful operation",
@@ -7809,28 +7787,6 @@
                 ],
                 "summary": "Get list of salary rules",
                 "operationId": "e6e6c1412e1404a3f6f69cf2fb309b2c",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number for pagination",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of items per page",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Successful operation",
@@ -9386,31 +9342,6 @@
                 "summary": "Get list of TOP data",
                 "description": "Mendapatkan daftar data Terms of Payment dengan pagination",
                 "operationId": "05150da42335e25f9473d5bf3a033a4e",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number for pagination",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of items per page",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "maximum": 100,
-                            "minimum": 1,
-                            "example": 10
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Successful operation",
@@ -10304,26 +10235,6 @@
                 "operationId": "cf87be584008c617af80694f085526f7",
                 "parameters": [
                     {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of items per page",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 10
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
-                    {
                         "name": "search",
                         "in": "query",
                         "description": "Search by training name",
@@ -11125,6 +11036,418 @@
                     }
                 ]
             }
+        },
+        "/api/tunjangan/list": {
+            "get": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Get list of tunjangan posisi",
+                "description": "Retrieve paginated list of position allowances with related data",
+                "operationId": "getTunjanganList",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by tunjangan name",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "nama": {
+                                                                "type": "string"
+                                                            },
+                                                            "nominal": {
+                                                                "type": "number",
+                                                                "format": "float"
+                                                            },
+                                                            "nama_kebutuhan": {
+                                                                "type": "string"
+                                                            },
+                                                            "nama_jabatan": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/view/{id}": {
+            "get": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Get specific tunjangan posisi",
+                "description": "Retrieve specific position allowance by ID",
+                "operationId": "getTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "kebutuhan_id": {
+                                                    "type": "integer"
+                                                },
+                                                "position_id": {
+                                                    "type": "integer"
+                                                },
+                                                "nama": {
+                                                    "type": "string"
+                                                },
+                                                "nominal": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "kebutuhan": {
+                                                    "type": "object"
+                                                },
+                                                "position": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/add": {
+            "post": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Create new tunjangan posisi",
+                "description": "Create a new position allowance",
+                "operationId": "createTunjangan",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "nominal",
+                                    "kebutuhan_id",
+                                    "position_id"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "Tunjangan Jabatan"
+                                    },
+                                    "nominal": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1000000
+                                    },
+                                    "kebutuhan_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "position_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Data created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tunjangan created successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/update/{id}": {
+            "put": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Update tunjangan posisi",
+                "description": "Update existing position allowance",
+                "operationId": "updateTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "nominal",
+                                    "kebutuhan_id",
+                                    "position_id"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "Tunjangan Jabatan"
+                                    },
+                                    "nominal": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1000000
+                                    },
+                                    "kebutuhan_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "position_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Data updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tunjangan updated successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "422": {
+                        "description": "Validation errors"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Delete tunjangan posisi",
+                "description": "Soft delete position allowance",
+                "operationId": "deleteTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil menghapus data"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -11180,6 +11503,10 @@
         {
             "name": "Training",
             "description": "API endpoints for Training management"
+        },
+        {
+            "name": "Tunjangan Posisi",
+            "description": "API endpoints for managing position allowances"
         },
         {
             "name": "Authentication",

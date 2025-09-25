@@ -23,20 +23,6 @@ class TopController extends Controller
      *     description="Mendapatkan daftar data Terms of Payment dengan pagination",
      *     tags={"TOP"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         required=false,
-     *         description="Page number for pagination",
-     *         @OA\Schema(type="integer", example=1, minimum=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         required=false,
-     *         description="Number of items per page",
-     *         @OA\Schema(type="integer", example=10, minimum=1, maximum=100)
-     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
@@ -85,8 +71,7 @@ class TopController extends Controller
     public function list(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $data = Top::paginate($perPage);
+            $data = Top::all();
 
             return response()->json([
                 'success' => true,
