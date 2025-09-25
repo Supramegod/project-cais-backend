@@ -320,7 +320,7 @@ class PositionController extends Controller
     try {
         $validator = Validator::make($request->all(), [
             'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-            'layanan' => 'required|integer|exists:m_kebutuhan,id', // menggunakan database default
+            'layanan' => 'required|integer|exists:m_kebutuhan,id', 
             'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
             'deskripsi' => 'required|string',
         ], [
@@ -1042,4 +1042,72 @@ class PositionController extends Controller
         ], 500);
     }
 }
+
+
+    /**
+     * @OA\Get(
+     *     path="/api/position/entitas-list",
+     *     operationId="getEntitasDropdown",
+     *     tags={"Position"},
+     *     summary="Get companies for dropdown",
+     *     description="Retrieve simplified company list for dropdown/select components (id and name only)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success - Returns simplified company list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Company options retrieved successfully"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="PT Teknologi Indonesia"),
+     *                     @OA\Property(property="code", type="string", example="PTTI")
+     *                 )
+     *             ),
+     *             @OA\Property(property="total", type="integer", example=25)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Unauthorized")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Internal server error"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+    public function listEntitas(Request $request): JsonResponse
+    {
+        try {
+            $data = Company::where('is_active', true)
+                ->select(['id', 'name', 'code'])
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Company options retrieved successfully',
+                'data' => $data,
+                'total' => $data->count()
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
+        }
+    }
 }

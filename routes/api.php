@@ -100,6 +100,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requirement/add', 'addRequirement');
         Route::put('/requirement/edit', 'requirementEdit');
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
+        //entitas
+        Route::get('/entitas-list', 'listEntitas');
     });
 
     // Management Fee

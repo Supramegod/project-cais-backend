@@ -7780,6 +7780,111 @@
                 ]
             }
         },
+        "/api/position/entitas-list": {
+            "get": {
+                "tags": [
+                    "Position"
+                ],
+                "summary": "Get companies for dropdown",
+                "description": "Retrieve simplified company list for dropdown/select components (id and name only)",
+                "operationId": "getEntitasDropdown",
+                "responses": {
+                    "200": {
+                        "description": "Success - Returns simplified company list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Company options retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "PT Teknologi Indonesia"
+                                                    },
+                                                    "code": {
+                                                        "type": "string",
+                                                        "example": "PTTI"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 25
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/salary-rule/list": {
             "get": {
                 "tags": [
@@ -11470,7 +11575,7 @@
         },
         {
             "name": "Customer Activity",
-            "description": "Endpoints untuk manajemen aktivitas customer"
+            "description": "Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
         },
         {
             "name": "Jenis Perusahaan",
