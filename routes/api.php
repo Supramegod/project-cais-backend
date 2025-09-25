@@ -14,6 +14,7 @@ use App\Http\Controllers\ChemicalController;
 use App\Http\Controllers\BarangController;
 use App\Http\Controllers\JenisBarangController;
 use App\Http\Controllers\ManagementFeeController; // Tambahkan import ini
+use App\Http\Controllers\TopController; // Tambahkan import untuk TopController
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -101,6 +102,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Management Fee
     Route::prefix('management-fee')->controller(ManagementFeeController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/list-all', 'listAll');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    // TOP (Terms of Payment)
+    Route::prefix('top')->controller(TopController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/list-all', 'listAll');
         Route::get('/view/{id}', 'view');

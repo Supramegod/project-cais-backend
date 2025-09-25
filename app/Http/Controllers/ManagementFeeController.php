@@ -8,8 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
-
-
 /**
  * @OA\Tag(
  *     name="Management Fee",
@@ -22,7 +20,7 @@ class ManagementFeeController extends Controller
     /**
      * @OA\Get(
      *     path="/api/management-fee/list",
-     *     summary="Get all management fees",
+     *     summary="Get all management fees ",
      *     tags={"Management Fee"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -400,7 +398,7 @@ class ManagementFeeController extends Controller
     /**
      * @OA\Get(
      *     path="/api/management-fee/list-all",
-     *     summary="Get all management fees without pagination",
+     *     summary="Get all management fees without pagination (optional)",
      *     tags={"Management Fee"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(

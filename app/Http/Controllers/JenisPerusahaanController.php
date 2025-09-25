@@ -5,8 +5,12 @@ use App\Http\Controllers\Controller;
 use App\Models\JenisPerusahaan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-
-class JenisPerusahaanController extends Controller
+/**
+ * @OA\Tag(
+ *     name="Jenis Perusahaan",
+ *     description="API Endpoints untuk Jenis Perusahaan"
+ * )
+ */class JenisPerusahaanController extends Controller
 {
     /**
      * @OA\Get(
