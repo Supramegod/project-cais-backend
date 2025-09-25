@@ -180,7 +180,7 @@ class KebutuhanController extends Controller
      *     operationId="getKebutuhanDetailTunjangan",
      *     tags={"Kebutuhan"},
      *     summary="Get kebutuhan detail tunjangan",
-     *     description="Mengambil daftar tunjangan berdasarkan kebutuhan_id",
+     *     description="Mengambil daftar tunjangan berdasarkan kebutuhan_id dan position_id (opsional)",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -188,6 +188,13 @@ class KebutuhanController extends Controller
      *         required=true,
      *         description="ID kebutuhan untuk mengambil daftar tunjangan",
      *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="position_id",
+     *         in="query",
+     *         required=false,
+     *         description="ID posisi untuk filter tunjangan (opsional)",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -203,6 +210,7 @@ class KebutuhanController extends Controller
      *                     type="object",
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                     @OA\Property(property="position_id", type="integer", example=1),
      *                     @OA\Property(property="nama", type="string", example="Tunjangan Transport"),
      *                     @OA\Property(property="nominal", type="string", example="500000"),
      *                     @OA\Property(property="created_at", type="string", format="date-time", example="2023-05-01 10:00:00"),
@@ -232,7 +240,13 @@ class KebutuhanController extends Controller
     public function listDetailTunjangan(Request $request, $id)
     {
         try {
-            $data = KebutuhanDetailTunjangan::where('kebutuhan_id', $id)->get();
+            $query = KebutuhanDetailTunjangan::where('kebutuhan_id', $id);
+            
+            if ($request->has('position_id') && $request->position_id != '') {
+                $query->where('position_id', $request->position_id);
+            }
+            
+            $data = $query->get();
 
             return response()->json([
                 'success' => true,
@@ -245,7 +259,8 @@ class KebutuhanController extends Controller
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'user' => Auth::user()->id ?? null,
-                'kebutuhan_id' => $id
+                'kebutuhan_id' => $id,
+                'position_id' => $request->position_id ?? null
             ]);
             return response()->json([
                 'success' => false,
@@ -275,6 +290,12 @@ class KebutuhanController extends Controller
      *                 example=1
      *             ),
      *             @OA\Property(
+     *                 property="position_id",
+     *                 type="integer",
+     *                 description="ID posisi (opsional, default: 0)",
+     *                 example=1
+     *             ),
+     *             @OA\Property(
      *                 property="nama",
      *                 type="string",
      *                 description="Nama tunjangan",
@@ -301,6 +322,7 @@ class KebutuhanController extends Controller
      *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                 @OA\Property(property="position_id", type="integer", example=1),
      *                 @OA\Property(property="nama", type="string", example="Tunjangan Transport"),
      *                 @OA\Property(property="nominal", type="string", example="500000"),
      *                 @OA\Property(property="created_at", type="string", format="date-time", example="2023-05-01 10:00:00"),
@@ -348,6 +370,7 @@ class KebutuhanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'kebutuhan_id' => 'required|integer',
+                'position_id' => 'sometimes|integer',
                 'nama' => 'required|string',
                 'nominal' => 'required|string'
             ]);
@@ -364,7 +387,7 @@ class KebutuhanController extends Controller
 
             $data = KebutuhanDetailTunjangan::create([
                 'kebutuhan_id' => $request->kebutuhan_id,
-                'position_id' => 0,
+                'position_id' => $request->position_id ?? 0,
                 'nama' => $request->nama,
                 'nominal' => $nominal,
                 'created_by' => Auth::user()->full_name ?? 'system'
@@ -486,7 +509,7 @@ class KebutuhanController extends Controller
      *     operationId="getKebutuhanDetailRequirement",
      *     tags={"Kebutuhan"},
      *     summary="Get kebutuhan detail requirement",
-     *     description="Mengambil daftar requirement berdasarkan kebutuhan_id",
+     *     description="Mengambil daftar requirement berdasarkan kebutuhan_id dan position_id (opsional)",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -494,6 +517,13 @@ class KebutuhanController extends Controller
      *         required=true,
      *         description="ID kebutuhan untuk mengambil daftar requirement",
      *         @OA\Schema(type="integer", minimum=1, example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="position_id",
+     *         in="query",
+     *         required=false,
+     *         description="ID posisi untuk filter requirement (opsional)",
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -509,6 +539,7 @@ class KebutuhanController extends Controller
      *                     type="object",
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                     @OA\Property(property="position_id", type="integer", example=1),
      *                     @OA\Property(property="requirement", type="string", example="Minimal S1 Teknik Informatika dengan pengalaman 2 tahun"),
      *                     @OA\Property(property="created_at", type="string", format="date-time", example="2023-05-01 10:00:00"),
      *                     @OA\Property(property="updated_at", type="string", format="date-time", example="2023-05-01 10:00:00")
@@ -537,7 +568,13 @@ class KebutuhanController extends Controller
     public function listDetailRequirement(Request $request, $id)
     {
         try {
-            $data = KebutuhanDetailRequirement::where('kebutuhan_id', $id)->get();
+            $query = KebutuhanDetailRequirement::where('kebutuhan_id', $id);
+            
+            if ($request->has('position_id') && $request->position_id != '') {
+                $query->where('position_id', $request->position_id);
+            }
+            
+            $data = $query->get();
 
             return response()->json([
                 'success' => true,
@@ -550,7 +587,8 @@ class KebutuhanController extends Controller
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'user' => Auth::user()->id ?? null,
-                'kebutuhan_id' => $id
+                'kebutuhan_id' => $id,
+                'position_id' => $request->position_id ?? null
             ]);
             return response()->json([
                 'success' => false,
@@ -580,6 +618,12 @@ class KebutuhanController extends Controller
      *                 example=1
      *             ),
      *             @OA\Property(
+     *                 property="position_id",
+     *                 type="integer",
+     *                 description="ID posisi (opsional, default: 0)",
+     *                 example=1
+     *             ),
+     *             @OA\Property(
      *                 property="requirement",
      *                 type="string",
      *                 description="Deskripsi requirement atau persyaratan",
@@ -599,6 +643,7 @@ class KebutuhanController extends Controller
      *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                 @OA\Property(property="position_id", type="integer", example=1),
      *                 @OA\Property(property="requirement", type="string", example="Minimal S1 Teknik Informatika dengan pengalaman 2 tahun"),
      *                 @OA\Property(property="created_at", type="string", format="date-time", example="2023-05-01 10:00:00"),
      *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2023-05-01 10:00:00")
@@ -645,6 +690,7 @@ class KebutuhanController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'kebutuhan_id' => 'required|integer',
+                'position_id' => 'sometimes|integer',
                 'requirement' => 'required|string'
             ]);
 
@@ -658,7 +704,7 @@ class KebutuhanController extends Controller
 
             $data = KebutuhanDetailRequirement::create([
                 'kebutuhan_id' => $request->kebutuhan_id,
-                'position_id' => 0,
+                'position_id' => $request->position_id ?? 0,
                 'requirement' => $request->requirement,
                 'created_by' => Auth::user()->full_name ?? 'system'
             ]);

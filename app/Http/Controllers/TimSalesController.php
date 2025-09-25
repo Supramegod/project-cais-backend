@@ -886,7 +886,7 @@ class TimSalesController extends Controller
             }
 
             $member = $timSales->details()
-                ->where('id', $request->member_id)
+                ->where('id', $request->member_id) 
                 ->first();
 
             if (!$member) {
@@ -896,13 +896,16 @@ class TimSalesController extends Controller
                 ], 404);
             }
 
-            // Reset all leaders in this team
-            $timSales->details()->update([
-                'is_leader' => 0,
-                'updated_by' => Auth::user()->full_name
-            ]);
+            // Cek leader lama
+            $oldLeader = $timSales->details()->where('is_leader', 1)->first();
+            if ($oldLeader && $oldLeader->id !== $member->id) {
+                $oldLeader->update([
+                    'is_leader' => 0,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
 
-            // Set new leader
+            // Set leader baru
             $member->update([
                 'is_leader' => 1,
                 'updated_by' => Auth::user()->full_name
@@ -925,6 +928,7 @@ class TimSalesController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Get(
@@ -1130,250 +1134,6 @@ class TimSalesController extends Controller
         }
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/tim-sales/getStatistics",
-     *     tags={"Tim Sales"},
-     *     summary="Mendapatkan statistik tim sales",
-     *     description="Mengambil statistik umum tim sales",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Berhasil mengambil statistik tim sales",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Statistik berhasil diambil"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="total_tim", type="integer", example=15),
-     *                 @OA\Property(property="total_anggota", type="integer", example=75),
-     *                 @OA\Property(property="total_leader", type="integer", example=15),
-     *                 @OA\Property(property="rata_rata_anggota_per_tim", type="number", format="float", example=5.0),
-     *                 @OA\Property(
-     *                     property="tim_per_branch",
-     *                     type="array",
-     *                     @OA\Items(
-     *                         @OA\Property(property="branch_id", type="integer", example=2),
-     *                         @OA\Property(property="branch_name", type="string", example="Jakarta Pusat"),
-     *                         @OA\Property(property="jumlah_tim", type="integer", example=5)
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function getStatistics()
-    {
-        try {
-            $totalTim = TimSales::count();
-            $totalAnggota = TimSalesDetail::count();
-            $totalLeader = TimSalesDetail::where('is_leader', 1)->count();
 
-            // Tim per branch
-            $timPerBranch = TimSales::with('branch')
-                ->selectRaw('branch_id, branch, COUNT(*) as jumlah_tim')
-                ->groupBy('branch_id', 'branch')
-                ->get()
-                ->map(function ($item) {
-                    return [
-                        'branch_id' => $item->branch_id,
-                        'branch_name' => $item->branch,
-                        'jumlah_tim' => $item->jumlah_tim
-                    ];
-                });
 
-            // Rata-rata anggota per tim
-            $rataRataAnggota = $totalTim > 0 ? round($totalAnggota / $totalTim, 2) : 0;
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Statistik berhasil diambil',
-                'data' => [
-                    'total_tim' => $totalTim,
-                    'total_anggota' => $totalAnggota,
-                    'total_leader' => $totalLeader,
-                    'rata_rata_anggota_per_tim' => $rataRataAnggota,
-                    'tim_per_branch' => $timPerBranch
-                ]
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil statistik',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/tim-sales/bulkAddMembers/{id}",
-     *     tags={"Tim Sales"},
-     *     summary="Tambah multiple anggota sekaligus",
-     *     description="Menambah beberapa anggota ke tim sales sekaligus",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="ID tim sales",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"user_ids"},
-     *             @OA\Property(
-     *                 property="user_ids",
-     *                 type="array",
-     *                 @OA\Items(type="integer"),
-     *                 example={123, 124, 125}
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Anggota berhasil ditambahkan",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="3 anggota berhasil ditambahkan"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(property="added_count", type="integer", example=3),
-     *                 @OA\Property(property="skipped_count", type="integer", example=0),
-     *                 @OA\Property(property="error_count", type="integer", example=0),
-     *                 @OA\Property(
-     *                     property="added_members",
-     *                     type="array",
-     *                     @OA\Items(type="object")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="skipped_users",
-     *                     type="array",
-     *                     @OA\Items(type="integer")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="error_users",
-     *                     type="array",
-     *                     @OA\Items(type="integer")
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Tim sales tidak ditemukan"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validasi gagal"
-     *     )
-     * )
-     */
-    public function bulkAddMembers(Request $request, $id)
-    {
-        try {
-            DB::beginTransaction();
-
-            $validator = Validator::make($request->all(), [
-                'user_ids' => 'required|array',
-                'user_ids.*' => 'integer|exists:m_user,id'
-            ], [
-                'required' => ':attribute harus diisi',
-                'array' => ':attribute harus berupa array',
-                'integer' => 'User ID harus berupa angka',
-                'exists' => 'User tidak ditemukan'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            $userIds = $request->user_ids;
-            $addedMembers = [];
-            $skippedUsers = [];
-            $errorUsers = [];
-
-            foreach ($userIds as $userId) {
-                // Check if user already exists in this team
-                $existingMember = $timSales->details()
-                    ->where('user_id', $userId)
-                    ->first();
-
-                if ($existingMember) {
-                    $skippedUsers[] = $userId;
-                    continue;
-                }
-
-                // Get user info
-                $user = User::where('id', $userId)
-                    ->where('is_active', 1)
-                    ->whereIn('role_id', [29, 31, 32, 33])
-                    ->where('branch_id', $timSales->branch_id)
-                    ->first();
-
-                if (!$user) {
-                    $errorUsers[] = $userId;
-                    continue;
-                }
-
-                $member = TimSalesDetail::create([
-                    'tim_sales_id' => $id,
-                    'nama' => $user->full_name,
-                    'user_id' => $userId,
-                    'username' => $user->username,
-                    'created_by' => Auth::user()->full_name
-                ]);
-
-                $addedMembers[] = $member;
-            }
-
-            DB::commit();
-
-            $message = count($addedMembers) . ' anggota berhasil ditambahkan';
-            if (count($skippedUsers) > 0) {
-                $message .= ', ' . count($skippedUsers) . ' user sudah menjadi anggota';
-            }
-            if (count($errorUsers) > 0) {
-                $message .= ', ' . count($errorUsers) . ' user tidak valid';
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'data' => [
-                    'added_count' => count($addedMembers),
-                    'skipped_count' => count($skippedUsers),
-                    'error_count' => count($errorUsers),
-                    'added_members' => $addedMembers,
-                    'skipped_users' => $skippedUsers,
-                    'error_users' => $errorUsers
-                ]
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat menambah anggota',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 }

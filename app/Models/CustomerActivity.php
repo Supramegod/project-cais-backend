@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -36,7 +37,7 @@ class CustomerActivity extends Model
         return $this->belongsTo(TimSales::class, 'tim_sales_id');
     }
 
-    public function timSalesD()
+    public function timSalesDetail()
     {
         return $this->belongsTo(TimSalesDetail::class, 'tim_sales_d_id');
     }
@@ -54,5 +55,17 @@ class CustomerActivity extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+     public function getCreatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
+
+    /**
+     * Format updated_at jadi dd-mm-YYYY
+     */
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
     }
 }

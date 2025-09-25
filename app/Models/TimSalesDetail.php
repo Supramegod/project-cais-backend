@@ -5,10 +5,11 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TimSalesDetail extends Model
 {
-    use HasFactory;
+    use HasFactory,SoftDeletes;
 
     protected $table = 'm_tim_sales_d';
     protected $primaryKey = 'id';
@@ -16,9 +17,13 @@ class TimSalesDetail extends Model
 
     protected $fillable = [
         'tim_sales_id',
+        'nama',
+        'username',
         'user_id',
+        'is_leader',
         'is_active',
         'created_by',
+        'deleted_by',
         'updated_by',
     ];
 
