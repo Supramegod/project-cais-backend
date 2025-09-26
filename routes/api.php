@@ -13,11 +13,12 @@ use App\Http\Controllers\OhcController;
 use App\Http\Controllers\ChemicalController;
 use App\Http\Controllers\BarangController;
 use App\Http\Controllers\JenisBarangController;
-use App\Http\Controllers\ManagementFeeController; // Tambahkan import ini
-use App\Http\Controllers\TopController; // Tambahkan import untuk TopController
-use App\Http\Controllers\SalaryRuleController; // Tambahkan import untuk SalaryRuleController
-use App\Http\Controllers\TunjanganController; // Tambahkan import untuk TunjanganController
-use App\Http\Controllers\UmpController; // Tambahkan import untuk UmpController
+use App\Http\Controllers\ManagementFeeController; 
+use App\Http\Controllers\TopController; 
+use App\Http\Controllers\SalaryRuleController; 
+use App\Http\Controllers\TunjanganController; 
+use App\Http\Controllers\UmpController;
+use App\Http\Controllers\UmkController; 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -147,6 +148,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/list', 'index');
         Route::get('/view/{id}', 'view');
         Route::get('/province/{provinceId}', 'listUmp');
+        Route::post('/add', 'save');
+    });
+
+    // UMK (Upah Minimum Kabupaten/Kota)
+    Route::prefix('umk')->controller(UmkController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::get('/city/{cityId}', 'listUmk');
         Route::post('/add', 'add');
     });
 

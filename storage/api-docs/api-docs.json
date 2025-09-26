@@ -8361,58 +8361,6 @@
                 ]
             }
         },
-        "/api/salary-rule/list-all": {
-            "get": {
-                "tags": [
-                    "Salary Rule"
-                ],
-                "summary": "Get all salary rules without pagination (optional)",
-                "operationId": "7ebb0d398fb032173eead23488b88697",
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_salary_rule": {
-                                                        "type": "string",
-                                                        "example": "Salary Rule January 2024"
-                                                    },
-                                                    "cutoff": {
-                                                        "type": "string",
-                                                        "example": "Tanggal 1 - 15"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -10236,100 +10184,6 @@
                 ]
             }
         },
-        "/api/top/list-all": {
-            "get": {
-                "tags": [
-                    "TOP"
-                ],
-                "summary": "Get all TOP data without pagination (optional)",
-                "description": "Mendapatkan semua data Terms of Payment tanpa pagination untuk dropdown/select option",
-                "operationId": "3379d529ebc9a1a3c88d204f21d8b00b",
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "TOP 30 Hari"
-                                                    },
-                                                    "persentase": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 30
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthorized"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Internal server error"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/training/list": {
             "get": {
                 "tags": [
@@ -11554,6 +11408,305 @@
                 ]
             }
         },
+        "/api/umk/list": {
+            "get": {
+                "tags": [
+                    "UMK"
+                ],
+                "summary": "Get list of active UMK data",
+                "operationId": "12360d98bf3833955a8128221f2a886c",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "city_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "city_name": {
+                                                        "type": "string",
+                                                        "example": "Kota Bandung"
+                                                    },
+                                                    "umk": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-umk"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/umk/view/{id}": {
+            "get": {
+                "tags": [
+                    "UMK"
+                ],
+                "summary": "Get UMK detail by ID",
+                "operationId": "4e3560b0f2c683ab01efaef7b47d7005",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "UMK ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "UMK not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/umk/city/{cityId}": {
+            "get": {
+                "tags": [
+                    "UMK"
+                ],
+                "summary": "Get UMK data by city ID",
+                "operationId": "8a8816a381f5a037a060f94716488bfc",
+                "parameters": [
+                    {
+                        "name": "cityId",
+                        "in": "path",
+                        "description": "City ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "city_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "city_name": {
+                                                        "type": "string",
+                                                        "example": "Kota Bandung"
+                                                    },
+                                                    "umk": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-umk"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/umk/add": {
+            "post": {
+                "tags": [
+                    "UMK"
+                ],
+                "summary": "Create a new UMK data",
+                "operationId": "1889818dc9eb9e7677c6740a00a67cd6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "city_id",
+                                    "city_name",
+                                    "umk",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "city_id": {
+                                        "description": "ID Kota/Kabupaten",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "city_name": {
+                                        "description": "Nama Kota/Kabupaten",
+                                        "type": "string",
+                                        "example": "Kota Bandung"
+                                    },
+                                    "umk": {
+                                        "description": "Nilai UMK",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 3500000
+                                    },
+                                    "tgl_berlaku": {
+                                        "description": "Tanggal berlaku UMK",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "description": "Sumber informasi UMK",
+                                        "type": "string",
+                                        "example": "https://example.com/sumber-umk"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "UMK created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data UMK berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/ump/list": {
             "get": {
                 "tags": [
@@ -11852,68 +12005,6 @@
                     }
                 ]
             }
-        },
-        "/api/ump/list/all": {
-            "get": {
-                "tags": [
-                    "UMP"
-                ],
-                "summary": "Get all UMP data without pagination",
-                "operationId": "912c60f4180654ca8cc23d9f0c50fcc9",
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "province_name": {
-                                                        "type": "string",
-                                                        "example": "Jawa Barat"
-                                                    },
-                                                    "ump": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 3500000
-                                                    },
-                                                    "tgl_berlaku": {
-                                                        "type": "string",
-                                                        "format": "date",
-                                                        "example": "2024-01-01"
-                                                    },
-                                                    "is_aktif": {
-                                                        "type": "boolean",
-                                                        "example": true
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
         }
     },
     "components": {
@@ -11973,6 +12064,10 @@
         {
             "name": "Tunjangan Posisi",
             "description": "API endpoints for managing position allowances"
+        },
+        {
+            "name": "UMK",
+            "description": "API Endpoints untuk Management Upah Minimum Kabupaten/Kota (UMK)"
         },
         {
             "name": "UMP",
