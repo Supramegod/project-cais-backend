@@ -13,11 +13,37 @@ class CustomerActivity extends Model
 
     protected $table = 'sl_customer_activity';
     protected $fillable = [
-        'tgl_activity', 'branch_id', 'nomor', 'leads_id', 'pks_id', 'tim_sales_id', 'tim_sales_d_id',
-        'notes', 'tipe', 'start', 'end', 'durasi', 'tgl_realisasi', 'jam_realisasi', 'penerima',
-        'notes_tipe', 'link_bukti_foto', 'notulen', 'email', 'ro_id', 'ro', 'crm_id', 'crm',
-        'status_leads_id', 'jenis_visit', 'jenis_visit_id', 'is_activity', 'user_id',
-        'created_by', 'updated_by', 'deleted_by'
+        'tgl_activity',
+        'branch_id',
+        'nomor',
+        'leads_id',
+        'pks_id',
+        'tim_sales_id',
+        'tim_sales_d_id',
+        'notes',
+        'tipe',
+        'start',
+        'end',
+        'durasi',
+        'tgl_realisasi',
+        'jam_realisasi',
+        'penerima',
+        'notes_tipe',
+        'link_bukti_foto',
+        'notulen',
+        'email',
+        'ro_id',
+        'ro',
+        'crm_id',
+        'crm',
+        'status_leads_id',
+        'jenis_visit',
+        'jenis_visit_id',
+        'is_activity',
+        'user_id',
+        'created_by',
+        'updated_by',
+        'deleted_by'
     ];
 
     protected $dates = ['deleted_at'];
@@ -56,14 +82,12 @@ class CustomerActivity extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-     public function getCreatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
 
-    /**
-     * Format updated_at jadi dd-mm-YYYY
-     */
+
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');

@@ -52,49 +52,53 @@ class Company extends Model
             }
         });
     }
-
-    // Relasi untuk mendapatkan user
-    public function creator()
-    {
-        return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function updater()
-    {
-        return $this->belongsTo(User::class, 'updated_by');
-    }
-
-    // Accessors untuk menampilkan nama
-    public function getCreatedByAttribute($value)
-    {
-        // Pastikan relasi sudah dimuat sebelum diakses
-        if ($this->relationLoaded('creator')) {
-            return $this->creator ? $this->creator->full_name : $value;
-        }
-        return $value;
-    }
-
-    public function getUpdatedByAttribute($value)
-    {
-        // Pastikan relasi sudah dimuat sebelum diakses
-        if ($this->relationLoaded('updater')) {
-            return $this->updater ? $this->updater->full_name : $value;
-        }
-        return $value;
-    }
-    /**
-     * Format created_at jadi dd-mm-YYYY
-     */
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
 
-    /**
-     * Format updated_at jadi dd-mm-YYYY
-     */
+
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
+    }
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
+    }
+
+    public function updater()
+    {
+        return $this->belongsTo(User::class, 'updated_by', 'id');
+    }
+
+    public function deleter()
+    {
+        return $this->belongsTo(User::class, 'deleted_by', 'id');
+    }
+
+    public function getCreatedByAttribute($value)
+    {
+        if ($this->relationLoaded('creator') && $this->creator) {
+            return $this->creator->is_active ? $this->creator->full_name : null;
+        }
+        return null;
+    }
+
+
+    public function getUpdatedByAttribute($value)
+    {
+        if ($this->relationLoaded('updater') && $this->updater) {
+            return $this->updater->is_active ? $this->updater->full_name : null;
+        }
+        return null;
+    }
+
+    public function getDeletedByAttribute($value)
+    {
+        if ($this->relationLoaded('deleter') && $this->deleter) {
+            return $this->deleter->is_active ? $this->deleter->full_name : null;
+        }
+        return null;
     }
 }

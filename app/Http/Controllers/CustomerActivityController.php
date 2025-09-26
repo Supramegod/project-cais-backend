@@ -20,7 +20,7 @@ use App\Models\Pks;
 /**
  * @OA\Tag(
  *     name="Customer Activity",
- *     description="Endpoints untuk manajemen aktivitas customer"
+ *     description="Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
  * )
  */
 class CustomerActivityController extends Controller

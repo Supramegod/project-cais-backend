@@ -4794,7 +4794,7 @@
                     "Kebutuhan"
                 ],
                 "summary": "Get kebutuhan detail tunjangan",
-                "description": "Mengambil daftar tunjangan berdasarkan kebutuhan_id",
+                "description": "Mengambil daftar tunjangan berdasarkan kebutuhan_id dan position_id (opsional)",
                 "operationId": "getKebutuhanDetailTunjangan",
                 "parameters": [
                     {
@@ -4805,6 +4805,16 @@
                         "schema": {
                             "type": "integer",
                             "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "position_id",
+                        "in": "query",
+                        "description": "ID posisi untuk filter tunjangan (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
                             "example": 1
                         }
                     }
@@ -4833,6 +4843,10 @@
                                                         "example": 1
                                                     },
                                                     "kebutuhan_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "position_id": {
                                                         "type": "integer",
                                                         "example": 1
                                                     },
@@ -4939,6 +4953,11 @@
                                         "type": "integer",
                                         "example": 1
                                     },
+                                    "position_id": {
+                                        "description": "ID posisi (opsional, default: 0)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
                                     "nama": {
                                         "description": "Nama tunjangan",
                                         "type": "string",
@@ -4978,6 +4997,10 @@
                                                     "example": 1
                                                 },
                                                 "kebutuhan_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "position_id": {
                                                     "type": "integer",
                                                     "example": 1
                                                 },
@@ -5214,7 +5237,7 @@
                     "Kebutuhan"
                 ],
                 "summary": "Get kebutuhan detail requirement",
-                "description": "Mengambil daftar requirement berdasarkan kebutuhan_id",
+                "description": "Mengambil daftar requirement berdasarkan kebutuhan_id dan position_id (opsional)",
                 "operationId": "getKebutuhanDetailRequirement",
                 "parameters": [
                     {
@@ -5225,6 +5248,16 @@
                         "schema": {
                             "type": "integer",
                             "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "position_id",
+                        "in": "query",
+                        "description": "ID posisi untuk filter requirement (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
                             "example": 1
                         }
                     }
@@ -5253,6 +5286,10 @@
                                                         "example": 1
                                                     },
                                                     "kebutuhan_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "position_id": {
                                                         "type": "integer",
                                                         "example": 1
                                                     },
@@ -5354,6 +5391,11 @@
                                         "type": "integer",
                                         "example": 1
                                     },
+                                    "position_id": {
+                                        "description": "ID posisi (opsional, default: 0)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
                                     "requirement": {
                                         "description": "Deskripsi requirement atau persyaratan",
                                         "type": "string",
@@ -5387,6 +5429,10 @@
                                                     "example": 1
                                                 },
                                                 "kebutuhan_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "position_id": {
                                                     "type": "integer",
                                                     "example": 1
                                                 },
@@ -5596,6 +5642,551 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/list": {
+            "get": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Get all management fees ",
+                "operationId": "2bd5742dda157b312a8f9721709481f3",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Management Fee 1"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "updated_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 100
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/add": {
+            "post": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Create a new management fee",
+                "operationId": "bb3dbdc15aa1c18419a70437d039c6ac",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama management fee",
+                                        "type": "string",
+                                        "example": "Management Fee Baru"
+                                    },
+                                    "description": {
+                                        "description": "Deskripsi optional",
+                                        "type": "string",
+                                        "example": "Deskripsi management fee"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Management fee created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Management Fee Baru"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The nama field is required."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/view/{id}": {
+            "get": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Get management fee by ID",
+                "operationId": "5f651063649bcc27a8ea86a852c163da",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Management Fee ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Management Fee 1"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Management fee not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/update/{id}": {
+            "put": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Update management fee",
+                "operationId": "0c8e0f17c14f1e2c210ccb1d8631f0cd",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Management Fee ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama management fee",
+                                        "type": "string",
+                                        "example": "Management Fee Updated"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Management fee updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Management Fee Updated"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Management fee not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Delete management fee",
+                "operationId": "33c0ad2fd8c7a493d4ce8166447d93b6",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Management Fee ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Management fee deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Management fee not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Management Fee tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/management-fee/list-all": {
+            "get": {
+                "tags": [
+                    "Management Fee"
+                ],
+                "summary": "Get all management fees without pagination (optional)",
+                "operationId": "ec018daba41764791eb56fb676d03541",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Management Fee 1"
+                                                    }
+                                                },
                                                 "type": "object"
                                             }
                                         }
@@ -7189,6 +7780,639 @@
                 ]
             }
         },
+        "/api/position/entitas-list": {
+            "get": {
+                "tags": [
+                    "Position"
+                ],
+                "summary": "Get companies for dropdown",
+                "description": "Retrieve simplified company list for dropdown/select components (id and name only)",
+                "operationId": "getEntitasDropdown",
+                "responses": {
+                    "200": {
+                        "description": "Success - Returns simplified company list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Company options retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "PT Teknologi Indonesia"
+                                                    },
+                                                    "code": {
+                                                        "type": "string",
+                                                        "example": "PTTI"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 25
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/list": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get list of salary rules",
+                "operationId": "e6e6c1412e1404a3f6f69cf2fb309b2c",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_salary_rule": {
+                                                                "type": "string",
+                                                                "example": "Salary Rule January 2024"
+                                                            },
+                                                            "cutoff": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 1 - 15"
+                                                            },
+                                                            "cutoff_awal": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "cutoff_akhir": {
+                                                                "type": "integer",
+                                                                "example": 15
+                                                            },
+                                                            "crosscheck_absen": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 16 - 20"
+                                                            },
+                                                            "crosscheck_absen_awal": {
+                                                                "type": "integer",
+                                                                "example": 16
+                                                            },
+                                                            "crosscheck_absen_akhir": {
+                                                                "type": "integer",
+                                                                "example": 20
+                                                            },
+                                                            "pengiriman_invoice": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 21 - 25"
+                                                            },
+                                                            "pengiriman_invoice_awal": {
+                                                                "type": "integer",
+                                                                "example": 21
+                                                            },
+                                                            "pengiriman_invoice_akhir": {
+                                                                "type": "integer",
+                                                                "example": 25
+                                                            },
+                                                            "perkiraan_invoice_diterima": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 26 - 30"
+                                                            },
+                                                            "perkiraan_invoice_diterima_awal": {
+                                                                "type": "integer",
+                                                                "example": 26
+                                                            },
+                                                            "perkiraan_invoice_diterima_akhir": {
+                                                                "type": "integer",
+                                                                "example": 30
+                                                            },
+                                                            "pembayaran_invoice": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 5 bulan berikutnya"
+                                                            },
+                                                            "tgl_pembayaran_invoice": {
+                                                                "type": "integer",
+                                                                "example": 5
+                                                            },
+                                                            "rilis_payroll": {
+                                                                "type": "string",
+                                                                "example": "Tanggal 10 bulan berikutnya"
+                                                            },
+                                                            "tgl_rilis_payroll": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/add": {
+            "post": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Create a new salary rule",
+                "operationId": "828dc84c026db8dc8721ee99b46a952c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_salary_rule",
+                                    "cutoff_awal",
+                                    "cutoff_akhir",
+                                    "crosscheck_absen_awal",
+                                    "crosscheck_absen_akhir",
+                                    "pengiriman_invoice_awal",
+                                    "pengiriman_invoice_akhir",
+                                    "perkiraan_invoice_diterima_awal",
+                                    "perkiraan_invoice_diterima_akhir",
+                                    "pembayaran_invoice",
+                                    "rilis_payroll"
+                                ],
+                                "properties": {
+                                    "nama_salary_rule": {
+                                        "type": "string",
+                                        "example": "Salary Rule January 2024"
+                                    },
+                                    "cutoff_awal": {
+                                        "description": "Tanggal awal cutoff",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cutoff_akhir": {
+                                        "description": "Tanggal akhir cutoff",
+                                        "type": "integer",
+                                        "example": 15
+                                    },
+                                    "crosscheck_absen_awal": {
+                                        "description": "Tanggal awal crosscheck absen",
+                                        "type": "integer",
+                                        "example": 16
+                                    },
+                                    "crosscheck_absen_akhir": {
+                                        "description": "Tanggal akhir crosscheck absen",
+                                        "type": "integer",
+                                        "example": 20
+                                    },
+                                    "pengiriman_invoice_awal": {
+                                        "description": "Tanggal awal pengiriman invoice",
+                                        "type": "integer",
+                                        "example": 21
+                                    },
+                                    "pengiriman_invoice_akhir": {
+                                        "description": "Tanggal akhir pengiriman invoice",
+                                        "type": "integer",
+                                        "example": 25
+                                    },
+                                    "perkiraan_invoice_diterima_awal": {
+                                        "description": "Tanggal awal perkiraan invoice diterima",
+                                        "type": "integer",
+                                        "example": 26
+                                    },
+                                    "perkiraan_invoice_diterima_akhir": {
+                                        "description": "Tanggal akhir perkiraan invoice diterima",
+                                        "type": "integer",
+                                        "example": 30
+                                    },
+                                    "pembayaran_invoice": {
+                                        "description": "Tanggal pembayaran invoice bulan berikutnya",
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "rilis_payroll": {
+                                        "description": "Tanggal rilis payroll bulan berikutnya",
+                                        "type": "integer",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Salary rule created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/view/{id}": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get salary rule by ID",
+                "operationId": "2fec6885390d6ebb20c5d1d929dff9bf",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/update/{id}": {
+            "put": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Update salary rule",
+                "operationId": "ae64fe7fae44002ed015c75c368ee118",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_salary_rule",
+                                    "cutoff_awal",
+                                    "cutoff_akhir",
+                                    "crosscheck_absen_awal",
+                                    "crosscheck_absen_akhir",
+                                    "pengiriman_invoice_awal",
+                                    "pengiriman_invoice_akhir",
+                                    "perkiraan_invoice_diterima_awal",
+                                    "perkiraan_invoice_diterima_akhir",
+                                    "pembayaran_invoice",
+                                    "rilis_payroll"
+                                ],
+                                "properties": {
+                                    "nama_salary_rule": {
+                                        "type": "string",
+                                        "example": "Salary Rule Updated"
+                                    },
+                                    "cutoff_awal": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "cutoff_akhir": {
+                                        "type": "integer",
+                                        "example": 15
+                                    },
+                                    "crosscheck_absen_awal": {
+                                        "type": "integer",
+                                        "example": 16
+                                    },
+                                    "crosscheck_absen_akhir": {
+                                        "type": "integer",
+                                        "example": 20
+                                    },
+                                    "pengiriman_invoice_awal": {
+                                        "type": "integer",
+                                        "example": 21
+                                    },
+                                    "pengiriman_invoice_akhir": {
+                                        "type": "integer",
+                                        "example": 25
+                                    },
+                                    "perkiraan_invoice_diterima_awal": {
+                                        "type": "integer",
+                                        "example": 26
+                                    },
+                                    "perkiraan_invoice_diterima_akhir": {
+                                        "type": "integer",
+                                        "example": 30
+                                    },
+                                    "pembayaran_invoice": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "rilis_payroll": {
+                                        "type": "integer",
+                                        "example": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Salary rule updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Delete salary rule",
+                "operationId": "ad812df152a780a4b5e100ef8f34539a",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Salary Rule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Salary rule deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Salary Rule berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Salary rule not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/salary-rule/list-all": {
+            "get": {
+                "tags": [
+                    "Salary Rule"
+                ],
+                "summary": "Get all salary rules without pagination (optional)",
+                "operationId": "7ebb0d398fb032173eead23488b88697",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_salary_rule": {
+                                                        "type": "string",
+                                                        "example": "Salary Rule January 2024"
+                                                    },
+                                                    "cutoff": {
+                                                        "type": "string",
+                                                        "example": "Tanggal 1 - 15"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -8215,17 +9439,17 @@
                 ]
             }
         },
-        "/api/tim-sales/getStatistics": {
+        "/api/top/list": {
             "get": {
                 "tags": [
-                    "Tim Sales"
+                    "TOP"
                 ],
-                "summary": "Mendapatkan statistik tim sales",
-                "description": "Mengambil statistik umum tim sales",
-                "operationId": "c437f030da36f82579cf4efaebc0fca8",
+                "summary": "Get list of TOP data",
+                "description": "Mendapatkan daftar data Terms of Payment dengan pagination",
+                "operationId": "05150da42335e25f9473d5bf3a033a4e",
                 "responses": {
                     "200": {
-                        "description": "Berhasil mengambil statistik tim sales",
+                        "description": "Successful operation",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8234,51 +9458,109 @@
                                             "type": "boolean",
                                             "example": true
                                         },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Statistik berhasil diambil"
-                                        },
                                         "data": {
                                             "properties": {
-                                                "total_tim": {
-                                                    "type": "integer",
-                                                    "example": 15
-                                                },
-                                                "total_anggota": {
-                                                    "type": "integer",
-                                                    "example": 75
-                                                },
-                                                "total_leader": {
-                                                    "type": "integer",
-                                                    "example": 15
-                                                },
-                                                "rata_rata_anggota_per_tim": {
-                                                    "type": "number",
-                                                    "format": "float",
-                                                    "example": 5
-                                                },
-                                                "tim_per_branch": {
+                                                "data": {
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
-                                                            "branch_id": {
+                                                            "id": {
                                                                 "type": "integer",
-                                                                "example": 2
+                                                                "example": 1
                                                             },
-                                                            "branch_name": {
+                                                            "nama": {
                                                                 "type": "string",
-                                                                "example": "Jakarta Pusat"
+                                                                "example": "TOP 30 Hari"
                                                             },
-                                                            "jumlah_tim": {
-                                                                "type": "integer",
-                                                                "example": 5
+                                                            "persentase": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 30
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2024-01-15T10:30:00.000000Z"
+                                                            },
+                                                            "updated_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2024-01-15T10:30:00.000000Z"
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
+                                                },
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 100
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "from": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "to": {
+                                                    "type": "integer",
+                                                    "example": 10
                                                 }
                                             },
                                             "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
                                         }
                                     },
                                     "type": "object"
@@ -8294,44 +9576,38 @@
                 ]
             }
         },
-        "/api/tim-sales/bulkAddMembers/{id}": {
+        "/api/top/add": {
             "post": {
                 "tags": [
-                    "Tim Sales"
+                    "TOP"
                 ],
-                "summary": "Tambah multiple anggota sekaligus",
-                "description": "Menambah beberapa anggota ke tim sales sekaligus",
-                "operationId": "109011eaaaf12db15cb075966c22fb63",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "ID tim sales",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
+                "summary": "Create a new TOP",
+                "description": "Membuat data Terms of Payment baru",
+                "operationId": "e99936abd5bd695c969a182b4bc100ef",
                 "requestBody": {
+                    "description": "Data TOP yang akan dibuat",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "user_ids"
+                                    "nama",
+                                    "persentase"
                                 ],
                                 "properties": {
-                                    "user_ids": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "example": [
-                                            123,
-                                            124,
-                                            125
-                                        ]
+                                    "nama": {
+                                        "description": "Nama terms of payment",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "TOP 30 Hari"
+                                    },
+                                    "persentase": {
+                                        "description": "Persentase TOP (0-100)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 30
                                     }
                                 },
                                 "type": "object"
@@ -8341,7 +9617,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Anggota berhasil ditambahkan",
+                        "description": "TOP created successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8352,38 +9628,94 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "3 anggota berhasil ditambahkan"
+                                            "example": "TOP berhasil dibuat"
                                         },
                                         "data": {
                                             "properties": {
-                                                "added_count": {
+                                                "id": {
                                                     "type": "integer",
-                                                    "example": 3
+                                                    "example": 1
                                                 },
-                                                "skipped_count": {
-                                                    "type": "integer",
-                                                    "example": 0
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "TOP 30 Hari"
                                                 },
-                                                "error_count": {
-                                                    "type": "integer",
-                                                    "example": 0
+                                                "persentase": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 30
                                                 },
-                                                "added_members": {
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T10:30:00.000000Z"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T10:30:00.000000Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "object"
+                                                        "type": "string",
+                                                        "example": "Nama TOP harus diisi"
                                                     }
                                                 },
-                                                "skipped_users": {
+                                                "persentase": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "integer"
-                                                    }
-                                                },
-                                                "error_users": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "integer"
+                                                        "type": "string",
+                                                        "example": "Persentase harus diisi"
                                                     }
                                                 }
                                             },
@@ -8395,11 +9727,600 @@
                             }
                         }
                     },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/top/view/{id}": {
+            "get": {
+                "tags": [
+                    "TOP"
+                ],
+                "summary": "Get TOP by ID",
+                "description": "Mendapatkan detail data Terms of Payment berdasarkan ID",
+                "operationId": "861ba7bcf1f75be04569017f889d0e82",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "TOP ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "TOP 30 Hari"
+                                                },
+                                                "persentase": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 30
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T10:30:00.000000Z"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T10:30:00.000000Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "404": {
-                        "description": "Tim sales tidak ditemukan"
+                        "description": "TOP not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/top/update/{id}": {
+            "put": {
+                "tags": [
+                    "TOP"
+                ],
+                "summary": "Update TOP",
+                "description": "Mengupdate data Terms of Payment yang sudah ada",
+                "operationId": "e6848dff5de92a593623960c7a4b0b58",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "TOP ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data TOP yang akan diupdate",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "persentase"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama terms of payment",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "TOP 60 Hari"
+                                    },
+                                    "persentase": {
+                                        "description": "Persentase TOP (0-100)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 60
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "TOP updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "TOP 60 Hari"
+                                                },
+                                                "persentase": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 60
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Jane Doe"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T10:30:00.000000Z"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-16T14:20:00.000000Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "TOP not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "422": {
-                        "description": "Validasi gagal"
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Nama TOP sudah ada"
+                                                    }
+                                                },
+                                                "persentase": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Persentase harus berupa angka"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/top/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "TOP"
+                ],
+                "summary": "Delete TOP",
+                "description": "Menghapus data Terms of Payment (soft delete)",
+                "operationId": "a9314497b40b30136593369ff4d62af7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "TOP ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "TOP deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "TOP not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Cannot delete TOP (constraint violation)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "TOP tidak dapat dihapus karena masih digunakan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/top/list-all": {
+            "get": {
+                "tags": [
+                    "TOP"
+                ],
+                "summary": "Get all TOP data without pagination (optional)",
+                "description": "Mendapatkan semua data Terms of Payment tanpa pagination untuk dropdown/select option",
+                "operationId": "3379d529ebc9a1a3c88d204f21d8b00b",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "TOP 30 Hari"
+                                                    },
+                                                    "persentase": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 30
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -8418,26 +10339,6 @@
                 "description": "Retrieve all training records with pagination",
                 "operationId": "cf87be584008c617af80694f085526f7",
                 "parameters": [
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Number of items per page",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 10
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
                     {
                         "name": "search",
                         "in": "query",
@@ -9240,6 +11141,779 @@
                     }
                 ]
             }
+        },
+        "/api/tunjangan/list": {
+            "get": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Get list of tunjangan posisi",
+                "description": "Retrieve paginated list of position allowances with related data",
+                "operationId": "getTunjanganList",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by tunjangan name",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "nama": {
+                                                                "type": "string"
+                                                            },
+                                                            "nominal": {
+                                                                "type": "number",
+                                                                "format": "float"
+                                                            },
+                                                            "nama_kebutuhan": {
+                                                                "type": "string"
+                                                            },
+                                                            "nama_jabatan": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/view/{id}": {
+            "get": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Get specific tunjangan posisi",
+                "description": "Retrieve specific position allowance by ID",
+                "operationId": "getTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "kebutuhan_id": {
+                                                    "type": "integer"
+                                                },
+                                                "position_id": {
+                                                    "type": "integer"
+                                                },
+                                                "nama": {
+                                                    "type": "string"
+                                                },
+                                                "nominal": {
+                                                    "type": "number",
+                                                    "format": "float"
+                                                },
+                                                "kebutuhan": {
+                                                    "type": "object"
+                                                },
+                                                "position": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/add": {
+            "post": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Create new tunjangan posisi",
+                "description": "Create a new position allowance",
+                "operationId": "createTunjangan",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "nominal",
+                                    "kebutuhan_id",
+                                    "position_id"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "Tunjangan Jabatan"
+                                    },
+                                    "nominal": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1000000
+                                    },
+                                    "kebutuhan_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "position_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Data created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tunjangan created successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/update/{id}": {
+            "put": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Update tunjangan posisi",
+                "description": "Update existing position allowance",
+                "operationId": "updateTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "nominal",
+                                    "kebutuhan_id",
+                                    "position_id"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "example": "Tunjangan Jabatan"
+                                    },
+                                    "nominal": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1000000
+                                    },
+                                    "kebutuhan_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "position_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Data updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tunjangan updated successfully"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "422": {
+                        "description": "Validation errors"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/tunjangan/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Tunjangan Posisi"
+                ],
+                "summary": "Delete tunjangan posisi",
+                "description": "Soft delete position allowance",
+                "operationId": "deleteTunjangan",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Tunjangan ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil menghapus data"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data not found"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/list": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get list of active UMP data",
+                "operationId": "4b0437db3e470a2b086bf8492c9ff50c",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-ump"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/view/{id}": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get UMP detail by ID",
+                "operationId": "048bf6514f3ec3646d7c1601d5d17216",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "UMP ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "UMP not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/province/{provinceId}": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get UMP data by province ID",
+                "operationId": "e7072a5324788d0af330589f8afeddde",
+                "parameters": [
+                    {
+                        "name": "provinceId",
+                        "in": "path",
+                        "description": "Province ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-ump"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/add": {
+            "post": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Create a new UMP data",
+                "operationId": "ad3645762c7282e5ce13c5554958ecd1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "province_id",
+                                    "province_name",
+                                    "ump",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "province_id": {
+                                        "description": "ID Provinsi",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "province_name": {
+                                        "description": "Nama Provinsi",
+                                        "type": "string",
+                                        "example": "Jawa Barat"
+                                    },
+                                    "ump": {
+                                        "description": "Nilai UMP",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 3500000
+                                    },
+                                    "tgl_berlaku": {
+                                        "description": "Tanggal berlaku UMP",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "description": "Sumber informasi UMP",
+                                        "type": "string",
+                                        "example": "https://example.com/sumber-ump"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "UMP created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data UMP berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/list/all": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get all UMP data without pagination",
+                "operationId": "912c60f4180654ca8cc23d9f0c50fcc9",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -9253,40 +11927,60 @@
     },
     "tags": [
         {
+            "name": "Jenis Barang",
+            "description": "API Endpoints untuk Master Jenis Barang"
+        },
+        {
             "name": "Barang",
             "description": "API untuk manajemen data barang"
         },
         {
             "name": "Customer Activity",
-            "description": "Endpoints untuk manajemen aktivitas customer"
+            "description": "Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
         },
         {
-            "name": "Jenis Barang",
-            "description": "API Endpoints untuk Master Jenis Barang"
+            "name": "Jenis Perusahaan",
+            "description": "API Endpoints untuk Jenis Perusahaan"
         },
         {
             "name": "Kebutuhan",
             "description": "API untuk mengelola master data kebutuhan"
         },
         {
+            "name": "Management Fee",
+            "description": "Endpoints untuk manajemen data management fee"
+        },
+        {
             "name": "Position",
             "description": "API endpoints for Position management"
+        },
+        {
+            "name": "Salary Rule",
+            "description": "API Endpoints untuk Management Salary Rule"
         },
         {
             "name": "Tim Sales",
             "description": "API Endpoints untuk mengelola Tim Sales"
         },
         {
+            "name": "TOP",
+            "description": "API Endpoints untuk Terms of Payment (TOP)"
+        },
+        {
             "name": "Training",
             "description": "API endpoints for Training management"
         },
         {
-            "name": "Authentication",
-            "description": "Authentication"
+            "name": "Tunjangan Posisi",
+            "description": "API endpoints for managing position allowances"
         },
         {
-            "name": "Jenis Perusahaan",
-            "description": "Jenis Perusahaan"
+            "name": "UMP",
+            "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
+        },
+        {
+            "name": "Authentication",
+            "description": "Authentication"
         }
     ]
 }

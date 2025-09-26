@@ -83,53 +83,51 @@ class TimSalesController extends Controller
      * )
      */
     public function list(Request $request)
-    {
-        try {
-            $perPage = $request->get('per_page', 10);
-            $search = $request->get('search');
+{
+    try {
+        $search = $request->get('search');
 
-            $query = TimSales::with([
-                'branch',
-                'details' => function ($q) {
-                    $q->whereNull('deleted_at');
-                }
-            ]);
-
-            if ($search) {
-                $query->where('nama', 'like', '%' . $search . '%');
+        $query = TimSales::with([
+            'branch',
+            'details' => function ($q) {
+                $q->whereNull('deleted_at');
             }
+        ]);
 
-            $timSales = $query->paginate($perPage);
-
-            // Transform data to include jumlah_anggota
-            $timSales->getCollection()->transform(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'branch' => $item->branch,
-                    'branch_id' => $item->branch_id,
-                    'jumlah_anggota' => $item->details->count(),
-                    'created_at' => $item->created_at,
-                    'created_by' => $item->created_by,
-                    'updated_at' => $item->updated_at,
-                    'updated_by' => $item->updated_by
-                ];
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data tim sales berhasil diambil',
-                'data' => $timSales
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
+        if ($search) {
+            $query->where('nama', 'like', '%' . $search . '%');
         }
+
+        // ambil data tanpa paginate
+        $data = $query->get()->transform(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama' => $item->nama,
+                'branch' => $item->branch,
+                'branch_id' => $item->branch_id,
+                'jumlah_anggota' => $item->details->count(),
+                'created_at' => $item->created_at,
+                'created_by' => $item->created_by,
+                'updated_at' => $item->updated_at,
+                'updated_by' => $item->updated_by,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data tim sales berhasil diambil',
+            'data' => $data
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Terjadi kesalahan saat mengambil data',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * @OA\Get(
@@ -886,7 +884,7 @@ class TimSalesController extends Controller
             }
 
             $member = $timSales->details()
-                ->where('id', $request->member_id)
+                ->where('id', $request->member_id) 
                 ->first();
 
             if (!$member) {
@@ -896,13 +894,16 @@ class TimSalesController extends Controller
                 ], 404);
             }
 
-            // Reset all leaders in this team
-            $timSales->details()->update([
-                'is_leader' => 0,
-                'updated_by' => Auth::user()->full_name
-            ]);
+            // Cek leader lama
+            $oldLeader = $timSales->details()->where('is_leader', 1)->first();
+            if ($oldLeader && $oldLeader->id !== $member->id) {
+                $oldLeader->update([
+                    'is_leader' => 0,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
 
-            // Set new leader
+            // Set leader baru
             $member->update([
                 'is_leader' => 1,
                 'updated_by' => Auth::user()->full_name
@@ -925,6 +926,7 @@ class TimSalesController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Get(

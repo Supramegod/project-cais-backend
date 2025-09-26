@@ -12,7 +12,12 @@ use App\Http\Controllers\DevicesController;
 use App\Http\Controllers\OhcController;
 use App\Http\Controllers\ChemicalController;
 use App\Http\Controllers\BarangController;
-use App\Http\Controllers\JenisBarangController; 
+use App\Http\Controllers\JenisBarangController;
+use App\Http\Controllers\ManagementFeeController; // Tambahkan import ini
+use App\Http\Controllers\TopController; // Tambahkan import untuk TopController
+use App\Http\Controllers\SalaryRuleController; // Tambahkan import untuk SalaryRuleController
+use App\Http\Controllers\TunjanganController; // Tambahkan import untuk TunjanganController
+use App\Http\Controllers\UmpController; // Tambahkan import untuk UmpController
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -98,8 +103,53 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
     });
 
+    // Management Fee
+    Route::prefix('management-fee')->controller(ManagementFeeController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/list-all', 'listAll');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
 
-    
+    // TOP (Terms of Payment)
+    Route::prefix('top')->controller(TopController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/list-all', 'listAll');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    // Salary Rule
+    Route::prefix('salary-rule')->controller(SalaryRuleController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/list-all', 'listAll');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    // Tunjangan Posisi
+    Route::prefix('tunjangan')->controller(TunjanganController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    // UMP (Upah Minimum Provinsi)
+    Route::prefix('ump')->controller(UmpController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::get('/view/{id}', 'view');
+        Route::get('/province/{provinceId}', 'listUmp');
+        Route::post('/add', 'add');
+    });
+
     // Barang Utama
     Route::prefix('barang')->controller(BarangController::class)->group(function () {
         Route::get('/list', 'list');
@@ -128,12 +178,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('chemical')->controller(ChemicalController::class)->group(function () {
         Route::get('/list', 'list');
     });
+
     Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
-    Route::get('/list', 'list');                           
-    Route::get('/view/{id}', 'view');                     
-    Route::post('/add', 'add');                           
-    Route::put('/update/{id}', 'update');                 
-    Route::delete('/delete/{id}', 'delete');               
-    Route::get('/leads/{leadsId}/track', 'trackActivity'); 
-});
+        Route::get('/list', 'list');                           
+        Route::get('/view/{id}', 'view');                     
+        Route::post('/add', 'add');                           
+        Route::put('/update/{id}', 'update');                 
+        Route::delete('/delete/{id}', 'delete');               
+        Route::get('/leads/{leadsId}/track', 'trackActivity'); 
+    });
 });

@@ -24,7 +24,13 @@ use Exception;
  *     scheme="bearer",
  *     bearerFormat="Token"
  * )
+ * /**
+ * @OA\Tag(
+ *     name="Jenis Barang",
+ *     description="API Endpoints untuk Authentication"
+ * )
  */
+
 class AuthController extends Controller
 {
     /**
