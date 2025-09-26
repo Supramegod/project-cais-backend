@@ -8361,6 +8361,378 @@
                 ]
             }
         },
+        "/api/supplier/list": {
+            "get": {
+                "tags": [
+                    "Supplier"
+                ],
+                "summary": "Get list of all suppliers",
+                "operationId": "f32e541292e7ddd50f7d868f41574530",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_supplier": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Supplier"
+                                                    },
+                                                    "alamat": {
+                                                        "type": "string",
+                                                        "example": "Jl. Contoh Alamat No. 123"
+                                                    },
+                                                    "kontak": {
+                                                        "type": "string",
+                                                        "example": "08123456789"
+                                                    },
+                                                    "pic": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "npwp": {
+                                                        "type": "string",
+                                                        "example": "01.234.567.8-910.000"
+                                                    },
+                                                    "kategori_barang": {
+                                                        "type": "string",
+                                                        "example": "Chemical"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/supplier/view/{id}": {
+            "get": {
+                "tags": [
+                    "Supplier"
+                ],
+                "summary": "Get supplier detail by ID",
+                "operationId": "90b88b1659a4a8462aa2dea34661a352",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Supplier ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Supplier not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/supplier/add": {
+            "post": {
+                "tags": [
+                    "Supplier"
+                ],
+                "summary": "Create a new supplier",
+                "operationId": "ea4944e72664b17bd19e8cf8a059234e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "pic",
+                                    "alamat",
+                                    "kontak"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama supplier",
+                                        "type": "string",
+                                        "example": "PT. Contoh Supplier"
+                                    },
+                                    "pic": {
+                                        "description": "Person In Charge",
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "alamat": {
+                                        "description": "Alamat supplier",
+                                        "type": "string",
+                                        "example": "Jl. Contoh Alamat No. 123"
+                                    },
+                                    "kontak": {
+                                        "description": "Kontak supplier",
+                                        "type": "string",
+                                        "example": "08123456789"
+                                    },
+                                    "npwp": {
+                                        "description": "NPWP supplier",
+                                        "type": "string",
+                                        "example": "01.234.567.8-910.000"
+                                    },
+                                    "kategori_barang": {
+                                        "description": "Kategori barang yang disupply",
+                                        "type": "string",
+                                        "example": "Chemical"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Supplier created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Supplier berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/supplier/update/{id}": {
+            "put": {
+                "tags": [
+                    "Supplier"
+                ],
+                "summary": "Update an existing supplier",
+                "operationId": "c27c723e21ddf19238457a490d7e4bfa",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Supplier ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama",
+                                    "pic",
+                                    "alamat",
+                                    "kontak"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "description": "Nama supplier",
+                                        "type": "string",
+                                        "example": "PT. Supplier Updated"
+                                    },
+                                    "pic": {
+                                        "description": "Person In Charge",
+                                        "type": "string",
+                                        "example": "Jane Doe"
+                                    },
+                                    "alamat": {
+                                        "description": "Alamat supplier",
+                                        "type": "string",
+                                        "example": "Jl. Alamat Baru No. 456"
+                                    },
+                                    "kontak": {
+                                        "description": "Kontak supplier",
+                                        "type": "string",
+                                        "example": "087654321"
+                                    },
+                                    "npwp": {
+                                        "description": "NPWP supplier",
+                                        "type": "string",
+                                        "example": "02.345.678.9-101.000"
+                                    },
+                                    "kategori_barang": {
+                                        "description": "Kategori barang yang disupply",
+                                        "type": "string",
+                                        "example": "Equipment"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Supplier updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Supplier berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Supplier not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/supplier/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Supplier"
+                ],
+                "summary": "Delete supplier",
+                "operationId": "f04ed0a92ade387c3c63f1d092c0c820",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Supplier ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Supplier deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Supplier berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Supplier not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -12048,6 +12420,10 @@
         {
             "name": "Salary Rule",
             "description": "API Endpoints untuk Management Salary Rule"
+        },
+        {
+            "name": "Supplier",
+            "description": "API Endpoints untuk Management Supplier"
         },
         {
             "name": "Tim Sales",

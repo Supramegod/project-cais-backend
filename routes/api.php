@@ -15,10 +15,11 @@ use App\Http\Controllers\BarangController;
 use App\Http\Controllers\JenisBarangController;
 use App\Http\Controllers\ManagementFeeController; 
 use App\Http\Controllers\TopController; 
-use App\Http\Controllers\SalaryRuleController; 
+use App\Http\Controllers\SalaryRuleController;
 use App\Http\Controllers\TunjanganController; 
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController; 
+use App\Http\Controllers\SupplierController; 
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -146,6 +147,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // UMP (Upah Minimum Provinsi)
     Route::prefix('ump')->controller(UmpController::class)->group(function () {
         Route::get('/list', 'index');
+        Route::get('/list-all', 'listAll');
         Route::get('/view/{id}', 'view');
         Route::get('/province/{provinceId}', 'listUmp');
         Route::post('/add', 'save');
@@ -157,6 +159,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/view/{id}', 'view');
         Route::get('/city/{cityId}', 'listUmk');
         Route::post('/add', 'add');
+    });
+
+    // Supplier
+    Route::prefix('supplier')->controller(SupplierController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
     });
 
     // Barang Utama
