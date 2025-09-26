@@ -83,53 +83,51 @@ class TimSalesController extends Controller
      * )
      */
     public function list(Request $request)
-    {
-        try {
-            $perPage = $request->get('per_page', 10);
-            $search = $request->get('search');
+{
+    try {
+        $search = $request->get('search');
 
-            $query = TimSales::with([
-                'branch',
-                'details' => function ($q) {
-                    $q->whereNull('deleted_at');
-                }
-            ]);
-
-            if ($search) {
-                $query->where('nama', 'like', '%' . $search . '%');
+        $query = TimSales::with([
+            'branch',
+            'details' => function ($q) {
+                $q->whereNull('deleted_at');
             }
+        ]);
 
-            // $timSales = $query->paginate($perPage);
-
-            // Transform data to include jumlah_anggota
-            $query->getCollection()->transform(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'branch' => $item->branch,
-                    'branch_id' => $item->branch_id,
-                    'jumlah_anggota' => $item->details->count(),
-                    'created_at' => $item->created_at,
-                    'created_by' => $item->created_by,
-                    'updated_at' => $item->updated_at,
-                    'updated_by' => $item->updated_by
-                ];
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data tim sales berhasil diambil',
-                'data' => $query
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
+        if ($search) {
+            $query->where('nama', 'like', '%' . $search . '%');
         }
+
+        // ambil data tanpa paginate
+        $data = $query->get()->transform(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama' => $item->nama,
+                'branch' => $item->branch,
+                'branch_id' => $item->branch_id,
+                'jumlah_anggota' => $item->details->count(),
+                'created_at' => $item->created_at,
+                'created_by' => $item->created_by,
+                'updated_at' => $item->updated_at,
+                'updated_by' => $item->updated_by,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data tim sales berhasil diambil',
+            'data' => $data
+        ], 200);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Terjadi kesalahan saat mengambil data',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * @OA\Get(

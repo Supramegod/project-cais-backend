@@ -11553,6 +11553,367 @@
                     }
                 ]
             }
+        },
+        "/api/ump/list": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get list of active UMP data",
+                "operationId": "4b0437db3e470a2b086bf8492c9ff50c",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-ump"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/view/{id}": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get UMP detail by ID",
+                "operationId": "048bf6514f3ec3646d7c1601d5d17216",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "UMP ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "UMP not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/province/{provinceId}": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get UMP data by province ID",
+                "operationId": "e7072a5324788d0af330589f8afeddde",
+                "parameters": [
+                    {
+                        "name": "provinceId",
+                        "in": "path",
+                        "description": "Province ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "sumber": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/sumber-ump"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/add": {
+            "post": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Create a new UMP data",
+                "operationId": "ad3645762c7282e5ce13c5554958ecd1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "province_id",
+                                    "province_name",
+                                    "ump",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "province_id": {
+                                        "description": "ID Provinsi",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "province_name": {
+                                        "description": "Nama Provinsi",
+                                        "type": "string",
+                                        "example": "Jawa Barat"
+                                    },
+                                    "ump": {
+                                        "description": "Nilai UMP",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 3500000
+                                    },
+                                    "tgl_berlaku": {
+                                        "description": "Tanggal berlaku UMP",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "description": "Sumber informasi UMP",
+                                        "type": "string",
+                                        "example": "https://example.com/sumber-ump"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "UMP created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data UMP berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/ump/list/all": {
+            "get": {
+                "tags": [
+                    "UMP"
+                ],
+                "summary": "Get all UMP data without pagination",
+                "operationId": "912c60f4180654ca8cc23d9f0c50fcc9",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "province_name": {
+                                                        "type": "string",
+                                                        "example": "Jawa Barat"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 3500000
+                                                    },
+                                                    "tgl_berlaku": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -11612,6 +11973,10 @@
         {
             "name": "Tunjangan Posisi",
             "description": "API endpoints for managing position allowances"
+        },
+        {
+            "name": "UMP",
+            "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
         },
         {
             "name": "Authentication",

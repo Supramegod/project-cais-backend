@@ -17,6 +17,7 @@ use App\Http\Controllers\ManagementFeeController; // Tambahkan import ini
 use App\Http\Controllers\TopController; // Tambahkan import untuk TopController
 use App\Http\Controllers\SalaryRuleController; // Tambahkan import untuk SalaryRuleController
 use App\Http\Controllers\TunjanganController; // Tambahkan import untuk TunjanganController
+use App\Http\Controllers\UmpController; // Tambahkan import untuk UmpController
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -100,8 +101,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/requirement/add', 'addRequirement');
         Route::put('/requirement/edit', 'requirementEdit');
         Route::delete('/requirement/delete/{id}', 'requirementDelete');
-        //entitas
-        Route::get('/entitas-list', 'listEntitas');
     });
 
     // Management Fee
@@ -141,6 +140,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+
+    // UMP (Upah Minimum Provinsi)
+    Route::prefix('ump')->controller(UmpController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::get('/view/{id}', 'view');
+        Route::get('/province/{provinceId}', 'listUmp');
+        Route::post('/add', 'add');
     });
 
     // Barang Utama
