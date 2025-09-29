@@ -27,27 +27,7 @@ class TimSalesController extends Controller
      *     summary="Mendapatkan daftar tim sales",
      *     description="Mengambil semua data tim sales dengan jumlah anggota",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Nomor halaman",
-     *         required=false,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Jumlah data per halaman",
-     *         required=false,
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
-     *     @OA\Parameter(
-     *         name="search",
-     *         in="query",
-     *         description="Pencarian nama tim sales",
-     *         required=false,
-     *         @OA\Schema(type="string")
-     *     ),
+     *    
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil data tim sales",
