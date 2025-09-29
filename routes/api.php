@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CustomerActivityController;
+use App\Http\Controllers\MenuController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
@@ -188,6 +189,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('devices')->controller(DevicesController::class)->group(function () {
         Route::get('/list', 'list');
     });
+  // Menu Management
+Route::prefix('menu')->controller(MenuController::class)->group(function () {
+    Route::get('/list', 'list');                          
+    Route::get('/by-role', 'getMenusByRole');           
+    Route::get('/permissions', 'getUserPermissions'); 
+    Route::get('/all-permissions', 'getAllPermissions');    // Route baru untuk melihat semua permission
+    Route::post('/add', 'add');                          
+    Route::get('/view/{id}', 'view');                       
+    Route::put('/update/{id}', 'update');                    
+    Route::delete('/delete/{id}', 'delete');                
+    Route::get('/listRole/{id}', 'listRole');             
+    Route::post('/addrole/{id}', 'addrole');       
+});
 
     // OHC (hanya index)
     Route::prefix('ohc')->controller(OhcController::class)->group(function () {

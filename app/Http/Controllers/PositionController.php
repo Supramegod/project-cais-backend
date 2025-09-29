@@ -9,6 +9,7 @@ use App\Models\Kebutuhan;
 use App\Models\RequirementPosisi;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -96,11 +97,11 @@ class PositionController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            // Start with base query - gets ALL active positions by default
-            $query = Position::with(['company.creator', 'company.updater', 'kebutuhan','creator', 'updater'])
+            $query = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'creator', 'updater'])
                 ->where('is_active', true);
 
-            // Apply optional filters only if provided
+            \Log::info('tes', [$query]);
+
             if ($request->filled('entitas')) {
                 $query->where('company_id', $request->entitas);
             }
@@ -109,9 +110,10 @@ class PositionController extends Controller
                 $query->where('layanan_id', $request->layanan);
             }
 
-            $data = $query->get();
+            // urutkan berdasarkan data terbaru
+            $data = $query->orderBy('created_at', 'desc')->get();
+            // Log::info('data,', [$data]);
 
-            // Dynamic message based on whether filters were applied
             $message = 'Data retrieved successfully';
             if ($request->filled('entitas') || $request->filled('layanan')) {
                 $message = 'Filtered data retrieved successfully';
@@ -132,6 +134,7 @@ class PositionController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Get(
@@ -221,7 +224,7 @@ class PositionController extends Controller
                 ], 400);
             }
 
-            $data = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'requirements','creator', 'updater'])
+            $data = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'requirements', 'creator', 'updater'])
                 ->find($id);
 
             if (!$data) {
@@ -315,56 +318,55 @@ class PositionController extends Controller
      *     )
      * )
      */
-   public function save(Request $request): JsonResponse
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-            'layanan' => 'required|integer|exists:m_kebutuhan,id', 
-            'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
-            'deskripsi' => 'required|string',
-        ], [
-            'nama.unique' => 'Position name already exists',
-            'entitas.exists' => 'Selected company does not exist',
-            'layanan.exists' => 'Selected service does not exist',
-        ]);
+    public function save(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
+                'layanan' => 'required|integer|exists:m_kebutuhan,id',
+                'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
+                'deskripsi' => 'required|string',
+            ], [
+                'nama.unique' => 'Position name already exists',
+                'entitas.exists' => 'Selected company does not exist',
+                'layanan.exists' => 'Selected service does not exist',
+            ]);
 
-        if ($validator->fails()) {
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            DB::connection('mysqlhris')->beginTransaction();
+
+            $position = Position::create([
+                'company_id' => $request->entitas,
+                'name' => $request->nama,
+                'description' => $request->deskripsi,
+                'layanan_id' => $request->layanan,
+                'is_active' => true,
+                'created_by' => Auth::id() ?? 0, // Gunakan user ID, bukan name
+            ]);
+
+            DB::connection('mysqlhris')->commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Position created successfully',
+                'data' => $position
+            ], 201);
+        } catch (Exception $e) {
+            DB::connection('mysqlhris')->rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
         }
-
-        DB::connection('mysqlhris')->beginTransaction();
-
-        $position = Position::create([
-            'company_id' => $request->entitas,
-            'name' => $request->nama,
-            'description' => $request->deskripsi,
-            'layanan_id' => $request->layanan,
-            'is_active' => true,
-            'created_by' => Auth::id() ?? 0, // Gunakan user ID, bukan name
-            'updated_by' => Auth::id() ?? 0, // Gunakan user ID, bukan name
-        ]);
-
-        DB::connection('mysqlhris')->commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Position created successfully',
-            'data' => $position
-        ], 201);
-    } catch (Exception $e) {
-        DB::connection('mysqlhris')->rollBack();
-        return response()->json([
-            'success' => false,
-            'message' => 'Internal server error',
-            'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-        ], 500);
     }
-}
 
     /**
      * @OA\Put(
@@ -471,16 +473,13 @@ class PositionController extends Controller
                 ], 404);
             }
 
-           $validator = Validator::make($request->all(), [
-            'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-            'layanan' => 'required|integer|exists:m_kebutuhan,id', // menggunakan database default
-            'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
-            'deskripsi' => 'required|string',
-        ], [
-            'nama.unique' => 'Position name already exists',
-            'entitas.exists' => 'Selected company does not exist',
-            'layanan.exists' => 'Selected service does not exist',
-        ]);
+            $validator = Validator::make($request->all(), [
+                'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
+                'layanan' => 'required|integer|exists:m_kebutuhan,id', 
+            ], [
+                'entitas.exists' => 'Selected company does not exist',
+                'layanan.exists' => 'Selected service does not exist',
+            ]);
 
             if ($validator->fails()) {
                 return response()->json([
@@ -780,52 +779,52 @@ class PositionController extends Controller
      * )
      */
     public function addRequirement(Request $request): JsonResponse
-{
-    try {
-        $validator = Validator::make($request->all(), [
-            'position_id' => 'required|integer|exists:mysqlhris.m_position,id',
-            'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
-            'layanan_id' => 'required|integer|exists:m_kebutuhan,id'
-        ], [
-            'position_id.exists' => 'Selected position does not exist',
-            'layanan_id.exists' => 'Selected service does not exist',
-            'nama.max' => 'Requirement text cannot exceed 500 characters'
-        ]);
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'position_id' => 'required|integer|exists:mysqlhris.m_position,id',
+                'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
+                'layanan_id' => 'required|integer|exists:m_kebutuhan,id'
+            ], [
+                'position_id.exists' => 'Selected position does not exist',
+                'layanan_id.exists' => 'Selected service does not exist',
+                'nama.max' => 'Requirement text cannot exceed 500 characters'
+            ]);
 
-        if ($validator->fails()) {
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            $requirement = RequirementPosisi::create([
+                'position_id' => $request->position_id,
+                'requirement' => trim($request->nama),
+                'kebutuhan_id' => $request->layanan_id,
+                'created_by' => Auth::id() ?? 0,
+                'updated_by' => Auth::id() ?? 0,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Requirement added successfully',
+                'data' => $requirement
+            ], 201);
+        } catch (Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
         }
-
-        DB::beginTransaction();
-
-        $requirement = RequirementPosisi::create([
-            'position_id' => $request->position_id,
-            'requirement' => trim($request->nama),
-            'kebutuhan_id' => $request->layanan_id,
-            'created_by' =>  Auth::id() ?? 0,
-            'updated_by' =>  Auth::id() ?? 0,
-        ]);
-
-        DB::commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Requirement added successfully',
-            'data' => $requirement
-        ], 201);
-    } catch (Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'success' => false,
-            'message' => 'Internal server error',
-            'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-        ], 500);
     }
-}
 
     /**
      * @OA\Put(
@@ -1004,44 +1003,44 @@ class PositionController extends Controller
      *   )
      */
     public function requirementDelete(Request $request, $id): JsonResponse
-{
-    try {
-        if (!is_numeric($id) || $id <= 0) {
+    {
+        try {
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid requirement ID'
+                ], 400);
+            }
+
+            // Ambil data yang tidak terhapus, trait SoftDeletes akan otomatis menambahkan whereNull('deleted_at')
+            $requirement = RequirementPosisi::find($id);
+
+            if (!$requirement) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Requirement not found'
+                ], 404);
+            }
+
+            // Set kolom deleted_by sebelum melakukan soft delete
+            $requirement->deleted_by = Auth::user()->full_name ?? 'System';
+            $requirement->save(); // Simpan perubahan pada kolom deleted_by
+
+            // Laravel akan otomatis mengisi deleted_at saat metode delete() dipanggil
+            $requirement->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Requirement deleted successfully'
+            ], 200);
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid requirement ID'
-            ], 400);
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
         }
-
-        // Ambil data yang tidak terhapus, trait SoftDeletes akan otomatis menambahkan whereNull('deleted_at')
-        $requirement = RequirementPosisi::find($id);
-
-        if (!$requirement) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Requirement not found'
-            ], 404);
-        }
-
-        // Set kolom deleted_by sebelum melakukan soft delete
-        $requirement->deleted_by = Auth::user()->full_name ?? 'System';
-        $requirement->save(); // Simpan perubahan pada kolom deleted_by
-
-        // Laravel akan otomatis mengisi deleted_at saat metode delete() dipanggil
-        $requirement->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Requirement deleted successfully'
-        ], 200);
-    } catch (Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Internal server error',
-            'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-        ], 500);
     }
-}
 
 
     /**
