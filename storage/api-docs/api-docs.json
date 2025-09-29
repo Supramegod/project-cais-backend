@@ -6529,6 +6529,7 @@
                     {
                         "name": "id",
                         "in": "path",
+                        "description": "Menu ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -9596,37 +9597,6 @@
                 "summary": "Mendapatkan daftar tim sales",
                 "description": "Mengambil semua data tim sales dengan jumlah anggota",
                 "operationId": "273fc9994b247d6fcd5e2f2ae6a66ff4",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Nomor halaman",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Jumlah data per halaman",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Pencarian nama tim sales",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Berhasil mengambil data tim sales",
@@ -10541,13 +10511,13 @@
                     "Tim Sales"
                 ],
                 "summary": "Mendapatkan user yang tersedia untuk ditambah ke tim",
-                "description": "Mengambil daftar user yang belum menjadi anggota tim sales ini",
+                "description": "Mengambil daftar user yang belum menjadi anggota tim sales manapun di branch yang sama dengan tim ini",
                 "operationId": "8a90399db29ed5b1209065c0ec2f203b",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "ID tim sales",
+                        "description": "ID tim sales (digunakan untuk menentukan branch)",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -10605,6 +10575,9 @@
                     },
                     "404": {
                         "description": "Tim sales tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Terjadi kesalahan saat mengambil data"
                     }
                 },
                 "security": [

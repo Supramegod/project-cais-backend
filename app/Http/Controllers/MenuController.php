@@ -70,90 +70,90 @@ class MenuController extends Controller
         }
     }
     /**
- * @OA\Get(
- *     path="/api/menu/all-permissions",
- *     summary="Get all menu role permissions",
- *     tags={"Menu"},
- *     security={{"bearerAuth":{}}},
- *     @OA\Response(
- *         response=200,
- *         description="Success",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=true),
- *             @OA\Property(property="data", type="array",
- *                 @OA\Items(
- *                     @OA\Property(property="id", type="integer"),
- *                     @OA\Property(property="sysmenu_id", type="integer"),
- *                     @OA\Property(property="role_id", type="integer"),
- *                     @OA\Property(property="menu_name", type="string"),
- *                     @OA\Property(property="menu_code", type="string"),
- *                     @OA\Property(property="role_name", type="string"),
- *                     @OA\Property(property="is_view", type="boolean"),
- *                     @OA\Property(property="is_add", type="boolean"),
- *                     @OA\Property(property="is_edit", type="boolean"),
- *                     @OA\Property(property="is_delete", type="boolean"),
- *                     @OA\Property(property="created_at", type="string"),
- *                     @OA\Property(property="created_by", type="string")
- *                 )
- *             )
- *         )
- *     ),
- *     @OA\Response(
- *         response=500,
- *         description="Internal Server Error"
- *     )
- * )
- */
-public function getAllPermissions(Request $request)
-{
-    try {
-        $permissions = SysmenuRole::with([
+     * @OA\Get(
+     *     path="/api/menu/all-permissions",
+     *     summary="Get all menu role permissions",
+     *     tags={"Menu"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer"),
+     *                     @OA\Property(property="sysmenu_id", type="integer"),
+     *                     @OA\Property(property="role_id", type="integer"),
+     *                     @OA\Property(property="menu_name", type="string"),
+     *                     @OA\Property(property="menu_code", type="string"),
+     *                     @OA\Property(property="role_name", type="string"),
+     *                     @OA\Property(property="is_view", type="boolean"),
+     *                     @OA\Property(property="is_add", type="boolean"),
+     *                     @OA\Property(property="is_edit", type="boolean"),
+     *                     @OA\Property(property="is_delete", type="boolean"),
+     *                     @OA\Property(property="created_at", type="string"),
+     *                     @OA\Property(property="created_by", type="string")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error"
+     *     )
+     * )
+     */
+    public function getAllPermissions(Request $request)
+    {
+        try {
+            $permissions = SysmenuRole::with([
                 'menu:id,nama,kode',
                 'role:id,name'
             ])
-            ->select([
-                'id',
-                'sysmenu_id',
-                'role_id',
-                'is_view',
-                'is_add',
-                'is_edit',
-                'is_delete',
-                'created_at',
-                'created_by'
-            ])
-            ->get()
-            ->map(function ($permission) {
-                return [
-                    'id' => $permission->id,
-                    'sysmenu_id' => $permission->sysmenu_id,
-                    'role_id' => $permission->role_id,
-                    'menu_name' => $permission->menu->nama ?? 'Menu not found',
-                    'menu_code' => $permission->menu->kode ?? 'Code not found',
-                    'role_name' => $permission->role->name ?? 'Role not found',
-                    'is_view' => $permission->is_view,
-                    'is_add' => $permission->is_add,
-                    'is_edit' => $permission->is_edit,
-                    'is_delete' => $permission->is_delete,
-                    'created_at' => $permission->created_at,
-                    'created_by' => $permission->created_by
-                ];
-            });
+                ->select([
+                    'id',
+                    'sysmenu_id',
+                    'role_id',
+                    'is_view',
+                    'is_add',
+                    'is_edit',
+                    'is_delete',
+                    'created_at',
+                    'created_by'
+                ])
+                ->get()
+                ->map(function ($permission) {
+                    return [
+                        'id' => $permission->id,
+                        'sysmenu_id' => $permission->sysmenu_id,
+                        'role_id' => $permission->role_id,
+                        'menu_name' => $permission->menu->nama ?? 'Menu not found',
+                        'menu_code' => $permission->menu->kode ?? 'Code not found',
+                        'role_name' => $permission->role->name ?? 'Role not found',
+                        'is_view' => $permission->is_view,
+                        'is_add' => $permission->is_add,
+                        'is_edit' => $permission->is_edit,
+                        'is_delete' => $permission->is_delete,
+                        'created_at' => $permission->created_at,
+                        'created_by' => $permission->created_by
+                    ];
+                });
 
-        return response()->json([
-            'success' => true,
-            'data' => $permissions,
-            'total' => $permissions->count()
-        ], 200);
+            return response()->json([
+                'success' => true,
+                'data' => $permissions,
+                'total' => $permissions->count()
+            ], 200);
 
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => $e->getMessage(),   // tampilkan pesan error asli
-            'trace' => $e->getTraceAsString() // opsional, buat debug
-        ], 500);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),   // tampilkan pesan error asli
+                'trace' => $e->getTraceAsString() // opsional, buat debug
+            ], 500);
+        }
     }
-}
 
 
     /**
@@ -304,6 +304,7 @@ public function getAllPermissions(Request $request)
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
+     *         description="Menu ID",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="integer")

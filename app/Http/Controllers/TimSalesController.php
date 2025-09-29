@@ -27,7 +27,6 @@ class TimSalesController extends Controller
      *     summary="Mendapatkan daftar tim sales",
      *     description="Mengambil semua data tim sales dengan jumlah anggota",
      *     security={{"bearerAuth":{}}},
-     *    
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil data tim sales",
@@ -63,50 +62,50 @@ class TimSalesController extends Controller
      * )
      */
     public function list(Request $request)
-{
-    try {
-        $search = $request->get('search');
+    {
+        try {
+            $search = $request->get('search');
 
-        $query = TimSales::with([
-            'branch',
-            'details' => function ($q) {
-                $q->whereNull('deleted_at');
+            $query = TimSales::with([
+                'branch',
+                'details' => function ($q) {
+                    $q->whereNull('deleted_at');
+                }
+            ]);
+
+            if ($search) {
+                $query->where('nama', 'like', '%' . $search . '%');
             }
-        ]);
 
-        if ($search) {
-            $query->where('nama', 'like', '%' . $search . '%');
+            // ambil data tanpa paginate
+            $data = $query->get()->transform(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'branch' => $item->branch,
+                    'branch_id' => $item->branch_id,
+                    'jumlah_anggota' => $item->details->count(),
+                    'created_at' => $item->created_at,
+                    'created_by' => $item->created_by,
+                    'updated_at' => $item->updated_at,
+                    'updated_by' => $item->updated_by,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data tim sales berhasil diambil',
+                'data' => $data
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // ambil data tanpa paginate
-        $data = $query->get()->transform(function ($item) {
-            return [
-                'id' => $item->id,
-                'nama' => $item->nama,
-                'branch' => $item->branch,
-                'branch_id' => $item->branch_id,
-                'jumlah_anggota' => $item->details->count(),
-                'created_at' => $item->created_at,
-                'created_by' => $item->created_by,
-                'updated_at' => $item->updated_at,
-                'updated_by' => $item->updated_by,
-            ];
-        });
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Data tim sales berhasil diambil',
-            'data' => $data
-        ], 200);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Terjadi kesalahan saat mengambil data',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
 
     /**
@@ -864,7 +863,7 @@ class TimSalesController extends Controller
             }
 
             $member = $timSales->details()
-                ->where('id', $request->member_id) 
+                ->where('id', $request->member_id)
                 ->first();
 
             if (!$member) {
@@ -1039,12 +1038,12 @@ class TimSalesController extends Controller
      *     path="/api/tim-sales/getAvailableUsers/{id}",
      *     tags={"Tim Sales"},
      *     summary="Mendapatkan user yang tersedia untuk ditambah ke tim",
-     *     description="Mengambil daftar user yang belum menjadi anggota tim sales ini",
+     *     description="Mengambil daftar user yang belum menjadi anggota tim sales manapun di branch yang sama dengan tim ini",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
-     *         description="ID tim sales",
+     *         description="ID tim sales (digunakan untuk menentukan branch)",
      *         required=true,
      *         @OA\Schema(type="integer")
      *     ),
@@ -1070,6 +1069,10 @@ class TimSalesController extends Controller
      *     @OA\Response(
      *         response=404,
      *         description="Tim sales tidak ditemukan"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Terjadi kesalahan saat mengambil data"
      *     )
      * )
      */
@@ -1084,12 +1087,16 @@ class TimSalesController extends Controller
                 ], 404);
             }
 
-            // Get existing member user IDs
-            $existingUserIds = $timSales->details()
-                ->pluck('user_id')
+            // Ambil semua user_id yang sudah jadi anggota tim di branch yang sama
+            $existingUserIds = TimSales::where('branch_id', $timSales->branch_id)
+                ->with('details') // pastikan relasi details ada di model TimSales
+                ->get()
+                ->pluck('details.*.user_id') // ambil semua user_id dari details
+                ->flatten()
+                ->unique()
                 ->toArray();
 
-            // Get available users (not in current team)
+            // Ambil user yang aktif, role sesuai, branch sama, dan
             $availableUsers = User::where('is_active', 1)
                 ->whereIn('role_id', [29, 31, 32, 33])
                 ->where('branch_id', $timSales->branch_id)
@@ -1111,6 +1118,7 @@ class TimSalesController extends Controller
             ], 500);
         }
     }
+
 
 
 
