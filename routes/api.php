@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\TrainingController;
@@ -14,13 +15,13 @@ use App\Http\Controllers\OhcController;
 use App\Http\Controllers\ChemicalController;
 use App\Http\Controllers\BarangController;
 use App\Http\Controllers\JenisBarangController;
-use App\Http\Controllers\ManagementFeeController; 
-use App\Http\Controllers\TopController; 
+use App\Http\Controllers\ManagementFeeController;
+use App\Http\Controllers\TopController;
 use App\Http\Controllers\SalaryRuleController;
-use App\Http\Controllers\TunjanganController; 
+use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
-use App\Http\Controllers\UmkController; 
-use App\Http\Controllers\SupplierController; 
+use App\Http\Controllers\UmkController;
+use App\Http\Controllers\SupplierController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -43,12 +44,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Jenis Barang
     Route::prefix('jenis-barang')->controller(JenisBarangController::class)->group(function () {
-        Route::get('/list', 'list'); 
-        Route::get('/view/{id}', 'view'); 
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
         Route::get('/list-detail/{id}', 'listdetail');
-        Route::post('/add', 'add'); 
-        Route::put('/update/{id}', 'update'); 
-        Route::delete('/delete/{id}', 'delete'); 
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
     });
 
     // Tim Sales
@@ -81,11 +82,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/add-detail-requirement', 'addDetailRequirement');
         Route::delete('/delete-detail-requirement/{id}', 'deleteDetailRequirement');
     });
-    
+
     // Training
     Route::prefix('training')->controller(TrainingController::class)->group(function () {
         Route::get('/list', 'list');
-        Route::get('/view/{id}', 'view'); 
+        Route::get('/view/{id}', 'view');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
@@ -94,11 +95,12 @@ Route::middleware('auth:sanctum')->group(function () {
     // Position
     Route::prefix('position')->controller(PositionController::class)->group(function () {
         Route::get('/list', 'list');
+        Route::get('/entitas-list', 'listEntitas');
         Route::get('/view/{id}', 'view');
         Route::post('/add', 'save');
         Route::put('/edit/{id}', 'edit');
         Route::delete('/delete/{id}', 'delete');
-        
+
         // Position Requirements
         Route::get('/requirement/list/{position_id}', 'requirementList');
         Route::post('/requirement/add', 'addRequirement');
@@ -173,13 +175,20 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Barang Utama
     Route::prefix('barang')->controller(BarangController::class)->group(function () {
+        // Basic CRUD
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
-        Route::delete('/delete/{id}', 'Delete');
-    });
+        Route::delete('/delete/{id}', 'delete');
 
+        // Default Quantity Management
+        Route::get('/default-qty/{id}', 'getDefaultQty');
+        Route::get('/{barangId}/default-qty/{layananId}', 'getDefaultQtyByLayanan');
+        Route::post('/default-qty/save', 'saveDefaultQty');
+        Route::post('/default-qty/bulk-save', 'bulkSaveDefaultQty');
+        Route::delete('/default-qty/delete/{id}', 'deleteDefaultQty');
+    });
     // Kaporlap (hanya index)
     Route::prefix('kaporlap')->controller(KaporlapController::class)->group(function () {
         Route::get('/list', 'list');
@@ -189,19 +198,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('devices')->controller(DevicesController::class)->group(function () {
         Route::get('/list', 'list');
     });
-  // Menu Management
-Route::prefix('menu')->controller(MenuController::class)->group(function () {
-    Route::get('/list', 'list');                          
-    Route::get('/by-role', 'getMenusByRole');           
-    Route::get('/permissions', 'getUserPermissions'); 
-    Route::get('/all-permissions', 'getAllPermissions');    // Route baru untuk melihat semua permission
-    Route::post('/add', 'add');                          
-    Route::get('/view/{id}', 'view');                       
-    Route::put('/update/{id}', 'update');                    
-    Route::delete('/delete/{id}', 'delete');                
-    Route::get('/listRole/{id}', 'listRole');             
-    Route::post('/addrole/{id}', 'addrole');       
-});
+    // Menu Management
+    Route::prefix('menu')->controller(MenuController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/by-role', 'getMenusByRole');
+        Route::get('/permissions', 'getUserPermissions');
+        Route::get('/all-permissions', 'getAllPermissions');    // Route baru untuk melihat semua permission
+        Route::post('/add', 'add');
+        Route::get('/view/{id}', 'view');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+        Route::get('/listRole/{id}', 'listRole');
+        Route::post('/addrole/{id}', 'addrole');
+    });
 
     // OHC (hanya index)
     Route::prefix('ohc')->controller(OhcController::class)->group(function () {
@@ -214,11 +223,32 @@ Route::prefix('menu')->controller(MenuController::class)->group(function () {
     });
 
     Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
-        Route::get('/list', 'list');                           
-        Route::get('/view/{id}', 'view');                     
-        Route::post('/add', 'add');                           
-        Route::put('/update/{id}', 'update');                 
-        Route::delete('/delete/{id}', 'delete');               
-        Route::get('/leads/{leadsId}/track', 'trackActivity'); 
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+        Route::get('/leads/{leadsId}/track', 'trackActivity');
+    });
+    // Company Group Routes
+    Route::prefix('company-group')->controller(CompanyGroupController::class)->group(function () {
+        // Basic CRUD
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+
+        // Company Management
+        Route::get('/get-available-companies/{groupId}', 'getAvailableCompanies');
+        Route::get('/get-companies-in-group/{groupId}', 'getCompaniesInGroup');
+        Route::post('/bulk-assign', 'bulkAssign');
+        Route::delete('/remove-company/{groupId}/{companyId}', 'removeCompany');
+        Route::delete('/bulk-remove-companies', 'bulkRemoveCompanies');
+
+        // Statistics & Filtering
+        Route::get('/statistics', 'getStatistics');
+        Route::get('/filter-rekomendasi', 'filterRekomendasi');
+        Route::post('/groupkan', 'groupkan');
     });
 });

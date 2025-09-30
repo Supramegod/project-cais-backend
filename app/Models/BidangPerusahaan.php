@@ -6,17 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class StatusLeads extends Model
+class BidangPerusahaan extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'm_status_leads';
+    protected $table = 'm_bidang_perusahaan';
     protected $primaryKey = 'id';
 
     protected $fillable = [
         'nama',
-        'warna_background',
-        'warna_font',
         'created_by',
         'updated_by',
         'deleted_by'
@@ -31,6 +29,6 @@ class StatusLeads extends Model
     // Relasi ke leads
     public function leads()
     {
-        return $this->hasMany(Leads::class, 'status_leads_id', 'id');
+        return $this->hasMany(Leads::class, 'bidang_perusahaan_id', 'id');
     }
 }

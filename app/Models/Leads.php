@@ -69,4 +69,9 @@ class Leads extends Model
     {
         return $this->hasMany(Pks::class, 'leads_id');
     }
+        // Relasi balik ke detail grup
+    public function groupDetails()
+    {
+        return $this->hasMany(PerusahaanGroupDetail::class, 'leads_id', 'id');
+    }
 }
