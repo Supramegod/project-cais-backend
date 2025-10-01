@@ -14,17 +14,17 @@ class User extends Authenticatable
 {
     protected $table = 'm_user';
     protected $primaryKey = 'id';
-     protected $connection= 'mysqlhris';
+    protected $connection = 'mysqlhris';
 
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens,HasUuids;
+    use HasFactory, Notifiable, HasApiTokens, HasUuids;
     /**
      * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
     protected $fillable = [
-       'username',
+        'username',
         'password',
         'full_name',
         'email',
@@ -57,7 +57,7 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-     // Relasi ke role
+    // Relasi ke role
     public function role()
     {
         return $this->belongsTo(Role::class, 'role_id', 'id');
@@ -73,5 +73,10 @@ class User extends Authenticatable
     public function timSalesDetails()
     {
         return $this->hasMany(TimSalesDetail::class, 'user_id', 'id');
+    }
+
+    public function customerActivities()
+    {
+        return $this->hasMany(CustomerActivity::class, 'user_id');
     }
 }

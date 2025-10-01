@@ -97,10 +97,13 @@ class PositionController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            $query = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'creator', 'updater'])
-                ->where('is_active', true);
-
-            \Log::info('tes', [$query]);
+            $query = Position::with([
+                'company.creator',
+                'company.updater',
+                'kebutuhan:id,nama', // ambil hanya id & nama kebutuhan
+                'creator',
+                'updater'
+            ])->where('is_active', true);
 
             if ($request->filled('entitas')) {
                 $query->where('company_id', $request->entitas);
@@ -110,23 +113,33 @@ class PositionController extends Controller
                 $query->where('layanan_id', $request->layanan);
             }
 
-            // urutkan berdasarkan data terbaru
             $data = $query->orderBy('created_at', 'desc')->get();
-            // Log::info('data,', [$data]);
 
-            $message = 'Data retrieved successfully';
-            if ($request->filled('entitas') || $request->filled('layanan')) {
-                $message = 'Filtered data retrieved successfully';
-            }
+            // Mapping supaya kebutuhan return id & nama aja
+            $mappedData = $data->map(function ($pos) {
+                return [
+                    'id' => $pos->id,
+                    'name' => $pos->name,
+                    'description' => $pos->description,
+                    'company_id' => $pos->company_id,
+                    'layanan_id' => $pos->layanan_id,
+                    'kebutuhan' => $pos->kebutuhan ? [
+                        'id' => $pos->kebutuhan->id,
+                        'nama' => $pos->kebutuhan->nama
+                    ] : null,
+                    'created_at' => $pos->created_at,
+                    'updated_at' => $pos->updated_at,
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'message' => $message,
-                'data' => $data,
-                'total' => $data->count()
+                'message' => 'Data retrieved successfully',
+                'data' => $mappedData,
+                'total' => $mappedData->count()
             ], 200);
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Internal server error',
@@ -134,6 +147,7 @@ class PositionController extends Controller
             ], 500);
         }
     }
+
 
 
     /**
@@ -475,7 +489,7 @@ class PositionController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-                'layanan' => 'required|integer|exists:m_kebutuhan,id', 
+                'layanan' => 'required|integer|exists:m_kebutuhan,id',
             ], [
                 'entitas.exists' => 'Selected company does not exist',
                 'layanan.exists' => 'Selected service does not exist',

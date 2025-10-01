@@ -426,7 +426,7 @@ class CompanyGroupController extends Controller
     /**
      * @OA\Get(
      *     path="/api/company-group/get-available-companies/{groupId}",
-     *     summary="Get available companies for group assignment",
+     *     summary="dipakai untuk mengambil daftar perusahaan (leads) yang tersedia untuk dimasukkan ke dalam sebuah grup tertentu.",
      *     tags={"Company Group"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -579,7 +579,7 @@ class CompanyGroupController extends Controller
     /**
      * @OA\Get(
      *     path="/api/company-group/get-companies-in-group/{groupId}",
-     *     summary="Get all companies in a specific group",
+     *     summary="Get all companies in a specific group(list grub)",
      *     description="Retrieve all companies that are members of a specific company group",
      *     tags={"Company Group"},
      *     security={{"bearerAuth":{}}},
@@ -670,7 +670,7 @@ class CompanyGroupController extends Controller
     /**
      * @OA\Post(
      *     path="/api/company-group/bulk-assign",
-     *     summary="Bulk assign companies to groups",
+     *     summary="Bulk assign companies to groups(group lama tambh anggota)",
      *     tags={"Company Group"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
@@ -889,7 +889,7 @@ class CompanyGroupController extends Controller
     /**
      * @OA\Get(
      *     path="/api/company-group/filter-rekomendasi",
-     *     summary="Filter recommended companies for grouping",
+     *     summary="Filter recommended companies for grouping (fillter sebelum post)",
      *     tags={"Company Group"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -966,7 +966,7 @@ class CompanyGroupController extends Controller
     /**
      * @OA\Post(
      *     path="/api/company-group/groupkan",
-     *     summary="Group companies into a company group",
+     *     summary="Group companies into a company group(post setelah filter )",
      *     tags={"Company Group"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(

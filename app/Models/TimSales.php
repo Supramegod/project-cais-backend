@@ -37,6 +37,15 @@ class TimSales extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+     public function leads()
+    {
+        return $this->hasMany(Leads::class, 'tim_sales_id');
+    }
+
+    public function customerActivities()
+    {
+        return $this->hasMany(CustomerActivity::class, 'tim_sales_id');
+    }
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
@@ -49,4 +58,5 @@ class TimSales extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+    
 }

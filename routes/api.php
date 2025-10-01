@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
+use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -250,5 +251,35 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/statistics', 'getStatistics');
         Route::get('/filter-rekomendasi', 'filterRekomendasi');
         Route::post('/groupkan', 'groupkan');
+    });
+    // Leads Routes
+    Route::prefix('leads')->controller(LeadsController::class)->group(function () {
+        // Basic CRUD
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+        Route::post('/restore/{id}', 'restore');
+
+        // Additional endpoints
+        Route::get('/deleted', 'listTerhapus');
+        Route::get('/child/{id}', 'childLeads');
+        Route::post('/child/{id}', 'saveChildLeads');
+        Route::get('/belum-aktif', 'leadsBelumAktif');
+        Route::get('/available', 'availableLeads');
+        Route::get('/available-quotation', 'availableQuotation');
+        Route::post('/activate/{id}', 'activateLead');
+        Route::post('/import', 'import');
+        Route::get('/export', 'exportExcel');
+        Route::get('/template-import', 'templateImport');
+        Route::post('/generate-null-kode', 'generateNullKode');
+
+        // Location data endpoints
+        Route::get('/provinsi', 'getProvinsi'); // ✅ Route baru untuk provinsi
+        Route::get('/kota/{provinsiId}', 'getKota');
+        Route::get('/kecamatan/{kotaId}', 'getKecamatan');
+        Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
+        Route::get('/negara/{benuaId}', 'getNegara');
     });
 });
