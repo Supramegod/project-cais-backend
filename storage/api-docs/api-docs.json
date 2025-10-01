@@ -27,13 +27,13 @@
                                     "username": {
                                         "description": "Username user",
                                         "type": "string",
-                                        "example": "3578142602980002"
+                                        "example": "superadmin2"
                                     },
                                     "password": {
                                         "description": "Password user",
                                         "type": "string",
                                         "format": "password",
-                                        "example": "3578142602980002"
+                                        "example": "salesshelter"
                                     }
                                 },
                                 "type": "object"
@@ -75,6 +75,14 @@
                                                         "email": {
                                                             "type": "string",
                                                             "example": "john@example.com"
+                                                        },
+                                                        "role_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "branch_id": {
+                                                            "type": "integer",
+                                                            "example": 1
                                                         }
                                                     },
                                                     "type": "object"
@@ -86,6 +94,11 @@
                                                 "token_type": {
                                                     "type": "string",
                                                     "example": "Bearer"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T12:00:00Z"
                                                 }
                                             },
                                             "type": "object"
@@ -97,7 +110,7 @@
                         }
                     },
                     "401": {
-                        "description": "Kredensial tidak valid",
+                        "description": "Kredensial tidak valid atau akun tidak aktif",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -283,6 +296,102 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Unauthenticated"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Refresh token",
+                "description": "Memperbarui token akses yang sudah kadaluarsa",
+                "operationId": "b2eae7a8032954d25b46c7ec6f489c68",
+                "responses": {
+                    "200": {
+                        "description": "Token berhasil direfresh",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Token berhasil direfresh"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "user": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "username": {
+                                                            "type": "string",
+                                                            "example": "3578142602980002"
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "john@example.com"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "token": {
+                                                    "type": "string",
+                                                    "example": "2|abcdefghijklmnopqrstuvwxyz123456789"
+                                                },
+                                                "token_type": {
+                                                    "type": "string",
+                                                    "example": "Bearer"
+                                                },
+                                                "expires_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-01T12:00:00Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token tidak valid atau sudah kadaluarsa",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Token tidak valid"
                                         }
                                     },
                                     "type": "object"
@@ -8274,7 +8383,7 @@
                                     "pma": {
                                         "description": "Apakah perusahaan PMA (Penanaman Modal Asing)",
                                         "type": "string",
-                                        "example": "Yes"
+                                        "example": "PMDN"
                                     },
                                     "detail_leads": {
                                         "description": "Catatan/detail tambahan tentang lead",
@@ -8284,32 +8393,32 @@
                                     "provinsi": {
                                         "description": "ID provinsi lokasi perusahaan",
                                         "type": "integer",
-                                        "example": 11
+                                        "example": 10
                                     },
                                     "kota": {
                                         "description": "ID kota/kabupaten lokasi perusahaan",
                                         "type": "integer",
-                                        "example": 1101
+                                        "example": 259
                                     },
                                     "kecamatan": {
                                         "description": "ID kecamatan lokasi perusahaan",
                                         "type": "integer",
-                                        "example": 110101
+                                        "example": 3515170
                                     },
                                     "kelurahan": {
                                         "description": "ID kelurahan/desa lokasi perusahaan",
                                         "type": "integer",
-                                        "example": 11010101
+                                        "example": 9471083530
                                     },
                                     "benua": {
                                         "description": "ID benua (untuk perusahaan luar negeri)",
                                         "type": "integer",
-                                        "example": 1
+                                        "example": 2
                                     },
                                     "negara": {
                                         "description": "ID negara (untuk perusahaan luar negeri)",
                                         "type": "integer",
-                                        "example": 1
+                                        "example": 79
                                     },
                                     "perusahaan_group_id": {
                                         "description": "ID grup perusahaan jika ada. Gunakan '__new__' untuk membuat grup baru",
@@ -9821,14 +9930,14 @@
                 ]
             }
         },
-        "/api/Leads/kota/{provinsiId}": {
+        "/api/leads/kota/{provinsiId}": {
             "get": {
                 "tags": [
                     "Leads"
                 ],
                 "summary": "Mendapatkan daftar kota berdasarkan ID provinsi",
                 "description": "Endpoint ini digunakan untuk mengambil data kota/kabupaten berdasarkan provinsi yang dipilih. Berguna untuk form input alamat perusahaan.",
-                "operationId": "5711494bc296e235852e3e7f2328102a",
+                "operationId": "ce48dc7456bee97a76e2259a3afea8a1",
                 "parameters": [
                     {
                         "name": "provinsiId",
@@ -9926,14 +10035,14 @@
                 ]
             }
         },
-        "/api/Leads/kecamatan/{kotaId}": {
+        "/api/leads/kecamatan/{kotaId}": {
             "get": {
                 "tags": [
                     "Leads"
                 ],
                 "summary": "Mendapatkan daftar kecamatan berdasarkan ID kota",
                 "description": "Endpoint ini digunakan untuk mengambil data kecamatan berdasarkan kota/kabupaten yang dipilih. Berguna untuk form input alamat perusahaan yang lebih detail.",
-                "operationId": "7731bca446484b77782e7ea5816fb45b",
+                "operationId": "2f35ef598ba0420433829d87099eb660",
                 "parameters": [
                     {
                         "name": "kotaId",
@@ -10031,14 +10140,14 @@
                 ]
             }
         },
-        "/api/Leads/kelurahan/{kecamatanId}": {
+        "/api/leads/kelurahan/{kecamatanId}": {
             "get": {
                 "tags": [
                     "Leads"
                 ],
                 "summary": "Mendapatkan daftar kelurahan berdasarkan ID kecamatan",
                 "description": "Endpoint ini digunakan untuk mengambil data kelurahan/desa berdasarkan kecamatan yang dipilih. Berguna untuk form input alamat perusahaan yang lengkap.",
-                "operationId": "19e3a285a837fff07139842af6410079",
+                "operationId": "0d7ead7578bba1a4823747a38ba9ce55",
                 "parameters": [
                     {
                         "name": "kecamatanId",
@@ -10136,14 +10245,14 @@
                 ]
             }
         },
-        "/api/Leads/negara/{benuaId}": {
+        "/api/leads/negara/{benuaId}": {
             "get": {
                 "tags": [
                     "Leads"
                 ],
                 "summary": "Mendapatkan daftar negara berdasarkan ID benua",
                 "description": "Endpoint ini digunakan untuk mengambil data negara berdasarkan benua yang dipilih. Berguna untuk form input perusahaan luar negeri.",
-                "operationId": "b803697b71430fb8d65fecbeda928881",
+                "operationId": "48f4ae0f1f99891021fbfd41d16c6c06",
                 "parameters": [
                     {
                         "name": "benuaId",

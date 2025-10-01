@@ -50,7 +50,7 @@ class PerusahaanGroupDetail extends Model
     {
         return $this->belongsTo(Leads::class, 'leads_id', 'id');
     }
-     public function getCreatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }

@@ -12,7 +12,7 @@ class Sysmenu extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'sysmenu';
-    
+
     protected $fillable = [
         'nama',
         'kode',
@@ -45,11 +45,11 @@ class Sysmenu extends Model
     }
 
     // Scope untuk menu yang tidak terhapus
-public function scopeActive($query)
-{
-    return $query->whereNull($this->getTable() . '.deleted_at');
-}
-   public function getCreatedAtAttribute($value)
+    public function scopeActive($query)
+    {
+        return $query->whereNull($this->getTable() . '.deleted_at');
+    }
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }

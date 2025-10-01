@@ -19,10 +19,6 @@ class LeadsKebutuhan extends Model
     ];
 
     public $timestamps = false; // kalau tabel pivot nggak punya created_at, updated_at
-    public function kebutuhans()
-{
-    return $this->hasMany(LeadsKebutuhan::class, 'leads_id');
-}
 
 }
 

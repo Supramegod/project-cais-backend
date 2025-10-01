@@ -34,7 +34,32 @@ class Leads extends Model
         'nomor',
         'created_by',
         'updated_by',
-        'deleted_by'
+        'deleted_by',
+        'tgl_leads',
+        'telp_perusahaan',
+        'jenis_perusahaan',
+        'bidang_perusahaan_id',
+        'bidang_perusahaan',
+        'platform_id',
+        'alamat',
+        'pic',
+        'jabatan',
+        'no_telp',
+        'email',
+        'pma',
+        'notes',
+        'provinsi_id',
+        'provinsi',
+        'kota_id',
+        'kota',
+        'kecamatan_id',
+        'kecamatan',
+        'kelurahan_id',
+        'kelurahan',
+        'benua_id',
+        'benua',
+        'negara_id',
+        'negara'
     ];
 
     protected $dates = ['deleted_at'];
@@ -43,18 +68,18 @@ class Leads extends Model
     {
         return $this->belongsTo(Branch::class, 'branch_id');
     }
-// Leads.php
+    // Leads.php
 
-public function kebutuhan()
-{
-    return $this->belongsToMany(
-        Kebutuhan::class,          // model tujuan
-        'sl_leads_kebutuhan',      // nama tabel pivot
-        'leads_id',                // foreign key di tabel pivot
-        'kebutuhan_id'             // foreign key ke tabel kebutuhan
-    )
-    ->wherePivot('deleted_at', null); // Tambahkan kondisi ini
-}
+    public function kebutuhan()
+    {
+        return $this->belongsToMany(
+            Kebutuhan::class,          // model tujuan
+            'sl_leads_kebutuhan',      // nama tabel pivot
+            'leads_id',                // foreign key di tabel pivot
+            'kebutuhan_id'             // foreign key ke tabel kebutuhan
+        )
+            ->wherePivot('deleted_at', null); // Tambahkan kondisi ini
+    }
 
 
     public function timSales()
@@ -106,7 +131,7 @@ public function kebutuhan()
     {
         return $this->belongsTo(Platform::class, 'platform_id', 'id');
     }
-    
+
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
@@ -118,6 +143,11 @@ public function kebutuhan()
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
+    }
+    public function getTglLeadsAttribute($value)
+    {
+        // Pastikan locale Carbon diatur ke 'id' di config/app.php
+        return Carbon::parse($value)->isoFormat('D MMMM Y');
     }
 
 }

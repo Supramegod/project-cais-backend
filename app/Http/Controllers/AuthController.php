@@ -43,8 +43,8 @@ class AuthController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"username","password"},
-     *             @OA\Property(property="username", type="string", example="3578142602980002", description="Username user"),
-     *             @OA\Property(property="password", type="string", format="password", example="3578142602980002", description="Password user")
+     *             @OA\Property(property="username", type="string", example="superadmin2", description="Username user"),
+     *             @OA\Property(property="password", type="string", format="password", example="salesshelter", description="Password user")
      *         )
      *     ),
      *     @OA\Response(
@@ -58,16 +58,19 @@ class AuthController extends Controller
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="username", type="string", example="3578142602980002"),
      *                     @OA\Property(property="name", type="string", example="John Doe"),
-     *                     @OA\Property(property="email", type="string", example="john@example.com")
+     *                     @OA\Property(property="email", type="string", example="john@example.com"),
+     *                     @OA\Property(property="role_id", type="integer", example=1),
+     *                     @OA\Property(property="branch_id", type="integer", example=1)
      *                 ),
      *                 @OA\Property(property="token", type="string", example="1|abcdefghijklmnopqrstuvwxyz123456789"),
-     *                 @OA\Property(property="token_type", type="string", example="Bearer")
+     *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+     *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T12:00:00Z")
      *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Kredensial tidak valid",
+     *         description="Kredensial tidak valid atau akun tidak aktif",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Kredensial yang diberikan tidak valid")
@@ -85,69 +88,95 @@ class AuthController extends Controller
      * )
      */
     public function login(Request $request)
-    {
-        try {
-            $request->validate([
-                'username' => 'required|string',
-                // 'password' => 'required|string'
-            ]);
+{
+    try {
+        // 1. Validasi Input - hanya username yang required untuk sementara
+        $request->validate([
+            'username' => 'required|string',
+            // 'password' => 'required|string', // Dinonaktifkan sementara
+        ]);
 
-            // Cari user berdasarkan username
-            $user = User::where('username', $request->username)->first();
+        $inputUsername = $request->username;
 
-            // // Cek apakah user ditemukan dan password cocok
-            // if (!$user || !Hash::check($request->password, $user->password)) {
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'Kredensial yang diberikan tidak valid',
-            //     ], 401);
-            // }
+        // 2. Cari pengguna
+        $user = User::where('username', $inputUsername)->first();
 
-            // Generate token baru dengan Sanctum
-            $token = $user->createToken('auth_token')->plainTextToken;
-
-            Log::info('User berhasil login', [
-                'user_id' => $user->id,
-                'username' => $user->username,
-                'timestamp' => now()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Login berhasil',
-                'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'name' => $user->full_name,
-                        'email' => $user->email,
-                    ],
-                    'token' => $token,
-                    'token_type' => 'Bearer'
-                ]
-            ], 200);
-
-        } catch (ValidationException $e) {
+        if (!$user) {
             return response()->json([
                 'success' => false,
-                'message' => 'Data tidak valid',
-                'errors' => $e->errors()
-            ], 422);
-
-        } catch (Exception $e) {
-            Log::error('Login error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'username' => $request->username ?? 'unknown'
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan pada server',
-            ], 500);
+                'message' => 'Kredensial yang diberikan tidak valid',
+            ], 401);
         }
-    }
 
+        // 3. Skip validasi password untuk sementara - langsung buat token
+        // $isPasswordValid = $this->verifyMD5Password($inputPassword, $user->password);
+        // if (!$isPasswordValid) {
+        //     Log::warning('Login attempt failed - invalid password', [
+        //         'user_id' => $user->id,
+        //         'username' => $user->username,
+        //         'ip' => $request->ip()
+        //     ]);
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => 'Kredensial yang diberikan tidak valid',
+        //     ], 401);
+        // }
+
+        // 4. Hapus token lama dan buat token baru
+        $user->tokens()->where('name', 'auth_token')->delete();
+        
+        // Buat token baru
+        $token = $user->createToken('auth_token');
+        $plainTextToken = $token->plainTextToken;
+
+        // Dapatkan model token untuk mengambil expires_at
+        $tokenModel = $user->tokens()->where('name', 'auth_token')->latest()->first();
+
+        // 5. Kembalikan Response Sukses dengan expires_at
+        return response()->json([
+            'success' => true,
+            'message' => 'Login berhasil',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'name' => $user->full_name ?? $user->name,
+                    'email' => $user->email,
+                    'role_id' => $user->role_id,
+                    'branch_id' => $user->branch_id,
+                ],
+                'token' => $plainTextToken,
+                'token_type' => 'Bearer',
+                'expires_at' => $tokenModel->expires_at ? $tokenModel->expires_at->toISOString() : null
+            ]
+        ], 200);
+
+    } catch (ValidationException $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Data tidak valid',
+            'errors' => $e->errors()
+        ], 422);
+
+    } catch (Exception $e) {
+        Log::error('Login error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'username_attempt' => $request->username ?? 'unknown'
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage()
+        ], 500);
+    }
+}
+// Method verifyMD5Password tetap ada tapi tidak dipanggil untuk sementara
+private function verifyMD5Password($inputPassword, $storedMD5Hash)
+{
+    $inputMD5 = md5($inputPassword);
+    return $inputMD5 === $storedMD5Hash;
+}
     /**
      * @OA\Post(
      *     path="/api/auth/logout",
@@ -239,7 +268,7 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-            
+
             // Cek apakah user terautentikasi
             if (!$user) {
                 return response()->json([
@@ -275,4 +304,111 @@ class AuthController extends Controller
             ], 500);
         }
     }
+/**
+ * @OA\Post(
+ *     path="/api/auth/refresh",
+ *     tags={"Authentication"},
+ *     summary="Refresh token",
+ *     description="Memperbarui token akses yang sudah kadaluarsa",
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Response(
+ *         response=200,
+ *         description="Token berhasil direfresh",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Token berhasil direfresh"),
+ *             @OA\Property(property="data", type="object",
+ *                 @OA\Property(property="user", type="object",
+ *                     @OA\Property(property="id", type="integer", example=1),
+ *                     @OA\Property(property="username", type="string", example="3578142602980002"),
+ *                     @OA\Property(property="name", type="string", example="John Doe"),
+ *                     @OA\Property(property="email", type="string", example="john@example.com")
+ *                 ),
+ *                 @OA\Property(property="token", type="string", example="2|abcdefghijklmnopqrstuvwxyz123456789"),
+ *                 @OA\Property(property="token_type", type="string", example="Bearer"),
+ *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T12:00:00Z")
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=401,
+ *         description="Token tidak valid atau sudah kadaluarsa",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=false),
+ *             @OA\Property(property="message", type="string", example="Token tidak valid")
+ *         )
+ *     )
+ * )
+ */
+public function refresh(Request $request)
+{
+    try {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
+        // Dapatkan token saat ini
+        $currentToken = $user->currentAccessToken();
+
+        if (!$currentToken) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token tidak valid'
+            ], 401);
+        }
+
+        // Simpan info token lama untuk log
+        $oldTokenId = $currentToken->id;
+
+        // Hapus token lama
+        $currentToken->delete();
+
+        // Buat token baru
+        $newToken = $user->createToken('auth_token')->plainTextToken;
+
+        // Dapatkan model token yang baru dibuat
+        $tokenModel = $user->tokens()->where('name', 'auth_token')->latest()->first();
+
+        Log::info('Token berhasil direfresh', [
+            'user_id' => $user->id,
+            'username' => $user->username,
+            'old_token_id' => $oldTokenId,
+            'new_token_id' => $tokenModel->id,
+            'timestamp' => now()
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Token berhasil direfresh',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'name' => $user->full_name,
+                    'email' => $user->email,
+                ],
+                'token' => $newToken,
+                'token_type' => 'Bearer',
+                'expires_at' => $tokenModel->expires_at?->toISOString()
+            ]
+        ], 200);
+
+    } catch (Exception $e) {
+        Log::error('Refresh token error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'user_id' => Auth::id() ?? 'unknown'
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Terjadi kesalahan pada server'
+        ], 500);
+    }
+}
 }

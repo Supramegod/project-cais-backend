@@ -57,6 +57,7 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
     // Relasi ke role
     public function role()
     {

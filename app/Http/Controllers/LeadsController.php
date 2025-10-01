@@ -372,14 +372,14 @@ class LeadsController extends Controller
      *             @OA\Property(property="jabatan_pic", type="string", example="Manager Purchasing", description="Jabatan PIC di perusahaan"),
      *             @OA\Property(property="no_telp", type="string", example="08123456789", description="Nomor telepon/HP PIC"),
      *             @OA\Property(property="email", type="string", format="email", example="john@abc.com", description="Email PIC"),
-     *             @OA\Property(property="pma", type="string", example="Yes", description="Apakah perusahaan PMA (Penanaman Modal Asing)"),
+     *             @OA\Property(property="pma", type="string", example="PMDN", description="Apakah perusahaan PMA (Penanaman Modal Asing)"),
      *             @OA\Property(property="detail_leads", type="string", example="Tertarik dengan produk A untuk kebutuhan X", description="Catatan/detail tambahan tentang lead"),
-     *             @OA\Property(property="provinsi", type="integer", example=11, description="ID provinsi lokasi perusahaan"),
-     *             @OA\Property(property="kota", type="integer", example=1101, description="ID kota/kabupaten lokasi perusahaan"),
-     *             @OA\Property(property="kecamatan", type="integer", example=110101, description="ID kecamatan lokasi perusahaan"),
-     *             @OA\Property(property="kelurahan", type="integer", example=11010101, description="ID kelurahan/desa lokasi perusahaan"),
-     *             @OA\Property(property="benua", type="integer", example=1, description="ID benua (untuk perusahaan luar negeri)"),
-     *             @OA\Property(property="negara", type="integer", example=1, description="ID negara (untuk perusahaan luar negeri)"),
+     *             @OA\Property(property="provinsi", type="integer", example=10, description="ID provinsi lokasi perusahaan"),
+     *             @OA\Property(property="kota", type="integer", example=259, description="ID kota/kabupaten lokasi perusahaan"),
+     *             @OA\Property(property="kecamatan", type="integer", example=3515170, description="ID kecamatan lokasi perusahaan"),
+     *             @OA\Property(property="kelurahan", type="integer", example=9471083530, description="ID kelurahan/desa lokasi perusahaan"),
+     *             @OA\Property(property="benua", type="integer", example=2, description="ID benua (untuk perusahaan luar negeri)"),
+     *             @OA\Property(property="negara", type="integer", example=79, description="ID negara (untuk perusahaan luar negeri)"),
      *             @OA\Property(property="perusahaan_group_id", type="integer", example=1, description="ID grup perusahaan jika ada. Gunakan '__new__' untuk membuat grup baru"),
      *             @OA\Property(property="new_nama_grup", type="string", example="ABC Group", description="Nama grup baru jika perusahaan_group_id = '__new__'")
      *         )
@@ -914,11 +914,17 @@ class LeadsController extends Controller
             $lead->restore();
             $lead->deleted_by = null;
             $lead->save();
+            LeadsKebutuhan::onlyTrashed()
+                ->where('leads_id', $id)
+                ->update([
+                    'deleted_at' => null, // Me-restore record
+                    'deleted_by' => null, // Mengosongkan kolom kustom
+                ]);
 
             DB::commit();
             return response()->json([
                 'success' => true,
-                'message' => 'Leads ' . $lead->nama_perusahaan . ' berhasil direstore'
+                'message' => 'Leads ' . $lead->nama_perusahaan . ' berhasil direstore beserta kebutuhan terkait'
             ]);
         } catch (\Exception $e) {
             DB::rollback();
@@ -1416,30 +1422,50 @@ class LeadsController extends Controller
     public function availableLeads()
     {
         try {
+            // Pastikan Anda telah mengimpor kelas Leads, DB, dan Auth (jika di luar controller/model)
+            // use App\Models\Leads;
+            // use Illuminate\Support\Facades\DB;
+            // use Illuminate\Support\Facades\Auth;
+
+            $user = auth()->user();
             $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD']);
 
             // Role-based filtering
-            $user = auth()->user();
             if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+                // Role 29: Individual Sales (hanya melihat Leads mereka sendiri)
                 if ($user->role_id == 29) {
+                    // Filter Leads berdasarkan TimSalesDetail yang memiliki user_id sama dengan user yang login
                     $query->whereHas('timSalesD', function ($q) use ($user) {
                         $q->where('user_id', $user->id);
                     });
-                } elseif ($user->role_id == 31) {
-                    $tim = DB::table('m_tim_sales_d')->where('user_id', $user->id)->first();
-                    if ($tim) {
-                        $memberSales = DB::table('m_tim_sales_d')
-                            ->where('tim_sales_id', $tim->tim_sales_id)
+                }
+                // Role 31: Sales Leader (melihat Leads tim mereka)
+                elseif ($user->role_id == 31) {
+                    // 1. Dapatkan TimSalesDetail untuk user leader
+                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
+
+                    if ($timSalesDetail) {
+                        // 2. Dapatkan semua user_id anggota tim (termasuk leader itu sendiri)
+                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
                             ->pluck('user_id')
                             ->toArray();
-                        $query->whereHas('timSalesD', function ($q) use ($memberSales) {
-                            $q->whereIn('user_id', $memberSales);
+
+                        // 3. Filter Leads yang dimiliki oleh anggota tim tersebut
+                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
+                            $q->whereIn('user_id', $memberSalesUserIds);
                         });
+                    } else {
+                        // Jika leader tidak terdaftar di m_tim_sales_d, kembalikan Leads kosong
+                        $query->whereRaw('1 = 0');
                     }
                 }
-            } elseif (in_array($user->role_id, [6, 8])) {
-                // RO roles
-            } elseif (in_array($user->role_id, [54, 55, 56])) {
+            }
+            // RO roles
+            elseif (in_array($user->role_id, [6, 8])) {
+                // Implementasi filter RO, jika ada (saat ini kosong)
+            }
+            // CRM roles
+            elseif (in_array($user->role_id, [54, 55, 56])) {
                 if ($user->role_id == 54) {
                     $query->where('crm_id', $user->id);
                 }
@@ -1447,8 +1473,11 @@ class LeadsController extends Controller
 
             $data = $query->get();
 
+            // Transformasi data
             $data->transform(function ($item) {
-                $item->tgl = \Carbon\Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
+                // Pastikan kolom 'tgl_leads' tersedia di model Leads
+                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
+                // Properti ini mungkin perlu diisi dengan data dari relasi 'timSalesD' dan 'branch' jika diperlukan
                 $item->salesEmail = '';
                 $item->branchManagerEmail = '';
                 $item->branchManager = '';
@@ -1461,6 +1490,7 @@ class LeadsController extends Controller
                 'data' => $data
             ]);
         } catch (\Exception $e) {
+            // Penanganan error
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()
@@ -1567,7 +1597,7 @@ class LeadsController extends Controller
             $data = $query->get();
 
             $data->transform(function ($item) {
-                $item->tgl = \Carbon\Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
+                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
                 return $item;
             });
 
@@ -1645,7 +1675,7 @@ class LeadsController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/Leads/kota/{provinsiId}",
+     *     path="/api/leads/kota/{provinsiId}",
      *     summary="Mendapatkan daftar kota berdasarkan ID provinsi",
      *     description="Endpoint ini digunakan untuk mengambil data kota/kabupaten berdasarkan provinsi yang dipilih. Berguna untuk form input alamat perusahaan.",
      *     tags={"Leads"},
@@ -1714,7 +1744,7 @@ class LeadsController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/Leads/kecamatan/{kotaId}",
+     *     path="/api/leads/kecamatan/{kotaId}",
      *     summary="Mendapatkan daftar kecamatan berdasarkan ID kota",
      *     description="Endpoint ini digunakan untuk mengambil data kecamatan berdasarkan kota/kabupaten yang dipilih. Berguna untuk form input alamat perusahaan yang lebih detail.",
      *     tags={"Leads"},
@@ -1782,7 +1812,7 @@ class LeadsController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/Leads/kelurahan/{kecamatanId}",
+     *     path="/api/leads/kelurahan/{kecamatanId}",
      *     summary="Mendapatkan daftar kelurahan berdasarkan ID kecamatan",
      *     description="Endpoint ini digunakan untuk mengambil data kelurahan/desa berdasarkan kecamatan yang dipilih. Berguna untuk form input alamat perusahaan yang lengkap.",
      *     tags={"Leads"},
@@ -1848,7 +1878,7 @@ class LeadsController extends Controller
     }
     /**
      * @OA\Get(
-     *     path="/api/Leads/negara/{benuaId}",
+     *     path="/api/leads/negara/{benuaId}",
      *     summary="Mendapatkan daftar negara berdasarkan ID benua",
      *     description="Endpoint ini digunakan untuk mengambil data negara berdasarkan benua yang dipilih. Berguna untuk form input perusahaan luar negeri.",
      *     tags={"Leads"},
