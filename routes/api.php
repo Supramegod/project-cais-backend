@@ -23,6 +23,7 @@ use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SiteController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 
@@ -34,6 +35,13 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Branches & Users
     Route::get('/branches', [TimSalesController::class, 'getBranches']);
     Route::get('/users', [TimSalesController::class, 'getUsers']);
+
+    // Site Management
+    Route::prefix('site')->controller(SiteController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::get('/available-customer', 'availableCustomer');
+    });
 
     // Jenis Perusahaan
     Route::prefix('jenis-perusahaan')->controller(JenisPerusahaanController::class)->group(function () {
@@ -155,7 +163,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/list-all', 'listAll');
         Route::get('/view/{id}', 'view');
         Route::get('/province/{provinceId}', 'listUmp');
-        Route::post('/add', 'save');
+        Route::post('/add', 'add');
     });
 
     // UMK (Upah Minimum Kabupaten/Kota)
@@ -205,7 +213,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/list', 'list');
         Route::get('/by-role', 'getMenusByRole');
         Route::get('/permissions', 'getUserPermissions');
-        Route::get('/all-permissions', 'getAllPermissions');    // Route baru untuk melihat semua permission
+        Route::get('/all-permissions', 'getAllPermissions');
         Route::post('/add', 'add');
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
@@ -277,7 +285,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/generate-null-kode', 'generateNullKode');
 
         // Location data endpoints
-        Route::get('/provinsi', 'getProvinsi'); // ✅ Route baru untuk provinsi
+        Route::get('/provinsi', 'getProvinsi');
         Route::get('/kota/{provinsiId}', 'getKota');
         Route::get('/kecamatan/{kotaId}', 'getKecamatan');
         Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');

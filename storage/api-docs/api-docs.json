@@ -14354,6 +14354,422 @@
                 ]
             }
         },
+        "/api/site/list": {
+            "get": {
+                "tags": [
+                    "Site"
+                ],
+                "summary": "Get list of all sites",
+                "description": "Mengambil daftar semua site/lokasi kerja dari quotation yang terhubung dengan leads. Endpoint ini menampilkan informasi dasar site termasuk nama perusahaan, lokasi, status SPK dan kontrak. Data diurutkan berdasarkan ID terbaru.",
+                "operationId": "getSiteList",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar site",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Perusahaan"
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site Jakarta Pusat"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string",
+                                                        "example": "DKI Jakarta"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Pusat"
+                                                    },
+                                                    "penempatan": {
+                                                        "type": "string",
+                                                        "example": "Gedung Perkantoran Lt. 5"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15T10:30:00.000000Z"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "spk": {
+                                                        "description": "Status apakah sudah ada SPK",
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "kontrak": {
+                                                        "description": "Status apakah sudah ada kontrak",
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid atau sudah expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error - Terjadi kesalahan saat mengambil data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve sites"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/site/view/{id}": {
+            "get": {
+                "tags": [
+                    "Site"
+                ],
+                "summary": "Get detailed information of a specific site",
+                "description": "Mengambil detail lengkap dari site/leads tertentu berdasarkan ID. Endpoint ini menampilkan informasi leads yang sudah memiliki customer_id beserta 5 aktivitas customer terbaru yang terkait dengan leads tersebut. Berguna untuk melihat histori interaksi dengan customer di site tertentu.",
+                "operationId": "getSiteDetail",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID dari leads/site yang ingin dilihat detailnya",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil detail site",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "leads": {
+                                                    "description": "Data lengkap leads/site",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        },
+                                                        "stgl_leads": {
+                                                            "type": "string",
+                                                            "example": "15 Januari 2024"
+                                                        },
+                                                        "screated_at": {
+                                                            "type": "string",
+                                                            "example": "15 Januari 2024"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "activity": {
+                                                    "description": "5 aktivitas customer terbaru",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "screated_at": {
+                                                                "type": "string",
+                                                                "example": "15 Januari 2024 10:30"
+                                                            },
+                                                            "stgl_activity": {
+                                                                "type": "string",
+                                                                "example": "15 Januari 2024"
+                                                            },
+                                                            "notes": {
+                                                                "type": "string",
+                                                                "example": "Meeting dengan client"
+                                                            },
+                                                            "tipe": {
+                                                                "type": "string",
+                                                                "example": "meeting"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Site tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Site not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve site details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/site/available-customer": {
+            "get": {
+                "tags": [
+                    "Site"
+                ],
+                "summary": "Get list of available customers for site assignment",
+                "description": "Mengambil daftar customer yang tersedia untuk penugasan site. Endpoint ini menampilkan leads yang sudah memiliki customer_id dan dapat difilter berdasarkan role user yang login. Sales hanya melihat leads mereka sendiri, SPV Sales melihat leads tim mereka, RO melihat leads yang ditugaskan ke mereka, dan CRM melihat leads yang menjadi tanggung jawab mereka. Data mencakup informasi lengkap customer beserta status, kebutuhan, dan tim sales yang menangani.",
+                "operationId": "getAvailableCustomers",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar customer yang tersedia",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "tgl": {
+                                                        "description": "Tanggal leads dalam format bahasa Indonesia",
+                                                        "type": "string",
+                                                        "example": "15 Januari 2024"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Perusahaan"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "description": "Jenis layanan yang dibutuhkan",
+                                                        "type": "string",
+                                                        "example": "Security"
+                                                    },
+                                                    "pic": {
+                                                        "description": "Person In Charge dari customer",
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "no_telp": {
+                                                        "type": "string",
+                                                        "example": "081234567890"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "john@example.com"
+                                                    },
+                                                    "status": {
+                                                        "description": "Status leads saat ini",
+                                                        "type": "string",
+                                                        "example": "Hot Prospect"
+                                                    },
+                                                    "branch": {
+                                                        "description": "Cabang yang menangani",
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "platform": {
+                                                        "description": "Platform asal leads",
+                                                        "type": "string",
+                                                        "example": "Website"
+                                                    },
+                                                    "tim_sales": {
+                                                        "description": "Nama tim sales",
+                                                        "type": "string",
+                                                        "example": "Tim A"
+                                                    },
+                                                    "sales": {
+                                                        "description": "Nama sales person",
+                                                        "type": "string",
+                                                        "example": "Jane Smith"
+                                                    },
+                                                    "ro": {
+                                                        "description": "Regional Officer yang menangani",
+                                                        "type": "string",
+                                                        "example": "RO Name"
+                                                    },
+                                                    "crm": {
+                                                        "description": "CRM staff yang menangani",
+                                                        "type": "string",
+                                                        "example": "CRM Name"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve available customers"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/supplier/list": {
             "get": {
                 "tags": [
@@ -18393,6 +18809,10 @@
         {
             "name": "Salary Rule",
             "description": "API Endpoints untuk Management Salary Rule"
+        },
+        {
+            "name": "Site",
+            "description": "API Endpoints untuk mengelola Site"
         },
         {
             "name": "Supplier",
