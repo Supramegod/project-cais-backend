@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class HrisPersonalAccessToken extends SanctumPersonalAccessToken
 {
@@ -12,6 +13,7 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
 
     // Token expires dalam 2 jam
     protected $expirationTime = 2;
+
 
     /**
      * Boot method untuk set tokenable_type dan expires_at otomatis
@@ -25,7 +27,7 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
             if (empty($token->tokenable_type)) {
                 $token->tokenable_type = 'App\\Models\\User';
             }
-            
+
             // Set expires_at otomatis jika NULL
             if (empty($token->expires_at)) {
                 $token->expires_at = Carbon::now()->addHours($token->expirationTime);

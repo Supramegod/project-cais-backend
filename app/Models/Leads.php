@@ -111,6 +111,11 @@ class Leads extends Model
     {
         return $this->hasMany(CustomerActivity::class, 'leads_id');
     }
+    public function scopeAvailableCustomers($query)
+    {
+        return $query->whereNotNull('customer_id')
+            ->whereNull('deleted_at');
+    }
 
     public function quotations()
     {

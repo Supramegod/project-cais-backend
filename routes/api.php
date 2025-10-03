@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\TrainingController;
@@ -290,5 +291,10 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/kecamatan/{kotaId}', 'getKecamatan');
         Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
         Route::get('/negara/{benuaId}', 'getNegara');
+    });
+    Route::prefix('customer')->controller(CustomerController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::get('/available', 'availableCustomer')->name('customer.available');
     });
 });

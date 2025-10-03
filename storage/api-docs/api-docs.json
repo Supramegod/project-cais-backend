@@ -5462,6 +5462,719 @@
                 ]
             }
         },
+        "/api/customer/list": {
+            "get": {
+                "tags": [
+                    "Customer"
+                ],
+                "summary": "Mendapatkan daftar customer dengan filter",
+                "description": "Menampilkan daftar customer yang sudah terkonversi (status_leads_id = 102) dengan kemampuan filtering berdasarkan branch, platform, status, dan range tanggal. Data yang ditampilkan disesuaikan dengan role user yang login (Sales, SPV Sales, RO, CRM). Default range tanggal adalah 3 bulan terakhir jika tidak dispesifikasikan.",
+                "operationId": "6467e31be60f4e674ce0ee10bf6edef5",
+                "parameters": [
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "ID Branch untuk filter customer berdasarkan cabang",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "description": "ID Platform untuk filter customer berdasarkan sumber platform (misal: Website, WhatsApp, Referral)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "ID Status Leads untuk filter customer berdasarkan status saat ini",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 102
+                        }
+                    },
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Tanggal awal periode (format: YYYY-MM-DD). Default: 3 bulan yang lalu dari hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-07-02"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "Tanggal akhir periode (format: YYYY-MM-DD). Default: hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-10-02"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "master": {
+                                                    "description": "Data master untuk dropdown filter",
+                                                    "properties": {
+                                                        "branch": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 2
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string",
+                                                                        "example": "Jakarta"
+                                                                    },
+                                                                    "is_active": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "platform": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Website"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "status": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 102
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Customer"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "customers": {
+                                                    "description": "Daftar customer yang sudah difilter",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "ro": {
+                                                                "type": "string",
+                                                                "example": "RO-2025-001"
+                                                            },
+                                                            "crm": {
+                                                                "type": "string",
+                                                                "example": "CRM-2025-001"
+                                                            },
+                                                            "nama_perusahaan": {
+                                                                "type": "string",
+                                                                "example": "PT. Contoh Indonesia"
+                                                            },
+                                                            "pic": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "no_telp": {
+                                                                "type": "string",
+                                                                "example": "08123456789"
+                                                            },
+                                                            "email": {
+                                                                "type": "string",
+                                                                "example": "john@example.com"
+                                                            },
+                                                            "tgl": {
+                                                                "type": "string",
+                                                                "example": "2 Oktober 2025"
+                                                            },
+                                                            "sales": {
+                                                                "type": "string",
+                                                                "example": "Ahmad Salesman"
+                                                            },
+                                                            "status_name": {
+                                                                "type": "string",
+                                                                "example": "Customer"
+                                                            },
+                                                            "branch_name": {
+                                                                "type": "string",
+                                                                "example": "Jakarta"
+                                                            },
+                                                            "platform_name": {
+                                                                "type": "string",
+                                                                "example": "Website"
+                                                            },
+                                                            "warna_background": {
+                                                                "type": "string",
+                                                                "example": "#28a745"
+                                                            },
+                                                            "warna_font": {
+                                                                "type": "string",
+                                                                "example": "#ffffff"
+                                                            },
+                                                            "can_view": {
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "aksi": {
+                                                                "type": "string",
+                                                                "example": "view"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "applied_filters": {
+                                                    "description": "Filter yang sedang digunakan",
+                                                    "properties": {
+                                                        "branch": {
+                                                            "type": "integer",
+                                                            "example": 2
+                                                        },
+                                                        "platform": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "status": {
+                                                            "type": "integer",
+                                                            "example": 102
+                                                        },
+                                                        "tgl_dari": {
+                                                            "type": "string",
+                                                            "example": "2025-07-02"
+                                                        },
+                                                        "tgl_sampai": {
+                                                            "type": "string",
+                                                            "example": "2025-10-02"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "error": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid atau sudah expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer/view/{id}": {
+            "get": {
+                "tags": [
+                    "Customer"
+                ],
+                "summary": "Mendapatkan detail customer berdasarkan ID",
+                "description": "Menampilkan informasi lengkap customer termasuk data perusahaan, PIC, kebutuhan, dan 5 aktivitas terakhir. Endpoint ini hanya menampilkan customer yang memiliki customer_id (sudah terkonversi). Data aktivitas ditampilkan dalam urutan terbaru terlebih dahulu dengan format tanggal yang user-friendly.",
+                "operationId": "eebe4337a058eb950020c2bc61cadfbb",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID Customer (leads_id yang sudah memiliki customer_id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil detail customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "customer": {
+                                                    "description": "Detail informasi customer",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "customer_id": {
+                                                            "type": "string",
+                                                            "example": "CUST-2025-001"
+                                                        },
+                                                        "ro": {
+                                                            "type": "string",
+                                                            "example": "RO-2025-001"
+                                                        },
+                                                        "crm": {
+                                                            "type": "string",
+                                                            "example": "CRM-2025-001"
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Indonesia"
+                                                        },
+                                                        "pic": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "jabatan_pic": {
+                                                            "type": "string",
+                                                            "example": "Manager"
+                                                        },
+                                                        "no_telp": {
+                                                            "type": "string",
+                                                            "example": "08123456789"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "john@example.com"
+                                                        },
+                                                        "alamat": {
+                                                            "type": "string",
+                                                            "example": "Jl. Contoh No. 123"
+                                                        },
+                                                        "stgl_leads": {
+                                                            "type": "string",
+                                                            "example": "2 Oktober 2025"
+                                                        },
+                                                        "screated_at": {
+                                                            "type": "string",
+                                                            "example": "1 Oktober 2025"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "activity": {
+                                                    "description": "5 aktivitas terakhir customer",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "leads_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "tgl_activity": {
+                                                                "type": "string",
+                                                                "example": "2025-10-02"
+                                                            },
+                                                            "stgl_activity": {
+                                                                "type": "string",
+                                                                "example": "2 Oktober 2025"
+                                                            },
+                                                            "keterangan": {
+                                                                "type": "string",
+                                                                "example": "Follow up meeting dengan client"
+                                                            },
+                                                            "screated_at": {
+                                                                "type": "string",
+                                                                "example": "2 Oktober 2025 14:30"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "branch": {
+                                                    "description": "List semua branch aktif",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Jakarta"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "jabatanPic": {
+                                                    "description": "List jabatan PIC",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Manager"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "jenisPerusahaan": {
+                                                    "description": "List jenis perusahaan",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "PT"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "kebutuhan": {
+                                                    "description": "List kebutuhan",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Security"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "platform": {
+                                                    "description": "List platform",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Website"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Customer tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Customer not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/customer/available": {
+            "get": {
+                "tags": [
+                    "Customer"
+                ],
+                "summary": "Mendapatkan daftar customer yang tersedia",
+                "description": "Menampilkan semua customer yang tersedia dengan informasi lengkap termasuk sales team, status, dan platform. Data yang ditampilkan disesuaikan dengan role user (Sales hanya melihat customer sendiri, SPV melihat team, RO melihat yang ditangani, CRM melihat yang ditangani). Berguna untuk dropdown selection atau quick reference customer list.",
+                "operationId": "5f43806a33df29b4cef5c450763ca4fe",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar customer yang tersedia",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Array customer dengan informasi ringkas untuk selection",
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "ro": {
+                                                        "description": "Nomor RO (Routing Order)",
+                                                        "type": "string",
+                                                        "example": "RO-2025-001"
+                                                    },
+                                                    "crm": {
+                                                        "description": "Nomor CRM",
+                                                        "type": "string",
+                                                        "example": "CRM-2025-001"
+                                                    },
+                                                    "tim_sales": {
+                                                        "description": "Nama tim sales",
+                                                        "type": "string",
+                                                        "example": "Team Alpha"
+                                                    },
+                                                    "sales": {
+                                                        "description": "Nama sales person",
+                                                        "type": "string",
+                                                        "example": "Ahmad Salesman"
+                                                    },
+                                                    "tim_sales_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "tim_sales_d_id": {
+                                                        "type": "integer",
+                                                        "example": 5
+                                                    },
+                                                    "status_leads_id": {
+                                                        "type": "integer",
+                                                        "example": 102
+                                                    },
+                                                    "tgl_leads": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-10-02"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT. Contoh Indonesia"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "description": "Jenis kebutuhan customer",
+                                                        "type": "string",
+                                                        "example": "Security"
+                                                    },
+                                                    "pic": {
+                                                        "description": "Person in Charge",
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "no_telp": {
+                                                        "type": "string",
+                                                        "example": "08123456789"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "john@example.com"
+                                                    },
+                                                    "status": {
+                                                        "description": "Status leads saat ini",
+                                                        "type": "string",
+                                                        "example": "Customer"
+                                                    },
+                                                    "branch": {
+                                                        "description": "Nama cabang",
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "platform": {
+                                                        "description": "Platform sumber",
+                                                        "type": "string",
+                                                        "example": "Website"
+                                                    },
+                                                    "warna_background": {
+                                                        "description": "Warna background badge status",
+                                                        "type": "string",
+                                                        "example": "#28a745"
+                                                    },
+                                                    "warna_font": {
+                                                        "description": "Warna font badge status",
+                                                        "type": "string",
+                                                        "example": "#ffffff"
+                                                    },
+                                                    "tgl": {
+                                                        "description": "Tanggal leads terformat",
+                                                        "type": "string",
+                                                        "example": "2 Oktober 2025"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/devices/list": {
             "get": {
                 "tags": [
@@ -14362,6 +15075,55 @@
                 "summary": "Get list of all sites",
                 "description": "Mengambil daftar semua site/lokasi kerja dari quotation yang terhubung dengan leads. Endpoint ini menampilkan informasi dasar site termasuk nama perusahaan, lokasi, status SPK dan kontrak. Data diurutkan berdasarkan ID terbaru.",
                 "operationId": "getSiteList",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Filter tanggal dari (format: Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "Filter tanggal sampai (format: Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter branch ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "description": "Filter platform ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter status leads ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Berhasil mengambil daftar site",
@@ -14553,6 +15315,42 @@
                                                         },
                                                         "type": "object"
                                                     }
+                                                },
+                                                "master_data": {
+                                                    "description": "Data master untuk form",
+                                                    "properties": {
+                                                        "branch": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "jabatan_pic": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "jenis_perusahaan": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "kebutuhan": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "platform": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
@@ -14715,6 +15513,16 @@
                                                         "description": "CRM staff yang menangani",
                                                         "type": "string",
                                                         "example": "CRM Name"
+                                                    },
+                                                    "warna_background": {
+                                                        "description": "Warna background status",
+                                                        "type": "string",
+                                                        "example": "#FFFFFF"
+                                                    },
+                                                    "warna_font": {
+                                                        "description": "Warna font status",
+                                                        "type": "string",
+                                                        "example": "#000000"
                                                     }
                                                 },
                                                 "type": "object"
@@ -18785,6 +19593,10 @@
         {
             "name": "Customer Activity",
             "description": "Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
+        },
+        {
+            "name": "Customer",
+            "description": "API untuk manajemen data Customer. "
         },
         {
             "name": "Jenis Perusahaan",

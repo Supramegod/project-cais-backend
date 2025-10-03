@@ -147,7 +147,8 @@ class AuthController extends Controller
                 ],
                 'token' => $plainTextToken,
                 'token_type' => 'Bearer',
-                'expires_at' => $tokenModel->expires_at ? $tokenModel->expires_at->toISOString() : null
+                'expires_at' => $tokenModel->expires_at->timezone('Asia/Jakarta')->format('Y-m-d H:i:s'),
+
             ]
         ], 200);
 

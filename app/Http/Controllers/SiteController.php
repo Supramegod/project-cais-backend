@@ -11,6 +11,13 @@ use App\Models\Leads;
 use App\Models\QuotationSite;
 use App\Models\CustomerActivity;
 use App\Models\TimSalesDetail;
+use App\Models\StatusLeads;
+use App\Models\Branch;
+use App\Models\Platform;
+use App\Models\Kebutuhan;
+use App\Models\TimSales;
+use Illuminate\Support\Facades\DB;
+
 /**
  * @OA\Tag(
  *     name="Site",
@@ -27,6 +34,41 @@ class SiteController extends Controller
      *     description="Mengambil daftar semua site/lokasi kerja dari quotation yang terhubung dengan leads. Endpoint ini menampilkan informasi dasar site termasuk nama perusahaan, lokasi, status SPK dan kontrak. Data diurutkan berdasarkan ID terbaru.",
      *     operationId="getSiteList",
      *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="tgl_dari",
+     *         in="query",
+     *         description="Filter tanggal dari (format: Y-m-d)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="tgl_sampai",
+     *         in="query",
+     *         description="Filter tanggal sampai (format: Y-m-d)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch",
+     *         in="query",
+     *         description="Filter branch ID",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="platform",
+     *         in="query",
+     *         description="Filter platform ID",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         description="Filter status leads ID",
+     *         required=false,
+     *         @OA\Schema(type="integer")
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil daftar site",
@@ -72,12 +114,43 @@ class SiteController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            $data = QuotationSite::with(['leads', 'spkSite', 'site'])
+            $query = QuotationSite::with(['leads', 'spkSite', 'site'])
                 ->whereHas('leads', function ($query) {
                     $query->whereNull('deleted_at');
-                })
-                ->orderBy('id', 'desc')
-                ->get();
+                });
+
+            // Apply filters like in web controller
+            if (!empty($request->tgl_dari)) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('tgl_leads', '>=', $request->tgl_dari);
+                });
+            }
+
+            if (!empty($request->tgl_sampai)) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('tgl_leads', '<=', $request->tgl_sampai);
+                });
+            }
+
+            if (!empty($request->branch)) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('branch_id', $request->branch);
+                });
+            }
+
+            if (!empty($request->platform)) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('platform_id', $request->platform);
+                });
+            }
+
+            if (!empty($request->status)) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('status_leads_id', $request->status);
+                });
+            }
+
+            $data = $query->orderBy('id', 'desc')->get();
 
             $result = $data->map(function ($item) {
                 return [
@@ -151,6 +224,36 @@ class SiteController extends Controller
      *                         @OA\Property(property="notes", type="string", example="Meeting dengan client"),
      *                         @OA\Property(property="tipe", type="string", example="meeting")
      *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="master_data",
+     *                     type="object",
+     *                     description="Data master untuk form",
+     *                     @OA\Property(
+     *                         property="branch",
+     *                         type="array",
+     *                         @OA\Items(type="object")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="jabatan_pic",
+     *                         type="array",
+     *                         @OA\Items(type="object")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="jenis_perusahaan",
+     *                         type="array",
+     *                         @OA\Items(type="object")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="kebutuhan",
+     *                         type="array",
+     *                         @OA\Items(type="object")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="platform",
+     *                         type="array",
+     *                         @OA\Items(type="object")
+     *                     )
      *                 )
      *             )
      *         )
@@ -211,11 +314,21 @@ class SiteController extends Controller
                     ];
                 });
 
+            // Get master data like in web controller
+            $masterData = [
+                'branch' => DB::connection('mysqlhris')->table('m_branch')->where('is_active', 1)->get(),
+                'jabatan_pic' => DB::table('m_jabatan_pic')->whereNull('deleted_at')->get(),
+                'jenis_perusahaan' => DB::table('m_jenis_perusahaan')->whereNull('deleted_at')->get(),
+                'kebutuhan' => DB::table('m_kebutuhan')->whereNull('deleted_at')->get(),
+                'platform' => DB::table('m_platform')->whereNull('deleted_at')->get(),
+            ];
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'leads' => $data,
-                    'activity' => $activities
+                    'activity' => $activities,
+                    'master_data' => $masterData
                 ]
             ]);
 
@@ -259,7 +372,9 @@ class SiteController extends Controller
      *                     @OA\Property(property="tim_sales", type="string", example="Tim A", description="Nama tim sales"),
      *                     @OA\Property(property="sales", type="string", example="Jane Smith", description="Nama sales person"),
      *                     @OA\Property(property="ro", type="string", example="RO Name", description="Regional Officer yang menangani"),
-     *                     @OA\Property(property="crm", type="string", example="CRM Name", description="CRM staff yang menangani")
+     *                     @OA\Property(property="crm", type="string", example="CRM Name", description="CRM staff yang menangani"),
+     *                     @OA\Property(property="warna_background", type="string", example="#FFFFFF", description="Warna background status"),
+     *                     @OA\Property(property="warna_font", type="string", example="#000000", description="Warna font status")
      *                 )
      *             )
      *         )
@@ -306,7 +421,9 @@ class SiteController extends Controller
                     'tim_sales' => $item->timSales->nama ?? '',
                     'sales' => $item->timSalesDetail->nama ?? '',
                     'ro' => $item->ro,
-                    'crm' => $item->crm
+                    'crm' => $item->crm,
+                    'warna_background' => $item->statusLeads->warna_background ?? '',
+                    'warna_font' => $item->statusLeads->warna_font ?? ''
                 ];
             });
 
