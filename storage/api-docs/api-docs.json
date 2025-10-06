@@ -19050,18 +19050,18 @@
                 ]
             }
         },
-        "/api/umk/view/{id}": {
+        "/api/umk/view/{cityId}": {
             "get": {
                 "tags": [
                     "UMK"
                 ],
-                "summary": "Get UMK detail by ID",
-                "operationId": "4e3560b0f2c683ab01efaef7b47d7005",
+                "summary": "Get UMK detail by City ID",
+                "operationId": "9d0c292c9a4178aecd4907430e6e645a",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "cityId",
                         "in": "path",
-                        "description": "UMK ID",
+                        "description": "City ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -19349,18 +19349,18 @@
                 ]
             }
         },
-        "/api/ump/view/{id}": {
+        "/api/ump/view/{provinceId}": {
             "get": {
                 "tags": [
                     "UMP"
                 ],
-                "summary": "Get UMP detail by ID",
-                "operationId": "048bf6514f3ec3646d7c1601d5d17216",
+                "summary": "Get UMP detail by Province ID",
+                "operationId": "9794dafd2a3ba93fdfe9ee5ffa271779",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "provinceId",
                         "in": "path",
-                        "description": "UMP ID",
+                        "description": "Province ID",
                         "required": true,
                         "schema": {
                             "type": "integer"

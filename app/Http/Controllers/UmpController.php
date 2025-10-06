@@ -67,57 +67,58 @@ class UmpController extends Controller
         }
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/ump/view/{id}",
-     *     summary="Get UMP detail by ID",
-     *     tags={"UMP"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="UMP ID",
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="UMP not found"
-     *     )
-     * )
-     */
-    public function view($id)
-    {
-        try {
-            $data = Ump::find($id);
+/**
+ * @OA\Get(
+ *     path="/api/ump/view/{provinceId}",
+ *     summary="Get UMP detail by Province ID",
+ *     tags={"UMP"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(
+ *         name="provinceId",
+ *         in="path",
+ *         required=true,
+ *         description="Province ID",
+ *         @OA\Schema(type="integer")
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Successful operation",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="data", type="object")
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=404,
+ *         description="UMP not found"
+ *     )
+ * )
+ */
+public function view($provinceId)
+{
+    try {
+        $data = Ump::where('province_id', $provinceId)->first();
 
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data UMP tidak ditemukan'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-
-        } catch (\Exception $e) {
+        if (!$data) {
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Data UMP tidak ditemukan'
+            ], 404);
         }
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Internal server error: ' . $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * @OA\Get(

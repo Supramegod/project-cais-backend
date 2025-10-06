@@ -69,15 +69,15 @@ class UmkController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/umk/view/{id}",
-     *     summary="Get UMK detail by ID",
+     *     path="/api/umk/view/{cityId}",
+     *     summary="Get UMK detail by City ID",
      *     tags={"UMK"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="cityId",
      *         in="path",
      *         required=true,
-     *         description="UMK ID",
+     *         description="City ID",
      *         @OA\Schema(type="integer")
      *     ),
      *     @OA\Response(
@@ -94,10 +94,10 @@ class UmkController extends Controller
      *     )
      * )
      */
-    public function view($id)
+    public function view($cityId)
     {
         try {
-            $data = Umk::find($id);
+            $data = Umk::where('city_id', $cityId)->first();
 
             if (!$data) {
                 return response()->json([
