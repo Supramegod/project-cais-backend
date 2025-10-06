@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Models\Top;
+use App\Models\TOP;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -488,63 +488,6 @@ class TopController extends Controller
                 'message' => 'TOP berhasil dihapus'
             ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/top/list-all",
-     *     summary="Get all TOP data without pagination (optional)",
-     *     description="Mendapatkan semua data Terms of Payment tanpa pagination untuk dropdown/select option",
-     *     tags={"TOP"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nama", type="string", example="TOP 30 Hari"),
-     *                     @OA\Property(property="persentase", type="number", format="float", example=30.00)
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Unauthorized")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Internal server error")
-     *         )
-     *     )
-     * )
-     */
-    public function listAll()
-    {
-        try {
-            $data = Top::all(['id', 'nama', 'persentase']);
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

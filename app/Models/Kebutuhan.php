@@ -46,6 +46,11 @@ class Kebutuhan extends Model
     {
         return $this->hasMany(RequirementPosisi::class, 'kebutuhan_id');
     }
+     public function leads()
+    {
+        // Ini adalah relasi custom karena kebutuhan_id disimpan sebagai string comma separated
+        return; // Tidak ada relasi langsung
+    }
 
     // Auto-fill creator
     public static function boot()

@@ -460,44 +460,4 @@ class SalaryRuleController extends Controller
             ], 500);
         }
     }
-
-    /**
-     * @OA\Get(
-     *     path="/api/salary-rule/list-all",
-     *     summary="Get all salary rules without pagination (optional)",
-     *     tags={"Salary Rule"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Successful operation",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nama_salary_rule", type="string", example="Salary Rule January 2024"),
-     *                     @OA\Property(property="cutoff", type="string", example="Tanggal 1 - 15")
-     *                 )
-     *             )
-     *         )
-     *     )
-     * )
-     */
-    public function listAll()
-    {
-        try {
-            $data = SalaryRule::all(['id', 'nama_salary_rule', 'cutoff']);
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
-        }
-    }
 }
