@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
@@ -36,6 +37,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Branches & Users
     Route::get('/branches', [TimSalesController::class, 'getBranches']);
     Route::get('/users', [TimSalesController::class, 'getUsers']);
+    Route::get('/platforms', [LeadsController::class, 'getPlatforms']);
+    Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -296,5 +299,30 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
         Route::get('/available', 'availableCustomer')->name('customer.available');
+    });
+    // SPK Routes
+    Route::prefix('spk')->controller(SpkController::class)->group(function () {
+        // Basic CRUD
+        Route::get('/list', 'list');
+        Route::get('/list-terhapus', 'listTerhapus');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+
+        // Cetak SPK
+        Route::get('/cetak/{id}', 'cetakSpk');
+
+        // File Upload
+        Route::post('/upload/{id}', 'uploadSpk');
+
+        // Ajukan Ulang Quotation
+        Route::post('/ajukan-ulang/{spkId}', 'ajukanUlangQuotation');
+
+        // Available Resources
+        Route::get('/available-quotation', 'availableQuotation');
+        Route::get('/available-leads', 'availableLeads');
+        Route::get('/available-sites/{leadsId}', 'getSiteAvailableList');
+
+        // Site Management
+        Route::get('/site-list/{id}', 'getSiteList');
     });
 });

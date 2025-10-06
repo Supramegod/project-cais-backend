@@ -32,6 +32,11 @@ class QuotationSite extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+    // Di model QuotationSite
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
 
     /**
      * Format updated_at jadi dd-mm-YYYY

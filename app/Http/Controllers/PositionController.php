@@ -94,7 +94,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function list(Request $request): JsonResponse
+    public function list(Request $request)
     {
         try {
             $query = Position::with([
@@ -122,6 +122,7 @@ class PositionController extends Controller
                     'name' => $pos->name,
                     'description' => $pos->description,
                     'company_id' => $pos->company_id,
+                    'company_name' => $pos->company ? $pos->company->name : null, // tambahkan ini
                     'layanan_id' => $pos->layanan_id,
                     'kebutuhan' => $pos->kebutuhan ? [
                         'id' => $pos->kebutuhan->id,
@@ -131,6 +132,7 @@ class PositionController extends Controller
                     'updated_at' => $pos->updated_at,
                 ];
             });
+
 
             return response()->json([
                 'success' => true,
@@ -227,7 +229,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function view($id): JsonResponse
+    public function view($id)
     {
         try {
             // Validate ID parameter
@@ -332,7 +334,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function save(Request $request): JsonResponse
+    public function save(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -467,7 +469,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function edit(Request $request, $id): JsonResponse
+    public function edit(Request $request, $id)
     {
         try {
             // Validate ID parameter
@@ -585,7 +587,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function delete(Request $request, $id): JsonResponse
+    public function delete(Request $request, $id)
     {
         try {
             // Validate ID parameter
@@ -687,7 +689,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function requirementList(Request $request, $position_id): JsonResponse
+    public function requirementList(Request $request, $position_id)
     {
         try {
             // Validate position_id parameter
@@ -792,7 +794,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function addRequirement(Request $request): JsonResponse
+    public function addRequirement(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -914,7 +916,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function requirementEdit(Request $request): JsonResponse
+    public function requirementEdit(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -1016,7 +1018,7 @@ class PositionController extends Controller
      *      )
      *   )
      */
-    public function requirementDelete(Request $request, $id): JsonResponse
+    public function requirementDelete(Request $request, $id)
     {
         try {
             if (!is_numeric($id) || $id <= 0) {
@@ -1100,7 +1102,7 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function listEntitas(Request $request): JsonResponse
+    public function listEntitas(Request $request)
     {
         try {
             $data = Company::where('is_active', true)
