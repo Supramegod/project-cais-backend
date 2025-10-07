@@ -11,6 +11,7 @@ class Role extends Model
 
     protected $table = 'm_role';
     protected $primaryKey = 'id';
+    protected $connection = 'mysqlhris';
     public $timestamps = false;
 
     protected $fillable = [

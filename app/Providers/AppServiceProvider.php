@@ -23,4 +23,5 @@ class AppServiceProvider extends ServiceProvider
     {
          Sanctum::usePersonalAccessTokenModel(HrisPersonalAccessToken::class); 
     }
+    
 }

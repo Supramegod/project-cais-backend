@@ -10,6 +10,7 @@ use App\Models\BarangDefaultQty;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 /**
@@ -537,7 +538,7 @@ class BarangController extends Controller
      *     )
      * )
      */
-    public function Delete($id)
+    public function delete($id)
     {
         try {
             $barang = Barang::whereNull('deleted_at')->find($id);
@@ -561,6 +562,548 @@ class BarangController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Default Quantity Management Endpoints
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * @OA\Get(
+     *     path="/api/barang/default-qty/{id}",
+     *     summary="Get data default quantity barang",
+     *     description="Mengambil semua data default quantity untuk barang tertentu berdasarkan layanan",
+     *     tags={"Barang"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID barang",
+     *         required=true,
+     *         @OA\Schema(type="integer", minimum=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data berhasil diambil",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="barang_id", type="integer", example=1),
+     *                     @OA\Property(property="layanan_id", type="integer", example=1),
+     *                     @OA\Property(property="layanan", type="string", example="Kaporlap"),
+     *                     @OA\Property(property="qty_default", type="integer", example=10),
+     *                     @OA\Property(property="created_by", type="string", example="Admin User"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time"),
+     *                     @OA\Property(property="updated_at", type="string", format="date-time")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error: Internal server error")
+     *         )
+     *     )
+     * )
+     */
+    public function getDefaultQty($id)
+    {
+        try {
+            $data = BarangDefaultQty::where('barang_id', $id)
+                ->whereNull('deleted_at')
+                ->orderBy('layanan')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/barang/default-qty/save",
+     *     summary="Simpan atau update default quantity",
+     *     description="Menyimpan atau mengupdate data default quantity barang untuk layanan tertentu",
+     *     tags={"Barang"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Data default quantity yang akan disimpan",
+     *         @OA\JsonContent(
+     *             required={"barang_id", "layanan_id", "qty_default"},
+     *             @OA\Property(property="barang_id", type="integer", example=1, description="ID barang"),
+     *             @OA\Property(property="layanan_id", type="integer", example=1, description="ID layanan/kebutuhan"),
+     *             @OA\Property(property="qty_default", type="integer", example=10, minimum=0, description="Jumlah default quantity")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data berhasil disimpan",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data default qty berhasil disimpan"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="action", type="string", example="created", description="Action performed: created or updated")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Layanan tidak ditemukan",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Layanan tidak ditemukan")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validasi gagal",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="barang_id harus diisi")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error: Internal server error")
+     *         )
+     *     )
+     * )
+     */
+    public function saveDefaultQty(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'barang_id' => 'required|numeric',
+                'layanan_id' => 'required|numeric',
+                'qty_default' => 'required|numeric|min:0',
+            ], [
+                'required' => ':attribute harus diisi',
+                'numeric' => ':attribute harus berupa angka',
+                'min' => ':attribute minimal :min',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()->first(),
+                ], 422);
+            }
+
+            // Cek apakah layanan/kebutuhan ada
+            $layanan = Kebutuhan::find($request->layanan_id);
+            if (!$layanan) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Layanan tidak ditemukan'
+                ], 404);
+            }
+
+            // Cek apakah sudah ada data untuk barang_id dan layanan
+            $existing = BarangDefaultQty::where('barang_id', $request->barang_id)
+                ->where('layanan_id', $request->layanan_id)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($existing) {
+                // Update existing record
+                $existing->update([
+                    'qty_default' => $request->qty_default,
+                    'updated_by' => Auth::user()->full_name,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data default qty berhasil diupdate',
+                    'data' => [
+                        'id' => $existing->id,
+                        'action' => 'updated'
+                    ]
+                ]);
+            } else {
+                // Insert new record
+                $newDefaultQty = BarangDefaultQty::create([
+                    'barang_id' => $request->barang_id,
+                    'layanan_id' => $request->layanan_id,
+                    'qty_default' => $request->qty_default,
+                    'layanan' => $layanan->nama,
+                    'created_by' => Auth::user()->full_name,
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Data default qty berhasil disimpan',
+                    'data' => [
+                        'id' => $newDefaultQty->id,
+                        'action' => 'created'
+                    ]
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/api/barang/default-qty/delete/{id}",
+     *     summary="Hapus default quantity",
+     *     description="Menghapus data default quantity barang (soft delete)",
+     *     tags={"Barang"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID default quantity yang ingin dihapus",
+     *         required=true,
+     *         @OA\Schema(type="integer", minimum=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data berhasil dihapus",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data default qty berhasil dihapus")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Data tidak ditemukan",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Data tidak ditemukan")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error: Internal server error")
+     *         )
+     *     )
+     * )
+     */
+    public function deleteDefaultQty($id)
+    {
+        try {
+            // Cek apakah data ada
+            $defaultQty = BarangDefaultQty::whereNull('deleted_at')->find($id);
+
+            if (!$defaultQty) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+
+            $defaultQty->update([
+                'deleted_at' => Carbon::now(),
+                'deleted_by' => Auth::user()->full_name,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data default qty berhasil dihapus'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/barang/{barangId}/default-qty/{layananId}",
+     *     summary="Get default quantity by barang and layanan",
+     *     description="Mengambil data default quantity untuk barang dan layanan tertentu",
+     *     tags={"Barang"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="barangId",
+     *         in="path",
+     *         description="ID barang",
+     *         required=true,
+     *         @OA\Schema(type="integer", minimum=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="layananId",
+     *         in="path",
+     *         description="ID layanan",
+     *         required=true,
+     *         @OA\Schema(type="integer", minimum=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data berhasil diambil",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="barang_id", type="integer", example=1),
+     *                 @OA\Property(property="layanan_id", type="integer", example=1),
+     *                 @OA\Property(property="layanan", type="string", example="Kaporlap"),
+     *                 @OA\Property(property="qty_default", type="integer", example=10)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Data tidak ditemukan",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Data tidak ditemukan")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error: Internal server error")
+     *         )
+     *     )
+     * )
+     */
+    public function getDefaultQtyByLayanan($barangId, $layananId)
+    {
+        try {
+            $data = BarangDefaultQty::where('barang_id', $barangId)
+                ->where('layanan_id', $layananId)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$data) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data tidak ditemukan'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/barang/default-qty/bulk-save",
+     *     summary="Bulk save default quantities",
+     *     description="Menyimpan atau mengupdate multiple default quantity sekaligus untuk satu barang",
+     *     tags={"Barang"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Array data default quantities yang akan disimpan",
+     *         @OA\JsonContent(
+     *             required={"barang_id", "quantities"},
+     *             @OA\Property(property="barang_id", type="integer", example=1, description="ID barang"),
+     *             @OA\Property(
+     *                 property="quantities",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="layanan_id", type="integer", example=1),
+     *                     @OA\Property(property="qty_default", type="integer", example=10)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data berhasil disimpan",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Berhasil menyimpan 5 default qty"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="created", type="integer", example=3),
+     *                 @OA\Property(property="updated", type="integer", example=2)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validasi gagal",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validasi gagal")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error"
+     *     )
+     * )
+     */
+    public function bulkSaveDefaultQty(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'barang_id' => 'required|numeric',
+                'quantities' => 'required|array|min:1',
+                'quantities.*.layanan_id' => 'required|numeric',
+                'quantities.*.qty_default' => 'required|numeric|min:0',
+            ], [
+                'required' => ':attribute harus diisi',
+                'numeric' => ':attribute harus berupa angka',
+                'array' => ':attribute harus berupa array',
+                'min' => ':attribute minimal :min',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            $created = 0;
+            $updated = 0;
+
+            foreach ($request->quantities as $qty) {
+                // Cek layanan exist
+                $layanan = Kebutuhan::find($qty['layanan_id']);
+                if (!$layanan) {
+                    continue; // Skip jika layanan tidak ditemukan
+                }
+
+                // Cek existing record
+                $existing = BarangDefaultQty::where('barang_id', $request->barang_id)
+                    ->where('layanan_id', $qty['layanan_id'])
+                    ->whereNull('deleted_at')
+                    ->first();
+
+                if ($existing) {
+                    // Update
+                    $existing->update([
+                        'qty_default' => $qty['qty_default'],
+                        'updated_by' => Auth::user()->full_name,
+                    ]);
+                    $updated++;
+                } else {
+                    // Insert
+                    BarangDefaultQty::create([
+                        'barang_id' => $request->barang_id,
+                        'layanan_id' => $qty['layanan_id'],
+                        'qty_default' => $qty['qty_default'],
+                        'layanan' => $layanan->nama,
+                        'created_by' => Auth::user()->full_name,
+                    ]);
+                    $created++;
+                }
+            }
+
+            DB::commit();
+
+            $total = $created + $updated;
+            return response()->json([
+                'success' => true,
+                'message' => "Berhasil menyimpan {$total} default qty",
+                'data' => [
+                    'created' => $created,
+                    'updated' => $updated,
+                    'total' => $total
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
     }

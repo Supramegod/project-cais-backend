@@ -124,4 +124,9 @@ class JenisPerusahaan extends Model
         }
         return null;
     }
+       // Relasi ke leads
+    public function leads()
+    {
+        return $this->hasMany(Leads::class, 'jenis_perusahaan_id', 'id');
+    }
 }

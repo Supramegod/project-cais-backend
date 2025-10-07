@@ -31,6 +31,10 @@ class Company extends Model
         'is_active' => 'boolean',
     ];
 
+    public function leads()
+    {
+        return $this->hasMany(Leads::class, 'company_id');
+    }
     public static function boot()
     {
         parent::boot();

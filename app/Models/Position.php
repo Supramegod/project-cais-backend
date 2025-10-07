@@ -27,7 +27,6 @@ class Position extends Model
         'created_by',
         'updated_by',
     ];
-
     protected $casts = [
         'is_active' => 'boolean',
         'layanan_id' => 'integer',
@@ -69,7 +68,7 @@ class Position extends Model
             $model->updated_by = Auth::id();
         });
     }
-   public function getCreatedAtAttribute($value)
+public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
@@ -94,28 +93,27 @@ class Position extends Model
         return $this->belongsTo(User::class, 'deleted_by', 'id');
     }
 
-    public function getCreatedByAttribute($value)
+public function getCreatedByNameAttribute()
     {
         if ($this->relationLoaded('creator') && $this->creator) {
             return $this->creator->is_active ? $this->creator->full_name : null;
         }
-        return null;
+        return $this->created_by;
     }
 
-
-    public function getUpdatedByAttribute($value)
+    public function getUpdatedByNameAttribute()
     {
         if ($this->relationLoaded('updater') && $this->updater) {
             return $this->updater->is_active ? $this->updater->full_name : null;
         }
-        return null;
+        return $this->updated_by;
     }
 
-    public function getDeletedByAttribute($value)
+    public function getDeletedByNameAttribute()
     {
         if ($this->relationLoaded('deleter') && $this->deleter) {
             return $this->deleter->is_active ? $this->deleter->full_name : null;
         }
-        return null;
+        return $this->deleted_by;
     }
 }

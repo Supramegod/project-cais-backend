@@ -18,7 +18,9 @@ class Ump extends Model
         'ump',
         'tgl_berlaku',
         'sumber',
-        'is_aktif'
+        'is_aktif',
+        'created_by', 
+        'updated_by', 
     ];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
