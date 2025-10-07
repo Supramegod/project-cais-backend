@@ -142,7 +142,6 @@ class LeadsController extends Controller
             $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD', 'kebutuhan'])
                 ->where('status_leads_id', '!=', 102);
 
-
             if ($request->filled('tgl_dari')) {
                 $query->where('tgl_leads', '>=', $request->tgl_dari);
             } else {
@@ -167,6 +166,9 @@ class LeadsController extends Controller
                 $query->where('status_leads_id', $request->status);
             }
 
+            // 🧩 Tambahkan ini sebelum get()
+            $query->orderBy('created_at', 'desc');
+
             $data = $query->get();
 
             $data->transform(function ($item) use ($tim) {
@@ -187,6 +189,7 @@ class LeadsController extends Controller
             ], 500);
         }
     }
+
 
     private function canViewLead($lead, $tim)
     {
