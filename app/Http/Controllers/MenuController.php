@@ -12,7 +12,12 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-
+/**
+ * @OA\Tag(
+ *     name="Menu",
+ *     description="API untuk manajemen Menu"
+ * )
+ */
 class MenuController extends Controller
 {
     /**

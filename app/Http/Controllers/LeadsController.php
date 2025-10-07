@@ -142,7 +142,6 @@ class LeadsController extends Controller
             $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD', 'kebutuhan'])
                 ->where('status_leads_id', '!=', 102);
 
-
             if ($request->filled('tgl_dari')) {
                 $query->where('tgl_leads', '>=', $request->tgl_dari);
             } else {
@@ -167,6 +166,9 @@ class LeadsController extends Controller
                 $query->where('status_leads_id', $request->status);
             }
 
+            // 🧩 Tambahkan ini sebelum get()
+            $query->orderBy('created_at', 'desc');
+
             $data = $query->get();
 
             $data->transform(function ($item) use ($tim) {
@@ -187,6 +189,7 @@ class LeadsController extends Controller
             ], 500);
         }
     }
+
 
     private function canViewLead($lead, $tim)
     {
@@ -2277,6 +2280,121 @@ class LeadsController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/platforms",
+     *     summary="Mendapatkan daftar semua platform sumber leads",
+     *     description="Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data platform",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data platform berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Website")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getPlatforms()
+    {
+        try {
+            $platforms = Platform::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data platform berhasil diambil',
+                'data' => $platforms
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/status-leads",
+     *     summary="Mendapatkan daftar semua status leads",
+     *     description="Endpoint ini digunakan untuk mengambil data status leads (misal: new, contacted, qualified, dll). Berguna untuk filter dan dropdown form input leads.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data status leads",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data status leads berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="New Lead")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getStatusLeads()
+    {
+        try {
+            $statusLeads = StatusLeads::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data status leads berhasil diambil',
+                'data' => $statusLeads
+            ]);
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()

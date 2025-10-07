@@ -11509,6 +11509,184 @@
                 ]
             }
         },
+        "/api/platforms": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar semua platform sumber leads",
+                "description": "Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+                "operationId": "952f5edcd0d2239b1a087ff38e8dedf6",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data platform",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data platform berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Website"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/status-leads": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar semua status leads",
+                "description": "Endpoint ini digunakan untuk mengambil data status leads (misal: new, contacted, qualified, dll). Berguna untuk filter dan dropdown form input leads.",
+                "operationId": "4db21c4646aa2c87e7fb34f1b2d04eec",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data status leads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data status leads berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "New Lead"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -15578,6 +15756,1234 @@
                 ]
             }
         },
+        "/api/spk/list": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar semua SPK dengan filter tanggal dan status",
+                "description": "Endpoint untuk mengambil data semua SPK yang aktif. Dapat difilter berdasarkan rentang tanggal dan status SPK.",
+                "operationId": "719c64a64490510c0565b6c70bd727a3",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Tanggal mulai filter (format: Y-m-d). Default: 3 bulan kebelakang dari sekarang",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "Tanggal akhir filter (format: Y-m-d). Default: hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter berdasarkan status SPK ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data SPK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "SPK/LEAD001-012024-00001"
+                                                    },
+                                                    "tgl_spk": {
+                                                        "type": "string",
+                                                        "example": "2024-01-15"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
+                                                    },
+                                                    "status_spk_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "2024-01-15 10:30:00"
+                                                    },
+                                                    "leads": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_perusahaan": {
+                                                                "type": "string",
+                                                                "example": "PT Example Company"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "status_spk": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Draft"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching SPK data"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/list-terhapus": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar SPK yang sudah dihapus (soft delete)",
+                "description": "Endpoint untuk mengambil data SPK yang telah dihapus (masuk dalam trash).",
+                "operationId": "915634a6c578c0889ec0b0b9a75c7df5",
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data SPK terhapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Deleted SPK data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "SPK/LEAD001-012024-00001"
+                                                    },
+                                                    "deleted_at": {
+                                                        "type": "string",
+                                                        "example": "2024-01-20 15:30:00"
+                                                    },
+                                                    "deleted_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/available-quotation": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar quotation yang tersedia untuk dibuat SPK",
+                "description": "Endpoint untuk mengambil data quotation yang memenuhi syarat untuk dibuat SPK. Hanya quotation milik user yang login dan belum memiliki SPK.",
+                "operationId": "9036abd4dc918c420d7fff926da92b24",
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data quotation tersedia",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Available quotations retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "QUOT/COMP001-012024-00001"
+                                                    },
+                                                    "quotation": {
+                                                        "type": "string",
+                                                        "example": "QUOT/COMP001-012024-00001"
+                                                    },
+                                                    "tgl_quotation": {
+                                                        "type": "string",
+                                                        "example": "15 Januari 2024"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
+                                                    },
+                                                    "jumlah_site": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "kebutuhan": {
+                                                        "type": "string",
+                                                        "example": "Security Service"
+                                                    },
+                                                    "layanan": {
+                                                        "type": "string",
+                                                        "example": "Security Service"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching available quotations"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/available-leads": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar leads yang tersedia untuk dibuat SPK",
+                "description": "Endpoint untuk mengambil data leads yang memiliki quotation aktif dan belum memiliki SPK untuk semua site-nya.",
+                "operationId": "307b7eae6479283e4de851b45bec1bdf",
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data leads tersedia",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Available leads retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "LEAD001"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string",
+                                                        "example": "DKI Jakarta"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Selatan"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching available leads"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/add": {
+            "post": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Membuat SPK baru",
+                "description": "Endpoint untuk membuat SPK baru berdasarkan leads dan quotation site yang dipilih.",
+                "operationId": "7ca37fa6dd173f08807c88edbb5470a2",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "quotation_id",
+                                    "tanggal_spk",
+                                    "site_ids"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "description": "ID Leads",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "quotation_id": {
+                                        "description": "ID Quotation",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tanggal_spk": {
+                                        "description": "Tanggal SPK",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-15"
+                                    },
+                                    "site_ids": {
+                                        "description": "Array ID Quotation Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "SPK berhasil dibuat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK created successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "SPK/LEAD001-012024-00001"
+                                                },
+                                                "tgl_spk": {
+                                                    "type": "string",
+                                                    "example": "2024-01-15"
+                                                },
+                                                "status_spk_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quotation_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "spk_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "leads": {
+                                                    "type": "object"
+                                                },
+                                                "quotation": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validasi error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error creating SPK"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/view/{id}": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan detail SPK berdasarkan ID",
+                "description": "Endpoint untuk mengambil data detail SPK termasuk leads, status, dan site-site yang terkait.",
+                "operationId": "b1933b1eecf104db0e1ffe5db6558562",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID SPK",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil detail SPK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK details retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "SPK/LEAD001-012024-00001"
+                                                },
+                                                "tgl_spk": {
+                                                    "type": "string",
+                                                    "example": "2024-01-15"
+                                                },
+                                                "stgl_spk": {
+                                                    "type": "string",
+                                                    "example": "15 Januari 2024"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "Draft"
+                                                },
+                                                "screated_at": {
+                                                    "type": "string",
+                                                    "example": "15 Januari 2024"
+                                                },
+                                                "leads": {
+                                                    "type": "object"
+                                                },
+                                                "status_spk": {
+                                                    "type": "object"
+                                                },
+                                                "spk_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SPK tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching SPK details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/cetak/{id}": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan data untuk cetak SPK",
+                "description": "Endpoint untuk mengambil semua data yang diperlukan untuk proses pencetakan SPK.",
+                "operationId": "6421781d27307000a40f0011c6159b74",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID SPK",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data cetak SPK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK print data retrieved successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "now": {
+                                                    "type": "string",
+                                                    "example": "15 Januari 2024"
+                                                },
+                                                "spk": {
+                                                    "type": "object"
+                                                },
+                                                "spk_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "quotation": {
+                                                    "type": "object"
+                                                },
+                                                "leads": {
+                                                    "type": "object"
+                                                },
+                                                "company": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SPK tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Tidak ada site ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "No SPK sites found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching SPK print data"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/upload/{id}": {
+            "post": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Upload dokumen SPK yang sudah disetujui",
+                "description": "Endpoint untuk mengupload file SPK yang sudah disetujui dan mengubah status SPK menjadi approved.",
+                "operationId": "e242f7f28a1e6e79c3b82234a0362ea7",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID SPK",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "file": {
+                                        "description": "File SPK (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "File berhasil diupload",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "File uploaded successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "File tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/ajukan-ulang/{spkId}": {
+            "post": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mengajukan ulang quotation dari SPK",
+                "description": "Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Akan membuat quotation baru dan menghapus SPK yang lama.",
+                "operationId": "52baa3de9b3512989f7219e2e3b37dc7",
+                "parameters": [
+                    {
+                        "name": "spkId",
+                        "in": "path",
+                        "description": "ID SPK yang akan diajukan ulang",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "alasan"
+                                ],
+                                "properties": {
+                                    "alasan": {
+                                        "description": "Alasan pengajuan ulang quotation",
+                                        "type": "string",
+                                        "example": "Perubahan harga material"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Quotation berhasil diajukan ulang",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation successfully resubmitted"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "quotation_baru_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quotation_baru_nomor": {
+                                                    "type": "string",
+                                                    "example": "QUOT/COMP001-012024-00002"
+                                                },
+                                                "spk_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validasi error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/site-list/{id}": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar site untuk SPK tertentu",
+                "description": "Endpoint untuk mengambil data site yang terkait dengan SPK dan belum digunakan untuk pembuatan site.",
+                "operationId": "b9f9bd58e1a95a1c036d189c6a02f03f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID SPK",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil daftar site",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Site list retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site Jakarta"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string",
+                                                        "example": "DKI Jakarta"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Selatan"
+                                                    },
+                                                    "nomor_quotation": {
+                                                        "type": "string",
+                                                        "example": "QUOT/COMP001-012024-00001"
+                                                    },
+                                                    "quotation": {
+                                                        "type": "object"
+                                                    },
+                                                    "quotation_site": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching site list"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/available-sites/{leadsId}": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar site yang tersedia untuk leads tertentu",
+                "description": "Endpoint untuk mengambil data quotation site yang tersedia (belum memiliki SPK) untuk leads tertentu.",
+                "operationId": "a6bea97ba2a7839741f474fa7317e92d",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "description": "ID Leads",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil daftar site tersedia",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Available sites retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site Jakarta"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string",
+                                                        "example": "DKI Jakarta"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Selatan"
+                                                    },
+                                                    "quotation": {
+                                                        "type": "string",
+                                                        "example": "QUOT/COMP001-012024-00001"
+                                                    },
+                                                    "ump": {
+                                                        "type": "number",
+                                                        "example": 4500000
+                                                    },
+                                                    "umk": {
+                                                        "type": "number",
+                                                        "example": 4400000
+                                                    },
+                                                    "nominal_upah": {
+                                                        "type": "number",
+                                                        "example": 4300000
+                                                    },
+                                                    "penempatan": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Office"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching available sites"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/supplier/list": {
             "get": {
                 "tags": [
@@ -19579,8 +20985,8 @@
     },
     "tags": [
         {
-            "name": "Jenis Barang",
-            "description": "API Endpoints untuk Master Jenis Barang"
+            "name": "Authentication",
+            "description": "API Endpoints untuk Authentication"
         },
         {
             "name": "Barang",
@@ -19599,6 +21005,10 @@
             "description": "API untuk manajemen data Customer. "
         },
         {
+            "name": "Jenis Barang",
+            "description": "API Endpoints untuk Master Jenis Barang"
+        },
+        {
             "name": "Jenis Perusahaan",
             "description": "API Endpoints untuk Jenis Perusahaan"
         },
@@ -19615,6 +21025,10 @@
             "description": "Endpoints untuk manajemen data management fee"
         },
         {
+            "name": "Menu",
+            "description": "API untuk manajemen Menu"
+        },
+        {
             "name": "Position",
             "description": "API endpoints for Position management"
         },
@@ -19625,6 +21039,10 @@
         {
             "name": "Site",
             "description": "API Endpoints untuk mengelola Site"
+        },
+        {
+            "name": "SPK",
+            "description": "API untuk manajemen Surat Perintah Kerja (SPK)"
         },
         {
             "name": "Supplier",
@@ -19653,14 +21071,6 @@
         {
             "name": "UMP",
             "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
-        },
-        {
-            "name": "Authentication",
-            "description": "Authentication"
-        },
-        {
-            "name": "Menu",
-            "description": "Menu"
         }
     ]
 }

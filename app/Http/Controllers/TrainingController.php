@@ -81,7 +81,7 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function list(Request $request): JsonResponse
+    public function list(Request $request)
     {
         try {
             $search = $request->get('search');
@@ -162,7 +162,7 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function view(int $id): JsonResponse
+    public function view(int $id)
     {
         try {
             $training = Training::find($id);
@@ -252,7 +252,7 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function add(Request $request): JsonResponse
+    public function add(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
@@ -378,7 +378,7 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, int $id)
     {
         try {
             $training = Training::find($id);
@@ -476,7 +476,7 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function delete(int $id): JsonResponse
+    public function delete(int $id)
     {
         try {
             $training = Training::find($id);
