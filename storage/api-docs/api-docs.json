@@ -12260,9 +12260,6 @@
                                                     "nama": {
                                                         "type": "string"
                                                     },
-                                                    "kode": {
-                                                        "type": "string"
-                                                    },
                                                     "parent_id": {
                                                         "type": "integer",
                                                         "nullable": true
@@ -12273,85 +12270,6 @@
                                                     "icon": {
                                                         "type": "string",
                                                         "nullable": true
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "created_by": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/menu/all-permissions": {
-            "get": {
-                "tags": [
-                    "Menu"
-                ],
-                "summary": "Get all menu role permissions",
-                "operationId": "058b962391ec426c41fa9ddb90160d22",
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "sysmenu_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "role_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "menu_name": {
-                                                        "type": "string"
-                                                    },
-                                                    "menu_code": {
-                                                        "type": "string"
-                                                    },
-                                                    "role_name": {
-                                                        "type": "string"
-                                                    },
-                                                    "is_view": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_add": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_edit": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_delete": {
-                                                        "type": "boolean"
                                                     },
                                                     "created_at": {
                                                         "type": "string"
@@ -12416,9 +12334,6 @@
                                                 "nama": {
                                                     "type": "string"
                                                 },
-                                                "kode": {
-                                                    "type": "string"
-                                                },
                                                 "parent_id": {
                                                     "type": "integer",
                                                     "nullable": true
@@ -12464,7 +12379,6 @@
                             "schema": {
                                 "required": [
                                     "nama",
-                                    "kode",
                                     "url"
                                 ],
                                 "properties": {
@@ -12472,11 +12386,6 @@
                                         "type": "string",
                                         "maxLength": 100,
                                         "example": "Dashboard"
-                                    },
-                                    "kode": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "example": "DASH"
                                     },
                                     "menu_parent": {
                                         "type": "integer",
@@ -12522,9 +12431,6 @@
                                                 },
                                                 "nama": {
                                                     "type": "string"
-                                                },
-                                                "kode": {
-                                                    "type": "string"
                                                 }
                                             },
                                             "type": "object"
@@ -12537,215 +12443,6 @@
                     },
                     "422": {
                         "description": "Validation Error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/menu/listRole/{id}": {
-            "get": {
-                "tags": [
-                    "Menu"
-                ],
-                "summary": "Get menu roles and permissions",
-                "operationId": "989b17c9386895bc69b10bc8480a5453",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Menu ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "is_view": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_add": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_edit": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "is_delete": {
-                                                        "type": "boolean"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/menu/addrole/{id}": {
-            "post": {
-                "tags": [
-                    "Menu"
-                ],
-                "summary": "Save menu roles and permissions",
-                "operationId": "68dbaa44b5b90332296b462e041fc269",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "akses"
-                                ],
-                                "properties": {
-                                    "akses": {
-                                        "type": "array",
-                                        "items": {
-                                            "properties": {
-                                                "role_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "field": {
-                                                    "type": "string",
-                                                    "example": "is_view"
-                                                },
-                                                "value": {
-                                                    "type": "boolean",
-                                                    "example": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data Akses Berhasil Disimpan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/menu/permissions": {
-            "get": {
-                "tags": [
-                    "Menu"
-                ],
-                "summary": "Get user menu permissions",
-                "operationId": "f52eff6e83a82bd89e8aab538bf434c4",
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "permissions": {
-                                                    "properties": {
-                                                        "menu_code_1": {
-                                                            "properties": {
-                                                                "is_view": {
-                                                                    "type": "boolean"
-                                                                },
-                                                                "is_add": {
-                                                                    "type": "boolean"
-                                                                },
-                                                                "is_edit": {
-                                                                    "type": "boolean"
-                                                                },
-                                                                "is_delete": {
-                                                                    "type": "boolean"
-                                                                }
-                                                            },
-                                                            "type": "object"
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
                     }
                 },
                 "security": [
@@ -12779,7 +12476,6 @@
                             "schema": {
                                 "required": [
                                     "nama",
-                                    "kode",
                                     "url"
                                 ],
                                 "properties": {
@@ -12787,11 +12483,6 @@
                                         "type": "string",
                                         "maxLength": 100,
                                         "example": "Dashboard Updated"
-                                    },
-                                    "kode": {
-                                        "type": "string",
-                                        "maxLength": 50,
-                                        "example": "DASH_UPD"
                                     },
                                     "url": {
                                         "type": "string",
@@ -12882,203 +12573,6 @@
                     },
                     "404": {
                         "description": "Not Found"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/menu/by-role": {
-            "get": {
-                "tags": [
-                    "Menu"
-                ],
-                "summary": "Get menus by user role",
-                "operationId": "4ae6384f433ce4b28e533eb948ccee47",
-                "responses": {
-                    "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "Dashboard"
-                                                    },
-                                                    "kode": {
-                                                        "type": "string",
-                                                        "example": "DASH"
-                                                    },
-                                                    "parent_id": {
-                                                        "type": "integer",
-                                                        "example": null,
-                                                        "nullable": true
-                                                    },
-                                                    "url": {
-                                                        "type": "string",
-                                                        "example": "/dashboard"
-                                                    },
-                                                    "icon": {
-                                                        "type": "string",
-                                                        "example": "mdi mdi-home",
-                                                        "nullable": true
-                                                    },
-                                                    "children": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "properties": {
-                                                                "id": {
-                                                                    "type": "integer",
-                                                                    "example": 2
-                                                                },
-                                                                "nama": {
-                                                                    "type": "string",
-                                                                    "example": "User Management"
-                                                                },
-                                                                "kode": {
-                                                                    "type": "string",
-                                                                    "example": "USER_MGMT"
-                                                                },
-                                                                "parent_id": {
-                                                                    "type": "integer",
-                                                                    "example": 1
-                                                                },
-                                                                "url": {
-                                                                    "type": "string",
-                                                                    "example": "/users"
-                                                                },
-                                                                "icon": {
-                                                                    "type": "string",
-                                                                    "example": "mdi mdi-account",
-                                                                    "nullable": true
-                                                                },
-                                                                "created_at": {
-                                                                    "type": "string",
-                                                                    "example": "2024-01-01T00:00:00.000000Z"
-                                                                },
-                                                                "updated_at": {
-                                                                    "type": "string",
-                                                                    "example": "2024-01-01T00:00:00.000000Z"
-                                                                },
-                                                                "deleted_at": {
-                                                                    "type": "string",
-                                                                    "example": null,
-                                                                    "nullable": true
-                                                                },
-                                                                "created_by": {
-                                                                    "type": "string",
-                                                                    "example": "Admin"
-                                                                },
-                                                                "updated_by": {
-                                                                    "type": "string",
-                                                                    "example": null,
-                                                                    "nullable": true
-                                                                },
-                                                                "deleted_by": {
-                                                                    "type": "string",
-                                                                    "example": null,
-                                                                    "nullable": true
-                                                                }
-                                                            },
-                                                            "type": "object"
-                                                        }
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "example": "2024-01-01T00:00:00.000000Z"
-                                                    },
-                                                    "updated_at": {
-                                                        "type": "string",
-                                                        "example": "2024-01-01T00:00:00.000000Z"
-                                                    },
-                                                    "deleted_at": {
-                                                        "type": "string",
-                                                        "example": null,
-                                                        "nullable": true
-                                                    },
-                                                    "created_by": {
-                                                        "type": "string",
-                                                        "example": "Admin"
-                                                    },
-                                                    "updated_by": {
-                                                        "type": "string",
-                                                        "example": null,
-                                                        "nullable": true
-                                                    },
-                                                    "deleted_by": {
-                                                        "type": "string",
-                                                        "example": null,
-                                                        "nullable": true
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Menus retrieved successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Role is not assigned to the user"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Internal Server Error"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
                     }
                 },
                 "security": [
@@ -14769,6 +14263,306 @@
                 ]
             }
         },
+        "/api/roles/list": {
+            "get": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Get all active roles",
+                "operationId": "e7fc129059e6b8cb80499aa1df130494",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Admin"
+                                                    },
+                                                    "Is_active": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/roles/view/{id}": {
+            "get": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Get role by ID",
+                "operationId": "c09d152268b54697fb2f843f94197675",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "Is_active": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Role not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/roles/permissions": {
+            "get": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Get menu permissions for the authenticated user's role",
+                "operationId": "19d803042b370d26e3c08e58e2c5c9d5",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Dashboard"
+                                                    },
+                                                    "kode": {
+                                                        "type": "string",
+                                                        "example": "DASH"
+                                                    },
+                                                    "is_view": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "is_add": {
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    },
+                                                    "is_edit": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "is_delete": {
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/roles/{id}/update-permissions": {
+            "post": {
+                "tags": [
+                    "Roles"
+                ],
+                "summary": "Update menu permissions",
+                "operationId": "a5f34a5a84e0025cc0f671e0de58d090",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "akses"
+                                ],
+                                "properties": {
+                                    "akses": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "sysmenu_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "field": {
+                                                    "type": "string",
+                                                    "example": "is_view"
+                                                },
+                                                "value": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Permissions updated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to update permissions"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/salary-rule/list": {
             "get": {
                 "tags": [
@@ -16031,26 +15825,6 @@
                                 }
                             }
                         }
-                    },
-                    "500": {
-                        "description": "Error server",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Error fetching available quotations"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
                     }
                 },
                 "security": [
@@ -16151,7 +15925,7 @@
                     "SPK"
                 ],
                 "summary": "Membuat SPK baru",
-                "description": "Endpoint untuk membuat SPK baru berdasarkan leads dan quotation site yang dipilih.",
+                "description": "Endpoint untuk membuat SPK baru berdasarkan leads dan site yang dipilih.",
                 "operationId": "7ca37fa6dd173f08807c88edbb5470a2",
                 "requestBody": {
                     "required": true,
@@ -16160,18 +15934,12 @@
                             "schema": {
                                 "required": [
                                     "leads_id",
-                                    "quotation_id",
                                     "tanggal_spk",
                                     "site_ids"
                                 ],
                                 "properties": {
                                     "leads_id": {
                                         "description": "ID Leads",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "quotation_id": {
-                                        "description": "ID Quotation",
                                         "type": "integer",
                                         "example": 1
                                     },
@@ -16236,10 +16004,6 @@
                                                     "type": "integer",
                                                     "example": 1
                                                 },
-                                                "quotation_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
                                                 "spk_sites": {
                                                     "type": "array",
                                                     "items": {
@@ -16248,55 +16012,9 @@
                                                 },
                                                 "leads": {
                                                     "type": "object"
-                                                },
-                                                "quotation": {
-                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validasi error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation error"
-                                        },
-                                        "errors": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Error server",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Error creating SPK"
                                         }
                                     },
                                     "type": "object"
@@ -16667,7 +16385,7 @@
                     "SPK"
                 ],
                 "summary": "Mengajukan ulang quotation dari SPK",
-                "description": "Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Akan membuat quotation baru dan menghapus SPK yang lama.",
+                "description": "Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Jika hanya sebagian site yang diajukan ulang, SPK tetap dipertahankan. Jika semua site diajukan ulang, SPK akan dihapus.",
                 "operationId": "52baa3de9b3512989f7219e2e3b37dc7",
                 "parameters": [
                     {
@@ -16686,13 +16404,26 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "alasan"
+                                    "alasan",
+                                    "quotation_site_ids"
                                 ],
                                 "properties": {
                                     "alasan": {
                                         "description": "Alasan pengajuan ulang quotation",
                                         "type": "string",
                                         "example": "Perubahan harga material"
+                                    },
+                                    "quotation_site_ids": {
+                                        "description": "Array ID Quotation Site yang akan diajukan ulang",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -16728,6 +16459,32 @@
                                                 "spk_id": {
                                                     "type": "integer",
                                                     "example": 1
+                                                },
+                                                "spk_dihapus": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                },
+                                                "spk_sites_dihapus": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "example": [
+                                                        1,
+                                                        2,
+                                                        3
+                                                    ]
+                                                },
+                                                "quotation_sites_dihapus": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "example": [
+                                                        4,
+                                                        5,
+                                                        6
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -16751,6 +16508,123 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Validation error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/deleted-sites/{spkId}": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar SPK sites yang sudah dihapus",
+                "description": "Endpoint untuk mengambil data SPK sites yang telah dihapus (soft delete) berdasarkan ID SPK.",
+                "operationId": "3a61d5c2e8870e31206831e7321f67bf",
+                "parameters": [
+                    {
+                        "name": "spkId",
+                        "in": "path",
+                        "description": "ID SPK",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data SPK sites yang dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Deleted SPK sites retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site Jakarta Pusat"
+                                                    },
+                                                    "quotation_site_id": {
+                                                        "type": "integer",
+                                                        "example": 5
+                                                    },
+                                                    "deleted_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-20 15:30:00"
+                                                    },
+                                                    "deleted_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SPK tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching deleted SPK sites"
                                         }
                                     },
                                     "type": "object"
@@ -21031,6 +20905,10 @@
         {
             "name": "Position",
             "description": "API endpoints for Position management"
+        },
+        {
+            "name": "Roles",
+            "description": "API Endpoints for Role Management"
         },
         {
             "name": "Salary Rule",

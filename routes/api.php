@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -215,15 +216,10 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Menu Management
     Route::prefix('menu')->controller(MenuController::class)->group(function () {
         Route::get('/list', 'list');
-        Route::get('/by-role', 'getMenusByRole');
-        Route::get('/permissions', 'getUserPermissions');
-        Route::get('/all-permissions', 'getAllPermissions');
         Route::post('/add', 'add');
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
-        Route::get('/listRole/{id}', 'listRole');
-        Route::post('/addrole/{id}', 'addrole');
     });
 
     // OHC (hanya index)
@@ -324,5 +320,13 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
 
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
+        Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
+    });
+    // Role Management
+    Route::prefix('roles')->controller(RoleController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::get('/view/{id}', 'show');
+        Route::get('/permissions', 'menuPermissions');
+        Route::post('/{id}/update-permissions', 'updatePermissions');
     });
 });
