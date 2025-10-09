@@ -11687,6 +11687,99 @@
                 ]
             }
         },
+        "/api/benua": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar semua benua",
+                "description": "Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
+                "operationId": "0568394e389dfd890c6faee35d6820ee",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data benua",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data benua berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id_benua": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_benua": {
+                                                        "type": "string",
+                                                        "example": "Asia"
+                                                    },
+                                                    "kode_benua": {
+                                                        "type": "string",
+                                                        "example": "AS"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -14423,10 +14516,6 @@
                                                     "nama": {
                                                         "type": "string",
                                                         "example": "Dashboard"
-                                                    },
-                                                    "kode": {
-                                                        "type": "string",
-                                                        "example": "DASH"
                                                     },
                                                     "is_view": {
                                                         "type": "boolean",

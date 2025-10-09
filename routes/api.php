@@ -40,6 +40,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::get('/users', [TimSalesController::class, 'getUsers']);
     Route::get('/platforms', [LeadsController::class, 'getPlatforms']);
     Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
+    Route::get('/benua', [LeadsController::class, 'getBenua']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
