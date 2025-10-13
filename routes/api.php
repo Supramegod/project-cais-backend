@@ -41,6 +41,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::get('/platforms', [LeadsController::class, 'getPlatforms']);
     Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
     Route::get('/benua', [LeadsController::class, 'getBenua']);
+    Route::get('/jabatan-pic', [LeadsController::class, 'getJabatanPic']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -241,27 +242,28 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::delete('/delete/{id}', 'delete');
         Route::get('/leads/{leadsId}/track', 'trackActivity');
     });
-    // Company Group Routes
+
+    // Company Group Routes - UPDATED
     Route::prefix('company-group')->controller(CompanyGroupController::class)->group(function () {
         // Basic CRUD
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
-        Route::post('/add', 'add');
+        Route::post('/create', 'create'); 
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
 
         // Company Management
-        Route::get('/get-available-companies/{groupId}', 'getAvailableCompanies');
-        Route::get('/get-companies-in-group/{groupId}', 'getCompaniesInGroup');
+        Route::get('/available-companies/{groupId}', 'getAvailableCompanies'); 
+        Route::get('/companies/{groupId}', 'getCompaniesInGroup');
         Route::post('/bulk-assign', 'bulkAssign');
         Route::delete('/remove-company/{groupId}/{companyId}', 'removeCompany');
         Route::delete('/bulk-remove-companies', 'bulkRemoveCompanies');
 
-        // Statistics & Filtering
+        // Statistics & Recommendations
         Route::get('/statistics', 'getStatistics');
-        Route::get('/filter-rekomendasi', 'filterRekomendasi');
-        Route::post('/groupkan', 'groupkan');
+        Route::get('/recommendations', 'getRecommendations'); 
     });
+
     // Leads Routes
     Route::prefix('leads')->controller(LeadsController::class)->group(function () {
         // Basic CRUD

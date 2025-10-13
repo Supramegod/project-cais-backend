@@ -7,6 +7,7 @@ use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\City;
 use App\Models\District;
+use App\Models\JabatanPic;
 use App\Models\JenisPerusahaan;
 use App\Models\Leads;
 use App\Models\Branch;
@@ -2451,6 +2452,66 @@ class LeadsController extends Controller
                 'success' => true,
                 'message' => 'Data benua berhasil diambil',
                 'data' => $benua
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/jabatan-pic",
+     *     summary="Mendapatkan daftar semua jabatan PIC",
+     *     description="Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data jabatan PIC",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data jabatan PIC berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_jabatan", type="string", example="Manager Purchasing"),
+     *                     @OA\Property(property="kode", type="string", example="MGR-PUR"),
+     *                     @OA\Property(property="created_at", type="string", example="15-01-2025")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getJabatanPic()
+    {
+        try {
+            // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
+            $jabatanPic = JabatanPic::whereNull('deleted_at')->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data jabatan PIC berhasil diambil',
+                'data' => $jabatanPic
             ]);
         } catch (\Exception $e) {
             return response()->json([

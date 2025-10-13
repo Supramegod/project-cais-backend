@@ -1895,13 +1895,24 @@
         "/api/company-group/list": {
             "get": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Get list of company groups with pagination and search",
+                "summary": "Get list of all company groups",
                 "operationId": "151f00a606905a98d76c9c9e22f607cb",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword untuk pencarian nama grup",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "List grup perusahaan berhasil diambil",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1915,45 +1926,37 @@
                                             "example": "Data grup perusahaan berhasil diambil"
                                         },
                                         "data": {
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "nama_grup": {
-                                                                "type": "string",
-                                                                "example": "Grup Perusahaan A"
-                                                            },
-                                                            "jumlah_perusahaan": {
-                                                                "type": "integer",
-                                                                "example": 5
-                                                            },
-                                                            "created_by": {
-                                                                "type": "string",
-                                                                "example": "Admin User"
-                                                            },
-                                                            "created_at": {
-                                                                "type": "string",
-                                                                "format": "date-time"
-                                                            }
-                                                        },
-                                                        "type": "object"
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_grup": {
+                                                        "type": "string",
+                                                        "example": "Grup Retail Jakarta"
+                                                    },
+                                                    "jumlah_perusahaan": {
+                                                        "type": "integer",
+                                                        "example": 15
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15 10:30:00"
                                                     }
                                                 },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "example": 100
-                                                }
-                                            },
-                                            "type": "object"
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 25
                                         }
                                     },
                                     "type": "object"
@@ -1992,15 +1995,15 @@
         "/api/company-group/view/{id}": {
             "get": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Get detail of a company group",
+                "summary": "Get detailed information of a company group",
                 "operationId": "327e136c8a5a89ef59b60e5d011655f9",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Company group ID",
+                        "description": "ID grup perusahaan",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -2009,7 +2012,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "Detail grup berhasil diambil",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2032,26 +2035,27 @@
                                                         },
                                                         "nama_grup": {
                                                             "type": "string",
-                                                            "example": "Grup Perusahaan A"
+                                                            "example": "Grup Retail Jakarta"
                                                         },
                                                         "jumlah_perusahaan": {
                                                             "type": "integer",
-                                                            "example": 5
+                                                            "example": 15
                                                         },
                                                         "created_by": {
                                                             "type": "string",
-                                                            "example": "Admin User"
+                                                            "example": "John Doe"
                                                         },
                                                         "created_at": {
                                                             "type": "string",
-                                                            "format": "date-time"
+                                                            "format": "date-time",
+                                                            "example": "2024-01-15 10:30:00"
                                                         }
                                                     },
                                                     "type": "object"
                                                 },
                                                 "total_perusahaan": {
                                                     "type": "integer",
-                                                    "example": 5
+                                                    "example": 15
                                                 },
                                                 "perusahaan": {
                                                     "type": "array",
@@ -2063,7 +2067,7 @@
                                                             },
                                                             "nama_perusahaan": {
                                                                 "type": "string",
-                                                                "example": "PT Contoh"
+                                                                "example": "PT Contoh Indonesia"
                                                             },
                                                             "kota": {
                                                                 "type": "string",
@@ -2071,7 +2075,7 @@
                                                             },
                                                             "pic": {
                                                                 "type": "string",
-                                                                "example": "John Doe"
+                                                                "example": "Budi Santoso"
                                                             },
                                                             "no_telp": {
                                                                 "type": "string",
@@ -2079,7 +2083,7 @@
                                                             },
                                                             "email": {
                                                                 "type": "string",
-                                                                "example": "email@example.com"
+                                                                "example": "budi@contoh.com"
                                                             },
                                                             "jenis_perusahaan": {
                                                                 "type": "string",
@@ -2129,89 +2133,9 @@
                                 }
                             }
                         }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/add": {
-            "post": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Create new company group",
-                "operationId": "fdbf927cc20f0cd2f925522cc414985b",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_grup"
-                                ],
-                                "properties": {
-                                    "nama_grup": {
-                                        "type": "string",
-                                        "example": "Grup Perusahaan Baru"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Grup 'Grup Perusahaan Baru' berhasil dibuat"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama_grup": {
-                                                    "type": "string",
-                                                    "example": "Grup Perusahaan Baru"
-                                                },
-                                                "jumlah_perusahaan": {
-                                                    "type": "integer",
-                                                    "example": 0
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "Admin User"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
                     },
-                    "400": {
-                        "description": "Validation failed",
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2222,16 +2146,108 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Validasi gagal"
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company-group/create": {
+            "post": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Create new company group (with or without companies)",
+                "description": "Membuat grup perusahaan baru. Bisa membuat grup kosong atau langsung dengan perusahaan.",
+                "operationId": "95a8b4204f3b24e928280dac34c52311",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_grup"
+                                ],
+                                "properties": {
+                                    "nama_grup": {
+                                        "description": "Nama grup baru",
+                                        "type": "string",
+                                        "example": "Grup Retail Baru"
+                                    },
+                                    "perusahaan_ids": {
+                                        "description": "Array ID perusahaan yang akan ditambahkan ke grup baru (opsional)",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 1
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Grup berhasil dibuat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
                                         },
-                                        "errors": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Grup 'Grup Retail Baru' berhasil dibuat dan menambahkan 5 perusahaan"
+                                        },
+                                        "data": {
                                             "properties": {
-                                                "nama_grup": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Nama grup sudah digunakan"
-                                                    }
+                                                "group": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_grup": {
+                                                            "type": "string",
+                                                            "example": "Grup Retail Baru"
+                                                        },
+                                                        "jumlah_perusahaan": {
+                                                            "type": "integer",
+                                                            "example": 5
+                                                        },
+                                                        "created_by": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "example": "2024-01-15 10:30:00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "added_companies": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "skipped_companies": {
+                                                    "type": "integer",
+                                                    "example": 2
                                                 }
                                             },
                                             "type": "object"
@@ -2253,15 +2269,15 @@
         "/api/company-group/update/{id}": {
             "put": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Update company group",
+                "summary": "Update company group name",
                 "operationId": "9ba4d5c51a124e5442784bdd8cba958b",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Company group ID",
+                        "description": "ID grup perusahaan yang akan diupdate",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -2279,7 +2295,7 @@
                                 "properties": {
                                     "nama_grup": {
                                         "type": "string",
-                                        "example": "Grup Perusahaan Updated"
+                                        "example": "Grup Retail Jakarta Updated"
                                     }
                                 },
                                 "type": "object"
@@ -2289,7 +2305,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "Grup berhasil diupdate",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2300,7 +2316,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Grup 'Grup Perusahaan Updated' berhasil diperbarui"
+                                            "example": "Grup 'Grup Retail Jakarta Updated' berhasil diperbarui"
                                         },
                                         "data": {
                                             "properties": {
@@ -2310,369 +2326,20 @@
                                                 },
                                                 "nama_grup": {
                                                     "type": "string",
-                                                    "example": "Grup Perusahaan Updated"
+                                                    "example": "Grup Retail Jakarta Updated"
                                                 },
                                                 "jumlah_perusahaan": {
                                                     "type": "integer",
-                                                    "example": 5
+                                                    "example": 15
                                                 },
                                                 "created_by": {
                                                     "type": "string",
-                                                    "example": "Admin User"
+                                                    "example": "John Doe"
                                                 },
                                                 "created_at": {
                                                     "type": "string",
-                                                    "format": "date-time"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/get-available-companies/{groupId}": {
-            "get": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "dipakai untuk mengambil daftar perusahaan (leads) yang tersedia untuk dimasukkan ke dalam sebuah grup tertentu.",
-                "operationId": "b93a381d10119cbe6fa6f841651d168c",
-                "parameters": [
-                    {
-                        "name": "groupId",
-                        "in": "path",
-                        "description": "Group ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "keyword",
-                        "in": "query",
-                        "description": "Search keyword",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Items per page",
-                        "schema": {
-                            "type": "integer",
-                            "default": 10
-                        }
-                    },
-                    {
-                        "name": "get_all",
-                        "in": "query",
-                        "description": "Get all data without pagination",
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data perusahaan tersedia berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT Contoh"
-                                                    },
-                                                    "kota": {
-                                                        "type": "string",
-                                                        "example": "Jakarta"
-                                                    },
-                                                    "pic": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "no_telp": {
-                                                        "type": "string",
-                                                        "example": "08123456789"
-                                                    },
-                                                    "email": {
-                                                        "type": "string",
-                                                        "example": "email@example.com"
-                                                    },
-                                                    "jenis_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "Retail"
-                                                    },
-                                                    "status_leads": {
-                                                        "type": "string",
-                                                        "example": "Hot Lead"
-                                                    },
-                                                    "warna_background": {
-                                                        "type": "string",
-                                                        "example": "#FF0000"
-                                                    },
-                                                    "warna_font": {
-                                                        "type": "string",
-                                                        "example": "#FFFFFF"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "pagination": {
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "last_page": {
-                                                    "type": "integer",
-                                                    "example": 5
-                                                },
-                                                "per_page": {
-                                                    "type": "integer",
-                                                    "example": 10
-                                                },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "example": 50
-                                                },
-                                                "from": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "to": {
-                                                    "type": "integer",
-                                                    "example": 10
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/get-companies-in-group/{groupId}": {
-            "get": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Get all companies in a specific group(list grub)",
-                "description": "Retrieve all companies that are members of a specific company group",
-                "operationId": "39d91f4254dfe8cd17c7ed6ededbe7f8",
-                "parameters": [
-                    {
-                        "name": "groupId",
-                        "in": "path",
-                        "description": "ID of the company group",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data perusahaan dalam grup berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT Contoh Indonesia"
-                                                    },
-                                                    "kota": {
-                                                        "type": "string",
-                                                        "example": "Jakarta"
-                                                    },
-                                                    "pic": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "no_telp": {
-                                                        "type": "string",
-                                                        "example": "08123456789"
-                                                    },
-                                                    "email": {
-                                                        "type": "string",
-                                                        "example": "john@contoh.com"
-                                                    },
-                                                    "jenis_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "Retail"
-                                                    },
-                                                    "status_leads": {
-                                                        "type": "string",
-                                                        "example": "Hot Lead"
-                                                    },
-                                                    "warna_background": {
-                                                        "type": "string",
-                                                        "example": "#FF0000"
-                                                    },
-                                                    "warna_font": {
-                                                        "type": "string",
-                                                        "example": "#FFFFFF"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/bulk-assign": {
-            "post": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Bulk assign companies to groups(group lama tambh anggota)",
-                "operationId": "0b53caa49986a1c90102dad73015810a",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "assignments"
-                                ],
-                                "properties": {
-                                    "assignments": {
-                                        "type": "array",
-                                        "items": {
-                                            "properties": {
-                                                "group_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "leads_ids": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Berhasil memproses 5 perusahaan, 2 dilewati karena sudah ada di grup"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "processed": {
-                                                    "type": "integer",
-                                                    "example": 5
-                                                },
-                                                "skipped": {
-                                                    "type": "integer",
-                                                    "example": 2
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15 10:30:00"
                                                 }
                                             },
                                             "type": "object"
@@ -2684,7 +2351,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid assignments data",
+                        "description": "Validation error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2695,318 +2362,10 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Data assignments tidak valid"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
+                                            "example": "Validasi gagal"
                                         },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/statistics": {
-            "get": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Get company group statistics",
-                "operationId": "ea41bf43cb41a116c717c7fb490609bc",
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Statistik grup perusahaan berhasil diambil"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "total_groups": {
-                                                    "type": "integer",
-                                                    "example": 10
-                                                },
-                                                "total_companies_in_groups": {
-                                                    "type": "integer",
-                                                    "example": 150
-                                                },
-                                                "companies_without_group": {
-                                                    "type": "integer",
-                                                    "example": 25
-                                                },
-                                                "largest_group": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "nama_grup": {
-                                                            "type": "string",
-                                                            "example": "Grup Terbesar"
-                                                        },
-                                                        "jumlah_perusahaan": {
-                                                            "type": "integer",
-                                                            "example": 50
-                                                        },
-                                                        "created_by": {
-                                                            "type": "string",
-                                                            "example": "Admin User"
-                                                        },
-                                                        "created_at": {
-                                                            "type": "string",
-                                                            "format": "date-time"
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                },
-                                                "recent_groups": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 5
-                                                            },
-                                                            "nama_grup": {
-                                                                "type": "string",
-                                                                "example": "Grup Baru"
-                                                            },
-                                                            "jumlah_perusahaan": {
-                                                                "type": "integer",
-                                                                "example": 3
-                                                            },
-                                                            "created_by": {
-                                                                "type": "string",
-                                                                "example": "Admin User"
-                                                            },
-                                                            "created_at": {
-                                                                "type": "string",
-                                                                "format": "date-time"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                }
-                                            },
+                                        "errors": {
                                             "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/filter-rekomendasi": {
-            "get": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Filter recommended companies for grouping (fillter sebelum post)",
-                "operationId": "70230a6073644604b46805e49eb09651",
-                "parameters": [
-                    {
-                        "name": "nama_grup",
-                        "in": "query",
-                        "description": "Group name for filtering",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "properties": {
-                                            "id": {
-                                                "type": "integer",
-                                                "example": 1
-                                            },
-                                            "nama_perusahaan": {
-                                                "type": "string",
-                                                "example": "PT Contoh Rekomendasi"
-                                            },
-                                            "kota": {
-                                                "type": "string",
-                                                "example": "Jakarta"
-                                            },
-                                            "jenis_perusahaan": {
-                                                "type": "string",
-                                                "example": "Retail"
-                                            }
-                                        },
-                                        "type": "object"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan saat memfilter perusahaan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/company-group/groupkan": {
-            "post": {
-                "tags": [
-                    "Company Group"
-                ],
-                "summary": "Group companies into a company group(post setelah filter )",
-                "operationId": "8d2c76ee2da847fc9b2655ca0e1621dc",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_grup_manual",
-                                    "perusahaan_terpilih"
-                                ],
-                                "properties": {
-                                    "nama_grup_manual": {
-                                        "type": "string",
-                                        "example": "Grup Perusahaan Baru"
-                                    },
-                                    "perusahaan_terpilih": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer",
-                                            "example": 1
-                                        }
-                                    },
-                                    "group_id": {
-                                        "description": "Existing group ID (optional)",
-                                        "type": "integer",
-                                        "example": 1
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Berhasil menambahkan 5 perusahaan ke grup. 2 perusahaan sudah ada di grup."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validation failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Nama grup dan setidaknya satu perusahaan harus dipilih."
                                         }
                                     },
                                     "type": "object"
@@ -3026,7 +2385,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Grup tidak ditemukan."
+                                            "example": "Grup tidak ditemukan"
                                         }
                                     },
                                     "type": "object"
@@ -3046,7 +2405,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Gagal mengelompokkan Leads: Error message"
+                                            "example": "Terjadi kesalahan: Error message"
                                         }
                                     },
                                     "type": "object"
@@ -3065,15 +2424,15 @@
         "/api/company-group/delete/{id}": {
             "delete": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Delete a company group",
+                "summary": "Delete company group and all its members",
                 "operationId": "e25b53073f7c1f0aef00f607ba93d77b",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Company group ID",
+                        "description": "ID grup perusahaan yang akan dihapus",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -3082,7 +2441,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "Grup berhasil dihapus",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3149,27 +2508,18 @@
                 ]
             }
         },
-        "/api/company-group/remove-company/{groupId}/{companyId}": {
-            "delete": {
+        "/api/company-group/companies/{groupId}": {
+            "get": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Remove a company from group",
-                "operationId": "4d181a28129c4bb7ccc408c68b5a9c59",
+                "summary": "Get all companies in a specific group",
+                "operationId": "56615a769e7da51fc92e705df73050ce",
                 "parameters": [
                     {
                         "name": "groupId",
                         "in": "path",
-                        "description": "Group ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    },
-                    {
-                        "name": "companyId",
-                        "in": "path",
-                        "description": "Company/Leads ID",
+                        "description": "ID grup perusahaan",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -3178,7 +2528,279 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "Data perusahaan dalam grup berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data perusahaan dalam grup berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Contoh Indonesia"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "pic": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "no_telp": {
+                                                        "type": "string",
+                                                        "example": "08123456789"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "budi@contoh.com"
+                                                    },
+                                                    "jenis_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "Retail"
+                                                    },
+                                                    "status_leads": {
+                                                        "type": "string",
+                                                        "example": "Hot Lead"
+                                                    },
+                                                    "warna_background": {
+                                                        "type": "string",
+                                                        "example": "#FF0000"
+                                                    },
+                                                    "warna_font": {
+                                                        "type": "string",
+                                                        "example": "#FFFFFF"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company-group/available-companies/{groupId}": {
+            "get": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Search available companies to add to group",
+                "operationId": "8d8c11b9ed1b81a0575f1097a75330b1",
+                "parameters": [
+                    {
+                        "name": "groupId",
+                        "in": "path",
+                        "description": "ID grup perusahaan tujuan",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "keyword",
+                        "in": "query",
+                        "description": "Keyword pencarian (nama perusahaan atau kota)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data perusahaan tersedia berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data perusahaan tersedia berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Contoh Baru"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Bandung"
+                                                    },
+                                                    "pic": {
+                                                        "type": "string",
+                                                        "example": "Sari Dewi"
+                                                    },
+                                                    "no_telp": {
+                                                        "type": "string",
+                                                        "example": "08123456790"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "sari@contoh.com"
+                                                    },
+                                                    "jenis_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "Manufacturing"
+                                                    },
+                                                    "status_leads": {
+                                                        "type": "string",
+                                                        "example": "Warm Lead"
+                                                    },
+                                                    "warna_background": {
+                                                        "type": "string",
+                                                        "example": "#FFFF00"
+                                                    },
+                                                    "warna_font": {
+                                                        "type": "string",
+                                                        "example": "#000000"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 50
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Group not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Grup tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company-group/remove-company/{groupId}/{companyId}": {
+            "delete": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Remove a company from group",
+                "operationId": "4d181a28129c4bb7ccc408c68b5a9c59",
+                "parameters": [
+                    {
+                        "name": "groupId",
+                        "in": "path",
+                        "description": "ID grup perusahaan",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "companyId",
+                        "in": "path",
+                        "description": "ID perusahaan/leads yang akan dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Perusahaan berhasil dihapus dari grup",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3245,12 +2867,135 @@
                 ]
             }
         },
+        "/api/company-group/bulk-assign": {
+            "post": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Bulk assign companies to multiple groups",
+                "operationId": "0b53caa49986a1c90102dad73015810a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "assignments"
+                                ],
+                                "properties": {
+                                    "assignments": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "group_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_ids": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Bulk assignment berhasil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Berhasil memproses 5 perusahaan, 2 dilewati karena sudah ada di grup"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "processed": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "skipped": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data assignments tidak valid"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/company-group/bulk-remove-companies": {
             "delete": {
                 "tags": [
-                    "Company Group"
+                    "Company Groups"
                 ],
-                "summary": "Remove multiple companies from groups",
+                "summary": "Bulk remove companies from groups",
                 "operationId": "60a326371c72131739cab8ee0c95a63b",
                 "requestBody": {
                     "required": true,
@@ -3288,7 +3033,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
+                        "description": "Bulk removal berhasil",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3299,7 +3044,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Berhasil menghapus 3 perusahaan dari grup"
+                                            "example": "Berhasil menghapus 3 perusahaan dari grup, 1 tidak ditemukan"
                                         },
                                         "data": {
                                             "properties": {
@@ -3333,6 +3078,245 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Data removals tidak valid"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company-group/statistics": {
+            "get": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Get company groups statistics",
+                "operationId": "ea41bf43cb41a116c717c7fb490609bc",
+                "responses": {
+                    "200": {
+                        "description": "Statistik berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Statistik grup perusahaan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "total_groups": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total_companies_in_groups": {
+                                                    "type": "integer",
+                                                    "example": 245
+                                                },
+                                                "companies_without_group": {
+                                                    "type": "integer",
+                                                    "example": 78
+                                                },
+                                                "largest_group": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 5
+                                                        },
+                                                        "nama_grup": {
+                                                            "type": "string",
+                                                            "example": "Grup Enterprise"
+                                                        },
+                                                        "jumlah_perusahaan": {
+                                                            "type": "integer",
+                                                            "example": 45
+                                                        },
+                                                        "created_by": {
+                                                            "type": "string",
+                                                            "example": "Admin User"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "example": "2024-01-10 08:15:00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "recent_groups": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 15
+                                                            },
+                                                            "nama_grup": {
+                                                                "type": "string",
+                                                                "example": "Grup Baru"
+                                                            },
+                                                            "jumlah_perusahaan": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time",
+                                                                "example": "2024-01-15 14:20:00"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/company-group/recommendations": {
+            "get": {
+                "tags": [
+                    "Company Groups"
+                ],
+                "summary": "Filter companies for grouping recommendation",
+                "operationId": "193368c3f2bcebe0deb83bc50ea2eca6",
+                "parameters": [
+                    {
+                        "name": "keyword",
+                        "in": "query",
+                        "description": "Keyword untuk filter nama perusahaan",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data rekomendasi berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Rekomendasi perusahaan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Contoh Rekomendasi"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "jenis_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "Retail"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan saat memfilter perusahaan: Error message"
                                         }
                                     },
                                     "type": "object"
@@ -11725,6 +11709,103 @@
                                                     "kode_benua": {
                                                         "type": "string",
                                                         "example": "AS"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/jabatan-pic": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar semua jabatan PIC",
+                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+                "operationId": "2d86dfb7a6a37c3efdae8f8715116653",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data jabatan PIC",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data jabatan PIC berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_jabatan": {
+                                                        "type": "string",
+                                                        "example": "Manager Purchasing"
+                                                    },
+                                                    "kode": {
+                                                        "type": "string",
+                                                        "example": "MGR-PUR"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "15-01-2025"
                                                     }
                                                 },
                                                 "type": "object"
@@ -20956,8 +21037,8 @@
             "description": "API untuk manajemen data barang"
         },
         {
-            "name": "Company Group",
-            "description": "API untuk manajemen data group perusahaan"
+            "name": "Company Groups",
+            "description": "API endpoints untuk manajemen grup perusahaan dan anggota perusahaan"
         },
         {
             "name": "Customer Activity",
