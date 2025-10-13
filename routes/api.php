@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -39,6 +40,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::get('/users', [TimSalesController::class, 'getUsers']);
     Route::get('/platforms', [LeadsController::class, 'getPlatforms']);
     Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
+    Route::get('/benua', [LeadsController::class, 'getBenua']);
+    Route::get('/jabatan-pic', [LeadsController::class, 'getJabatanPic']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -215,15 +218,10 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Menu Management
     Route::prefix('menu')->controller(MenuController::class)->group(function () {
         Route::get('/list', 'list');
-        Route::get('/by-role', 'getMenusByRole');
-        Route::get('/permissions', 'getUserPermissions');
-        Route::get('/all-permissions', 'getAllPermissions');
         Route::post('/add', 'add');
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
-        Route::get('/listRole/{id}', 'listRole');
-        Route::post('/addrole/{id}', 'addrole');
     });
 
     // OHC (hanya index)
@@ -244,27 +242,28 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::delete('/delete/{id}', 'delete');
         Route::get('/leads/{leadsId}/track', 'trackActivity');
     });
-    // Company Group Routes
+
+    // Company Group Routes - UPDATED
     Route::prefix('company-group')->controller(CompanyGroupController::class)->group(function () {
         // Basic CRUD
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
-        Route::post('/add', 'add');
+        Route::post('/create', 'create'); 
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
 
         // Company Management
-        Route::get('/get-available-companies/{groupId}', 'getAvailableCompanies');
-        Route::get('/get-companies-in-group/{groupId}', 'getCompaniesInGroup');
+        Route::get('/available-companies/{groupId}', 'getAvailableCompanies'); 
+        Route::get('/companies/{groupId}', 'getCompaniesInGroup');
         Route::post('/bulk-assign', 'bulkAssign');
         Route::delete('/remove-company/{groupId}/{companyId}', 'removeCompany');
         Route::delete('/bulk-remove-companies', 'bulkRemoveCompanies');
 
-        // Statistics & Filtering
+        // Statistics & Recommendations
         Route::get('/statistics', 'getStatistics');
-        Route::get('/filter-rekomendasi', 'filterRekomendasi');
-        Route::post('/groupkan', 'groupkan');
+        Route::get('/recommendations', 'getRecommendations'); 
     });
+
     // Leads Routes
     Route::prefix('leads')->controller(LeadsController::class)->group(function () {
         // Basic CRUD
@@ -324,5 +323,13 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
 
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
+        Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
+    });
+    // Role Management
+    Route::prefix('roles')->controller(RoleController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::get('/view/{id}', 'show');
+        Route::get('/permissions', 'menuPermissions');
+        Route::post('/{id}/update-permissions', 'updatePermissions');
     });
 });

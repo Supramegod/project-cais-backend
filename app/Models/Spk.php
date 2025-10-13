@@ -14,6 +14,7 @@ class Spk extends Model
     protected $table = 'sl_spk';
     protected $fillable = [
         'leads_id',
+        'nomor_quotation',
         'quotation_id',
         'nomor',
         'tgl_spk',
