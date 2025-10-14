@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\PksController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
@@ -42,6 +43,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
     Route::get('/benua', [LeadsController::class, 'getBenua']);
     Route::get('/jabatan-pic', [LeadsController::class, 'getJabatanPic']);
+    Route::get('/bidang-perusahaan', [LeadsController::class, 'getBidangPerusahaan']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -248,12 +250,12 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Basic CRUD
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
-        Route::post('/create', 'create'); 
+        Route::post('/create', 'create');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
 
         // Company Management
-        Route::get('/available-companies/{groupId}', 'getAvailableCompanies'); 
+        Route::get('/available-companies/{groupId}', 'getAvailableCompanies');
         Route::get('/companies/{groupId}', 'getCompaniesInGroup');
         Route::post('/bulk-assign', 'bulkAssign');
         Route::delete('/remove-company/{groupId}/{companyId}', 'removeCompany');
@@ -261,7 +263,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
 
         // Statistics & Recommendations
         Route::get('/statistics', 'getStatistics');
-        Route::get('/recommendations', 'getRecommendations'); 
+        Route::get('/recommendations', 'getRecommendations');
     });
 
     // Leads Routes
@@ -332,4 +334,25 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/permissions', 'menuPermissions');
         Route::post('/{id}/update-permissions', 'updatePermissions');
     });
+    // PKS Management - TAMBAHKAN BLOK INI
+    Route::prefix('pks')->controller(PksController::class)->group(function () {
+        // Basic CRUD
+        Route::get('/list', 'index');
+        Route::get('/view/{id}', 'show');
+        Route::post('/add', 'store');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'destroy');
+
+        // Approval & Activation
+        Route::post('/{id}/approve', 'approve');
+        Route::post('/{id}/activate', 'activate');
+
+        // Template Data
+        Route::get('/{id}/perjanjian', 'getPerjanjianTemplateData');
+
+        // Available Resources
+        Route::get('/available-leads', 'getAvailableLeads');
+        Route::get('/available-sites/{leadsId}', 'getAvailableSites');
+    });
+
 });

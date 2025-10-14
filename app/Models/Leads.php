@@ -111,6 +111,10 @@ class Leads extends Model
     {
         return $this->hasMany(CustomerActivity::class, 'leads_id');
     }
+    public function spkSites()
+    {
+        return $this->hasMany(SpkSite::class, 'leads_id');
+    }
     public function scopeAvailableCustomers($query)
     {
         return $query->whereNotNull('customer_id')

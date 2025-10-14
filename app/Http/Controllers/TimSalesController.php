@@ -937,8 +937,7 @@ class TimSalesController extends Controller
     public function getBranches()
     {
         try {
-            $branches = Branch::where('id', '!=', 1)
-                ->where('is_active', 1)
+            $branches = Branch::where('is_active', 1)
                 ->select('id', 'name', 'description', 'is_active')
                 ->get();
 
