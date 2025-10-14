@@ -1,7 +1,7 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "Cais Shalter API",
+        "title": "Cais Shelter API",
         "description": "Dokumentasi API Authentication dengan Laravel Sanctum (Plain Token)",
         "version": "1.0.0"
     },
@@ -11861,6 +11861,103 @@
                 ]
             }
         },
+        "/api/bidang-perusahaan": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar semua bidang perusahaan",
+                "description": "Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+                "operationId": "498a4ab2a07d6fa0c5d2c5757065fa14",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data bidang perusahaan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data bidang perusahaan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Manufacturing"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "2025-01-01T00:00:00.000000Z"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "example": "2025-01-01T00:00:00.000000Z"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -12783,6 +12880,854 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/list": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Get list of PKS",
+                "operationId": "f6442ddd28bc570e93b0273b03c4c55c",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Start date",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-10-01"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "End date",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-11-01"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Status filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string"
+                                                    },
+                                                    "tgl_pks": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatted_tgl_pks": {
+                                                        "type": "string"
+                                                    },
+                                                    "kontrak_awal": {
+                                                        "type": "string"
+                                                    },
+                                                    "kontrak_akhir": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatted_kontrak_awal": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatted_kontrak_akhir": {
+                                                        "type": "string"
+                                                    },
+                                                    "status": {
+                                                        "type": "string"
+                                                    },
+                                                    "berakhir_dalam": {
+                                                        "type": "string"
+                                                    },
+                                                    "status_berlaku": {
+                                                        "type": "string"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/view/{id}": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Get PKS details",
+                "operationId": "1ce513ab70e438ece293311e9897044c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/add": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Create new PKS",
+                "operationId": "7c9572ffb782399262abc1f949d94887",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "site_ids",
+                                    "tanggal_pks",
+                                    "tanggal_awal_kontrak",
+                                    "tanggal_akhir_kontrak",
+                                    "kategoriHC",
+                                    "loyalty",
+                                    "salary_rule",
+                                    "rule_thr",
+                                    "entitas"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "type": "integer",
+                                        "example": 38
+                                    },
+                                    "site_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            130
+                                        ]
+                                    },
+                                    "tanggal_pks": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2025-10-14"
+                                    },
+                                    "tanggal_awal_kontrak": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2025-11-01"
+                                    },
+                                    "tanggal_akhir_kontrak": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-10-31"
+                                    },
+                                    "kategoriHC": {
+                                        "description": "Kategori HC ID",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "loyalty": {
+                                        "description": "Loyalty ID",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "salary_rule": {
+                                        "description": "Salary Rule ID",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "rule_thr": {
+                                        "description": "Rule THR ID",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "entitas": {
+                                        "description": "Entitas ID",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "perjanjian_data": {
+                                        "description": "Template data for frontend to generate agreement",
+                                        "type": "object",
+                                        "example": {
+                                            "nomor_perjanjian": "PKS/2025/001",
+                                            "pihak_pertama": "PT ABC",
+                                            "pihak_kedua": "PT Client XYZ",
+                                            "lokasi_penandatanganan": "Jakarta"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "PKS created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "PKS/2025/001"
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tanggal_pks": {
+                                                    "type": "string",
+                                                    "example": "14-10-2025"
+                                                },
+                                                "tanggal_awal_kontrak": {
+                                                    "type": "string",
+                                                    "example": "01-11-2025"
+                                                },
+                                                "tanggal_akhir_kontrak": {
+                                                    "type": "string",
+                                                    "example": "31-10-2026"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "leads_id": [
+                                                    "The leads id field is required."
+                                                ],
+                                                "site_ids": [
+                                                    "The site ids field is required."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/update/{id}": {
+            "put": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Update PKS",
+                "operationId": "710679a8ecda55817edce677456fe42e",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "tanggal_pks": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2025-10-14"
+                                    },
+                                    "tanggal_awal_kontrak": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2025-11-01"
+                                    },
+                                    "tanggal_akhir_kontrak": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-10-31"
+                                    },
+                                    "status_pks_id": {
+                                        "description": "Status PKS ID (1=Draft, 2=Active, 3=Expired, etc.)",
+                                        "type": "integer",
+                                        "example": 2
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "PKS updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "PKS/2025/001"
+                                                },
+                                                "tanggal_pks": {
+                                                    "type": "string",
+                                                    "example": "14-10-2025"
+                                                },
+                                                "tanggal_awal_kontrak": {
+                                                    "type": "string",
+                                                    "example": "01-11-2025"
+                                                },
+                                                "tanggal_akhir_kontrak": {
+                                                    "type": "string",
+                                                    "example": "31-10-2026"
+                                                },
+                                                "status_pks_id": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "tanggal_pks": [
+                                                    "The tanggal pks must be a valid date."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Delete PKS",
+                "operationId": "522871aec7418f47c12bb6204cf3b2f8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PKS deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{id}/approve": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Approve PKS",
+                "operationId": "5e675294cc822cdb55d6e26a06638703",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ot"
+                                ],
+                                "properties": {
+                                    "ot": {
+                                        "description": "Approval level (1-4)",
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "PKS approved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{id}/activate": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Activate PKS sites",
+                "operationId": "98e7b1406d594a51c274b36917c385be",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PKS sites activated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{id}/perjanjian": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Get PKS perjanjian data for template",
+                "operationId": "0a70ec6c3d8ef8e00c1e4e95a38f6555",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Template data for frontend",
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/available-leads": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Get available leads for PKS creation",
+                "operationId": "493170ec0def5926dc5e87bd1031fbf9",
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/available-sites/{leadsId}": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Get available sites for leads",
+                "operationId": "462a69b4f54f525970fe5050b8eb50af",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string"
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string"
+                                                    },
+                                                    "provinsi": {
+                                                        "type": "string"
+                                                    },
+                                                    "kota": {
+                                                        "type": "string"
+                                                    },
+                                                    "penempatan": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Leads not found"
                     }
                 },
                 "security": [
@@ -21071,6 +22016,10 @@
         {
             "name": "Menu",
             "description": "API untuk manajemen Menu"
+        },
+        {
+            "name": "PKS",
+            "description": "API untuk manajemen PKS (Perjanjian Kerja Sama)"
         },
         {
             "name": "Position",

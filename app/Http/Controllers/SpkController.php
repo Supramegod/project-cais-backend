@@ -108,7 +108,8 @@ class SpkController extends Controller
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
             $query = Spk::with(['leads', 'statusSpk', 'spkSites'])
-                ->whereNull('deleted_at');
+                ->whereNull('deleted_at')
+                ->orderBy('created_at', 'desc');
 
             if (!empty($request->status)) {
                 $query->where('status_spk_id', $request->status);
@@ -1155,8 +1156,30 @@ class SpkController extends Controller
 
     private function generateActivityNomor($leadsId)
     {
-        $count = CustomerActivity::where('leads_id', $leadsId)->count();
-        return sprintf("%03d", $count + 1);
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        $prefix = "CAT/";
+        if ($leads) {
+            $prefix .= match ($leads->kebutuhan_id) {
+                1 => "SG/",
+                2 => "LS/",
+                3 => "CS/",
+                4 => "LL/",
+                default => "NN/"
+            };
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
 
     private function getQuotationDetails($quotationId)

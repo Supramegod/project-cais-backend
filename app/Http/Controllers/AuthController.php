@@ -14,7 +14,7 @@ use Exception;
 /**
  * @OA\Info(
  *     version="1.0.0",
- *     title="Cais Shalter API",
+ *     title="Cais Shelter API",
  *     description="Dokumentasi API Authentication dengan Laravel Sanctum (Plain Token)"
  * )
  *

@@ -717,54 +717,75 @@ class LeadsController extends Controller
     }
 
 
-
     private function generateNomor()
     {
-        $nomor = "AAAAA";
-        $lastLeads = Leads::orderBy('id', 'DESC')->first();
+        $lastLeads = Leads::latest('id')->first();
 
-        if ($lastLeads && $lastLeads->nomor) {
-            $nomor = $lastLeads->nomor;
-            $chars = str_split($nomor);
-            for ($i = count($chars) - 1; $i >= 0; $i--) {
-                $ascii = ord($chars[$i]);
-                if (($ascii >= 48 && $ascii < 57) || ($ascii >= 65 && $ascii < 90)) {
-                    $ascii += 1;
-                } elseif ($ascii == 90) {
-                    $ascii = 48;
+        // Default nomor if no previous leads
+        if (!$lastLeads?->nomor) {
+            return 'AAAAA';
+        }
+
+        $nomor = $lastLeads->nomor;
+        $chars = str_split($nomor);
+
+        // Increment from right to left
+        for ($i = count($chars) - 1; $i >= 0; $i--) {
+            $current = $chars[$i];
+
+            // Handle digits (0-9)
+            if (is_numeric($current)) {
+                if ($current < '9') {
+                    $chars[$i] = (string) ($current + 1);
+                    break;
                 } else {
+                    $chars[$i] = 'A'; // 9 -> A
+                    break;
+                }
+            }
+
+            // Handle letters (A-Z)
+            if (ctype_alpha($current)) {
+                if ($current < 'Z') {
+                    $chars[$i] = chr(ord($current) + 1);
+                    break;
+                } else {
+                    $chars[$i] = '0'; // Z -> 0 (carry over)
                     continue;
                 }
-                $ascchar = chr($ascii);
-                $nomor = substr_replace($nomor, $ascchar, $i);
-                break;
             }
         }
 
-        if (strlen($nomor) < 5) {
-            $jumlah = 5 - strlen($nomor);
-            for ($i = 0; $i < $jumlah; $i++) {
-                $nomor = $nomor . "A";
-            }
-        }
-
-        return $nomor;
+        // Convert back to string and pad to 5 chars
+        return str_pad(implode('', $chars), 5, 'A', STR_PAD_RIGHT);
     }
 
     private function generateNomorActivity($leadsId)
     {
-        $lastActivity = CustomerActivity::where('leads_id', $leadsId)
-            ->orderBy('id', 'DESC')
-            ->first();
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
 
-        if (!$lastActivity) {
-            return 'ACT-' . $leadsId . '-001';
+        $prefix = "CAT/";
+        if ($leads) {
+            $prefix .= match ($leads->kebutuhan_id) {
+                1 => "SG/",
+                2 => "LS/",
+                3 => "CS/",
+                4 => "LL/",
+                default => "NN/"
+            };
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
         }
 
-        $parts = explode('-', $lastActivity->nomor);
-        $number = isset($parts[2]) ? intval($parts[2]) + 1 : 1;
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
 
-        return 'ACT-' . $leadsId . '-' . str_pad($number, 3, '0', STR_PAD_LEFT);
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
 
     /**
@@ -2512,6 +2533,67 @@ class LeadsController extends Controller
                 'success' => true,
                 'message' => 'Data jabatan PIC berhasil diambil',
                 'data' => $jabatanPic
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/bidang-perusahaan",
+     *     summary="Mendapatkan daftar semua bidang perusahaan",
+     *     description="Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data bidang perusahaan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data bidang perusahaan berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Manufacturing"),
+     *                     @OA\Property(property="created_at", type="string", example="2025-01-01T00:00:00.000000Z"),
+     *                     @OA\Property(property="updated_at", type="string", example="2025-01-01T00:00:00.000000Z")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getBidangPerusahaan()
+    {
+        try {
+            $bidangPerusahaan = BidangPerusahaan::whereNull('deleted_at')
+                ->orderBy('nama', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data bidang perusahaan berhasil diambil',
+                'data' => $bidangPerusahaan
             ]);
         } catch (\Exception $e) {
             return response()->json([
