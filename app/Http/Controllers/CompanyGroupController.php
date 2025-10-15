@@ -259,7 +259,16 @@ class CompanyGroupController extends Controller
      *                     @OA\Property(property="created_at", type="string", format="date-time", example="2024-01-15 10:30:00")
      *                 ),
      *                 @OA\Property(property="added_companies", type="integer", example=5),
-     *                 @OA\Property(property="skipped_companies", type="integer", example=2)
+     *                 @OA\Property(property="already_in_group", type="integer", example=2),
+     *                 @OA\Property(property="not_found", type="integer", example=1),
+     *                 @OA\Property(property="companies_with_group", type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(property="company_id", type="integer", example=10),
+     *                         @OA\Property(property="company_name", type="string", example="PT Already Grouped"),
+     *                         @OA\Property(property="current_group", type="string", example="Grup Existing")
+     *                     ),
+     *                     description="List perusahaan yang sudah memiliki grup"
+     *                 )
      *             )
      *         )
      *     )
@@ -270,14 +279,18 @@ class CompanyGroupController extends Controller
         try {
             DB::beginTransaction();
 
-            // HANYA validasi untuk create grup baru
+            // Validasi input
             $validator = Validator::make($request->all(), [
-                'nama_grup' => 'required|max:100|min:3|unique:sl_perusahaan_groups,nama_grup',
+                'nama_grup' => 'required|string|min:3|max:100|unique:sl_perusahaan_groups,nama_grup',
                 'perusahaan_ids' => 'sometimes|array',
                 'perusahaan_ids.*' => 'integer|exists:sl_leads,id'
             ], [
                 'nama_grup.required' => 'Nama grup wajib diisi',
-                'nama_grup.unique' => 'Nama grup sudah digunakan'
+                'nama_grup.unique' => 'Nama grup sudah digunakan',
+                'nama_grup.min' => 'Nama grup minimal 3 karakter',
+                'nama_grup.max' => 'Nama grup maksimal 100 karakter',
+                'perusahaan_ids.array' => 'Format perusahaan_ids harus berupa array',
+                'perusahaan_ids.*.exists' => 'Salah satu perusahaan tidak ditemukan'
             ]);
 
             if ($validator->fails()) {
@@ -292,7 +305,7 @@ class CompanyGroupController extends Controller
             $perusahaanIds = $request->input('perusahaan_ids', []);
             $namaGrup = $request->input('nama_grup');
 
-            // CREATE NEW GROUP ONLY
+            // Buat grup baru
             $group = PerusahaanGroup::create([
                 'nama_grup' => $namaGrup,
                 'jumlah_perusahaan' => 0,
@@ -302,63 +315,37 @@ class CompanyGroupController extends Controller
                 'update_by' => $userInfo['name']
             ]);
 
-            // Add companies if provided
-            $addedCount = 0;
-            $skippedCount = 0;
+            // Inisialisasi counter
+            $stats = [
+                'added' => 0,
+                'already_in_group' => 0,
+                'not_found' => 0,
+                'companies_with_group' => []
+            ];
 
+            // Proses penambahan perusahaan jika ada
             if (!empty($perusahaanIds)) {
-                // Untuk grup baru, tidak perlu cek existing companies karena pasti kosong
-                // Langsung ambil data perusahaan yang valid
-                $validCompanies = Leads::whereIn('id', $perusahaanIds)
-                    ->whereNull('deleted_at')
-                    ->select('id', 'nama_perusahaan')
-                    ->get();
+                $stats = $this->processCompanyAdditions($group->id, $perusahaanIds, $userInfo);
 
-                $insertData = [];
-                foreach ($validCompanies as $company) {
-                    $insertData[] = [
-                        'group_id' => $group->id,
-                        'leads_id' => $company->id,
-                        'nama_perusahaan' => $company->nama_perusahaan,
-                        'created_at' => $userInfo['time'],
-                        'created_by' => $userInfo['name'],
-                        'update_at' => $userInfo['time'],
-                        'update_by' => $userInfo['name']
-                    ];
-                }
-
-                if (!empty($insertData)) {
-                    PerusahaanGroupDetail::insert($insertData);
-                    $addedCount = count($insertData);
-                }
-
-                // Hitung skipped (perusahaan yang tidak ditemukan)
-                $skippedCount = count($perusahaanIds) - $addedCount;
+                // Update jumlah perusahaan di grup
+                $this->updateGroupCompanyCount($group->id);
+                $group->refresh();
             }
-
-            // Update company count
-            $this->updateGroupCompanyCount($group->id);
-            $group->refresh();
 
             DB::commit();
 
-            // Build success message
-            $message = "Grup '{$group->nama_grup}' berhasil dibuat";
-            if ($addedCount > 0) {
-                $message .= " dan menambahkan {$addedCount} perusahaan";
-            }
-            if ($skippedCount > 0) {
-                $message .= ", {$skippedCount} perusahaan tidak valid/tidak ditemukan";
-            }
-            $message .= ".";
+            // Build response message
+            $message = $this->buildCreateSuccessMessage($group->nama_grup, $stats);
 
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'data' => [
                     'group' => $group,
-                    'added_companies' => $addedCount,
-                    'skipped_companies' => $skippedCount
+                    'added_companies' => $stats['added'],
+                    'already_in_group' => $stats['already_in_group'],
+                    'not_found' => $stats['not_found'],
+                    'companies_with_group' => $stats['companies_with_group']
                 ]
             ]);
 
@@ -371,6 +358,134 @@ class CompanyGroupController extends Controller
         }
     }
 
+    /**
+     * Proses penambahan perusahaan ke grup baru
+     * 
+     * @param int $groupId
+     * @param array $perusahaanIds
+     * @param array $userInfo
+     * @return array
+     */
+    private function processCompanyAdditions($groupId, $perusahaanIds, $userInfo)
+    {
+        $stats = [
+            'added' => 0,
+            'already_in_group' => 0,
+            'not_found' => 0,
+            'companies_with_group' => []
+        ];
+
+        // Cek perusahaan yang sudah ada di grup lain
+        $companiesInGroups = PerusahaanGroupDetail::whereIn('leads_id', $perusahaanIds)
+            ->with(['lead:id,nama_perusahaan', 'group:id,nama_grup'])
+            ->get();
+
+        // Buat mapping perusahaan yang sudah ada di grup
+        $existingCompanyIds = $companiesInGroups->pluck('leads_id')->toArray();
+
+        // Simpan info perusahaan yang sudah punya grup
+        foreach ($companiesInGroups as $detail) {
+            if ($detail->lead && $detail->group) {
+                $stats['companies_with_group'][] = [
+                    'company_id' => $detail->leads_id,
+                    'company_name' => $detail->lead->nama_perusahaan,
+                    'current_group' => $detail->group->nama_grup
+                ];
+            }
+        }
+        $stats['already_in_group'] = count($existingCompanyIds);
+
+        // Filter perusahaan yang belum ada di grup
+        $availableCompanyIds = array_diff($perusahaanIds, $existingCompanyIds);
+
+        if (empty($availableCompanyIds)) {
+            return $stats;
+        }
+
+        // Ambil data perusahaan yang valid dan belum ada di grup
+        $validCompanies = Leads::whereIn('id', $availableCompanyIds)
+            ->whereNull('deleted_at')
+            ->select('id', 'nama_perusahaan')
+            ->get();
+
+        // Hitung perusahaan yang tidak ditemukan
+        $stats['not_found'] = count($availableCompanyIds) - $validCompanies->count();
+
+        // Siapkan data untuk insert
+        $insertData = [];
+        foreach ($validCompanies as $company) {
+            $insertData[] = [
+                'group_id' => $groupId,
+                'leads_id' => $company->id,
+                'nama_perusahaan' => $company->nama_perusahaan,
+                'created_at' => $userInfo['time'],
+                'created_by' => $userInfo['name'],
+                'update_at' => $userInfo['time'],
+                'update_by' => $userInfo['name']
+            ];
+        }
+
+        // Insert data jika ada
+        if (!empty($insertData)) {
+            PerusahaanGroupDetail::insert($insertData);
+            $stats['added'] = count($insertData);
+        }
+
+        return $stats;
+    }
+
+    /**
+     * Build success message untuk create grup
+     * 
+     * @param string $groupName
+     * @param array $stats
+     * @return string
+     */
+    private function buildCreateSuccessMessage($groupName, $stats)
+    {
+        $messages = ["Grup '{$groupName}' berhasil dibuat"];
+
+        if ($stats['added'] > 0) {
+            $messages[] = "{$stats['added']} perusahaan berhasil ditambahkan";
+        }
+
+        if ($stats['already_in_group'] > 0) {
+            $groupDetails = $this->formatCompaniesWithGroupMessage($stats['companies_with_group']);
+            $messages[] = "{$stats['already_in_group']} perusahaan sudah terdaftar di grup lain: {$groupDetails}";
+        }
+
+        if ($stats['not_found'] > 0) {
+            $messages[] = "{$stats['not_found']} perusahaan tidak ditemukan";
+        }
+
+        return implode(', ', $messages) . '.';
+    }
+
+    /**
+     * Format pesan detail perusahaan yang sudah ada di grup
+     * 
+     * @param array $companiesWithGroup
+     * @return string
+     */
+    private function formatCompaniesWithGroupMessage($companiesWithGroup)
+    {
+        if (empty($companiesWithGroup)) {
+            return '';
+        }
+
+        $details = array_map(function ($item) {
+            return "{$item['company_name']} (di {$item['current_group']})";
+        }, $companiesWithGroup);
+
+        // Batasi maksimal 3 perusahaan di pesan, sisanya tampilkan jumlahnya
+        if (count($details) > 3) {
+            $shown = array_slice($details, 0, 3);
+            $remaining = count($details) - 3;
+            return implode(', ', $shown) . " dan {$remaining} lainnya";
+        }
+
+        return implode(', ', $details);
+    }
     /**
      * @OA\Put(
      *     path="/api/company-group/update/{id}",
