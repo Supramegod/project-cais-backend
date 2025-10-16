@@ -200,152 +200,87 @@ class LeadsController extends Controller
         return true;
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/leads/view/{id}",
-     *     summary="Mendapatkan detail lead berdasarkan ID",
-     *     description="Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
-     *     tags={"Leads"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="ID unik dari lead yang ingin dilihat detailnya",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Berhasil mengambil detail lead",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Detail lead berhasil diambil"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(
-     *                     property="lead",
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
-     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
-     *                     @OA\Property(property="telp_perusahaan", type="string", example="021-1234567"),
-     *                     @OA\Property(property="alamat", type="string", example="Jl. Sudirman No. 123"),
-     *                     @OA\Property(property="pic", type="string", example="John Doe"),
-     *                     @OA\Property(property="jabatan", type="string", example="Manager"),
-     *                     @OA\Property(property="no_telp", type="string", example="08123456789"),
-     *                     @OA\Property(property="email", type="string", example="john@abc.com"),
-     *                     @OA\Property(property="pma", type="string", example="Yes"),
-     *                     @OA\Property(property="notes", type="string", example="Tertarik dengan produk A"),
-     *                     @OA\Property(property="stgl_leads", type="string", example="1 Januari 2025"),
-     *                     @OA\Property(property="screated_at", type="string", example="1 Januari 2025"),
-     *                     @OA\Property(property="kebutuhan_array", type="array", @OA\Items(type="string", example="1")),
-     *                     @OA\Property(property="branch", type="object"),
-     *                     @OA\Property(property="kebutuhan", type="object"),
-     *                     @OA\Property(property="tim_sales", type="object"),
-     *                     @OA\Property(property="status_leads", type="object"),
-     *                     @OA\Property(property="jenis_perusahaan", type="object"),
-     *                     @OA\Property(property="company", type="object")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="activities",
-     *                     type="array",
-     *                     @OA\Items(
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nomor", type="string", example="ACT-1-001"),
-     *                         @OA\Property(property="notes", type="string", example="Follow up via telepon"),
-     *                         @OA\Property(property="tipe", type="string", example="Leads"),
-     *                         @OA\Property(property="screated_at", type="string", example="1 Januari 2025 10:30"),
-     *                         @OA\Property(property="stgl_activity", type="string", example="1 Januari 2025")
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Lead tidak ditemukan",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Lead tidak ditemukan")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal Server Error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
-     *         )
-     *     )
-     * )
-     */
-    public function view($id)
-    {
-        try {
-            $lead = Leads::with([
-                'branch',
-                'kebutuhan',
-                'timSales',
-                'timSalesD',
-                'statusLeads',
-                'jenisPerusahaan',
-                'company',
-                'kebutuhan'
-            ])
-                ->whereNull('customer_id')
-                ->find($id);
+/**
+ * @OA\Get(
+ *     path="/api/leads/view/{id}",
+ *     summary="Mendapatkan detail lead berdasarkan ID",
+ *     description="Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, perusahaan group, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
+ *     tags={"Leads"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="ID unik dari lead yang ingin dilihat detailnya",
+ *         required=true,
+ *         @OA\Schema(type="integer", example=1)
+ *     ),
+ *     @OA\Response(
+ *         response=200,
+ *         description="Berhasil mengambil detail lead",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="message", type="string", example="Detail lead berhasil diambil"),
+ *             @OA\Property(
+ *                 property="data",
+ *                 type="object",
+ *                 @OA\Property(property="lead", type="object"),
+ *                 @OA\Property(
+ *                     property="perusahaan_groups",
+ *                     type="array",
+ *                     description="Daftar grup perusahaan yang memiliki lead ini",
+ *                     @OA\Items(
+ *                         type="object",
+ *                         @OA\Property(property="group_id", type="integer", example=1),
+ *                         @OA\Property(property="nama_grup", type="string", example="Grup ABC"),
+ *                         @OA\Property(property="jumlah_perusahaan", type="integer", example=5),
+ *                         @OA\Property(property="created_at", type="string", example="01-01-2025")
+ *                     )
+ *                 ),
+ *                 @OA\Property(property="activities", type="array", @OA\Items(type="object"))
+ *             )
+ *         )
+ *     ),
+ *     @OA\Response(response=404, description="Lead tidak ditemukan"),
+ *     @OA\Response(response=401, description="Unauthorized"),
+ *     @OA\Response(response=500, description="Internal Server Error")
+ * )
+ */
+public function view($id)
+{
+    try {
+        $lead = Leads::with([
+            'branch', 'kebutuhan', 'timSales', 'timSalesD', 
+            'statusLeads', 'jenisPerusahaan', 'company', 'groupDetails'
+        ])->whereNull('customer_id')->find($id);
 
-            if (!$lead) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Lead tidak ditemukan'
-                ], 404);
-            }
-
-            $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
-            $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
-
-            if (!empty($lead->kebutuhan_id)) {
-                $lead->kebutuhan_array = array_map('trim', explode(',', $lead->kebutuhan_id));
-            } else {
-                $lead->kebutuhan_array = [];
-            }
-
-            $activities = CustomerActivity::where('leads_id', $id)
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get();
-
-            $activities->transform(function ($activity) {
-                $activity->screated_at = Carbon::parse($activity->created_at)->isoFormat('D MMMM Y HH:mm');
-                $activity->stgl_activity = Carbon::parse($activity->tgl_activity)->isoFormat('D MMMM Y');
-                return $activity;
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Detail lead berhasil diambil',
-                'data' => [
-                    'lead' => $lead,
-                    'activities' => $activities
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+        if (!$lead) {
+            return response()->json(['success' => false, 'message' => 'Lead tidak ditemukan'], 404);
         }
-    }
 
+        $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
+        $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
+        $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Detail lead berhasil diambil',
+            'data' => [
+                'lead' => $lead,
+                'activities' => CustomerActivity::where('leads_id', $id)
+                    ->latest()
+                    ->limit(5)
+                    ->get()
+                    ->map(function($a) {
+                        $a->screated_at = Carbon::parse($a->created_at)->isoFormat('D MMMM Y HH:mm');
+                        $a->stgl_activity = Carbon::parse($a->tgl_activity)->isoFormat('D MMMM Y');
+                        return $a;
+                    })
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
+    }
+}
 
     /**
      * @OA\Post(
