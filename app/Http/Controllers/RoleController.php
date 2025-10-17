@@ -56,7 +56,7 @@ class RoleController extends Controller
      * @OA\Get(
      *     path="/api/roles/view/{id}",
      *     tags={"Roles"},
-     *     summary="Get role by ID",
+     *     summary="Get role by ID with all menu permissions",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -72,7 +72,26 @@ class RoleController extends Controller
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="name", type="string", example="Admin"),
-     *                 @OA\Property(property="Is_active", type="integer", example=1)
+     *                 @OA\Property(property="Is_active", type="integer", example=1),
+     *                 @OA\Property(property="menus", type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="name", type="string", example="Dashboard"),
+     *                         @OA\Property(property="url", type="string", example="/dashboard"),
+     *                         @OA\Property(property="parent_id", type="integer", example=null),
+     *                         @OA\Property(property="is_view", type="boolean", example=true),
+     *                         @OA\Property(property="is_add", type="boolean", example=true),
+     *                         @OA\Property(property="is_edit", type="boolean", example=true),
+     *                         @OA\Property(property="is_delete", type="boolean", example=false),
+     *                         @OA\Property(property="children", type="array",
+     *                             @OA\Items(
+     *                                 @OA\Property(property="id", type="integer", example=2),
+     *                                 @OA\Property(property="name", type="string", example="Sub Menu"),
+     *                                 @OA\Property(property="is_view", type="boolean", example=false)
+     *                             )
+     *                         )
+     *                     )
+     *                 )
      *             )
      *         )
      *     ),
@@ -89,18 +108,37 @@ class RoleController extends Controller
     public function show($id): JsonResponse
     {
         try {
+            // Ambil role dari connection mysqlhris
             $role = Role::find($id);
 
             if (!$role) {
                 return $this->notFoundResponse('Role not found');
             }
 
-            return $this->successResponse($role);
+            // Ambil semua menu
+            $allMenus = Sysmenu::orderBy('id')->get();
+
+            // Ambil permission role untuk menu ini
+            $rolePermissions = SysmenuRole::where('role_id', $id)->get()->keyBy('sysmenu_id');
+
+            // Build hierarchical menu structure
+            $menuTree = $this->buildMenuTree($allMenus, $rolePermissions);
+
+            // Format response
+            $roleData = [
+                'id' => $role->id,
+                'name' => $role->name,
+                'Is_active' => $role->Is_active,
+                'menus' => $menuTree
+            ];
+
+            return $this->successResponse($roleData);
         } catch (\Exception $e) {
             $this->logError('Fetch role error', $e, ['role_id' => $id]);
             return $this->errorResponse();
         }
     }
+
 
     /**
      * @OA\Get(
@@ -248,7 +286,42 @@ class RoleController extends Controller
             ]));
         }
     }
+// ============================ HELPER METHODS ============================
 
+    /**
+     * Build hierarchical menu tree with permissions
+     */
+    private function buildMenuTree($menus, $rolePermissions, $parentId = null)
+    {
+        $branch = [];
+
+        foreach ($menus as $menu) {
+            if ($menu->parent_id == $parentId) {
+                // Get permission for this menu
+                $permission = $rolePermissions->get($menu->id);
+
+                $item = [
+                    'id' => $menu->id,
+                    'name' => $menu->nama,
+                    'parent_id' => $menu->parent_id,
+                    'is_view' => $permission ? $permission->is_view : false,
+                    'is_add' => $permission ? $permission->is_add : false,
+                    'is_edit' => $permission ? $permission->is_edit : false,
+                    'is_delete' => $permission ? $permission->is_delete : false,
+                ];
+
+                // Recursively get children
+                $children = $this->buildMenuTree($menus, $rolePermissions, $menu->id);
+                if (!empty($children)) {
+                    $item['children'] = $children;
+                }
+
+                $branch[] = $item;
+            }
+        }
+
+        return $branch;
+    }
     private function successResponse($data = null, string $message = null): JsonResponse
     {
         $response = ['success' => true];
