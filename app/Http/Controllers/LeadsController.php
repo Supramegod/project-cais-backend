@@ -19,6 +19,7 @@ use App\Models\Platform;
 use App\Models\TimSalesDetail;
 use App\Models\CustomerActivity;
 use App\Models\Village;
+use App\Rules\UniqueCompanyStrict;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
@@ -375,7 +376,7 @@ public function view($id)
             DB::beginTransaction();
 
             $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => 'required|max:100|min:3',
+                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
                 'pic' => 'required',
                 'branch' => 'required',
                 'kebutuhan' => 'required|array|min:1',
@@ -408,20 +409,6 @@ public function view($id)
             $negara = Negara::find($request->negara);
             $jenisPerusahaan = JenisPerusahaan::find($request->jenis_perusahaan);
             $bidangPerusahaan = BidangPerusahaan::find($request->bidang_perusahaan);
-
-            // 🔍 Check kemiripan nama
-            $companies = Leads::pluck('nama_perusahaan');
-            foreach ($companies as $company) {
-                if (similar_text(strtolower($request->nama_perusahaan), strtolower($company), $percent)) {
-                    if ($percent > 95) {
-                        DB::rollback();
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Nama perusahaan terlalu mirip dengan: ' . $company
-                        ], 400);
-                    }
-                }
-            }
 
             $nomor = $this->generateNomor();
 
