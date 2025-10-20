@@ -44,13 +44,14 @@ class RoleController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $roles = Role::where('is_active', '!=', 0)->get();
+            $roles = Role::active()->get();
             return $this->successResponse($roles);
         } catch (\Exception $e) {
             $this->logError('Fetch roles error', $e);
             return $this->errorResponse();
         }
     }
+
 
     /**
      * @OA\Get(
