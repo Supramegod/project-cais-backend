@@ -24,4 +24,9 @@ class Role extends Model
     {
         return $this->hasMany(User::class, 'role_id', 'id');
     }
+    public function scopeActive($query)
+{
+    return $query->where('is_active', '!=', 0);
+}
+
 }

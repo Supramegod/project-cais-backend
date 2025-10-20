@@ -34,4 +34,12 @@ class City extends Model
     {
         return $this->hasMany(Leads::class, 'kota_id');
     }
+
+    /**
+     * Scope untuk filter berdasarkan province
+     */
+    public function scopeByProvince($query, $provinceId)
+    {
+        return $query->where('province_id', $provinceId);
+    }
 }

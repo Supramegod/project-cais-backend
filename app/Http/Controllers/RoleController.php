@@ -44,13 +44,14 @@ class RoleController extends Controller
     public function index(): JsonResponse
     {
         try {
-            $roles = Role::where('is_active', '!=', 0)->get();
+            $roles = Role::active()->get();
             return $this->successResponse($roles);
         } catch (\Exception $e) {
             $this->logError('Fetch roles error', $e);
             return $this->errorResponse();
         }
     }
+
 
     /**
      * @OA\Get(
@@ -192,12 +193,70 @@ class RoleController extends Controller
      *     )
      * )
      */
-   public function menuPermissions(): JsonResponse
-{
-    try {
-        $user = Auth::user();
-        if (!$user || !$user->role_id) {
-            return $this->forbiddenResponse('User role not found');
+    public function menuPermissions(): JsonResponse
+    {
+        try {
+            $user = Auth::user();
+            if (!$user || !$user->role_id) {
+                return $this->forbiddenResponse('User role not found');
+            }
+
+            // Ambil semua menu aktif dengan LEFT JOIN ke permissions
+            $menus = Sysmenu::active()
+                ->withPermissions($user->role_id) // Sekarang menggunakan LEFT JOIN
+                ->withGroupInfo()
+                ->selectMenuFields() // Sudah handle COALESCE untuk null permissions
+                ->ordered()
+                ->get();
+
+            // Filter: hanya ambil menu yang memiliki is_view = 1 atau belum ada permission record
+            $filteredMenus = $menus->filter(function ($menu) {
+                return $menu->is_view == 1 || is_null($menu->is_view);
+            });
+
+            // Jika tidak ada menu yang memenuhi kriteria, return empty response
+            if ($filteredMenus->isEmpty()) {
+                return $this->successResponse([
+                    'ungrouped' => [],
+                    'grouped' => []
+                ]);
+            }
+
+            // Bangun tree + pewarisan group
+            $menuTree = $this->buildMenuTreeWithGroup($filteredMenus);
+
+            $groupedMenus = [];
+            $ungroupedMenus = [];
+
+            foreach ($menuTree as $menu) {
+                if (empty($menu['group_id'])) {
+                    $ungroupedMenus[] = $menu;
+                } else {
+                    $groupId = $menu['group_id'];
+                    $groupName = $menu['group_name'] ?? 'Tanpa Nama';
+
+                    if (!isset($groupedMenus[$groupId])) {
+                        $groupedMenus[$groupId] = [
+                            'group_id' => $groupId,
+                            'group_name' => $groupName,
+                            'menus' => [],
+                        ];
+                    }
+
+                    $groupedMenus[$groupId]['menus'][] = $menu;
+                }
+            }
+
+            $response = [
+                'ungrouped' => $ungroupedMenus,
+                'grouped' => array_values($groupedMenus),
+            ];
+
+            return $this->successResponse($response);
+
+        } catch (\Exception $e) {
+            $this->logError('Fetch menu permissions error', $e, ['user_id' => Auth::id()]);
+            return $this->errorResponse();
         }
 
         // Ambil semua menu aktif dengan LEFT JOIN ke permissions
@@ -258,6 +317,8 @@ class RoleController extends Controller
         return $this->errorResponse();
     }
 }
+
+
 
 
 
@@ -352,6 +413,43 @@ class RoleController extends Controller
         }
     }
     // ============================ HELPER METHODS ============================
+    /**
+     * Build hierarchical menu tree with permissions
+     */
+    private function buildMenuTree($menus, $rolePermissions, $parentId = null)
+    {
+        $tree = [];
+
+        foreach ($menus as $menu) {
+            if ($menu->parent_id == $parentId) {
+                // Gunakan group dari menu ini, atau warisi dari parent
+                $currentGroupId = $menu->group_id ?? $parentGroupId;
+                $currentGroupName = $menu->group_name ?? $parentGroupName;
+
+                $children = $this->buildMenuTreeWithGroup($menus, $menu->id, $currentGroupId, $currentGroupName);
+
+                $tree[] = [
+                    'id' => $menu->id,
+                    'nama' => $menu->nama,
+                    'icon' => $menu->icon,
+                    'url' => $menu->url,
+                    'parent_id' => $menu->parent_id,
+                    'group_id' => $currentGroupId,
+                    'group_name' => $currentGroupName,
+                    'permissions' => [
+                        'view' => (bool) $menu->is_view,
+                        'add' => (bool) $menu->is_add,
+                        'edit' => (bool) $menu->is_edit,
+                        'delete' => (bool) $menu->is_delete,
+                    ],
+                    'children' => $children,
+                ];
+            }
+        }
+
+        return $tree;
+    }
+
     private function buildMenuTreeWithGroup($menus, $parentId = null, $parentGroupId = null, $parentGroupName = null)
     {
         $tree = [];
