@@ -11,8 +11,8 @@
                 "tags": [
                     "Authentication"
                 ],
-                "summary": "Login user dengan username dan password",
-                "description": "Melakukan autentikasi user dan mengembalikan plain token dari Laravel Sanctum",
+                "summary": "Login user dengan username",
+                "description": "Melakukan autentikasi user dan mengembalikan access token dan refresh token menggunakan Laravel Sanctum",
                 "operationId": "8dcb70df1020986038d098cc08d05dae",
                 "requestBody": {
                     "required": true,
@@ -20,20 +20,13 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "username",
-                                    "password"
+                                    "username"
                                 ],
                                 "properties": {
                                     "username": {
                                         "description": "Username user",
                                         "type": "string",
                                         "example": "superadmin2"
-                                    },
-                                    "password": {
-                                        "description": "Password user",
-                                        "type": "string",
-                                        "format": "password",
-                                        "example": "salesshelter"
                                     }
                                 },
                                 "type": "object"
@@ -87,18 +80,29 @@
                                                     },
                                                     "type": "object"
                                                 },
-                                                "token": {
+                                                "access_token": {
+                                                    "description": "Sanctum access token berlaku 2 jam",
                                                     "type": "string",
                                                     "example": "1|abcdefghijklmnopqrstuvwxyz123456789"
+                                                },
+                                                "refresh_token": {
+                                                    "description": "Refresh token berlaku 7 hari",
+                                                    "type": "string",
+                                                    "example": "abcdefghijklmnopqrstuvwxyz123456789"
                                                 },
                                                 "token_type": {
                                                     "type": "string",
                                                     "example": "Bearer"
                                                 },
-                                                "expires_at": {
+                                                "access_token_expires_at": {
                                                     "type": "string",
                                                     "format": "date-time",
-                                                    "example": "2024-01-01T12:00:00Z"
+                                                    "example": "2024-01-01T12:00:00+07:00"
+                                                },
+                                                "refresh_token_expires_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-08T12:00:00+07:00"
                                                 }
                                             },
                                             "type": "object"
@@ -110,7 +114,7 @@
                         }
                     },
                     "401": {
-                        "description": "Kredensial tidak valid atau akun tidak aktif",
+                        "description": "Kredensial tidak valid",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -151,6 +155,26 @@
                                 }
                             }
                         }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan pada server"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -161,7 +185,7 @@
                     "Authentication"
                 ],
                 "summary": "Logout user",
-                "description": "Menghapus token aktif user dan melakukan logout",
+                "description": "Menghapus access token Sanctum dan refresh token user",
                 "operationId": "69281b12abb272c76871f19cb17ca563",
                 "responses": {
                     "200": {
@@ -316,12 +340,32 @@
                 "tags": [
                     "Authentication"
                 ],
-                "summary": "Refresh token",
-                "description": "Memperbarui token akses yang sudah kadaluarsa",
+                "summary": "Refresh access token menggunakan refresh token",
+                "description": "Memperbarui access token yang sudah kadaluarsa menggunakan refresh token yang masih valid dengan Laravel Sanctum",
                 "operationId": "b2eae7a8032954d25b46c7ec6f489c68",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "refresh_token"
+                                ],
+                                "properties": {
+                                    "refresh_token": {
+                                        "description": "Refresh token yang didapat saat login",
+                                        "type": "string",
+                                        "example": "abcdefghijklmnopqrstuvwxyz123456789"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
-                        "description": "Token berhasil direfresh",
+                        "description": "Access token berhasil direfresh",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -332,43 +376,26 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Token berhasil direfresh"
+                                            "example": "Access token berhasil direfresh"
                                         },
                                         "data": {
                                             "properties": {
-                                                "user": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "username": {
-                                                            "type": "string",
-                                                            "example": "3578142602980002"
-                                                        },
-                                                        "name": {
-                                                            "type": "string",
-                                                            "example": "John Doe"
-                                                        },
-                                                        "email": {
-                                                            "type": "string",
-                                                            "example": "john@example.com"
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                },
-                                                "token": {
+                                                "access_token": {
                                                     "type": "string",
                                                     "example": "2|abcdefghijklmnopqrstuvwxyz123456789"
+                                                },
+                                                "refresh_token": {
+                                                    "type": "string",
+                                                    "example": "abcdefghijklmnopqrstuvwxyz123456789"
                                                 },
                                                 "token_type": {
                                                     "type": "string",
                                                     "example": "Bearer"
                                                 },
-                                                "expires_at": {
+                                                "access_token_expires_at": {
                                                     "type": "string",
                                                     "format": "date-time",
-                                                    "example": "2024-01-01T12:00:00Z"
+                                                    "example": "2024-01-01T14:00:00+07:00"
                                                 }
                                             },
                                             "type": "object"
@@ -380,7 +407,7 @@
                         }
                     },
                     "401": {
-                        "description": "Token tidak valid atau sudah kadaluarsa",
+                        "description": "Refresh token tidak valid atau sudah kadaluarsa",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -391,7 +418,50 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Token tidak valid"
+                                            "example": "Refresh token tidak valid"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak valid"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan pada server"
                                         }
                                     },
                                     "type": "object"
@@ -399,12 +469,7 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/api/barang/list": {
@@ -2245,9 +2310,34 @@
                                                     "type": "integer",
                                                     "example": 5
                                                 },
-                                                "skipped_companies": {
+                                                "already_in_group": {
                                                     "type": "integer",
                                                     "example": 2
+                                                },
+                                                "not_found": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "companies_with_group": {
+                                                    "description": "List perusahaan yang sudah memiliki grup",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "company_id": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "company_name": {
+                                                                "type": "string",
+                                                                "example": "PT Already Grouped"
+                                                            },
+                                                            "current_group": {
+                                                                "type": "string",
+                                                                "example": "Grup Existing"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
                                                 }
                                             },
                                             "type": "object"
@@ -8768,7 +8858,7 @@
                     "Leads"
                 ],
                 "summary": "Mendapatkan detail lead berdasarkan ID",
-                "description": "Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
+                "description": "Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, perusahaan group, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
                 "operationId": "1ffa4fe7ed8c90d6b5b779f8f19a10a5",
                 "parameters": [
                     {
@@ -8800,115 +8890,36 @@
                                         "data": {
                                             "properties": {
                                                 "lead": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "nomor": {
-                                                            "type": "string",
-                                                            "example": "AAAAA"
-                                                        },
-                                                        "nama_perusahaan": {
-                                                            "type": "string",
-                                                            "example": "PT ABC Indonesia"
-                                                        },
-                                                        "telp_perusahaan": {
-                                                            "type": "string",
-                                                            "example": "021-1234567"
-                                                        },
-                                                        "alamat": {
-                                                            "type": "string",
-                                                            "example": "Jl. Sudirman No. 123"
-                                                        },
-                                                        "pic": {
-                                                            "type": "string",
-                                                            "example": "John Doe"
-                                                        },
-                                                        "jabatan": {
-                                                            "type": "string",
-                                                            "example": "Manager"
-                                                        },
-                                                        "no_telp": {
-                                                            "type": "string",
-                                                            "example": "08123456789"
-                                                        },
-                                                        "email": {
-                                                            "type": "string",
-                                                            "example": "john@abc.com"
-                                                        },
-                                                        "pma": {
-                                                            "type": "string",
-                                                            "example": "Yes"
-                                                        },
-                                                        "notes": {
-                                                            "type": "string",
-                                                            "example": "Tertarik dengan produk A"
-                                                        },
-                                                        "stgl_leads": {
-                                                            "type": "string",
-                                                            "example": "1 Januari 2025"
-                                                        },
-                                                        "screated_at": {
-                                                            "type": "string",
-                                                            "example": "1 Januari 2025"
-                                                        },
-                                                        "kebutuhan_array": {
-                                                            "type": "array",
-                                                            "items": {
+                                                    "type": "object"
+                                                },
+                                                "perusahaan_groups": {
+                                                    "description": "Daftar grup perusahaan yang memiliki lead ini",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "group_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_grup": {
                                                                 "type": "string",
-                                                                "example": "1"
+                                                                "example": "Grup ABC"
+                                                            },
+                                                            "jumlah_perusahaan": {
+                                                                "type": "integer",
+                                                                "example": 5
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "example": "01-01-2025"
                                                             }
                                                         },
-                                                        "branch": {
-                                                            "type": "object"
-                                                        },
-                                                        "kebutuhan": {
-                                                            "type": "object"
-                                                        },
-                                                        "tim_sales": {
-                                                            "type": "object"
-                                                        },
-                                                        "status_leads": {
-                                                            "type": "object"
-                                                        },
-                                                        "jenis_perusahaan": {
-                                                            "type": "object"
-                                                        },
-                                                        "company": {
-                                                            "type": "object"
-                                                        }
-                                                    },
-                                                    "type": "object"
+                                                        "type": "object"
+                                                    }
                                                 },
                                                 "activities": {
                                                     "type": "array",
                                                     "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "nomor": {
-                                                                "type": "string",
-                                                                "example": "ACT-1-001"
-                                                            },
-                                                            "notes": {
-                                                                "type": "string",
-                                                                "example": "Follow up via telepon"
-                                                            },
-                                                            "tipe": {
-                                                                "type": "string",
-                                                                "example": "Leads"
-                                                            },
-                                                            "screated_at": {
-                                                                "type": "string",
-                                                                "example": "1 Januari 2025 10:30"
-                                                            },
-                                                            "stgl_activity": {
-                                                                "type": "string",
-                                                                "example": "1 Januari 2025"
-                                                            }
-                                                        },
                                                         "type": "object"
                                                     }
                                                 }
@@ -8922,60 +8933,13 @@
                         }
                     },
                     "404": {
-                        "description": "Lead tidak ditemukan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Lead tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Lead tidak ditemukan"
                     },
                     "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized"
                     },
                     "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -15382,6 +15346,1764 @@
                 ]
             }
         },
+        "/api/quotations/list": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get all quotations",
+                "description": "Retrieves a list of quotations with optional filtering",
+                "operationId": "82a3ab3a39a78fdb9d74c9068507eb89",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Start date filter (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2024-01-01"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "End date filter (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2024-12-31"
+                        }
+                    },
+                    {
+                        "name": "company",
+                        "in": "query",
+                        "description": "Company ID filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "kebutuhan_id",
+                        "in": "query",
+                        "description": "Service need ID filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Status filter",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "approved"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotations retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotations retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve quotations"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/add": {
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Create new quotation",
+                "description": "Creates a new quotation with basic information including site details",
+                "operationId": "1341983b7039998dfb5dd1bfc595061f",
+                "requestBody": {
+                    "description": "Quotation data with site information",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "perusahaan_id",
+                                    "entitas",
+                                    "layanan",
+                                    "jumlah_site"
+                                ],
+                                "properties": {
+                                    "perusahaan_id": {
+                                        "description": "ID dari leads/perusahaan",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "entitas": {
+                                        "description": "ID company/entitas",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "layanan": {
+                                        "description": "ID layanan/kebutuhan",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "jumlah_site": {
+                                        "description": "Tipe penempatan site",
+                                        "type": "string",
+                                        "enum": [
+                                            "Single Site",
+                                            "Multi Site"
+                                        ],
+                                        "example": "Single Site"
+                                    },
+                                    "nama_site": {
+                                        "description": "Wajib diisi jika jumlah_site = Single Site",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Head Office Jakarta"
+                                    },
+                                    "provinsi": {
+                                        "description": "Wajib diisi jika jumlah_site = Single Site",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "kota": {
+                                        "description": "Wajib diisi jika jumlah_site = Single Site",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "penempatan": {
+                                        "description": "Wajib diisi jika jumlah_site = Single Site",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Jakarta Pusat"
+                                    },
+                                    "multisite": {
+                                        "description": "Wajib diisi jika jumlah_site = Multi Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "maxLength": 255,
+                                            "example": "Site A"
+                                        },
+                                        "example": [
+                                            "Site A",
+                                            "Site B"
+                                        ]
+                                    },
+                                    "provinsi_multi": {
+                                        "description": "Wajib diisi jika jumlah_site = Multi Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "example": [
+                                            1,
+                                            2
+                                        ]
+                                    },
+                                    "kota_multi": {
+                                        "description": "Wajib diisi jika jumlah_site = Multi Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "example": [
+                                            1,
+                                            2
+                                        ]
+                                    },
+                                    "penempatan_multi": {
+                                        "description": "Wajib diisi jika jumlah_site = Multi Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "maxLength": 255,
+                                            "example": "Jakarta"
+                                        },
+                                        "example": [
+                                            "Jakarta",
+                                            "Bandung"
+                                        ]
+                                    },
+                                    "tipe": {
+                                        "description": "Tipe quotation (opsional)",
+                                        "type": "string",
+                                        "enum": [
+                                            "Quotation Baru",
+                                            "Adendum",
+                                            "Quotation Lanjutan"
+                                        ],
+                                        "example": "Quotation Baru"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Quotation created successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "QUOT/ION/LEAD-001/012024-00001"
+                                                },
+                                                "nama_perusahaan": {
+                                                    "type": "string",
+                                                    "example": "PT Example Company"
+                                                },
+                                                "jumlah_site": {
+                                                    "type": "string",
+                                                    "example": "Single Site"
+                                                },
+                                                "step": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "status_quotation_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quotation_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_site": {
+                                                                "type": "string",
+                                                                "example": "Head Office"
+                                                            },
+                                                            "provinsi": {
+                                                                "type": "string",
+                                                                "example": "DKI Jakarta"
+                                                            },
+                                                            "kota": {
+                                                                "type": "string",
+                                                                "example": "Jakarta Pusat"
+                                                            },
+                                                            "penempatan": {
+                                                                "type": "string",
+                                                                "example": "Jakarta"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "quotation_pics": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "jabatan": {
+                                                                "type": "string",
+                                                                "example": "Director"
+                                                            },
+                                                            "email": {
+                                                                "type": "string",
+                                                                "example": "john@example.com"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation created successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "perusahaan_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Perusahaan wajib dipilih"
+                                                    }
+                                                },
+                                                "nama_site": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Nama site wajib diisi untuk single site"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to create quotation"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/view/{id}": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotation details",
+                "description": "Retrieves detailed information about a specific quotation including all related data",
+                "operationId": "0827b944a14ee21ec1bc294b11cbda98",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotation retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "No query results for model [App\\\\Models\\\\Quotation] 1"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Delete quotation",
+                "description": "Soft deletes a quotation and all its related data",
+                "operationId": "3a2a67834bb0a070a72d9ea796d49381",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotation deleted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation deleted successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to delete quotation"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{sourceId}/copy/{targetId}": {
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Copy quotation data",
+                "description": "Copies all data from source quotation to target quotation",
+                "operationId": "e3eefea7ffa348bf25e7e33117e45691",
+                "parameters": [
+                    {
+                        "name": "sourceId",
+                        "in": "path",
+                        "description": "Source quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "targetId",
+                        "in": "path",
+                        "description": "Target quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotation copied successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation copied successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to copy quotation"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{id}/resubmit": {
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Resubmit quotation",
+                "description": "Creates a new quotation version from an existing quotation with resubmit reason",
+                "operationId": "fed70055cddc2b54ec29fd9c56463435",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Original quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "alasan"
+                                ],
+                                "properties": {
+                                    "alasan": {
+                                        "type": "string",
+                                        "example": "Perubahan kebutuhan client"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Quotation resubmitted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation resubmitted successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to resubmit quotation"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{id}/submit-approval": {
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Submit quotation for approval",
+                "description": "Submits quotation for approval at different levels (OT1, OT2, OT3)",
+                "operationId": "021f68ceb6a992b138d5fa3cbfb2e899",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "approval_type",
+                                    "is_approved"
+                                ],
+                                "properties": {
+                                    "approval_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "ot1",
+                                            "ot2",
+                                            "ot3"
+                                        ],
+                                        "example": "ot1"
+                                    },
+                                    "is_approved": {
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "example": "Approval notes"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Quotation submitted for approval successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation submitted for approval successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to submit quotation for approval"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{id}/calculate": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Calculate quotation",
+                "description": "Performs calculation for quotation including HPP, COSS, and financial details",
+                "operationId": "21f721267e72feb1a4a575d4c4db6bed",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotation calculated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation calculated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to calculate quotation"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{id}/export-pdf": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Export quotation to PDF",
+                "description": "Generates and returns PDF document for quotation",
+                "operationId": "257d69a6dcf0d17a765c58fc106d996c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PDF generated successfully",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to generate PDF"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{id}/status": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotation status",
+                "description": "Retrieves current status and approval progress of quotation",
+                "operationId": "5a7dc39dcf7fced1c46227831b0144b8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Status retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "status_quotation_id": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "status_quotation": {
+                                                    "type": "string",
+                                                    "example": "Approved"
+                                                },
+                                                "step": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                },
+                                                "approval_progress": {
+                                                    "properties": {
+                                                        "ot1": {
+                                                            "type": "string",
+                                                            "example": "approved"
+                                                        },
+                                                        "ot2": {
+                                                            "type": "string",
+                                                            "example": "approved"
+                                                        },
+                                                        "ot3": {
+                                                            "type": "string",
+                                                            "example": "pending"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Status retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/leads/{leadsId}": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotations by leads",
+                "description": "Retrieves all quotations for a specific leads/company",
+                "operationId": "b495e6ad829e881490d47afb50a5f995",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "description": "Leads ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotations retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotations retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Leads not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Leads not found"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations-step/{id}/step/{step}": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotation data for specific step",
+                "description": "Get quotation data for specific step",
+                "operationId": "0976db217d5ef182bb025584f9a91431",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "description": "Step number (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step data retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to get step data"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error message details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Update specific quotation step",
+                "description": "Update specific step",
+                "operationId": "b8a02c6bc4046bcf3a23f6b4fbf9281b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "description": "Step number (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Step data (varies by step)",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "edit": {
+                                        "description": "Set to true if only updating without progressing step",
+                                        "type": "boolean",
+                                        "example": false
+                                    }
+                                },
+                                "type": "object",
+                                "oneOf": [
+                                    {
+                                        "description": "Step 1 - Contract Type",
+                                        "properties": {
+                                            "jenis_kontrak": {
+                                                "type": "string",
+                                                "example": "Reguler"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "description": "Step 2 - Contract Details",
+                                        "properties": {
+                                            "mulai_kontrak": {
+                                                "type": "string",
+                                                "format": "date",
+                                                "example": "2024-01-01"
+                                            },
+                                            "kontrak_selesai": {
+                                                "type": "string",
+                                                "format": "date",
+                                                "example": "2024-12-31"
+                                            },
+                                            "tgl_penempatan": {
+                                                "type": "string",
+                                                "format": "date",
+                                                "example": "2024-01-01"
+                                            },
+                                            "salary_rule": {
+                                                "type": "integer",
+                                                "example": 1
+                                            },
+                                            "top": {
+                                                "type": "string",
+                                                "example": "7 Hari"
+                                            },
+                                            "ada_cuti": {
+                                                "type": "string",
+                                                "example": "Ada"
+                                            },
+                                            "cuti": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string",
+                                                    "example": "Cuti Tahunan"
+                                                }
+                                            },
+                                            "edit": {
+                                                "type": "boolean",
+                                                "example": false
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "description": "Step 4 - Wage Calculation",
+                                        "properties": {
+                                            "upah": {
+                                                "type": "string",
+                                                "example": "UMP"
+                                            },
+                                            "manajemen_fee": {
+                                                "type": "integer",
+                                                "example": 1
+                                            },
+                                            "persentase": {
+                                                "type": "number",
+                                                "format": "float",
+                                                "example": 10.5
+                                            },
+                                            "thr": {
+                                                "type": "string",
+                                                "example": "Diprovisikan"
+                                            },
+                                            "kompensasi": {
+                                                "type": "string",
+                                                "example": "Diprovisikan"
+                                            },
+                                            "lembur": {
+                                                "type": "string",
+                                                "example": "Flat"
+                                            },
+                                            "is_ppn": {
+                                                "type": "boolean",
+                                                "example": true
+                                            },
+                                            "ppn_pph_dipotong": {
+                                                "type": "string",
+                                                "example": "Management Fee"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "description": "Step 5 - BPJS & Company Data",
+                                        "properties": {
+                                            "penjamin": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": "BPJS",
+                                                    "2": "Takaful"
+                                                }
+                                            },
+                                            "jkk": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": true,
+                                                    "2": false
+                                                }
+                                            },
+                                            "jkm": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": true,
+                                                    "2": true
+                                                }
+                                            },
+                                            "jht": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": true,
+                                                    "2": true
+                                                }
+                                            },
+                                            "jp": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": true,
+                                                    "2": false
+                                                }
+                                            },
+                                            "nominal_takaful": {
+                                                "type": "object",
+                                                "example": {
+                                                    "1": 50000,
+                                                    "2": 75000
+                                                }
+                                            },
+                                            "jenis_perusahaan": {
+                                                "type": "integer",
+                                                "example": 1
+                                            },
+                                            "bidang_perusahaan": {
+                                                "type": "integer",
+                                                "example": 2
+                                            },
+                                            "resiko": {
+                                                "type": "string",
+                                                "example": "Rendah"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "description": "Step 6 - Supporting Applications",
+                                        "properties": {
+                                            "aplikasi_pendukung": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "description": "Step 11 - Billing & Agreement",
+                                        "properties": {
+                                            "penagihan": {
+                                                "type": "string",
+                                                "example": "Bulanan"
+                                            },
+                                            "training_id": {
+                                                "type": "string",
+                                                "example": "1,2,3"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 1 updated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step method not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to update step 1"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error message details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/roles/list": {
             "get": {
                 "tags": [
@@ -15439,7 +17161,7 @@
                 "tags": [
                     "Roles"
                 ],
-                "summary": "Get role by ID",
+                "summary": "Get role by ID with all menu permissions",
                 "operationId": "c09d152268b54697fb2f843f94197675",
                 "parameters": [
                     {
@@ -15475,6 +17197,66 @@
                                                 "Is_active": {
                                                     "type": "integer",
                                                     "example": 1
+                                                },
+                                                "menus": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Dashboard"
+                                                            },
+                                                            "url": {
+                                                                "type": "string",
+                                                                "example": "/dashboard"
+                                                            },
+                                                            "parent_id": {
+                                                                "type": "integer",
+                                                                "example": null
+                                                            },
+                                                            "is_view": {
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "is_add": {
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "is_edit": {
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "is_delete": {
+                                                                "type": "boolean",
+                                                                "example": false
+                                                            },
+                                                            "children": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "properties": {
+                                                                        "id": {
+                                                                            "type": "integer",
+                                                                            "example": 2
+                                                                        },
+                                                                        "name": {
+                                                                            "type": "string",
+                                                                            "example": "Sub Menu"
+                                                                        },
+                                                                        "is_view": {
+                                                                            "type": "boolean",
+                                                                            "example": false
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
                                                 }
                                             },
                                             "type": "object"
@@ -15518,7 +17300,8 @@
                 "tags": [
                     "Roles"
                 ],
-                "summary": "Get menu permissions for the authenticated user's role",
+                "summary": "Get menu permissions grouped by menu group for authenticated user",
+                "description": "Returns hierarchical menu structure with permissions grouped by menu groups",
                 "operationId": "19d803042b370d26e3c08e58e2c5c9d5",
                 "responses": {
                     "200": {
@@ -15535,33 +17318,102 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "id": {
+                                                    "group_id": {
                                                         "type": "integer",
                                                         "example": 1
                                                     },
-                                                    "nama": {
+                                                    "group_name": {
                                                         "type": "string",
-                                                        "example": "Dashboard"
+                                                        "example": "Main Menu"
                                                     },
-                                                    "is_view": {
-                                                        "type": "boolean",
-                                                        "example": true
-                                                    },
-                                                    "is_add": {
-                                                        "type": "boolean",
-                                                        "example": false
-                                                    },
-                                                    "is_edit": {
-                                                        "type": "boolean",
-                                                        "example": true
-                                                    },
-                                                    "is_delete": {
-                                                        "type": "boolean",
-                                                        "example": false
+                                                    "menus": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 1
+                                                                },
+                                                                "nama": {
+                                                                    "type": "string",
+                                                                    "example": "Dashboard"
+                                                                },
+                                                                "icon": {
+                                                                    "type": "string",
+                                                                    "example": "fa-home"
+                                                                },
+                                                                "url": {
+                                                                    "type": "string",
+                                                                    "example": "/dashboard"
+                                                                },
+                                                                "permissions": {
+                                                                    "properties": {
+                                                                        "view": {
+                                                                            "type": "boolean",
+                                                                            "example": true
+                                                                        },
+                                                                        "add": {
+                                                                            "type": "boolean",
+                                                                            "example": false
+                                                                        },
+                                                                        "edit": {
+                                                                            "type": "boolean",
+                                                                            "example": true
+                                                                        },
+                                                                        "delete": {
+                                                                            "type": "boolean",
+                                                                            "example": false
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
                                                     }
                                                 },
                                                 "type": "object"
                                             }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User role not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
                                         }
                                     },
                                     "type": "object"
@@ -22024,6 +23876,10 @@
         {
             "name": "Position",
             "description": "API endpoints for Position management"
+        },
+        {
+            "name": "Quotations",
+            "description": "API Endpoints for Quotation Management"
         },
         {
             "name": "Roles",

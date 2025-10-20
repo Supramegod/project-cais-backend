@@ -50,4 +50,20 @@ class TimSalesDetail extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+    // Di file TimSalesDetail.php
+/**
+ * Scope untuk mendapatkan member sales berdasarkan tim_sales_id
+ */
+public function scopeByTeam($query, $timSalesId)
+{
+    return $query->where('tim_sales_id', $timSalesId);
+}
+
+/**
+ * Scope untuk user aktif
+ */
+public function scopeActive($query)
+{
+    return $query->where('is_active', 1);
+}
 }

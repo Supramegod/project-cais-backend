@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\RefreshTokens;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -38,14 +39,13 @@ class AuthController extends Controller
      * @OA\Post(
      *     path="/api/auth/login",
      *     tags={"Authentication"},
-     *     summary="Login user dengan username dan password",
-     *     description="Melakukan autentikasi user dan mengembalikan plain token dari Laravel Sanctum",
+     *     summary="Login user dengan username",
+     *     description="Melakukan autentikasi user dan mengembalikan access token dan refresh token menggunakan Laravel Sanctum",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"username","password"},
-     *             @OA\Property(property="username", type="string", example="superadmin2", description="Username user"),
-     *             @OA\Property(property="password", type="string", format="password", example="salesshelter", description="Password user")
+     *             required={"username"},
+     *             @OA\Property(property="username", type="string", example="superadmin2", description="Username user")
      *         )
      *     ),
      *     @OA\Response(
@@ -63,15 +63,17 @@ class AuthController extends Controller
      *                     @OA\Property(property="role_id", type="integer", example=1),
      *                     @OA\Property(property="branch_id", type="integer", example=1)
      *                 ),
-     *                 @OA\Property(property="token", type="string", example="1|abcdefghijklmnopqrstuvwxyz123456789"),
+     *                 @OA\Property(property="access_token", type="string", example="1|abcdefghijklmnopqrstuvwxyz123456789", description="Sanctum access token berlaku 2 jam"),
+     *                 @OA\Property(property="refresh_token", type="string", example="abcdefghijklmnopqrstuvwxyz123456789", description="Refresh token berlaku 7 hari"),
      *                 @OA\Property(property="token_type", type="string", example="Bearer"),
-     *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T12:00:00Z")
+     *                 @OA\Property(property="access_token_expires_at", type="string", format="date-time", example="2024-01-01T12:00:00+07:00"),
+     *                 @OA\Property(property="refresh_token_expires_at", type="string", format="date-time", example="2024-01-08T12:00:00+07:00")
      *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Kredensial tidak valid atau akun tidak aktif",
+     *         description="Kredensial tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Kredensial yang diberikan tidak valid")
@@ -85,16 +87,23 @@ class AuthController extends Controller
      *             @OA\Property(property="message", type="string", example="Data tidak valid"),
      *             @OA\Property(property="errors", type="object")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan pada server")
+     *         )
      *     )
      * )
      */
     public function login(Request $request)
     {
         try {
-            // 1. Validasi Input - hanya username yang required untuk sementara
+            // 1. Validasi Input
             $request->validate([
                 'username' => 'required|string',
-                // 'password' => 'required|string', // Dinonaktifkan sementara
             ]);
 
             $inputUsername = $request->username;
@@ -109,31 +118,19 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // 3. Skip validasi password untuk sementara - langsung buat token
-            // $isPasswordValid = $this->verifyMD5Password($inputPassword, $user->password);
-            // if (!$isPasswordValid) {
-            //     Log::warning('Login attempt failed - invalid password', [
-            //         'user_id' => $user->id,
-            //         'username' => $user->username,
-            //         'ip' => $request->ip()
-            //     ]);
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'Kredensial yang diberikan tidak valid',
-            //     ], 401);
-            // }
+            // 3. 🔥 HAPUS SEMUA TOKEN LAMA USER INI
+            $this->revokeAllUserTokens($user);
 
-            // 4. Hapus token lama dan buat token baru
-            $user->tokens()->where('name', 'auth_token')->delete();
+            // 4. Buat token pair baru
+            $tokenPair = $user->createTokenPair('auth_token');
 
-            // Buat token baru
-            $token = $user->createToken('auth_token');
-            $plainTextToken = $token->plainTextToken;
+            Log::info('User login - semua session lama dihapus', [
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'timestamp' => now()
+            ]);
 
-            // Dapatkan model token untuk mengambil expires_at
-            $tokenModel = $user->tokens()->where('name', 'auth_token')->latest()->first();
-
-            // 5. Kembalikan Response Sukses dengan expires_at
+            // 5. Kembalikan Response
             return response()->json([
                 'success' => true,
                 'message' => 'Login berhasil',
@@ -146,10 +143,15 @@ class AuthController extends Controller
                         'role_id' => $user->role_id,
                         'branch_id' => $user->branch_id,
                     ],
-                    'token' => $plainTextToken,
+                    'access_token' => $tokenPair['access_token']->plainTextToken,
+                    'refresh_token' => $tokenPair['refresh_token'],
                     'token_type' => 'Bearer',
-                    'expires_at' => $tokenModel->expires_at->timezone('Asia/Jakarta')->format('Y-m-d H:i:s'),
-
+                    'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
+                        ->timezone('Asia/Jakarta')
+                        ->format('Y-m-d H:i:s'),
+                    'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
+                        ->timezone('Asia/Jakarta')
+                        ->format('Y-m-d H:i:s'),
                 ]
             ], 200);
 
@@ -184,7 +186,7 @@ class AuthController extends Controller
      *     path="/api/auth/logout",
      *     tags={"Authentication"},
      *     summary="Logout user",
-     *     description="Menghapus token aktif user dan melakukan logout",
+     *     description="Menghapus access token Sanctum dan refresh token user",
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
@@ -214,9 +216,10 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user->currentAccessToken()->delete();
+        // 🔥 HAPUS SEMUA TOKEN USER
+        $this->revokeAllUserTokens($user);
 
-        Log::info('User logout', [
+        Log::info('User logout - semua session dihapus', [
             'user_id' => $user->id,
             'username' => $user->username,
             'timestamp' => now()
@@ -227,7 +230,6 @@ class AuthController extends Controller
             'message' => 'Logout berhasil'
         ], 200);
     }
-
     /**
      * @OA\Get(
      *     path="/api/auth/user",
@@ -310,34 +312,52 @@ class AuthController extends Controller
      * @OA\Post(
      *     path="/api/auth/refresh",
      *     tags={"Authentication"},
-     *     summary="Refresh token",
-     *     description="Memperbarui token akses yang sudah kadaluarsa",
-     *     security={{"bearerAuth":{}}},
+     *     summary="Refresh access token menggunakan refresh token",
+     *     description="Memperbarui access token yang sudah kadaluarsa menggunakan refresh token yang masih valid dengan Laravel Sanctum",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"refresh_token"},
+     *             @OA\Property(property="refresh_token", type="string", example="abcdefghijklmnopqrstuvwxyz123456789", description="Refresh token yang didapat saat login")
+     *         )
+     *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Token berhasil direfresh",
+     *         description="Access token berhasil direfresh",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Token berhasil direfresh"),
+     *             @OA\Property(property="message", type="string", example="Access token berhasil direfresh"),
      *             @OA\Property(property="data", type="object",
-     *                 @OA\Property(property="user", type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="username", type="string", example="3578142602980002"),
-     *                     @OA\Property(property="name", type="string", example="John Doe"),
-     *                     @OA\Property(property="email", type="string", example="john@example.com")
-     *                 ),
-     *                 @OA\Property(property="token", type="string", example="2|abcdefghijklmnopqrstuvwxyz123456789"),
+     *                 @OA\Property(property="access_token", type="string", example="2|abcdefghijklmnopqrstuvwxyz123456789"),
+     *                 @OA\Property(property="refresh_token", type="string", example="abcdefghijklmnopqrstuvwxyz123456789"),
      *                 @OA\Property(property="token_type", type="string", example="Bearer"),
-     *                 @OA\Property(property="expires_at", type="string", format="date-time", example="2024-01-01T12:00:00Z")
+     *                 @OA\Property(property="access_token_expires_at", type="string", format="date-time", example="2024-01-01T14:00:00+07:00")
      *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Token tidak valid atau sudah kadaluarsa",
+     *         description="Refresh token tidak valid atau sudah kadaluarsa",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Token tidak valid")
+     *             @OA\Property(property="message", type="string", example="Refresh token tidak valid")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Data tidak valid",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Data tidak valid"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan pada server")
      *         )
      *     )
      * )
@@ -345,72 +365,115 @@ class AuthController extends Controller
     public function refresh(Request $request)
     {
         try {
-            $user = Auth::user();
+            $request->validate([
+                'refresh_token' => 'required|string'
+            ]);
+
+            // Cari refresh token
+            $hashedToken = hash('sha256', $request->refresh_token);
+            $refreshTokenModel = RefreshTokens::where('token', $hashedToken)->first();
+
+            if (!$refreshTokenModel) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Refresh token tidak valid'
+                ], 401);
+            }
+
+            // Cek apakah refresh token expired
+            if ($refreshTokenModel->isExpired()) {
+                $refreshTokenModel->delete();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Refresh token telah kadaluarsa'
+                ], 401);
+            }
+
+            // Dapatkan user dari refresh token
+            $user = $refreshTokenModel->tokenableUser();
 
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthenticated'
+                    'message' => 'User tidak ditemukan'
                 ], 401);
             }
 
-            // Dapatkan token saat ini
-            $currentToken = $user->currentAccessToken();
+            // 🔥 HAPUS SEMUA TOKEN LAMA USER INI
+            $this->revokeAllUserTokens($user);
 
-            if (!$currentToken) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Token tidak valid'
-                ], 401);
-            }
+            // Buat token pair baru
+            $tokenPair = $user->createTokenPair('auth_token');
 
-            // Simpan info token lama untuk log
-            $oldTokenId = $currentToken->id;
-
-            // Hapus token lama
-            $currentToken->delete();
-
-            // Buat token baru
-            $newToken = $user->createToken('auth_token')->plainTextToken;
-
-            // Dapatkan model token yang baru dibuat
-            $tokenModel = $user->tokens()->where('name', 'auth_token')->latest()->first();
-
-            Log::info('Token berhasil direfresh', [
+            Log::info('Access token berhasil direfresh - semua session lama dihapus', [
                 'user_id' => $user->id,
                 'username' => $user->username,
-                'old_token_id' => $oldTokenId,
-                'new_token_id' => $tokenModel->id,
                 'timestamp' => now()
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Token berhasil direfresh',
+                'message' => 'Access token berhasil direfresh',
                 'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'name' => $user->full_name,
-                        'email' => $user->email,
-                    ],
-                    'token' => $newToken,
+                    'access_token' => $tokenPair['access_token']->plainTextToken,
+                    'refresh_token' => $tokenPair['refresh_token'],
                     'token_type' => 'Bearer',
-                    'expires_at' => $tokenModel->expires_at->timezone('Asia/Jakarta')->format('Y-m-d H:i:s'),
+                    'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
+                        ->timezone('Asia/Jakarta')
+                        ->format('Y-m-d H:i:s'),
+                    'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
+                        ->timezone('Asia/Jakarta')
+                        ->format('Y-m-d H:i:s'),
                 ]
             ], 200);
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data tidak valid',
+                'errors' => $e->errors()
+            ], 422);
         } catch (Exception $e) {
             Log::error('Refresh token error', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => Auth::id() ?? 'unknown'
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan pada server'
             ], 500);
+        }
+    }
+    /**
+     * 🔥 HELPER: Hapus semua token user (access + refresh)
+     */
+    private function revokeAllUserTokens(User $user)
+    {
+        try {
+            // 1. Dapatkan semua access token user ini
+            $accessTokenIds = $user->tokens()->pluck('id')->toArray();
+
+            // 2. Hapus semua refresh token yang terkait dengan access token user ini
+            if (!empty($accessTokenIds)) {
+                RefreshTokens::whereIn('access_token_id', $accessTokenIds)->delete();
+            }
+
+            // 3. Hapus semua access token user ini
+            $user->tokens()->delete();
+
+            Log::info('All user tokens revoked', [
+                'user_id' => $user->id,
+                'access_tokens_deleted' => count($accessTokenIds),
+                'timestamp' => now()
+            ]);
+
+        } catch (Exception $e) {
+            Log::error('Error revoking user tokens', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }

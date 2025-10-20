@@ -62,54 +62,46 @@ class Sysmenu extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
-    public function group()
+    // Ganti scope WithPermissions untuk menggunakan LEFT JOIN
+    public function scopeWithPermissions($query, $roleId)
     {
-        return $this->belongsTo(SysmenuGroup::class, 'group_id', 'id');
+        return $query->leftJoin('sysmenu_role', function ($join) use ($roleId) {
+            $join->on('sysmenu_role.sysmenu_id', '=', 'sysmenu.id')
+                ->where('sysmenu_role.role_id', $roleId);
+        });
     }
-    // Tambahkan di dalam model Sysmenu
-
-    public function scopeWithGroupInfo($query)
+       public function scopeWithGroupInfo($query)
     {
         return $query->leftJoin('sysmenu_group', 'sysmenu_group.id', '=', 'sysmenu.group_id');
     }
-
     public function scopeOrdered($query)
     {
         return $query->orderBy('sysmenu_group.nama')
             ->orderBy('id');
     }
 
-    // Ganti scope WithPermissions untuk menggunakan LEFT JOIN
-public function scopeWithPermissions($query, $roleId)
-{
-    return $query->leftJoin('sysmenu_role', function($join) use ($roleId) {
-        $join->on('sysmenu_role.sysmenu_id', '=', 'sysmenu.id')
-             ->where('sysmenu_role.role_id', $roleId);
-    });
-}
+    // Tambahkan scope untuk filter view permission
+    public function scopeWithViewPermission($query)
+    {
+        return $query->where('sysmenu_role.is_view', 1)
+            ->orWhereNull('sysmenu_role.id'); // Include menus without permission records
+    }
 
-// Tambahkan scope untuk filter view permission
-public function scopeWithViewPermission($query)
-{
-    return $query->where('sysmenu_role.is_view', 1)
-                ->orWhereNull('sysmenu_role.id'); // Include menus without permission records
-}
-
-// Update scope SelectMenuFields untuk handle null permissions
-public function scopeSelectMenuFields($query)
-{
-    return $query->select(
-        'sysmenu.id',
-        'sysmenu.nama',
-        'sysmenu.icon',
-        'sysmenu.url',
-        'sysmenu.parent_id',
-        'sysmenu.group_id',
-        'sysmenu_group.nama as group_name',
-        DB::raw('COALESCE(sysmenu_role.is_view, 0) as is_view'),
-        DB::raw('COALESCE(sysmenu_role.is_add, 0) as is_add'),
-        DB::raw('COALESCE(sysmenu_role.is_edit, 0) as is_edit'),
-        DB::raw('COALESCE(sysmenu_role.is_delete, 0) as is_delete')
-    );
-}
+    // Update scope SelectMenuFields untuk handle null permissions
+    public function scopeSelectMenuFields($query)
+    {
+        return $query->select(
+            'sysmenu.id',
+            'sysmenu.nama',
+            'sysmenu.icon',
+            'sysmenu.url',
+            'sysmenu.parent_id',
+            'sysmenu.group_id',
+            'sysmenu_group.nama as group_name',
+            DB::raw('COALESCE(sysmenu_role.is_view, 0) as is_view'),
+            DB::raw('COALESCE(sysmenu_role.is_add, 0) as is_add'),
+            DB::raw('COALESCE(sysmenu_role.is_edit, 0) as is_edit'),
+            DB::raw('COALESCE(sysmenu_role.is_delete, 0) as is_delete')
+        );
+    }
 }

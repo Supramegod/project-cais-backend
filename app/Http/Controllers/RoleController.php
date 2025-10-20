@@ -122,7 +122,7 @@ class RoleController extends Controller
             // Ambil permission role untuk menu ini
             $rolePermissions = SysmenuRole::where('role_id', $id)->get()->keyBy('sysmenu_id');
 
-            // Build hierarchical menu structure
+            // Build hierarchical menu structured
             $menuTree = $this->buildMenuTree($allMenus, $rolePermissions);
 
             // Format response

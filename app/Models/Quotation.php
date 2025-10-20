@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class Quotation extends Model
 {
@@ -13,12 +14,35 @@ class Quotation extends Model
 
     protected $table = 'sl_quotation';
     protected $fillable = [
-        'leads_id', 'nomor', 'tanggal', 'status_quotation_id', 'total_harga',
-        'created_by', 'updated_by', 'deleted_by', 'npwp', 'tgl_penempatan',
-        'company_id', 'kebutuhan', 'kebutuhan_id', 'jumlah_site', 'revisi',
-        'alasan_revisi', 'quotation_asal_id', 'is_aktif', 'step', 'top', 'persentase',
-        'tgl_quotation', 'nama_perusahaan', 'tim_sales_id', 'tim_sales_d_id','tgl_quotation',
-        'ot1', 'ot2', 'ot3' // TAMBAHKAN FIELD INI
+        'leads_id',
+        'nomor',
+        'tanggal',
+        'status_quotation_id',
+        'total_harga',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+        'npwp',
+        'tgl_penempatan',
+        'company_id',
+        'kebutuhan',
+        'kebutuhan_id',
+        'jumlah_site',
+        'revisi',
+        'alasan_revisi',
+        'quotation_asal_id',
+        'is_aktif',
+        'step',
+        'top',
+        'persentase',
+        'tgl_quotation',
+        'nama_perusahaan',
+        'tim_sales_id',
+        'tim_sales_d_id',
+        'tgl_quotation',
+        'ot1',
+        'ot2',
+        'ot3' // TAMBAHKAN FIELD INI
     ];
     protected $dates = ['deleted_at'];
 
@@ -226,5 +250,86 @@ class Quotation extends Model
     public function quotationRevisions()
     {
         return $this->hasMany(Quotation::class, 'quotation_asal_id');
+    }
+    // Alternatif yang lebih clean di Quotation.php
+    public function scopeByUserRole($query, $user = null)
+    {
+        $user = $user ?: Auth::user();
+
+        if (!$user) {
+            return $query;
+        }
+
+        // Sales division
+        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+            if ($user->role_id == 29) {
+                // Sales
+                $query->whereHas('leads.timSalesD', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            } elseif ($user->role_id == 31) {
+                // SPV Sales - menggunakan model dengan scope
+                $tim = TimSalesDetail::where('user_id', $user->id)->first();
+                if ($tim) {
+                    $memberSales = TimSalesDetail::byTeam($tim->tim_sales_id)
+                        ->active() // hanya yang aktif
+                        ->pluck('user_id');
+                    $query->whereHas('leads.timSalesD', function ($q) use ($memberSales) {
+                        $q->whereIn('user_id', $memberSales);
+                    });
+                }
+            }
+        } elseif (in_array($user->role_id, [4, 5])) {
+            // RO
+            $query->whereHas('leads', function ($q) use ($user) {
+                $q->where('ro_id', $user->id);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by date range
+     */
+    public function scopeDateRange($query, $startDate = null, $endDate = null)
+    {
+        $startDate = $startDate ?: Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
+        $endDate = $endDate ?: Carbon::now()->toDateString();
+
+        return $query->whereBetween('tgl_quotation', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope untuk filter by company
+     */
+    public function scopeByCompany($query, $companyId = null)
+    {
+        if ($companyId) {
+            return $query->where('company_id', $companyId);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by kebutuhan
+     */
+    public function scopeByKebutuhan($query, $kebutuhanId = null)
+    {
+        if ($kebutuhanId) {
+            return $query->where('kebutuhan_id', $kebutuhanId);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by status
+     */
+    public function scopeByStatus($query, $statusId = null)
+    {
+        if ($statusId) {
+            return $query->where('status_quotation_id', $statusId);
+        }
+        return $query;
     }
 }
