@@ -23,7 +23,7 @@ class RefreshTokens extends Model
     ];
 
     // Refresh token expires dalam 7 hari
-    protected $refreshTokenExpiration = 7 * 24;
+    protected $refreshTokenExpiration = 1 * 24;
 
     protected static function boot()
     {
