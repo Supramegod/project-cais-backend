@@ -45,7 +45,8 @@ class AuthController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"username"},
-     *             @OA\Property(property="username", type="string", example="superadmin2", description="Username user")
+     *                  @OA\Property(property="username", type="string", example="superadmin2", description="Username user"),
+     *                   @OA\Property(property="password", type="string", example="salesshelter", description="Password user")
      *         )
      *     ),
      *     @OA\Response(
@@ -101,22 +102,25 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         try {
-            // 1. Validasi Input
             $request->validate([
                 'username' => 'required|string',
+                'password' => 'required|string',
             ]);
+
 
             $inputUsername = $request->username;
 
             // 2. Cari pengguna
-            $user = User::where('username', $inputUsername)->first();
+            $user = User::checkLogin($request->username, $request->password)->first();
+
 
             if (!$user) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Kredensial yang diberikan tidak valid',
+                    'message' => 'Username atau password salah',
                 ], 401);
             }
+
 
             // 3. 🔥 HAPUS SEMUA TOKEN LAMA USER INI
             $this->revokeAllUserTokens($user);
