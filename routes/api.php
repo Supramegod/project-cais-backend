@@ -6,6 +6,8 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\PksController;
+use App\Http\Controllers\QuotationController;
+use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
@@ -30,9 +32,10 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SiteController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 
 Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
-    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
 
@@ -353,6 +356,26 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Available Resources
         Route::get('/available-leads', 'getAvailableLeads');
         Route::get('/available-sites/{leadsId}', 'getAvailableSites');
+    });
+    // Quotation Management
+    Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::post('/add', 'store');
+        Route::get('/view/{id}', 'show');
+        Route::delete('/delete/{id}', 'destroy');
+        Route::post('/{sourceId}/copy/{targetId}', 'copy');
+        Route::post('/{id}/resubmit', 'resubmit');
+        Route::post('/{id}/submit-approval', 'submitForApproval');
+        Route::get('/{id}/calculate', 'calculate');
+        Route::get('/{id}/export-pdf', 'exportPdf');
+        Route::get('/{id}/status', 'getStatus');
+        Route::get('/leads/{leadsId}', 'getByLeads');
+    });
+
+    // Quotation Step Management
+    Route::prefix('quotations-step')->controller(QuotationStepController::class)->group(function () {
+        Route::get('/{id}/step/{step}', 'getStep');
+        Route::post('/{id}/step/{step}', 'updateStep');
     });
 
 });
