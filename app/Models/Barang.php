@@ -73,7 +73,8 @@ class Barang extends Model
      */
     public function getFormattedHargaAttribute()
     {
-        return number_format($this->harga, 0, ',', '.');
+         $harga = $this->harga ?? 0;
+    return number_format($harga, 0, ',', '.');
     }
 
     public function getCreatedAtAttribute($value)
