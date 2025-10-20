@@ -27,6 +27,11 @@
                                         "description": "Username user",
                                         "type": "string",
                                         "example": "superadmin2"
+                                    },
+                                    "password": {
+                                        "description": "Password user",
+                                        "type": "string",
+                                        "example": "salesshelter"
                                     }
                                 },
                                 "type": "object"

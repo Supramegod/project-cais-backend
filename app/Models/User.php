@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -115,4 +116,12 @@ class User extends Authenticatable
             'id' // Local key pada personal_access_tokens
         );
     }
+    
+public function scopeCheckLogin(Builder $query, $username, $password)
+{
+    $hashedPassword = md5('SHELTER-' . $password . '-SHELTER');
+
+    return $query->where('username', $username)
+                 ->where('password', $hashedPassword);
+}
 }
