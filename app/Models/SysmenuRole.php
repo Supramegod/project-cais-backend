@@ -49,4 +49,14 @@ class SysmenuRole extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+    // Tambahkan di dalam model SysmenuRole
+    public function scopeForRole($query, $roleId)
+    {
+        return $query->where('role_id', $roleId);
+    }
+
+    public function scopeWithViewPermission($query)
+    {
+        return $query->where('is_view', true);
+    }
 }
