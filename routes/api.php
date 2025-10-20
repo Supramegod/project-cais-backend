@@ -47,6 +47,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::get('/benua', [LeadsController::class, 'getBenua']);
     Route::get('/jabatan-pic', [LeadsController::class, 'getJabatanPic']);
     Route::get('/bidang-perusahaan', [LeadsController::class, 'getBidangPerusahaan']);
+    Route::get('/entitas', [PositionController::class, 'listEntitas']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -117,7 +118,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Position
     Route::prefix('position')->controller(PositionController::class)->group(function () {
         Route::get('/list', 'list');
-        Route::get('/entitas-list', 'listEntitas');
         Route::get('/view/{id}', 'view');
         Route::post('/add', 'save');
         Route::put('/edit/{id}', 'edit');

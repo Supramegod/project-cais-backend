@@ -1061,7 +1061,7 @@ class PositionController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/position/entitas-list",
+     *     path="/api/entitas",
      *     operationId="getEntitasDropdown",
      *     tags={"Position"},
      *     summary="Get companies for dropdown",
