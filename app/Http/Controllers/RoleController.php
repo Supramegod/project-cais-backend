@@ -123,7 +123,7 @@ class RoleController extends Controller
             $rolePermissions = SysmenuRole::where('role_id', $id)->get()->keyBy('sysmenu_id');
 
             // Build hierarchical menu structure
-            $menuTree = $this->buildMenuTreeWithGroup($allMenus, $rolePermissions);
+            $menuTree = $this->buildMenuTree($allMenus, $rolePermissions);
 
             // Format response
             $roleData = [
