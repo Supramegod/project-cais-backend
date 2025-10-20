@@ -122,7 +122,7 @@ class RoleController extends Controller
             $rolePermissions = SysmenuRole::where('role_id', $id)->get()->keyBy('sysmenu_id');
 
             // Build hierarchical menu structure
-            $menuTree = $this->buildMenuTree($allMenus, $rolePermissions);
+            $menuTree = $this->buildMenuTreeWithGroup($allMenus, $rolePermissions);
 
             // Format response
             $roleData = [
@@ -144,7 +144,8 @@ class RoleController extends Controller
      * @OA\Get(
      *     path="/api/roles/permissions",
      *     tags={"Roles"},
-     *     summary="Get menu permissions for the authenticated user's role",
+     *     summary="Get menu permissions grouped by menu group for authenticated user",
+     *     description="Returns hierarchical menu structure with permissions grouped by menu groups",
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
@@ -153,48 +154,112 @@ class RoleController extends Controller
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array",
      *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nama", type="string", example="Dashboard"),
-     *                     @OA\Property(property="is_view", type="boolean", example=true),
-     *                     @OA\Property(property="is_add", type="boolean", example=false),
-     *                     @OA\Property(property="is_edit", type="boolean", example=true),
-     *                     @OA\Property(property="is_delete", type="boolean", example=false)
+     *                     @OA\Property(property="group_id", type="integer", example=1),
+     *                     @OA\Property(property="group_name", type="string", example="Main Menu"),
+     *                     @OA\Property(property="menus", type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="nama", type="string", example="Dashboard"),
+     *                             @OA\Property(property="icon", type="string", example="fa-home"),
+     *                             @OA\Property(property="url", type="string", example="/dashboard"),
+     *                             @OA\Property(property="permissions", type="object",
+     *                                 @OA\Property(property="view", type="boolean", example=true),
+     *                                 @OA\Property(property="add", type="boolean", example=false),
+     *                                 @OA\Property(property="edit", type="boolean", example=true),
+     *                                 @OA\Property(property="delete", type="boolean", example=false)
+     *                             )
+     *                         )
+     *                     )
      *                 )
      *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Forbidden",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="User role not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Internal server error")
      *         )
      *     )
      * )
      */
-    public function menuPermissions(): JsonResponse
-    {
-        try {
-            // Ambil user yang sedang login
-            $user = Auth::user();
-
-            // Pastikan user memiliki role_id
-            if (!$user || !$user->role_id) {
-                return $this->forbiddenResponse('User role not found');
-            }
-
-
-            $permissions = Sysmenu::join('sysmenu_role', 'sysmenu_role.sysmenu_id', '=', 'sysmenu.id')
-                ->where('sysmenu_role.role_id', $user->role_id)
-                ->select(
-                    'sysmenu.id',
-                    'sysmenu.nama',
-                    'sysmenu_role.is_view',
-                    'sysmenu_role.is_add',
-                    'sysmenu_role.is_edit',
-                    'sysmenu_role.is_delete'
-                )
-                ->get();
-
-            return $this->successResponse($permissions);
-        } catch (\Exception $e) {
-            $this->logError('Fetch menu permissions error', $e, ['user_id' => Auth::id()]);
-            return $this->errorResponse();
+   public function menuPermissions(): JsonResponse
+{
+    try {
+        $user = Auth::user();
+        if (!$user || !$user->role_id) {
+            return $this->forbiddenResponse('User role not found');
         }
+
+        // Ambil semua menu aktif dengan LEFT JOIN ke permissions
+        $menus = Sysmenu::active()
+            ->withPermissions($user->role_id) // Sekarang menggunakan LEFT JOIN
+            ->withGroupInfo()
+            ->selectMenuFields() // Sudah handle COALESCE untuk null permissions
+            ->ordered()
+            ->get();
+
+        // Filter: hanya ambil menu yang memiliki is_view = 1 atau belum ada permission record
+        $filteredMenus = $menus->filter(function($menu) {
+            return $menu->is_view == 1 || is_null($menu->is_view);
+        });
+
+        // Jika tidak ada menu yang memenuhi kriteria, return empty response
+        if ($filteredMenus->isEmpty()) {
+            return $this->successResponse([
+                'ungrouped' => [],
+                'grouped' => []
+            ]);
+        }
+
+        // Bangun tree + pewarisan group
+        $menuTree = $this->buildMenuTreeWithGroup($filteredMenus);
+
+        $groupedMenus = [];
+        $ungroupedMenus = [];
+
+        foreach ($menuTree as $menu) {
+            if (empty($menu['group_id'])) {
+                $ungroupedMenus[] = $menu;
+            } else {
+                $groupId = $menu['group_id'];
+                $groupName = $menu['group_name'] ?? 'Tanpa Nama';
+
+                if (!isset($groupedMenus[$groupId])) {
+                    $groupedMenus[$groupId] = [
+                        'group_id' => $groupId,
+                        'group_name' => $groupName,
+                        'menus' => [],
+                    ];
+                }
+
+                $groupedMenus[$groupId]['menus'][] = $menu;
+            }
+        }
+
+        $response = [
+            'ungrouped' => $ungroupedMenus,
+            'grouped' => array_values($groupedMenus),
+        ];
+
+        return $this->successResponse($response);
+
+    } catch (\Exception $e) {
+        $this->logError('Fetch menu permissions error', $e, ['user_id' => Auth::id()]);
+        return $this->errorResponse();
     }
+}
+
+
 
     /**
      * @OA\Post(
@@ -286,42 +351,41 @@ class RoleController extends Controller
             ]));
         }
     }
-// ============================ HELPER METHODS ============================
-
-    /**
-     * Build hierarchical menu tree with permissions
-     */
-    private function buildMenuTree($menus, $rolePermissions, $parentId = null)
+    // ============================ HELPER METHODS ============================
+    private function buildMenuTreeWithGroup($menus, $parentId = null, $parentGroupId = null, $parentGroupName = null)
     {
-        $branch = [];
+        $tree = [];
 
         foreach ($menus as $menu) {
             if ($menu->parent_id == $parentId) {
-                // Get permission for this menu
-                $permission = $rolePermissions->get($menu->id);
+                // Gunakan group dari menu ini, atau warisi dari parent
+                $currentGroupId = $menu->group_id ?? $parentGroupId;
+                $currentGroupName = $menu->group_name ?? $parentGroupName;
 
-                $item = [
+                $children = $this->buildMenuTreeWithGroup($menus, $menu->id, $currentGroupId, $currentGroupName);
+
+                $tree[] = [
                     'id' => $menu->id,
-                    'name' => $menu->nama,
+                    'nama' => $menu->nama,
+                    'icon' => $menu->icon,
+                    'url' => $menu->url,
                     'parent_id' => $menu->parent_id,
-                    'is_view' => $permission ? $permission->is_view : false,
-                    'is_add' => $permission ? $permission->is_add : false,
-                    'is_edit' => $permission ? $permission->is_edit : false,
-                    'is_delete' => $permission ? $permission->is_delete : false,
+                    'group_id' => $currentGroupId,
+                    'group_name' => $currentGroupName,
+                    'permissions' => [
+                        'view' => (bool) $menu->is_view,
+                        'add' => (bool) $menu->is_add,
+                        'edit' => (bool) $menu->is_edit,
+                        'delete' => (bool) $menu->is_delete,
+                    ],
+                    'children' => $children,
                 ];
-
-                // Recursively get children
-                $children = $this->buildMenuTree($menus, $rolePermissions, $menu->id);
-                if (!empty($children)) {
-                    $item['children'] = $children;
-                }
-
-                $branch[] = $item;
             }
         }
 
-        return $branch;
+        return $tree;
     }
+
     private function successResponse($data = null, string $message = null): JsonResponse
     {
         $response = ['success' => true];
