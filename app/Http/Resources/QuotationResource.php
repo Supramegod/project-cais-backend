@@ -69,6 +69,7 @@ class QuotationResource extends JsonResource
 
             // Work details
             'shift_kerja' => $this->shift_kerja,
+            'hari_kerja' => $this->hari_kerja,
             'jam_kerja' => $this->jam_kerja,
             'evaluasi_kontrak' => $this->evaluasi_kontrak,
             'durasi_kerjasama' => $this->durasi_kerjasama,

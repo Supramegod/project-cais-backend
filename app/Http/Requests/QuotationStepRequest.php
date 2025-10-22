@@ -46,6 +46,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['gaji_saat_cuti'] = 'sometimes|string|in:Full Pay,Prorate';
                 $rules['prorate'] = 'sometimes|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
+                $rules['hari_kerja'] = 'sometimes|string';
                 $rules['jam_kerja'] = 'sometimes|string';
                 break;
             

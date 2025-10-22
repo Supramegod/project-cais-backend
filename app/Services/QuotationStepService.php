@@ -296,6 +296,7 @@ class QuotationStepService
             'durasi_kerjasama' => $request->durasi_kerjasama,
             'durasi_karyawan' => $request->durasi_karyawan,
             'evaluasi_karyawan' => $request->evaluasi_karyawan,
+            'hari_kerja' => $request->hari_kerja,
             'shift_kerja' => $request->shift_kerja,
             'jam_kerja' => $request->jam_kerja,
             'updated_by' => Auth::user()->full_name
@@ -509,10 +510,23 @@ class QuotationStepService
             $data['cuti'] = "Tidak Ada";
             $data['gaji_saat_cuti'] = null;
             $data['prorate'] = null;
+            $data['hari_cuti_kematian'] = null;
+            $data['hari_istri_melahirkan'] = null;
+            $data['hari_cuti_menikah'] = null;
         } else {
-            $data['cuti'] = implode(",", $request->cuti);
+            // Handle case where cuti might be null, string, or array
+            $cuti = $request->cuti;
 
-            if (in_array("Cuti Melahirkan", $request->cuti)) {
+            if (is_null($cuti)) {
+                $cuti = [];
+            } elseif (!is_array($cuti)) {
+                // If it's a string, convert to array
+                $cuti = [$cuti];
+            }
+
+            $data['cuti'] = !empty($cuti) ? implode(",", $cuti) : null;
+
+            if (in_array("Cuti Melahirkan", $cuti)) {
                 if ($request->gaji_saat_cuti != "Prorate") {
                     $data['prorate'] = null;
                 }
@@ -521,9 +535,9 @@ class QuotationStepService
                 $data['prorate'] = null;
             }
 
-            $data['hari_cuti_kematian'] = in_array("Cuti Kematian", $request->cuti) ? $request->hari_cuti_kematian : null;
-            $data['hari_istri_melahirkan'] = in_array("Istri Melahirkan", $request->cuti) ? $request->hari_istri_melahirkan : null;
-            $data['hari_cuti_menikah'] = in_array("Cuti Menikah", $request->cuti) ? $request->hari_cuti_menikah : null;
+            $data['hari_cuti_kematian'] = in_array("Cuti Kematian", $cuti) ? $request->hari_cuti_kematian : null;
+            $data['hari_istri_melahirkan'] = in_array("Istri Melahirkan", $cuti) ? $request->hari_istri_melahirkan : null;
+            $data['hari_cuti_menikah'] = in_array("Cuti Menikah", $cuti) ? $request->hari_cuti_menikah : null;
         }
 
         return $data;
