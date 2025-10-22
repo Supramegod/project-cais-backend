@@ -17439,7 +17439,7 @@
                 "tags": [
                     "Roles"
                 ],
-                "summary": "Update menu permissions",
+                "summary": "Update menu permissions (parent updates will cascade to children)",
                 "operationId": "a5f34a5a84e0025cc0f671e0de58d090",
                 "parameters": [
                     {

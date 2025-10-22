@@ -261,17 +261,11 @@ class RoleController extends Controller
             return $this->errorResponse();
         }
     }
-
-
-
-
-
-
     /**
      * @OA\Post(
      *     path="/api/roles/{id}/update-permissions",
      *     tags={"Roles"},
-     *     summary="Update menu permissions",
+     *     summary="Update menu permissions (parent updates will cascade to children)",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -321,6 +315,9 @@ class RoleController extends Controller
 
             foreach ($permissions as $permission) {
                 $this->updateOrCreatePermission($id, $permission);
+
+                // Jika yang diupdate adalah menu parent, update juga semua child menus
+                $this->cascadePermissionToChildren($id, $permission);
             }
 
             DB::commit();
@@ -334,6 +331,83 @@ class RoleController extends Controller
             ]);
             return $this->errorResponse('Failed to update permissions');
         }
+    }
+
+    /**
+     * Update permission untuk menu parent dan cascade ke semua child menus
+     * untuk semua field: is_view, is_add, is_edit, is_delete
+     */
+    private function cascadePermissionToChildren($roleId, $parentPermission): void
+    {
+        $parentMenuId = $parentPermission['sysmenu_id'];
+        $field = $parentPermission['field'];
+        $value = $parentPermission['value'];
+
+        $childMenuIds = $this->getAllChildMenuIds($parentMenuId);
+
+        if (!empty($childMenuIds)) {
+            // Batch update existing records
+            SysmenuRole::where('role_id', $roleId)
+                ->whereIn('sysmenu_id', $childMenuIds)
+                ->update([
+                    $field => $value,
+                    'updated_by' => Auth::id()
+                ]);
+
+            // Find which child menus don't have permission records yet
+            $existingRecords = SysmenuRole::where('role_id', $roleId)
+                ->whereIn('sysmenu_id', $childMenuIds)
+                ->pluck('sysmenu_id')
+                ->toArray();
+
+            $newMenuIds = array_diff($childMenuIds, $existingRecords);
+
+            // Create new records for menus without permissions
+            $batchData = [];
+            $currentTime = now();
+
+            foreach ($newMenuIds as $menuId) {
+                $batchData[] = [
+                    'role_id' => $roleId,
+                    'sysmenu_id' => $menuId,
+                    $field => $value,
+                    // Set default values untuk field lainnya
+                    'is_view' => $field === 'is_view' ? $value : false,
+                    'is_add' => $field === 'is_add' ? $value : false,
+                    'is_edit' => $field === 'is_edit' ? $value : false,
+                    'is_delete' => $field === 'is_delete' ? $value : false,
+                    'created_by' => Auth::id(),
+                    'updated_by' => Auth::id(),
+                    'created_at' => $currentTime,
+                    'updated_at' => $currentTime
+                ];
+            }
+
+            if (!empty($batchData)) {
+                SysmenuRole::insert($batchData);
+            }
+        }
+    }
+
+    /**
+     * Dapatkan semua child menu IDs secara recursive
+     */
+    private function getAllChildMenuIds($parentId): array
+    {
+        $childIds = [];
+
+        // Dapatkan direct children
+        $directChildren = Sysmenu::where('parent_id', $parentId)->get();
+
+        foreach ($directChildren as $child) {
+            $childIds[] = $child->id;
+
+            // Dapatkan grandchildren recursively
+            $grandChildren = $this->getAllChildMenuIds($child->id);
+            $childIds = array_merge($childIds, $grandChildren);
+        }
+
+        return $childIds;
     }
 
     private function updateOrCreatePermission($roleId, $permission): void
@@ -353,7 +427,12 @@ class RoleController extends Controller
             SysmenuRole::create(array_merge($data, [
                 'role_id' => $roleId,
                 'sysmenu_id' => $permission['sysmenu_id'],
-                'created_by' => Auth::id()
+                'created_by' => Auth::id(),
+                // Set default values untuk field lainnya
+                'is_view' => $permission['field'] === 'is_view' ? $permission['value'] : false,
+                'is_add' => $permission['field'] === 'is_add' ? $permission['value'] : false,
+                'is_edit' => $permission['field'] === 'is_edit' ? $permission['value'] : false,
+                'is_delete' => $permission['field'] === 'is_delete' ? $permission['value'] : false,
             ]));
         }
     }

@@ -113,6 +113,7 @@ class QuotationController extends Controller
                 ->byKebutuhan($request->kebutuhan_id)
                 ->byStatus($request->status)
                 ->notDeleted()
+                ->orderBy('created_at', 'desc')
                 ->get();
 
             return response()->json([
