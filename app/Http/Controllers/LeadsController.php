@@ -372,7 +372,8 @@ public function view($id)
      */
     public function add(Request $request)
     {
-        try {
+        try { 
+            set_time_limit(0);
             DB::beginTransaction();
 
             $validator = Validator::make($request->all(), [
@@ -394,8 +395,8 @@ public function view($id)
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors(),
+                    // 'errors' => $validator->errors()
                 ], 400);
             }
 
@@ -563,7 +564,7 @@ public function view($id)
             }
 
             $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => 'required|max:100|min:3',
+                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
                 'pic' => 'required',
                 'branch' => 'required',
                 'kebutuhan' => 'required|array|min:1',
@@ -574,8 +575,8 @@ public function view($id)
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors(),
+                    // 'errors' => $validator->errors()
                 ], 400);
             }
 
