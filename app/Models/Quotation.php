@@ -410,4 +410,14 @@ class Quotation extends Model
         }
         return $query;
     }
+    // Tambahkan relasi
+    public function quotationReferensi()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_referensi_id');
+    }
+
+    public function quotationTurunan()
+    {
+        return $this->hasMany(Quotation::class, 'quotation_referensi_id');
+    }
 }

@@ -12,13 +12,20 @@ class QuotationStoreRequest extends FormRequest
     }
 
     public function rules(): array
-    {
+    { // Ambil tipe_quotation dari request (yang sudah di-merge dari URL parameter)
+        // Ambil tipe_quotation dari request (yang sudah di-merge dari URL parameter)
+        $tipe_quotation = $this->tipe_quotation;
         $rules = [
             'perusahaan_id' => 'required|exists:sl_leads,id',
             'entitas' => 'required|exists:mysqlhris.m_company,id',
             'layanan' => 'required|exists:m_kebutuhan,id',
             'jumlah_site' => 'required|string|in:Single Site,Multi Site',
+
         ];
+        // Conditional validation untuk referensi berdasarkan tipe_quotation
+        if (in_array($tipe_quotation, ['adendum', 'rekontrak'])) {
+            $rules['quotation_referensi_id'] = 'required|exists:sl_quotation,id';
+        }
 
         // Rules untuk Single Site
         if ($this->jumlah_site == 'Single Site') {
@@ -62,12 +69,13 @@ class QuotationStoreRequest extends FormRequest
             'layanan.exists' => 'Layanan tidak valid',
             'jumlah_site.required' => 'Jumlah site wajib dipilih',
             'jumlah_site.in' => 'Jumlah site harus Single Site atau Multi Site',
-            
+            'quotation_referensi_id.required' => 'Quotation referensi wajib dipilih untuk adendum/rekontrak',
+
             'nama_site.required_if' => 'Nama site wajib diisi untuk single site',
             'provinsi.required_if' => 'Provinsi wajib dipilih untuk single site',
             'kota.required_if' => 'Kota wajib dipilih untuk single site',
             'penempatan.required_if' => 'Penempatan wajib diisi untuk single site',
-            
+
             'multisite.required_if' => 'Data multisite wajib diisi',
             'multisite.size' => 'Jumlah data multisite harus sama dengan data provinsi, kota, dan penempatan',
             'provinsi_multi.required_if' => 'Provinsi multisite wajib dipilih',
@@ -76,7 +84,7 @@ class QuotationStoreRequest extends FormRequest
             'kota_multi.size' => 'Jumlah kota multisite harus sama dengan data site',
             'penempatan_multi.required_if' => 'Penempatan multisite wajib diisi',
             'penempatan_multi.size' => 'Jumlah penempatan multisite harus sama dengan data site',
-            
+
             'multisite.*.required' => 'Nama site multisite wajib diisi',
             'provinsi_multi.*.required' => 'Provinsi multisite wajib dipilih',
             'provinsi_multi.*.exists' => 'Provinsi multisite tidak valid',

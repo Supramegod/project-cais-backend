@@ -15,6 +15,7 @@ class Leads extends Model
     protected $fillable = [
         'nama_perusahaan',
         'leads_id',
+        'customer_id',
         'branch_id',
         'kebutuhan_id',
         'tim_sales_id',
@@ -59,6 +60,8 @@ class Leads extends Model
         'benua_id',
         'benua',
         'negara_id',
+        'customer_active',
+        'is_aktif',
         'negara'
     ];
 
@@ -115,11 +118,6 @@ class Leads extends Model
     {
         return $this->hasMany(SpkSite::class, 'leads_id');
     }
-    public function scopeAvailableCustomers($query)
-    {
-        return $query->whereNotNull('customer_id')
-            ->whereNull('deleted_at');
-    }
 
     public function quotations()
     {
@@ -139,6 +137,18 @@ class Leads extends Model
     public function platform()
     {
         return $this->belongsTo(Platform::class, 'platform_id', 'id');
+    }
+    // Tambahkan relasi ke Customer
+    public function customer()
+    {
+        return $this->hasOne(Customer::class, 'leads_id');
+    }
+
+    // Update scope AvailableCustomers
+    public function scopeAvailableCustomers($query)
+    {
+        return $query->whereNotNull('customer_id')
+            ->whereNull('deleted_at');
     }
 
     public function getCreatedAtAttribute($value)
