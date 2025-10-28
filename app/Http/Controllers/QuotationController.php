@@ -132,11 +132,18 @@ class QuotationController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/quotations/add",
+     *     path="/api/quotations/add/{tipe_quotation}",
      *     tags={"Quotations"},
      *     summary="Create new quotation",
      *     description="Creates a new quotation with basic information including site details",
      *     security={{"bearerAuth":{}}},
+     *       @OA\Parameter(
+     *         name="tipe_quotation",
+     *         in="path",
+     *         required=true,
+     *         description="Type of quotation",
+     *         @OA\Schema(type="string", enum={"baru", "adendum", "rekontrak"}, example="baru")
+     *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         description="Quotation data with site information",
@@ -146,6 +153,7 @@ class QuotationController extends Controller
      *             @OA\Property(property="entitas", type="integer", description="ID company/entitas", example=1),
      *             @OA\Property(property="layanan", type="integer", description="ID layanan/kebutuhan", example=1),
      *             @OA\Property(property="jumlah_site", type="string", enum={"Single Site","Multi Site"}, description="Tipe penempatan site", example="Single Site"),
+     *             @OA\Property(property="quotation_referensi_id", type="integer", description="ID quotation referensi untuk adendum/rekontrak", example=1),
      *             
      *             @OA\Property(
      *                 property="nama_site", 
@@ -286,22 +294,56 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function store(QuotationStoreRequest $request): JsonResponse
+    public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
         try {
             $user = Auth::user();
 
-            // Use business service to prepare data
+            // Validasi tipe_quotation dari URL parameter
+            if (!in_array($tipe_quotation, ['baru', 'adendum', 'rekontrak'])) {
+                throw new \Exception('Tipe quotation tidak valid');
+            }
+
+            // Merge tipe_quotation ke request untuk validasi
+            $request->merge(['tipe_quotation' => $tipe_quotation]);
+
+            // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
-            $quotationData['nomor'] = $this->quotationBusinessService->generateNomor($request->perusahaan_id, $request->entitas);
+
+            // Handle quotation referensi untuk adendum/rekontrak
+            $quotationReferensi = null;
+            if (in_array($tipe_quotation, ['adendum', 'rekontrak'])) {
+                if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
+                    throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
+                }
+
+                $quotationReferensi = Quotation::notDeleted()->findOrFail($request->quotation_referensi_id);
+                $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
+            }
+
+            // Generate nomor berdasarkan tipe dari URL parameter
+            $quotationData['nomor'] = $this->quotationBusinessService->generateNomorByType(
+                $request->perusahaan_id,
+                $request->entitas,
+                $tipe_quotation, // Gunakan parameter dari URL
+                $quotationReferensi
+            );
+
             $quotationData['created_by'] = $user->full_name;
+            $quotationData['tipe_quotation'] = $tipe_quotation;
 
             $quotation = Quotation::create($quotationData);
 
-            // Use business service to create related data
+            // Create site data dan PIC
             $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
             $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
+
+            // Untuk adendum/rekontrak, copy additional data dari referensi
+            if ($quotationReferensi) {
+                $this->quotationBusinessService->duplicateQuotationData($quotation, $quotationReferensi);
+            }
+
             $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
 
             DB::commit();
@@ -309,7 +351,7 @@ class QuotationController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => new QuotationResource($quotation->load(['quotationSites', 'quotationPics'])),
-                'message' => 'Quotation created successfully'
+                'message' => 'Quotation ' . $tipe_quotation . ' created successfully'
             ], 201);
 
         } catch (\Exception $e) {
@@ -321,7 +363,6 @@ class QuotationController extends Controller
             ], 500);
         }
     }
-
     /**
      * @OA\Get(
      *     path="/api/quotations/view/{id}",
@@ -1016,7 +1057,10 @@ class QuotationController extends Controller
     public function getByLeads(string $leadsId): JsonResponse
     {
         try {
-            $leads = Leads::findOrFail($leadsId);
+            set_time_limit(0);
+            $leads = Leads::with(['statusLeads', 'branch'])
+                ->withoutTrashed()
+                ->findOrFail($leadsId);
 
             $quotations = Quotation::with([
                 'statusQuotation',
@@ -1024,7 +1068,7 @@ class QuotationController extends Controller
                 'company'
             ])
                 ->where('leads_id', $leadsId)
-                ->notDeleted()
+                ->withoutTrashed()
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -1035,9 +1079,10 @@ class QuotationController extends Controller
                         'id' => $leads->id,
                         'nama_perusahaan' => $leads->nama_perusahaan,
                         'pic' => $leads->pic,
-                        'email' => $leads->email
+                        'wilayah' => $leads->branch->name ?? 'Unknown',
+                        'satuss_leads' => $leads->statusLeads->nama ?? 'Unknown',
                     ],
-                    'quotations' => new QuotationCollection($quotations)
+                    'quotations' => $quotations
                 ],
                 'message' => 'Quotations retrieved successfully'
             ]);

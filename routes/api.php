@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
@@ -39,15 +40,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
 
-    // Branches & Users
-    Route::get('/branches', [TimSalesController::class, 'getBranches']);
-    Route::get('/users', [TimSalesController::class, 'getUsers']);
-    Route::get('/platforms', [LeadsController::class, 'getPlatforms']);
-    Route::get('/status-leads', [LeadsController::class, 'getStatusLeads']);
-    Route::get('/benua', [LeadsController::class, 'getBenua']);
-    Route::get('/jabatan-pic', [LeadsController::class, 'getJabatanPic']);
-    Route::get('/bidang-perusahaan', [LeadsController::class, 'getBidangPerusahaan']);
-    Route::get('/entitas', [PositionController::class, 'listEntitas']);
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -376,6 +368,21 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('quotations-step')->controller(QuotationStepController::class)->group(function () {
         Route::get('/{id}/step/{step}', 'getStep');
         Route::post('/{id}/step/{step}', 'updateStep');
+    });
+
+    // Options/Master Data
+    Route::prefix('options')->controller(OptionController::class)->group(function () {
+        Route::get('/branches', 'getBranches');
+        Route::get('/users', 'getUsers');
+        Route::get('/platforms', 'getPlatforms');
+        Route::get('/status-leads', 'getStatusLeads');
+        Route::get('/benua', 'getBenua');
+        Route::get('/jabatan-pic', 'getJabatanPic');
+        Route::get('/bidang-perusahaan', 'getBidangPerusahaan');
+        Route::get('/entitas', 'listEntitas');
+        Route::get('/entitas/{layanan_id}', 'getEntitas');
+        Route::get('/status-quotation', 'getStatusQuotation');
+        
     });
 
 });

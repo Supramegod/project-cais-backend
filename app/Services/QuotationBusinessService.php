@@ -38,6 +38,8 @@ class QuotationBusinessService
             'company' => $company->name,
             'step' => 1,
             'status_quotation_id' => 1,
+            'tipe_quotation' => $request->tipe_quotation,
+
         ];
     }
 
@@ -189,6 +191,64 @@ class QuotationBusinessService
 
         return $nomor . $month . $now->year . "-" . $urutan;
     }
+    /**
+     * Generate nomor quotation berdasarkan jenis
+     */
+    public function generateNomorByType($leadsId, $companyId, $tipeQuotation = 'baru', $quotationReferensi = null): string
+    {
+        $now = Carbon::now();
+        $year = $now->year;
+        $month = $now->format('m');
+
+        $dataLeads = Leads::findOrFail($leadsId);
+        $company = Company::find($companyId);
+
+        // Base format: QUOT/[jenis jika ada]/[COMPANY_CODE]/[LEADS_NUMBER]-[MMYYYY]-[XXXXX]
+        $base = "QUOT/";
+
+        // Tambahkan jenis quotation untuk adendum dan rekontrak
+        if ($tipeQuotation == 'adendum') {
+            $base .= "AD/";
+        } elseif ($tipeQuotation == 'rekontrak') {
+            $base .= "RK/";
+        }
+        // Untuk baru, tidak ada tambahan jenis
+
+        // Tambahkan company code dan leads number
+        if ($company) {
+            $base .= $company->code . "/" . $dataLeads->nomor . "-" . $month . $year . "-";
+        } else {
+            $base .= "NN/NNNNN-" . $month . $year . "-";
+        }
+
+        // Hitung counter berdasarkan tipe quotation dan bulan
+        $counter = Quotation::where('tipe_quotation', $tipeQuotation)
+            ->whereYear('created_at', $year)
+            ->whereMonth('created_at', $now->month)
+            ->count() + 1;
+
+        return $base . str_pad($counter, 5, '0', STR_PAD_LEFT);
+    }
+    /**
+ * Duplikasi data dari quotation referensi
+ */
+public function duplicateQuotationData(Quotation $newQuotation, Quotation $referensiQuotation): void
+{
+    // Copy basic quotation data
+    $newQuotation->update([
+        'jenis_kontrak' => $referensiQuotation->jenis_kontrak,
+        'mulai_kontrak' => $referensiQuotation->mulai_kontrak,
+        'kontrak_selesai' => $referensiQuotation->kontrak_selesai,
+        'tgl_penempatan' => $referensiQuotation->tgl_penempatan,
+        'salary_rule_id' => $referensiQuotation->salary_rule_id,
+        'top' => $referensiQuotation->top,
+        'upah' => $referensiQuotation->upah,
+        'nominal_upah' => $referensiQuotation->nominal_upah,
+        'management_fee_id' => $referensiQuotation->management_fee_id,
+        'persentase' => $referensiQuotation->persentase,
+        // ... tambah field lain yang perlu di-copy
+    ]);
+}
     /**
      * Generate activity number
      */

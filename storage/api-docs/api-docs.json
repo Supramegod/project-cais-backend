@@ -11462,471 +11462,6 @@
                 ]
             }
         },
-        "/api/platforms": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua platform sumber leads",
-                "description": "Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
-                "operationId": "952f5edcd0d2239b1a087ff38e8dedf6",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data platform",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data platform berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "Website"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/status-leads": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua status leads",
-                "description": "Endpoint ini digunakan untuk mengambil data status leads (misal: new, contacted, qualified, dll). Berguna untuk filter dan dropdown form input leads.",
-                "operationId": "4db21c4646aa2c87e7fb34f1b2d04eec",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data status leads",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data status leads berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "New Lead"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/benua": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua benua",
-                "description": "Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
-                "operationId": "0568394e389dfd890c6faee35d6820ee",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data benua",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data benua berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id_benua": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_benua": {
-                                                        "type": "string",
-                                                        "example": "Asia"
-                                                    },
-                                                    "kode_benua": {
-                                                        "type": "string",
-                                                        "example": "AS"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/jabatan-pic": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua jabatan PIC",
-                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
-                "operationId": "2d86dfb7a6a37c3efdae8f8715116653",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data jabatan PIC",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data jabatan PIC berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_jabatan": {
-                                                        "type": "string",
-                                                        "example": "Manager Purchasing"
-                                                    },
-                                                    "kode": {
-                                                        "type": "string",
-                                                        "example": "MGR-PUR"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "example": "15-01-2025"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/bidang-perusahaan": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua bidang perusahaan",
-                "description": "Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
-                "operationId": "498a4ab2a07d6fa0c5d2c5757065fa14",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data bidang perusahaan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data bidang perusahaan berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "Manufacturing"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "example": "2025-01-01T00:00:00.000000Z"
-                                                    },
-                                                    "updated_at": {
-                                                        "type": "string",
-                                                        "example": "2025-01-01T00:00:00.000000Z"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -12843,6 +12378,909 @@
                                         "data": {
                                             "type": "array",
                                             "items": {}
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/entitas": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Get companies for dropdown",
+                "description": "Retrieve simplified company list for dropdown/select components (id and name only)",
+                "operationId": "getEntitasDropdown",
+                "responses": {
+                    "200": {
+                        "description": "Success - Returns simplified company list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Company options retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "PT Teknologi Indonesia"
+                                                    },
+                                                    "code": {
+                                                        "type": "string",
+                                                        "example": "PTTI"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 25
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthorized"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/bidang-perusahaan": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua bidang perusahaan",
+                "description": "Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+                "operationId": "699b1c786b9e603c249feaad6fb9c224",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data bidang perusahaan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data bidang perusahaan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Manufacturing"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "2025-01-01T00:00:00.000000Z"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "example": "2025-01-01T00:00:00.000000Z"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/platforms": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua platform sumber leads",
+                "description": "Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+                "operationId": "2117d5ca6a80bb62286d88898624e9c9",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data platform",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data platform berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Website"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/status-leads": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua status leads",
+                "description": "Endpoint ini digunakan untuk mengambil data status leads (misal: new, contacted, qualified, dll). Berguna untuk filter dan dropdown form input leads.",
+                "operationId": "f75c07bd9c6144e54b969bd6687be76a",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data status leads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data status leads berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "New Lead"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/benua": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua benua",
+                "description": "Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
+                "operationId": "a998831ad07fd4cd76d7b772576028a5",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data benua",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data benua berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id_benua": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_benua": {
+                                                        "type": "string",
+                                                        "example": "Asia"
+                                                    },
+                                                    "kode_benua": {
+                                                        "type": "string",
+                                                        "example": "AS"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/jabatan-pic": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua jabatan PIC",
+                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+                "operationId": "94299627f0bcdf0592b71576aef517da",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data jabatan PIC",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data jabatan PIC berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_jabatan": {
+                                                        "type": "string",
+                                                        "example": "Manager Purchasing"
+                                                    },
+                                                    "kode": {
+                                                        "type": "string",
+                                                        "example": "MGR-PUR"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "15-01-2025"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/branches": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar branch",
+                "description": "Mengambil daftar branch yang aktif",
+                "operationId": "da4758b73f2d5c773cddba4beac08b00",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Daftar branch berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Pusat"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "JKT"
+                                                    },
+                                                    "is_active": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/users": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar user sales",
+                "description": "Mengambil daftar user dengan role sales berdasarkan branch",
+                "operationId": "5438931315eb7e3816cca12876cda919",
+                "parameters": [
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "ID branch",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Daftar user berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "full_name": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "username": {
+                                                        "type": "string",
+                                                        "example": "john.doe"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "john@example.com"
+                                                    },
+                                                    "role_id": {
+                                                        "type": "integer",
+                                                        "example": 29
+                                                    },
+                                                    "branch_id": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/status-quotation": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua ststus quotation",
+                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input ststus quotation.",
+                "operationId": "29ed55f8ae80741ae70ee95a3e030cc7",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data ststus quotation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data ststus quotation berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_jabatan": {
+                                                        "type": "string",
+                                                        "example": "Manager Purchasing"
+                                                    },
+                                                    "kode": {
+                                                        "type": "string",
+                                                        "example": "MGR-PUR"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "15-01-2025"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/entitas/{layanan_id}": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Get companies for dropdown based on layanan",
+                "description": "Retrieve company list filtered by layanan_id for dropdown/select components",
+                "operationId": "getEntitasByLayanan",
+                "parameters": [
+                    {
+                        "name": "layanan_id",
+                        "in": "path",
+                        "description": "ID layanan/kebutuhan",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success - Returns filtered company list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Company options retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "PT Teknologi Indonesia"
+                                                    },
+                                                    "code": {
+                                                        "type": "string",
+                                                        "example": "PTTI"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 5
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Internal server error"
                                         }
                                     },
                                     "type": "object"
@@ -15246,111 +15684,6 @@
                 ]
             }
         },
-        "/api/entitas": {
-            "get": {
-                "tags": [
-                    "Position"
-                ],
-                "summary": "Get companies for dropdown",
-                "description": "Retrieve simplified company list for dropdown/select components (id and name only)",
-                "operationId": "getEntitasDropdown",
-                "responses": {
-                    "200": {
-                        "description": "Success - Returns simplified company list",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Company options retrieved successfully"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "PT Teknologi Indonesia"
-                                                    },
-                                                    "code": {
-                                                        "type": "string",
-                                                        "example": "PTTI"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "total": {
-                                            "type": "integer",
-                                            "example": 25
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthorized"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Internal server error"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/quotations/list": {
             "get": {
                 "tags": [
@@ -15469,14 +15802,31 @@
                 ]
             }
         },
-        "/api/quotations/add": {
+        "/api/quotations/add/{tipe_quotation}": {
             "post": {
                 "tags": [
                     "Quotations"
                 ],
                 "summary": "Create new quotation",
                 "description": "Creates a new quotation with basic information including site details",
-                "operationId": "1341983b7039998dfb5dd1bfc595061f",
+                "operationId": "23755e5370d96b964b099bf0a1133fc4",
+                "parameters": [
+                    {
+                        "name": "tipe_quotation",
+                        "in": "path",
+                        "description": "Type of quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "adendum",
+                                "rekontrak"
+                            ],
+                            "example": "baru"
+                        }
+                    }
+                ],
                 "requestBody": {
                     "description": "Quotation data with site information",
                     "required": true,
@@ -15513,6 +15863,11 @@
                                             "Multi Site"
                                         ],
                                         "example": "Single Site"
+                                    },
+                                    "quotation_referensi_id": {
+                                        "description": "ID quotation referensi untuk adendum/rekontrak",
+                                        "type": "integer",
+                                        "example": 1
                                     },
                                     "nama_site": {
                                         "description": "Wajib diisi jika jumlah_site = Single Site",
@@ -20974,150 +21329,6 @@
                 ]
             }
         },
-        "/api/branches": {
-            "get": {
-                "tags": [
-                    "Tim Sales"
-                ],
-                "summary": "Mendapatkan daftar branch",
-                "description": "Mengambil daftar branch yang aktif",
-                "operationId": "e1513c674e5aa2f45a7b605b3f7e4826",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil daftar branch",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Daftar branch berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 2
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "Jakarta Pusat"
-                                                    },
-                                                    "description": {
-                                                        "type": "string",
-                                                        "example": "JKT"
-                                                    },
-                                                    "is_active": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/users": {
-            "get": {
-                "tags": [
-                    "Tim Sales"
-                ],
-                "summary": "Mendapatkan daftar user sales",
-                "description": "Mengambil daftar user dengan role sales berdasarkan branch",
-                "operationId": "2355d2d49a19e2b0860059e095816c60",
-                "parameters": [
-                    {
-                        "name": "branch_id",
-                        "in": "query",
-                        "description": "ID branch",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil daftar user",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Daftar user berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 123
-                                                    },
-                                                    "full_name": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "username": {
-                                                        "type": "string",
-                                                        "example": "john.doe"
-                                                    },
-                                                    "email": {
-                                                        "type": "string",
-                                                        "example": "john@example.com"
-                                                    },
-                                                    "role_id": {
-                                                        "type": "integer",
-                                                        "example": 29
-                                                    },
-                                                    "branch_id": {
-                                                        "type": "integer",
-                                                        "example": 2
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validasi gagal"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/tim-sales/getAvailableUsers/{id}": {
             "get": {
                 "tags": [
@@ -23873,6 +24084,10 @@
         {
             "name": "Menu",
             "description": "API untuk manajemen Menu"
+        },
+        {
+            "name": "Option",
+            "description": "Endpoints untuk mengelola opsi dropdown dan data referensi lainnya"
         },
         {
             "name": "PKS",

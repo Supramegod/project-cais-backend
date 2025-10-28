@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\Customer;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Leads;
@@ -417,7 +418,8 @@ class PksController extends Controller
                 'tanggal_pks' => 'sometimes|date',
                 'tanggal_awal_kontrak' => 'sometimes|date',
                 'tanggal_akhir_kontrak' => 'sometimes|date|after:tanggal_awal_kontrak',
-                'status_pks_id' => 'sometimes|integer|exists:m_status_pks,id'
+                'status_pks_id' => 'sometimes|integer|exists:m_status_pks,id',
+                'is_aktif' => 'sometimes|boolean'
             ]);
 
             if ($validator->fails()) {
@@ -428,7 +430,20 @@ class PksController extends Controller
                 ], 422);
             }
 
+            DB::beginTransaction();
+
+            // Simpan data lama untuk pengecekan
+            $oldIsAktif = $pks->is_aktif;
+            $oldKontrakAkhir = $pks->kontrak_akhir;
+
             $pks->update($request->all());
+
+            // Jika ada perubahan pada is_aktif atau kontrak_akhir, sync customer_active
+            if ($oldIsAktif != $pks->is_aktif || $oldKontrakAkhir != $pks->kontrak_akhir) {
+                $this->autoSyncCustomerActiveStatus();
+            }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -437,6 +452,7 @@ class PksController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update PKS',
@@ -906,6 +922,7 @@ class PksController extends Controller
         DB::beginTransaction();
 
         try {
+            // Update PKS menjadi aktif
             $pks->update([
                 'ot5' => Auth::user()->full_name,
                 'status_pks_id' => 7,
@@ -913,19 +930,181 @@ class PksController extends Controller
                 'updated_by' => Auth::user()->full_name
             ]);
 
-            $pks->leads->update([
-                'status_leads_id' => 102,
-                'updated_by' => Auth::user()->full_name
-            ]);
+            $leads = $pks->leads;
 
-            // Note: HRIS synchronization logic would go here
-            // This is simplified - you'd need to implement the actual HRIS sync
+            // Cek apakah customer sudah ada
+            if (!$leads->customer_id) {
+                // Generate nomor customer
+                $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
+
+                // Buat record customer
+                $customer = Customer::create([
+                    'leads_id' => $leads->id,
+                    'nomor' => $customerNomor,
+                    'tgl_customer' => now(),
+                    'tim_sales_id' => $leads->tim_sales_id,
+                    'tim_sales_d_id' => $leads->tim_sales_d_id,
+                    'created_by' => Auth::user()->full_name
+                ]);
+
+                // Update leads dengan customer_id, status_leads_id, dan customer_active
+                $leads->update([
+                    'customer_id' => $customer->id,
+                    'status_leads_id' => 102,
+                    'customer_active' => 1, // Set ke 1 karena PKS aktif
+                    'updated_by' => Auth::user()->full_name
+                ]);
+
+                // Buat activity log untuk customer
+                $this->createCustomerActivity($leads, $customerNomor);
+
+            } else {
+                // Jika customer sudah ada, update status dan customer_active
+                $leads->update([
+                    'status_leads_id' => 102,
+                    'customer_active' => 1, // Set ke 1 karena PKS aktif
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
+
+            // Update customer_active untuk semua leads yang terkait (otomatis)
+            $this->autoSyncCustomerActiveStatus();
 
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             throw $e;
         }
+    }
+    /**
+     * SYNC OTOMATIS - Update customer_active berdasarkan status PKS
+     * Dipanggil otomatis ketika ada perubahan PKS
+     */
+    private function autoSyncCustomerActiveStatus()
+    {
+        try {
+            // Ambil semua leads yang sudah menjadi customer
+            $leadsWithCustomers = Leads::whereNotNull('customer_id')
+                ->whereNull('deleted_at')
+                ->get();
+
+            foreach ($leadsWithCustomers as $lead) {
+                $this->updateCustomerActiveFromPks($lead);
+            }
+
+            \Log::info('Auto sync customer_active status completed', [
+                'count' => $leadsWithCustomers->count(),
+                'timestamp' => now()
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Auto sync customer_active status failed: ' . $e->getMessage());
+        }
+    }
+    /**
+     * Update customer_active untuk satu leads berdasarkan status PKS
+     */
+    private function updateCustomerActiveFromPks($lead)
+    {
+        // Cari semua PKS yang terkait dengan leads ini
+        $pksList = Pks::where('leads_id', $lead->id)
+            ->whereNull('deleted_at')
+            ->get();
+
+        $hasActivePks = false;
+
+        foreach ($pksList as $pks) {
+            // Cek apakah PKS aktif dan kontrak masih berlaku
+            if ($pks->is_aktif == 1 && $this->isKontrakBerlaku($pks->kontrak_akhir)) {
+                $hasActivePks = true;
+                break;
+            }
+        }
+
+        // Update customer_active berdasarkan status PKS
+        $newStatus = $hasActivePks ? 1 : 0;
+
+        // Only update if changed to avoid unnecessary database operations
+        if ($lead->customer_active != $newStatus) {
+            $lead->update([
+                'customer_active' => $newStatus
+            ]);
+
+            \Log::info('Customer active status updated', [
+                'leads_id' => $lead->id,
+                'customer_id' => $lead->customer_id,
+                'customer_active' => $newStatus,
+                'timestamp' => now()
+            ]);
+        }
+    }
+
+    /**
+     * Cek apakah kontrak masih berlaku
+     */
+    private function isKontrakBerlaku($kontrakAkhir)
+    {
+        if (!$kontrakAkhir) {
+            return false;
+        }
+
+        $tanggalSekarang = Carbon::now();
+        $tanggalKontrakAkhir = Carbon::parse($kontrakAkhir);
+
+        return $tanggalSekarang->lessThanOrEqualTo($tanggalKontrakAkhir);
+    }
+    /**
+     * Generate nomor customer dengan format seperti PKS
+     */
+    private function generateCustomerNumber($leadsId, $companyId = null)
+    {
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        if (!$companyId && $leads && $leads->company_id) {
+            $companyId = $leads->company_id;
+        }
+
+        $company = Company::where('id', $companyId)->first();
+        $dataLeads = Leads::find($leadsId);
+
+        $nomor = "CUST/"; // Prefix CUST untuk Customer
+
+        if ($company && $dataLeads) {
+            $nomor .= $company->code . "/";
+            $nomor .= $dataLeads->nomor . "-";
+        } else {
+            $nomor .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+
+        // Hitung jumlah data customer dengan pattern yang sama
+        $pattern = $nomor . $month . $now->year . "-%";
+        $jumlahData = Customer::where('nomor', 'like', $pattern)->count();
+        $urutan = sprintf("%05d", $jumlahData + 1);
+
+        return $nomor . $month . $now->year . "-" . $urutan;
+    }
+
+    /**
+     * Create customer activity log
+     */
+    private function createCustomerActivity($leads, $customerNomor)
+    {
+        $nomorActivity = $this->generateNomorActivity($leads->id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $nomorActivity,
+            'tipe' => 'CUSTOMER',
+            'notes' => 'Customer dengan nomor :' . $customerNomor . ' terbentuk dari PKS',
+            'is_activity' => 0,
+            'user_id' => Auth::id(),
+            'created_by' => Auth::user()->full_name
+        ]);
     }
 
     private function getTemplateData($pks)

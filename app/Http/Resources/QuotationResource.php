@@ -104,6 +104,7 @@ class QuotationResource extends JsonResource
             // Timestamps
             'created_at' => $this->created_at,
             'created_at_formatted' => $this->created_at ? Carbon::parse($this->created_at)->isoFormat('D MMMM Y') : null,
+            'created_by' => $this->created_by,
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
 

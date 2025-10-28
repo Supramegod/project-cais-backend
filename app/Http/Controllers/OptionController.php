@@ -1,0 +1,682 @@
+<?php
+namespace App\Http\Controllers;
+use App\Http\Controllers\Controller;
+use App\Models\Benua;
+use App\Models\BidangPerusahaan;
+use App\Models\Branch;
+use App\Models\Company;
+use App\Models\JabatanPic;
+use App\Models\Platform;
+use App\Models\StatusLeads;
+use App\Models\StatusQuotation;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Exception;
+use Illuminate\Support\Facades\Validator;
+/**
+ * @OA\Tag(
+ *     name="Option",
+ *     description="Endpoints untuk mengelola opsi dropdown dan data referensi lainnya"
+ * )
+ */
+class OptionController extends Controller
+{
+    /**
+     * @OA\Get(
+     *     path="/api/options/entitas",
+     *     operationId="getEntitasDropdown",
+     *     tags={"Option"},
+     *     summary="Get companies for dropdown",
+     *     description="Retrieve simplified company list for dropdown/select components (id and name only)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success - Returns simplified company list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Company options retrieved successfully"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="PT Teknologi Indonesia"),
+     *                     @OA\Property(property="code", type="string", example="PTTI")
+     *                 )
+     *             ),
+     *             @OA\Property(property="total", type="integer", example=25)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Unauthorized")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Internal server error"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+    public function listEntitas(Request $request)
+    {
+        try {
+            $data = Company::where('is_active', true)
+                ->select(['id', 'name', 'code'])
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Company options retrieved successfully',
+                'data' => $data,
+                'total' => $data->count()
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/bidang-perusahaan",
+     *     summary="Mendapatkan daftar semua bidang perusahaan",
+     *     description="Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data bidang perusahaan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data bidang perusahaan berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Manufacturing"),
+     *                     @OA\Property(property="created_at", type="string", example="2025-01-01T00:00:00.000000Z"),
+     *                     @OA\Property(property="updated_at", type="string", example="2025-01-01T00:00:00.000000Z")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getBidangPerusahaan()
+    {
+        try {
+            $bidangPerusahaan = BidangPerusahaan::whereNull('deleted_at')
+                ->orderBy('nama', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data bidang perusahaan berhasil diambil',
+                'data' => $bidangPerusahaan
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/platforms",
+     *     summary="Mendapatkan daftar semua platform sumber leads",
+     *     description="Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data platform",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data platform berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Website")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getPlatforms()
+    {
+        try {
+            $platforms = Platform::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data platform berhasil diambil',
+                'data' => $platforms
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/status-leads",
+     *     summary="Mendapatkan daftar semua status leads",
+     *     description="Endpoint ini digunakan untuk mengambil data status leads (misal: new, contacted, qualified, dll). Berguna untuk filter dan dropdown form input leads.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data status leads",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data status leads berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="New Lead")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getStatusLeads()
+    {
+        try {
+            $statusLeads = StatusLeads::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data status leads berhasil diambil',
+                'data' => $statusLeads
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/benua",
+     *     summary="Mendapatkan daftar semua benua",
+     *     description="Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data benua",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data benua berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id_benua", type="integer", example=1),
+     *                     @OA\Property(property="nama_benua", type="string", example="Asia"),
+     *                     @OA\Property(property="kode_benua", type="string", example="AS")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getBenua()
+    {
+        try {
+            $benua = Benua::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data benua berhasil diambil',
+                'data' => $benua
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/jabatan-pic",
+     *     summary="Mendapatkan daftar semua jabatan PIC",
+     *     description="Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data jabatan PIC",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data jabatan PIC berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_jabatan", type="string", example="Manager Purchasing"),
+     *                     @OA\Property(property="kode", type="string", example="MGR-PUR"),
+     *                     @OA\Property(property="created_at", type="string", example="15-01-2025")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getJabatanPic()
+    {
+        try {
+            // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
+            $jabatanPic = JabatanPic::whereNull('deleted_at')->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data jabatan PIC berhasil diambil',
+                'data' => $jabatanPic
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/branches",
+     *     tags={"Option"},
+     *     summary="Mendapatkan daftar branch",
+     *     description="Mengambil daftar branch yang aktif",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil daftar branch",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Daftar branch berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=2),
+     *                     @OA\Property(property="name", type="string", example="Jakarta Pusat"),
+     *                     @OA\Property(property="description", type="string", example="JKT"),
+     *                     @OA\Property(property="is_active", type="integer", example=1)
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function getBranches()
+    {
+        try {
+            $branches = Branch::where('is_active', 1)
+                ->select('id', 'name', 'description', 'is_active')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar branch berhasil diambil',
+                'data' => $branches
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data branch',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/users",
+     *     tags={"Option"},
+     *     summary="Mendapatkan daftar user sales",
+     *     description="Mengambil daftar user dengan role sales berdasarkan branch",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="branch_id",
+     *         in="query",
+     *         description="ID branch",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil daftar user",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Daftar user berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="full_name", type="string", example="John Doe"),
+     *                     @OA\Property(property="username", type="string", example="john.doe"),
+     *                     @OA\Property(property="email", type="string", example="john@example.com"),
+     *                     @OA\Property(property="role_id", type="integer", example=29),
+     *                     @OA\Property(property="branch_id", type="integer", example=2)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validasi gagal"
+     *     )
+     * )
+     */
+    public function getUsers(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'branch_id' => 'required|integer'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $users = User::where('is_active', 1)
+                ->whereIn('role_id', [29, 31, 32, 33])
+                ->where('branch_id', $request->branch_id)
+                ->select('id', 'full_name', 'username', 'email', 'role_id', 'branch_id')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar user berhasil diambil',
+                'data' => $users
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/status-quotation",
+     *     summary="Mendapatkan daftar semua ststus quotation",
+     *     description="Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input ststus quotation.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data ststus quotation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data ststus quotation berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_jabatan", type="string", example="Manager Purchasing"),
+     *                     @OA\Property(property="kode", type="string", example="MGR-PUR"),
+     *                     @OA\Property(property="created_at", type="string", example="15-01-2025")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getStatusQuotation()
+    {
+        try {
+            // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
+            $jabatanPic = StatusQuotation::whereNull('deleted_at')->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data jabatan PIC berhasil diambil',
+                'data' => $jabatanPic
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }/**
+     * @OA\Get(
+     *     path="/api/options/entitas/{layanan_id}",
+     *     operationId="getEntitasByLayanan",
+     *     tags={"Option"},
+     *     summary="Get companies for dropdown based on layanan",
+     *     description="Retrieve company list filtered by layanan_id for dropdown/select components",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="layanan_id",
+     *         in="path",
+     *         required=true,
+     *         description="ID layanan/kebutuhan",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success - Returns filtered company list",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Company options retrieved successfully"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="PT Teknologi Indonesia"),
+     *                     @OA\Property(property="code", type="string", example="PTTI")
+     *                 )
+     *             ),
+     *             @OA\Property(property="total", type="integer", example=5)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Internal server error")
+     *         )
+     *     )
+     * )
+     */
+    public function getEntitas($layanan_id)
+    {
+        try {
+            $query = Company::where('is_active', true)
+                ->select(['id', 'name', 'code'])
+                ->orderBy('name', 'asc');
+
+            // Filter berdasarkan layanan_id sesuai dengan logika JavaScript
+            switch ($layanan_id) {
+                case 1:
+                    // Untuk layanan_id = 1: GSU atau SN
+                    $query->where(function ($q) {
+                        $q->where('code', 'GSU')
+                            ->orWhere('code', 'SN');
+                    });
+                    break;
+
+                case 2:
+                case 4:
+                    // Untuk layanan_id = 2 atau 4: SIG atau SNI
+                    $query->where(function ($q) {
+                        $q->where('code', 'SIG')
+                            ->orWhere('code', 'SNI');
+                    });
+                    break;
+
+                case 3:
+                    // Untuk layanan_id = 3: RCI atau SNI
+                    $query->where(function ($q) {
+                        $q->where('code', 'RCI')
+                            ->orWhere('code', 'SNI');
+                    });
+                    break;
+
+                default:
+                    // Untuk layanan_id lainnya, kembalikan array kosong
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Company options retrieved successfully',
+                        'data' => [],
+                        'total' => 0
+                    ], 200);
+            }
+
+            $data = $query->get();
+
+            // Tambahkan opsi IONS secara manual (sesuai dengan JavaScript)
+            // Pastikan IONS belum ada dalam hasil query sebelum menambahkannya
+            $ionsExists = $data->contains('id', 17);
+            if (!$ionsExists) {
+                $ionsCompany = [
+                    'id' => 17,
+                    'name' => 'PT. Indah Optimal Nusantara',
+                    'code' => 'IONS'
+                ];
+                $data->push($ionsCompany);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Company options retrieved successfully',
+                'data' => $data,
+                'total' => $data->count()
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
+        }
+    }
+    // Controller methods would go here
+}
