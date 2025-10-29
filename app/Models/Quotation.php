@@ -176,8 +176,6 @@ class Quotation extends Model
         return $this->belongsTo(StatusQuotation::class, 'status_quotation_id');
     }
 
-    // RELASI BARU YANG DIPERLUKAN:
-
     // Relasi ke QuotationSite
     public function quotationSites()
     {

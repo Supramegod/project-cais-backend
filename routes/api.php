@@ -284,12 +284,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/template-import', 'templateImport');
         Route::post('/generate-null-kode', 'generateNullKode');
 
-        // Location data endpoints
-        Route::get('/provinsi', 'getProvinsi');
-        Route::get('/kota/{provinsiId}', 'getKota');
-        Route::get('/kecamatan/{kotaId}', 'getKecamatan');
-        Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
-        Route::get('/negara/{benuaId}', 'getNegara');
+
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');
@@ -361,7 +356,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/{id}/calculate', 'calculate');
         Route::get('/{id}/export-pdf', 'exportPdf');
         Route::get('/{id}/status', 'getStatus');
-        Route::get('/leads/{leadsId}', 'getByLeads');
+        Route::get('/leads', 'getByLeads');
+        Route::get('/reference/{leads_id}', 'getReferenceQuotations');
     });
 
     // Quotation Step Management
@@ -382,7 +378,13 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/entitas', 'listEntitas');
         Route::get('/entitas/{layanan_id}', 'getEntitas');
         Route::get('/status-quotation', 'getStatusQuotation');
-        
+        // Location data endpoints
+        Route::get('/provinsi', 'getProvinsi');
+        Route::get('/kota/{provinsiId}', 'getKota');
+        Route::get('/kecamatan/{kotaId}', 'getKecamatan');
+        Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
+        Route::get('/negara/{benuaId}', 'getNegara');
+
     });
 
 });

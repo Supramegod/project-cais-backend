@@ -16,7 +16,7 @@ class Pks extends Model
     protected $primaryKey = 'id';
     
     protected $fillable = [
-        'leads_id', 'nomor', 'tgl_pks', 'nama_perusahaan', 'kontrak_awal', 
+        'leads_id','quotation_id', 'nomor', 'tgl_pks', 'nama_perusahaan', 'kontrak_awal', 
         'kontrak_akhir', 'status_pks_id', 'company_id', 'salary_rule_id', 
         'rule_thr_id', 'branch_id', 'kode_perusahaan', 'alamat_perusahaan',
         'layanan_id', 'layanan', 'bidang_usaha_id', 'bidang_usaha',

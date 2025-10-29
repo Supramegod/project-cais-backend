@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Services\QuotationDuplicationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -27,13 +28,15 @@ class QuotationController extends Controller
 {
     protected $quotationService;
     protected $quotationBusinessService;
-
+    protected $quotationDuplicationService;
     public function __construct(
         QuotationService $quotationService,
-        QuotationBusinessService $quotationBusinessService
+        QuotationBusinessService $quotationBusinessService,
+        QuotationDuplicationService $quotationDuplicationService
     ) {
         $this->quotationService = $quotationService;
         $this->quotationBusinessService = $quotationBusinessService;
+        $this->quotationDuplicationService = $quotationDuplicationService;
     }
 
     /**
@@ -142,7 +145,7 @@ class QuotationController extends Controller
      *         in="path",
      *         required=true,
      *         description="Type of quotation",
-     *         @OA\Schema(type="string", enum={"baru", "adendum", "rekontrak"}, example="baru")
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="baru")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
@@ -153,7 +156,7 @@ class QuotationController extends Controller
      *             @OA\Property(property="entitas", type="integer", description="ID company/entitas", example=1),
      *             @OA\Property(property="layanan", type="integer", description="ID layanan/kebutuhan", example=1),
      *             @OA\Property(property="jumlah_site", type="string", enum={"Single Site","Multi Site"}, description="Tipe penempatan site", example="Single Site"),
-     *             @OA\Property(property="quotation_referensi_id", type="integer", description="ID quotation referensi untuk adendum/rekontrak", example=1),
+     *             @OA\Property(property="quotation_referensi_id", type="integer", description="ID quotation referensi untuk revisi/rekontrak", example=1),
      *             
      *             @OA\Property(
      *                 property="nama_site", 
@@ -228,7 +231,7 @@ class QuotationController extends Controller
      *             @OA\Property(
      *                 property="tipe",
      *                 type="string",
-     *                 enum={"Quotation Baru","Adendum","Quotation Lanjutan"},
+     *                 enum={"Quotation Baru","revisi","Quotation Lanjutan"},
      *                 description="Tipe quotation (opsional)",
      *                 example="Quotation Baru"
      *             )
@@ -301,7 +304,7 @@ class QuotationController extends Controller
             $user = Auth::user();
 
             // Validasi tipe_quotation dari URL parameter
-            if (!in_array($tipe_quotation, ['baru', 'adendum', 'rekontrak'])) {
+            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak'])) {
                 throw new \Exception('Tipe quotation tidak valid');
             }
 
@@ -311,9 +314,9 @@ class QuotationController extends Controller
             // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
 
-            // Handle quotation referensi untuk adendum/rekontrak
+            // Handle quotation referensi untuk revisi/rekontrak
             $quotationReferensi = null;
-            if (in_array($tipe_quotation, ['adendum', 'rekontrak'])) {
+            if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
                 if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
                     throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
                 }
@@ -339,9 +342,9 @@ class QuotationController extends Controller
             $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
             $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
 
-            // Untuk adendum/rekontrak, copy additional data dari referensi
+            // Untuk revisi/rekontrak, copy additional data dari referensi
             if ($quotationReferensi) {
-                $this->quotationBusinessService->duplicateQuotationData($quotation, $quotationReferensi);
+                $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
             }
 
             $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
@@ -1022,18 +1025,11 @@ class QuotationController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/quotations/leads/{leadsId}",
+     *     path="/api/quotations/leads",
      *     tags={"Quotations"},
      *     summary="Get quotations by leads",
      *     description="Retrieves all quotations for a specific leads/company",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="leadsId",
-     *         in="path",
-     *         description="Leads ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Quotations retrieved successfully",
@@ -1054,45 +1050,153 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function getByLeads(string $leadsId): JsonResponse
+    public function getByLeads(): JsonResponse
     {
         try {
             set_time_limit(0);
+
             $leads = Leads::with(['statusLeads', 'branch'])
                 ->withoutTrashed()
-                ->findOrFail($leadsId);
-
-            $quotations = Quotation::with([
-                'statusQuotation',
-                'quotationSites',
-                'company'
-            ])
-                ->where('leads_id', $leadsId)
-                ->withoutTrashed()
-                ->orderBy('created_at', 'desc')
                 ->get();
 
+            $data = $leads->map(function ($lead) {
+                return [
+                    'id' => $lead->id,
+                    'nama_perusahaan' => $lead->nama_perusahaan,
+                    'pic' => $lead->pic,
+                    'wilayah' => $lead->branch->name ?? 'Unknown',
+                    'status_leads' => $lead->statusLeads->nama ?? 'Unknown',
+                ];
+            });
+
             return response()->json([
+                'message' => 'Leads retrieved successfully',
                 'success' => true,
-                'data' => [
-                    'leads' => [
-                        'id' => $leads->id,
-                        'nama_perusahaan' => $leads->nama_perusahaan,
-                        'pic' => $leads->pic,
-                        'wilayah' => $leads->branch->name ?? 'Unknown',
-                        'satuss_leads' => $leads->statusLeads->nama ?? 'Unknown',
-                    ],
-                    'quotations' => $quotations
-                ],
-                'message' => 'Quotations retrieved successfully'
-            ]);
+                'data' => $data,
+            ], 200);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Leads not found',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 404);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/quotations/reference/{leads_id}",
+     *     tags={"Quotations"},
+     *     summary="Get quotation references for revision or recontract",
+     *     description="Retrieves list of quotations by leads ID that can be used as reference based on quotation type",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="leads_id",
+     *         in="path",
+     *         description="Leads ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="tipe_quotation",
+     *         in="query",
+     *         description="Type of quotation to filter references",
+     *         required=true,
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="revisi")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Quotation references retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="QUOT/ION/LEAD-001/012024-00001"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                     @OA\Property(property="tgl_quotation", type="string", format="date", example="2024-01-01"),
+     *                     @OA\Property(property="jumlah_site", type="string", example="Single Site"),
+     *                     @OA\Property(property="step", type="integer", example=12),
+     *                     @OA\Property(property="is_aktif", type="boolean", example=true),
+     *                     @OA\Property(property="status_quotation_id", type="integer", example=3),
+     *                     @OA\Property(property="status_quotation", type="string", example="Approved")
+     *                 )
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Quotation references retrieved successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Leads not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Leads not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to retrieve quotation references")
+     *         )
+     *     )
+     * )
+     */
+    public function getReferenceQuotations(string $leadsId, Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'tipe_quotation' => 'required|in:baru,revisi,rekontrak'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Cek apakah leads exists dan memiliki quotation
+            $leads = Leads::withoutTrashed()->findOrFail($leadsId);
+
+            $totalQuotations = Quotation::where('leads_id', $leadsId)
+                ->withoutTrashed()
+                ->count();
+
+            \Log::info("Leads {$leadsId} has {$totalQuotations} quotations");
+
+            $quotations = $this->quotationBusinessService->getFilteredQuotations($leadsId, $request->tipe_quotation);
+
+            return response()->json([
+                'success' => true,
+                'data' => $quotations,
+                'debug' => [ // Tambahkan debug info
+                    'leads_id' => $leadsId,
+                    'tipe_quotation' => $request->tipe_quotation,
+                    'total_quotations' => $totalQuotations,
+                    'filtered_count' => count($quotations)
+                ],
+                'message' => 'Quotation references retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve quotation references',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }
