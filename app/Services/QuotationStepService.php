@@ -289,6 +289,7 @@ class QuotationStepService
             'kontrak_selesai' => $request->kontrak_selesai,
             'tgl_penempatan' => $request->tgl_penempatan,
             'salary_rule_id' => $request->salary_rule,
+            'pembayaran_invoice' => $request->pembayaran_invoice,
             'top' => $request->top,
             'jumlah_hari_invoice' => $request->jumlah_hari_invoice,
             'tipe_hari_invoice' => $request->tipe_hari_invoice,

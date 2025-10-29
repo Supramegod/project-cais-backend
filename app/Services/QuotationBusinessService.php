@@ -270,31 +270,33 @@ class QuotationBusinessService
             ->where('leads_id', $leadsId)
             ->withoutTrashed();
 
-        // Apply filters based on quotation type
         switch ($tipeQuotation) {
             case 'baru':
-                // $query->where('status_quotation_id', 8);
+                $query
+                    // Bukan revisi
+                    ->whereNotIn('status_quotation_id', [1, 2, 4, 5])
+                    // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
+                    ->whereDoesntHave('pks', function ($q) {
+                        $q->where('is_aktif', 1)
+                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                    });
                 break;
 
             case 'revisi':
-                $query->where('status_quotation_id', [1, 2, 4, 5]);
+                $query->whereIn('status_quotation_id', [1, 2, 4, 5]);
                 break;
 
             case 'rekontrak':
-                // Untuk rekontrak, quotation yang PKS-nya hampir berakhir
                 $query->whereHas('pks', function ($q) {
                     $q->where('is_aktif', 1)
-                        ->where('kontrak_akhir', '>=', now()) // Masih aktif
-                        ->where('kontrak_akhir', '<=', now()->addMonths(3)); // Akan berakhir dalam 3 bulan
+                        ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
                 });
                 break;
         }
 
-        return $query->orderBy('created_at', 'desc')
+        return $query->latest('created_at')
             ->get()
-            ->map(function (Quotation $quotation) use ($tipeQuotation) {
-                return $this->formatQuotationData($quotation, $tipeQuotation);
-            });
+            ->map(fn(Quotation $quotation) => $this->formatQuotationData($quotation, $tipeQuotation));
     }
 
     /**

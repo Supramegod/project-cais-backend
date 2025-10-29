@@ -88,7 +88,7 @@ class QuotationStepController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => new QuotationStepResource($stepData),
+                'data' => new QuotationStepResource($quotation, $step),
                 'message' => 'Step data retrieved successfully'
             ]);
 
@@ -244,7 +244,7 @@ class QuotationStepController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => new QuotationResource($quotation->fresh()),
+                'data' => new QuotationStepResource($quotation, $step),
                 'message' => "Step {$step} updated successfully"
             ]);
 
