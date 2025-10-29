@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Services;
+use App\Models\Pks;
 use App\Models\Province;
 use App\Models\City;
 use App\Models\Ump;
@@ -206,8 +207,8 @@ class QuotationBusinessService
         // Base format: QUOT/[jenis jika ada]/[COMPANY_CODE]/[LEADS_NUMBER]-[MMYYYY]-[XXXXX]
         $base = "QUOT/";
 
-        // Tambahkan jenis quotation untuk adendum dan rekontrak
-        if ($tipeQuotation == 'adendum') {
+        // Tambahkan jenis quotation untuk revisi dan rekontrak
+        if ($tipeQuotation == 'revisi') {
             $base .= "AD/";
         } elseif ($tipeQuotation == 'rekontrak') {
             $base .= "RK/";
@@ -229,26 +230,7 @@ class QuotationBusinessService
 
         return $base . str_pad($counter, 5, '0', STR_PAD_LEFT);
     }
-    /**
- * Duplikasi data dari quotation referensi
- */
-public function duplicateQuotationData(Quotation $newQuotation, Quotation $referensiQuotation): void
-{
-    // Copy basic quotation data
-    $newQuotation->update([
-        'jenis_kontrak' => $referensiQuotation->jenis_kontrak,
-        'mulai_kontrak' => $referensiQuotation->mulai_kontrak,
-        'kontrak_selesai' => $referensiQuotation->kontrak_selesai,
-        'tgl_penempatan' => $referensiQuotation->tgl_penempatan,
-        'salary_rule_id' => $referensiQuotation->salary_rule_id,
-        'top' => $referensiQuotation->top,
-        'upah' => $referensiQuotation->upah,
-        'nominal_upah' => $referensiQuotation->nominal_upah,
-        'management_fee_id' => $referensiQuotation->management_fee_id,
-        'persentase' => $referensiQuotation->persentase,
-        // ... tambah field lain yang perlu di-copy
-    ]);
-}
+
     /**
      * Generate activity number
      */
@@ -263,172 +245,9 @@ public function duplicateQuotationData(Quotation $newQuotation, Quotation $refer
 
         return "ACT/" . $leadsId . "/" . $month . $now->year . "/" . sprintf("%04d", $count + 1);
     }
-
     /**
-     * Validate step 2 data
+     * Validate multi site data consistency
      */
-    public function validateStep2(Request $request): void
-    {
-        $validator = \Validator::make($request->all(), [
-            'mulai_kontrak' => 'required|date',
-            'kontrak_selesai' => 'required|date|after_or_equal:mulai_kontrak',
-            'tgl_penempatan' => 'required|date',
-            'top' => 'required|string',
-            'salary_rule' => 'required|exists:m_salary_rule,id'
-        ]);
-
-        if ($validator->fails()) {
-            throw new \Exception($validator->errors()->first());
-        }
-
-        if ($request->tgl_penempatan < $request->mulai_kontrak) {
-            throw new \Exception('Tanggal Penempatan tidak boleh kurang dari Kontrak Awal');
-        }
-
-        if ($request->tgl_penempatan > $request->kontrak_selesai) {
-            throw new \Exception('Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
-        }
-    }
-
-    /**
-     * Prepare cuti data for step 2
-     */
-    public function prepareCutiData(Request $request): array
-    {
-        $data = [];
-
-        if ($request->ada_cuti == "Tidak Ada") {
-            $data['cuti'] = "Tidak Ada";
-            $data['gaji_saat_cuti'] = null;
-            $data['prorate'] = null;
-        } else {
-            $data['cuti'] = implode(",", $request->cuti);
-
-            if (in_array("Cuti Melahirkan", $request->cuti)) {
-                if ($request->gaji_saat_cuti != "Prorate") {
-                    $data['prorate'] = null;
-                }
-            } else {
-                $data['gaji_saat_cuti'] = null;
-                $data['prorate'] = null;
-            }
-
-            $data['hari_cuti_kematian'] = in_array("Cuti Kematian", $request->cuti) ? $request->hari_cuti_kematian : null;
-            $data['hari_istri_melahirkan'] = in_array("Istri Melahirkan", $request->cuti) ? $request->hari_istri_melahirkan : null;
-            $data['hari_cuti_menikah'] = in_array("Cuti Menikah", $request->cuti) ? $request->hari_cuti_menikah : null;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Calculate upah data for step 4
-     */
-    /**
-     * Calculate upah data for step 4
-     */
-    public function calculateUpahData(Quotation $quotation, Request $request): array
-    {
-        $nominalUpah = 0;
-        $hitunganUpah = "Per Bulan";
-
-        if ($request->upah == "Custom") {
-            $hitunganUpah = $request->hitungan_upah;
-            $customUpah = str_replace(".", "", $request->custom_upah);
-
-            if ($hitunganUpah == "Per Hari") {
-                $customUpah = $customUpah * 21;
-            } else if ($hitunganUpah == "Per Jam") {
-                $customUpah = $customUpah * 21 * 8;
-            }
-
-            $nominalUpah = $customUpah;
-        } else {
-            // Update nominal upah di semua site berdasarkan UMP/UMK menggunakan Model
-            foreach ($quotation->quotationSites as $site) {
-                if ($request->upah == "UMP") {
-                    $dataUmp = Ump::where('province_id', $site->provinsi_id)
-                        ->active()
-                        ->first();
-                    $nominalUpah = $dataUmp ? $dataUmp->ump : 0;
-                } else if ($request->upah == "UMK") {
-                    $dataUmk = Umk::where('city_id', $site->kota_id)
-                        ->active()
-                        ->first();
-                    $nominalUpah = $dataUmk ? $dataUmk->umk : 0;
-                }
-
-                $site->update([
-                    'nominal_upah' => $nominalUpah,
-                    'updated_by' => $request->user()->full_name
-                ]);
-            }
-        }
-
-        return [
-            'nominal_upah' => $nominalUpah,
-            'hitungan_upah' => $hitunganUpah
-        ];
-    }
-
-    /**
-     * Prepare company data for step 5
-     */
-    public function prepareCompanyData(Request $request): array
-    {
-        $data = [
-            'jenis_perusahaan_id' => $request->jenis_perusahaan,
-            'bidang_perusahaan_id' => $request->bidang_perusahaan,
-            'resiko' => $request->resiko
-        ];
-
-        if ($request->jenis_perusahaan) {
-            $jenisPerusahaan = DB::table('m_jenis_perusahaan')->where('id', $request->jenis_perusahaan)->first();
-            $data['jenis_perusahaan'] = $jenisPerusahaan ? $jenisPerusahaan->nama : null;
-        }
-
-        if ($request->bidang_perusahaan) {
-            $bidangPerusahaan = DB::table('m_bidang_perusahaan')->where('id', $request->bidang_perusahaan)->first();
-            $data['bidang_perusahaan'] = $bidangPerusahaan ? $bidangPerusahaan->nama : null;
-        }
-
-        return $data;
-    }
-
-    /**
-     * Calculate final status for quotation
-     */
-    public function calculateFinalStatus(Quotation $quotation): array
-    {
-        $isAktif = 1;
-        $statusQuotation = 3;
-
-        // Business logic untuk menentukan status final
-        if ($quotation->top == "Lebih Dari 7 Hari") {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
-
-        if ($quotation->persentase < 7) {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
-
-        if ($quotation->company_id == 17) { // PT ION
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
-
-        if ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada") {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
-
-        return [
-            'is_aktif' => $isAktif,
-            'status_quotation_id' => $statusQuotation
-        ];
-    }
     public function validateMultiSiteData(Request $request): void
     {
         if ($request->jumlah_site == 'Multi Site') {
@@ -441,5 +260,96 @@ public function duplicateQuotationData(Quotation $newQuotation, Quotation $refer
                 throw new \Exception('Jumlah data multisite, provinsi, kota, dan penempatan harus sama');
             }
         }
+    }
+    /**
+     * Get filtered quotations based on type
+     */
+    public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
+    {
+        $query = Quotation::with(['statusQuotation', 'pks', 'quotationSites'])
+            ->where('leads_id', $leadsId)
+            ->withoutTrashed();
+
+        // Apply filters based on quotation type
+        switch ($tipeQuotation) {
+            case 'baru':
+                // $query->where('status_quotation_id', 8);
+                break;
+
+            case 'revisi':
+                $query->where('status_quotation_id', [1, 2, 4, 5]);
+                break;
+
+            case 'rekontrak':
+                // Untuk rekontrak, quotation yang PKS-nya hampir berakhir
+                $query->whereHas('pks', function ($q) {
+                    $q->where('is_aktif', 1)
+                        ->where('kontrak_akhir', '>=', now()) // Masih aktif
+                        ->where('kontrak_akhir', '<=', now()->addMonths(3)); // Akan berakhir dalam 3 bulan
+                });
+                break;
+        }
+
+        return $query->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function (Quotation $quotation) use ($tipeQuotation) {
+                return $this->formatQuotationData($quotation, $tipeQuotation);
+            });
+    }
+
+    /**
+     * Format quotation data for response
+     */
+    public function formatQuotationData(Quotation $quotation, string $tipeQuotation): array
+    {
+        $data = [
+            'id' => $quotation->id,
+            'nomor' => $quotation->nomor,
+            'nama_perusahaan' => $quotation->nama_perusahaan,
+            'tgl_quotation' => $quotation->tgl_quotation,
+            'tgl_quotation_formatted' => $quotation->tgl_quotation ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y') : null,
+            'kebutuhan_id' => $quotation->kebutuhan_id,
+            'jumlah_site' => $quotation->jumlah_site,
+            'step' => $quotation->step,
+            'is_aktif' => $quotation->is_aktif,
+            'status_quotation_id' => $quotation->status_quotation_id,
+            'status_quotation' => $quotation->statusQuotation->nama ?? 'Unknown',
+            'tipe_quotation' => $quotation->tipe_quotation,
+            'kebutuhan' => $quotation->kebutuhan,
+            'company' => $quotation->company,
+            'source' => 'quotation',
+            // Menampilkan semua site dalam bentuk array
+            'sites' => $quotation->quotationSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'provinsi' => $site->provinsi,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'provinsi_id' => $site->provinsi_id,
+                    'kota_id' => $site->kota_id,
+                    'ump' => $site->ump,
+                    'umk' => $site->umk
+                ];
+            })->toArray()
+        ];
+
+        // Untuk kompatibilitas dengan kode yang sudah ada, tetap sertakan site pertama
+        // (opsional, bisa dihapus jika tidak diperlukan)
+        $data['site'] = $quotation->quotationSites->first()->nama_site ?? null;
+
+        // Add PKS data for recontract
+        if ($tipeQuotation === 'rekontrak' && $quotation->pks) {
+            $data['pks_data'] = [
+                'id' => $quotation->pks->id,
+                'nomor' => $quotation->pks->nomor,
+                'tgl_pks' => $quotation->pks->tgl_pks,
+                'kontrak_awal' => $quotation->pks->kontrak_awal,
+                'kontrak_akhir' => $quotation->pks->kontrak_akhir,
+                'is_aktif' => $quotation->pks->is_aktif
+            ];
+        }
+
+        return $data;
     }
 }

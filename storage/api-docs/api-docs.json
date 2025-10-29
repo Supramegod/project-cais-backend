@@ -10503,519 +10503,6 @@
                 ]
             }
         },
-        "/api/leads/provinsi": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar semua provinsi",
-                "description": "Endpoint ini digunakan untuk mengambil data provinsi dari database. Berguna untuk form input alamat perusahaan saat membuat atau mengupdate leads.",
-                "operationId": "6b3ef400ab118fedcfaaee8a75e6f557",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data provinsi",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data provinsi berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 11
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "ACEH"
-                                                    },
-                                                    "province_id": {
-                                                        "type": "string",
-                                                        "example": "11"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/kota/{provinsiId}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar kota berdasarkan ID provinsi",
-                "description": "Endpoint ini digunakan untuk mengambil data kota/kabupaten berdasarkan provinsi yang dipilih. Berguna untuk form input alamat perusahaan.",
-                "operationId": "ce48dc7456bee97a76e2259a3afea8a1",
-                "parameters": [
-                    {
-                        "name": "provinsiId",
-                        "in": "path",
-                        "description": "ID provinsi yang dipilih",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 11
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data kota",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data kota berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1101
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "KABUPATEN SIMEULUE"
-                                                    },
-                                                    "province_id": {
-                                                        "type": "integer",
-                                                        "example": 11
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/kecamatan/{kotaId}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar kecamatan berdasarkan ID kota",
-                "description": "Endpoint ini digunakan untuk mengambil data kecamatan berdasarkan kota/kabupaten yang dipilih. Berguna untuk form input alamat perusahaan yang lebih detail.",
-                "operationId": "2f35ef598ba0420433829d87099eb660",
-                "parameters": [
-                    {
-                        "name": "kotaId",
-                        "in": "path",
-                        "description": "ID kota/kabupaten yang dipilih",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1101
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data kecamatan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data kecamatan berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 110101
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "TEUPAH SELATAN"
-                                                    },
-                                                    "city_id": {
-                                                        "type": "integer",
-                                                        "example": 1101
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/kelurahan/{kecamatanId}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar kelurahan berdasarkan ID kecamatan",
-                "description": "Endpoint ini digunakan untuk mengambil data kelurahan/desa berdasarkan kecamatan yang dipilih. Berguna untuk form input alamat perusahaan yang lengkap.",
-                "operationId": "0d7ead7578bba1a4823747a38ba9ce55",
-                "parameters": [
-                    {
-                        "name": "kecamatanId",
-                        "in": "path",
-                        "description": "ID kecamatan yang dipilih",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 110101
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data kelurahan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data kelurahan berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 11010101
-                                                    },
-                                                    "name": {
-                                                        "type": "string",
-                                                        "example": "LATIUNG"
-                                                    },
-                                                    "district_id": {
-                                                        "type": "integer",
-                                                        "example": 110101
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/negara/{benuaId}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar negara berdasarkan ID benua",
-                "description": "Endpoint ini digunakan untuk mengambil data negara berdasarkan benua yang dipilih. Berguna untuk form input perusahaan luar negeri.",
-                "operationId": "48f4ae0f1f99891021fbfd41d16c6c06",
-                "parameters": [
-                    {
-                        "name": "benuaId",
-                        "in": "path",
-                        "description": "ID benua yang dipilih",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data negara",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data negara berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_negara": {
-                                                        "type": "string",
-                                                        "example": "Indonesia"
-                                                    },
-                                                    "id_benua": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/leads/activate/{id}": {
             "post": {
                 "tags": [
@@ -12504,7 +11991,7 @@
                     "Option"
                 ],
                 "summary": "Mendapatkan daftar semua bidang perusahaan",
-                "description": "Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+                "description": "Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input options saat menentukan bidang usaha perusahaan.",
                 "operationId": "699b1c786b9e603c249feaad6fb9c224",
                 "responses": {
                     "200": {
@@ -12600,8 +12087,8 @@
                 "tags": [
                     "Option"
                 ],
-                "summary": "Mendapatkan daftar semua platform sumber leads",
-                "description": "Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+                "summary": "Mendapatkan daftar semua platform sumber options",
+                "description": "Endpoint ini digunakan untuk mengambil data platform sumber options (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input options.",
                 "operationId": "2117d5ca6a80bb62286d88898624e9c9",
                 "responses": {
                     "200": {
@@ -12779,7 +12266,7 @@
                     "Option"
                 ],
                 "summary": "Mendapatkan daftar semua benua",
-                "description": "Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
+                "description": "Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate options.",
                 "operationId": "a998831ad07fd4cd76d7b772576028a5",
                 "responses": {
                     "200": {
@@ -12872,7 +12359,7 @@
                     "Option"
                 ],
                 "summary": "Mendapatkan daftar semua jabatan PIC",
-                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+                "description": "Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate options.",
                 "operationId": "94299627f0bcdf0592b71576aef517da",
                 "responses": {
                     "200": {
@@ -13281,6 +12768,519 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Internal server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/provinsi": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua provinsi",
+                "description": "Endpoint ini digunakan untuk mengambil data provinsi dari database. Berguna untuk form input alamat perusahaan saat membuat atau mengupdate options.",
+                "operationId": "199fdaf3f5eefdc601b4b14f7d2b3073",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data provinsi",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data provinsi berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 11
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "ACEH"
+                                                    },
+                                                    "province_id": {
+                                                        "type": "string",
+                                                        "example": "11"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/kota/{provinsiId}": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar kota berdasarkan ID provinsi",
+                "description": "Endpoint ini digunakan untuk mengambil data kota/kabupaten berdasarkan provinsi yang dipilih. Berguna untuk form input alamat perusahaan.",
+                "operationId": "7e7e705c095c4d153cc04dcf6a13fbaa",
+                "parameters": [
+                    {
+                        "name": "provinsiId",
+                        "in": "path",
+                        "description": "ID provinsi yang dipilih",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 11
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data kota",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data kota berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1101
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "KABUPATEN SIMEULUE"
+                                                    },
+                                                    "province_id": {
+                                                        "type": "integer",
+                                                        "example": 11
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/kecamatan/{kotaId}": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar kecamatan berdasarkan ID kota",
+                "description": "Endpoint ini digunakan untuk mengambil data kecamatan berdasarkan kota/kabupaten yang dipilih. Berguna untuk form input alamat perusahaan yang lebih detail.",
+                "operationId": "8211dc4b6cf8b8b8acab68b649b34bc9",
+                "parameters": [
+                    {
+                        "name": "kotaId",
+                        "in": "path",
+                        "description": "ID kota/kabupaten yang dipilih",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1101
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data kecamatan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data kecamatan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 110101
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "TEUPAH SELATAN"
+                                                    },
+                                                    "city_id": {
+                                                        "type": "integer",
+                                                        "example": 1101
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/kelurahan/{kecamatanId}": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar kelurahan berdasarkan ID kecamatan",
+                "description": "Endpoint ini digunakan untuk mengambil data kelurahan/desa berdasarkan kecamatan yang dipilih. Berguna untuk form input alamat perusahaan yang lengkap.",
+                "operationId": "a0f1ddac79dd8e567fa8fc74aa6d52fb",
+                "parameters": [
+                    {
+                        "name": "kecamatanId",
+                        "in": "path",
+                        "description": "ID kecamatan yang dipilih",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 110101
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data kelurahan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data kelurahan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 11010101
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "LATIUNG"
+                                                    },
+                                                    "district_id": {
+                                                        "type": "integer",
+                                                        "example": 110101
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/negara/{benuaId}": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar negara berdasarkan ID benua",
+                "description": "Endpoint ini digunakan untuk mengambil data negara berdasarkan benua yang dipilih. Berguna untuk form input perusahaan luar negeri.",
+                "operationId": "33d9d9ec966f83d5235bc6509847985f",
+                "parameters": [
+                    {
+                        "name": "benuaId",
+                        "in": "path",
+                        "description": "ID benua yang dipilih",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data negara",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data negara berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_negara": {
+                                                        "type": "string",
+                                                        "example": "Indonesia"
+                                                    },
+                                                    "id_benua": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
                                         }
                                     },
                                     "type": "object"
@@ -15820,7 +15820,7 @@
                             "type": "string",
                             "enum": [
                                 "baru",
-                                "adendum",
+                                "revisi",
                                 "rekontrak"
                             ],
                             "example": "baru"
@@ -15865,7 +15865,7 @@
                                         "example": "Single Site"
                                     },
                                     "quotation_referensi_id": {
-                                        "description": "ID quotation referensi untuk adendum/rekontrak",
+                                        "description": "ID quotation referensi untuk revisi/rekontrak",
                                         "type": "integer",
                                         "example": 1
                                     },
@@ -15946,7 +15946,7 @@
                                         "type": "string",
                                         "enum": [
                                             "Quotation Baru",
-                                            "Adendum",
+                                            "revisi",
                                             "Quotation Lanjutan"
                                         ],
                                         "example": "Quotation Baru"
@@ -16955,26 +16955,14 @@
                 ]
             }
         },
-        "/api/quotations/leads/{leadsId}": {
+        "/api/quotations/leads": {
             "get": {
                 "tags": [
                     "Quotations"
                 ],
                 "summary": "Get quotations by leads",
                 "description": "Retrieves all quotations for a specific leads/company",
-                "operationId": "b495e6ad829e881490d47afb50a5f995",
-                "parameters": [
-                    {
-                        "name": "leadsId",
-                        "in": "path",
-                        "description": "Leads ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
+                "operationId": "5b67e03147d0ce898d9400660bc99191",
                 "responses": {
                     "200": {
                         "description": "Quotations retrieved successfully",
@@ -17016,6 +17004,178 @@
                                         "error": {
                                             "type": "string",
                                             "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/reference/{leads_id}": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotation references for revision or recontract",
+                "description": "Retrieves list of quotations by leads ID that can be used as reference based on quotation type",
+                "operationId": "b9831e4071de1a2c3c65e21915459bab",
+                "parameters": [
+                    {
+                        "name": "leads_id",
+                        "in": "path",
+                        "description": "Leads ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "tipe_quotation",
+                        "in": "query",
+                        "description": "Type of quotation to filter references",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "revisi",
+                                "rekontrak"
+                            ],
+                            "example": "revisi"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Quotation references retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "QUOT/ION/LEAD-001/012024-00001"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
+                                                    },
+                                                    "tgl_quotation": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "jumlah_site": {
+                                                        "type": "string",
+                                                        "example": "Single Site"
+                                                    },
+                                                    "step": {
+                                                        "type": "integer",
+                                                        "example": 12
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "status_quotation_id": {
+                                                        "type": "integer",
+                                                        "example": 3
+                                                    },
+                                                    "status_quotation": {
+                                                        "type": "string",
+                                                        "example": "Approved"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation references retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Leads not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Leads not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve quotation references"
                                         }
                                     },
                                     "type": "object"

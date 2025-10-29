@@ -23,7 +23,7 @@ class QuotationStoreRequest extends FormRequest
 
         ];
         // Conditional validation untuk referensi berdasarkan tipe_quotation
-        if (in_array($tipe_quotation, ['adendum', 'rekontrak'])) {
+        if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
             $rules['quotation_referensi_id'] = 'required|exists:sl_quotation,id';
         }
 
@@ -69,7 +69,7 @@ class QuotationStoreRequest extends FormRequest
             'layanan.exists' => 'Layanan tidak valid',
             'jumlah_site.required' => 'Jumlah site wajib dipilih',
             'jumlah_site.in' => 'Jumlah site harus Single Site atau Multi Site',
-            'quotation_referensi_id.required' => 'Quotation referensi wajib dipilih untuk adendum/rekontrak',
+            'quotation_referensi_id.required' => 'Quotation referensi wajib dipilih untuk revisi/rekontrak',
 
             'nama_site.required_if' => 'Nama site wajib diisi untuk single site',
             'provinsi.required_if' => 'Provinsi wajib dipilih untuk single site',

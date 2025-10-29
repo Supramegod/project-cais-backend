@@ -4,12 +4,18 @@ use App\Http\Controllers\Controller;
 use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\Branch;
+use App\Models\City;
 use App\Models\Company;
+use App\Models\District;
 use App\Models\JabatanPic;
+use App\Models\Negara;
 use App\Models\Platform;
+use App\Models\Province;
 use App\Models\StatusLeads;
+use App\Models\Statusoptions;
 use App\Models\StatusQuotation;
 use App\Models\User;
+use App\Models\Village;
 use Illuminate\Http\Request;
 use Exception;
 use Illuminate\Support\Facades\Validator;
@@ -91,7 +97,7 @@ class OptionController extends Controller
      * @OA\Get(
      *     path="/api/options/bidang-perusahaan",
      *     summary="Mendapatkan daftar semua bidang perusahaan",
-     *     description="Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input leads saat menentukan bidang usaha perusahaan.",
+     *     description="Endpoint ini digunakan untuk mengambil data bidang/industri perusahaan (misal: Manufacturing, Trading, Service, dll). Berguna untuk dropdown form input options saat menentukan bidang usaha perusahaan.",
      *     tags={"Option"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
@@ -151,8 +157,8 @@ class OptionController extends Controller
     /**
      * @OA\Get(
      *     path="/api/options/platforms",
-     *     summary="Mendapatkan daftar semua platform sumber leads",
-     *     description="Endpoint ini digunakan untuk mengambil data platform sumber leads (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input leads.",
+     *     summary="Mendapatkan daftar semua platform sumber options",
+     *     description="Endpoint ini digunakan untuk mengambil data platform sumber options (misal: website, social media, referral, dll). Berguna untuk filter dan dropdown form input options.",
      *     tags={"Option"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
@@ -249,12 +255,12 @@ class OptionController extends Controller
     public function getStatusLeads()
     {
         try {
-            $statusLeads = StatusLeads::all();
+            $statusleads = StatusLeads::all();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data status leads berhasil diambil',
-                'data' => $statusLeads
+                'data' => $statusleads
             ]);
         } catch (Exception $e) {
             return response()->json([
@@ -267,7 +273,7 @@ class OptionController extends Controller
      * @OA\Get(
      *     path="/api/options/benua",
      *     summary="Mendapatkan daftar semua benua",
-     *     description="Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate leads.",
+     *     description="Endpoint ini digunakan untuk mengambil data benua dari database. Berguna untuk form input perusahaan luar negeri saat membuat atau mengupdate options.",
      *     tags={"Option"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
@@ -325,7 +331,7 @@ class OptionController extends Controller
      * @OA\Get(
      *     path="/api/options/jabatan-pic",
      *     summary="Mendapatkan daftar semua jabatan PIC",
-     *     description="Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate leads.",
+     *     description="Endpoint ini digunakan untuk mengambil data jabatan Person In Charge (PIC). Berguna untuk dropdown form input jabatan PIC saat membuat atau mengupdate options.",
      *     tags={"Option"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
@@ -568,7 +574,7 @@ class OptionController extends Controller
      * @OA\Get(
      *     path="/api/options/entitas/{layanan_id}",
      *     operationId="getEntitasByLayanan",
-     *     tags={"Option"},
+     *      tags={"Option"},
      *     summary="Get companies for dropdown based on layanan",
      *     description="Retrieve company list filtered by layanan_id for dropdown/select components",
      *     security={{"bearerAuth":{}}},
@@ -675,6 +681,336 @@ class OptionController extends Controller
                 'success' => false,
                 'message' => 'Internal server error',
                 'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/provinsi",
+     *     summary="Mendapatkan daftar semua provinsi",
+     *     description="Endpoint ini digunakan untuk mengambil data provinsi dari database. Berguna untuk form input alamat perusahaan saat membuat atau mengupdate options.",
+     *      tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data provinsi",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data provinsi berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=11),
+     *                     @OA\Property(property="name", type="string", example="ACEH"),
+     *                     @OA\Property(property="province_id", type="string", example="11")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getProvinsi()
+    {
+        try {
+            // Menggunakan Eloquent Model Province
+            $provinsi = Province::all();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data provinsi berhasil diambil',
+                'data' => $provinsi
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/kota/{provinsiId}",
+     *     summary="Mendapatkan daftar kota berdasarkan ID provinsi",
+     *     description="Endpoint ini digunakan untuk mengambil data kota/kabupaten berdasarkan provinsi yang dipilih. Berguna untuk form input alamat perusahaan.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="provinsiId",
+     *         in="path",
+     *         description="ID provinsi yang dipilih",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=11)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data kota",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data kota berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1101),
+     *                     @OA\Property(property="name", type="string", example="KABUPATEN SIMEULUE"),
+     *                     @OA\Property(property="province_id", type="integer", example=11)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+
+    public function getKota($provinsiId)
+    {
+        try {
+            // Menggunakan Eloquent Model City dan metode where
+            $kota = City::where('province_id', $provinsiId)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data kota berhasil diambil',
+                'data' => $kota
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/kecamatan/{kotaId}",
+     *     summary="Mendapatkan daftar kecamatan berdasarkan ID kota",
+     *     description="Endpoint ini digunakan untuk mengambil data kecamatan berdasarkan kota/kabupaten yang dipilih. Berguna untuk form input alamat perusahaan yang lebih detail.",
+     *      tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="kotaId",
+     *         in="path",
+     *         description="ID kota/kabupaten yang dipilih",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1101)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data kecamatan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data kecamatan berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=110101),
+     *                     @OA\Property(property="name", type="string", example="TEUPAH SELATAN"),
+     *                     @OA\Property(property="city_id", type="integer", example=1101)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getKecamatan($kotaId)
+    {
+        try {
+            // Menggunakan Eloquent Model District
+            $kecamatan = District::where('city_id', $kotaId)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data kecamatan berhasil diambil',
+                'data' => $kecamatan
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/kelurahan/{kecamatanId}",
+     *     summary="Mendapatkan daftar kelurahan berdasarkan ID kecamatan",
+     *     description="Endpoint ini digunakan untuk mengambil data kelurahan/desa berdasarkan kecamatan yang dipilih. Berguna untuk form input alamat perusahaan yang lengkap.",
+     *      tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="kecamatanId",
+     *         in="path",
+     *         description="ID kecamatan yang dipilih",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=110101)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data kelurahan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data kelurahan berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=11010101),
+     *                     @OA\Property(property="name", type="string", example="LATIUNG"),
+     *                     @OA\Property(property="district_id", type="integer", example=110101)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+    public function getKelurahan($kecamatanId)
+    {
+        try {
+            $kelurahan = Village::where('district_id', $kecamatanId)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data kelurahan berhasil diambil',
+                'data' => $kelurahan
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/negara/{benuaId}",
+     *     summary="Mendapatkan daftar negara berdasarkan ID benua",
+     *     description="Endpoint ini digunakan untuk mengambil data negara berdasarkan benua yang dipilih. Berguna untuk form input perusahaan luar negeri.",
+     *      tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="benuaId",
+     *         in="path",
+     *         description="ID benua yang dipilih",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data negara",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data negara berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_negara", type="string", example="Indonesia"),
+     *                     @OA\Property(property="id_benua", type="integer", example=1)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
+     *         )
+     *     )
+     * )
+     */
+
+    public function getNegara($benuaId)
+    {
+        try {
+            $negara = Negara::where('id_benua', $benuaId)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data negara berhasil diambil',
+                'data' => $negara
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
     }
