@@ -19,8 +19,8 @@ class Ump extends Model
         'tgl_berlaku',
         'sumber',
         'is_aktif',
-        'created_by', 
-        'updated_by', 
+        'created_by',
+        'updated_by',
     ];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
@@ -79,7 +79,7 @@ class Ump extends Model
     {
         return $query->where('province_id', $provinceId);
     }
-     public function getCreatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
@@ -92,9 +92,17 @@ class Ump extends Model
         return Carbon::parse($value)->format('d-m-Y');
     }
     public function getTglBerlakuAttribute($value)
-{
-    return $value 
-        ? Carbon::parse($value)->format('d-m-Y') 
-        : null;
-}
+    {
+        return $value
+            ? Carbon::parse($value)->format('d-m-Y')
+            : null;
+    }
+    public function formatump()
+    {
+        if (!$this->ump) {
+            return 'Rp. 0';
+        }
+
+        return 'Rp. ' . number_format(floatval($this->ump), 0, ',', '.');
+    }
 }

@@ -31,4 +31,8 @@ class BidangPerusahaan extends Model
     {
         return $this->hasMany(Leads::class, 'bidang_perusahaan_id', 'id');
     }
+     public static function getAllActive()
+    {
+        return self::whereNull('deleted_at')->get();
+    }
 }

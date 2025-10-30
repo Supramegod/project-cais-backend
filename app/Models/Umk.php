@@ -76,4 +76,14 @@ class Umk extends Model
     {
         return $query->where('city_id', $cityId);
     }
+    // App\Models\Umk.php
+public function formatUmk()
+{
+    if (!$this->umk) {
+        return 'Rp. 0';
+    }
+
+    return 'Rp. ' . number_format(floatval($this->umk), 0, ',', '.');
+}
+
 }

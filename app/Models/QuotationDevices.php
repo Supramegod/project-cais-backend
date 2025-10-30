@@ -17,4 +17,10 @@ class QuotationDevices extends Model
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+    public function scopeByBarangAndQuotation($query, $barangId, $quotationId)
+    {
+        return $query->whereNull('deleted_at')
+            ->where('barang_id', $barangId)
+            ->where('quotation_id', $quotationId);
+    }
 }

@@ -57,6 +57,11 @@ class QuotationStepService
         ];
 
         $additionalRelations = [];
+        if ($step == 3) {
+            $additionalRelations[] = 'quotationDetails.quotationDetailRequirements';
+            $additionalRelations[] = 'quotationDetails.quotationDetailTunjangans';
+            $additionalRelations[] = 'quotationDetails.position';
+        }
 
         if ($step >= 6) {
             $additionalRelations[] = 'quotationAplikasis';
@@ -120,13 +125,44 @@ class QuotationStepService
                 break;
 
             case 3:
-                // Step 3 biasanya untuk kebutuhan detail - tidak butuh data tambahan khusus
-                break;
+                // TAMBAHKAN data untuk step 3
+                $data['additional_data']['positions'] = \App\Models\Position::where('is_active', 1)
+                    ->where('layanan_id', $quotation->kebutuhan_id)
+                    ->orderBy('name', 'asc')
+                    ->get();
 
+                $data['additional_data']['quotation_sites'] = $quotation->quotationSites->map(function ($site) {
+                    return [
+                        'id' => $site->id,
+                        'nama_site' => $site->nama_site,
+                        'provinsi' => $site->provinsi,
+                        'kota' => $site->kota,
+                        'penempatan' => $site->penempatan,
+                    ];
+                })->toArray();
+                break;
             case 4:
                 $data['additional_data']['manajemen_fee_list'] = ManagementFee::all();
                 $data['additional_data']['province_list'] = Province::all();
 
+                // Data UMK per site
+                $data['additional_data']['umk_per_site'] = [];
+                foreach ($quotation->quotationSites as $site) {
+                    $umk = Umk::byCity($site->kota_id)
+                        ->active()
+                        ->first();
+
+                    $data['additional_data']['umk_per_site'][$site->id] = [
+                        'site_id' => $site->id,
+                        'site_name' => $site->nama_site,
+                        'city_id' => $site->kota_id,
+                        'city_name' => $site->kota,
+                        'umk_value' => $umk ? $umk->umk : 0,
+                        'umk_display' => $umk->formatUmk(),
+                    ];
+                }
+
+                // Data kota untuk referensi (opsional)
                 $data['additional_data']['city_list'] = City::all()->map(function ($city) {
                     $umk = Umk::byCity($city->id)
                         ->active()
@@ -234,7 +270,7 @@ class QuotationStepService
                 $data['additional_data']['calculated_quotation'] = $this->quotationService->calculateQuotation($quotation);
 
                 // Menggunakan model method
-                $data['additional_data']['daftar_tunjangan'] = QuotationDetailTunjangan::getDistinctTunjanganByQuotation($quotation->id);
+                $data['additional_data']['daftar_tunjangan'] = QuotationDetailTunjangan::distinctTunjanganByQuotation($quotation->id);
 
                 // Menggunakan model dengan SoftDeletes
                 $data['additional_data']['training_list'] = Training::all();
@@ -560,19 +596,26 @@ class QuotationStepService
             }
 
             $nominalUpah = $customUpah;
+
+            foreach ($quotation->quotationSites as $site) {
+                $site->update([
+                    'nominal_upah' => $nominalUpah,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
         } else {
-            // Update nominal upah di semua site berdasarkan UMP/UMK
+            // Update nominal upah di setiap site berdasarkan UMP/UMK masing-masing menggunakan scope
             foreach ($quotation->quotationSites as $site) {
                 if ($request->upah == "UMP") {
-                    $dataUmp = DB::table("m_ump")->where('is_aktif', 1)
-                        ->whereNull('deleted_at')
-                        ->where('province_id', $site->provinsi_id)
+                    // Gunakan scope dari model Ump
+                    $dataUmp = Ump::byProvince($site->provinsi_id)
+                        ->active()
                         ->first();
                     $nominalUpah = $dataUmp ? $dataUmp->ump : 0;
                 } else if ($request->upah == "UMK") {
-                    $dataUmk = DB::table("m_umk")->where('is_aktif', 1)
-                        ->whereNull('deleted_at')
-                        ->where('city_id', $site->kota_id)
+                    // Gunakan scope dari model Umk
+                    $dataUmk = Umk::byCity($site->kota_id)
+                        ->active()
                         ->first();
                     $nominalUpah = $dataUmk ? $dataUmk->umk : 0;
                 }

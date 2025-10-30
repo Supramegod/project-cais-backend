@@ -80,19 +80,22 @@ class QuotationStepController extends Controller
     public function getStep(string $id, int $step): JsonResponse
     {
         try {
-            $quotation = Quotation::with($this->quotationStepService->getStepRelations($step))
+            set_time_limit(0);
+            // Dapatkan relasi untuk step tertentu
+            $relations = $this->quotationStepService->getStepRelations($step);
+            $quotation = Quotation::with($relations)
                 ->notDeleted()
                 ->findOrFail($id);
-
+            // Pastikan relasi termuat dengan memuat ulang
+            $quotation->load($relations);
             $stepData = $this->quotationStepService->prepareStepData($quotation, $step);
-
             return response()->json([
                 'success' => true,
-                'data' => new QuotationStepResource($quotation, $step),
+                'data' => new QuotationStepResource($stepData), // Kirim seluruh stepData
                 'message' => 'Step data retrieved successfully'
             ]);
-
         } catch (\Exception $e) {
+            \Log::error("Error in getStep: " . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to get step data',
@@ -221,7 +224,6 @@ class QuotationStepController extends Controller
         DB::beginTransaction();
         try {
             $quotation = Quotation::notDeleted()->findOrFail($id);
-
             $updateMethod = 'updateStep' . $step;
             if (!method_exists($this->quotationStepService, $updateMethod)) {
                 return response()->json([
@@ -229,9 +231,7 @@ class QuotationStepController extends Controller
                     'message' => 'Step method not found'
                 ], 404);
             }
-
             $this->quotationStepService->$updateMethod($quotation, $request);
-
             // Update step progress
             if (!$request->has('edit') || !$request->edit) {
                 $quotation->update([
@@ -239,15 +239,12 @@ class QuotationStepController extends Controller
                     'updated_by' => Auth::user()->full_name
                 ]);
             }
-
             DB::commit();
-
             return response()->json([
                 'success' => true,
                 'data' => new QuotationStepResource($quotation, $step),
                 'message' => "Step {$step} updated successfully"
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([

@@ -17,4 +17,11 @@ class QuotationDetailTunjangan extends Model
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+    public function scopeDistinctTunjanganByQuotation($query, $quotationId)
+    {
+        return $query->select('nama_tunjangan as nama')
+            ->whereNull('deleted_at')
+            ->where('quotation_id', $quotationId)
+            ->distinct();
+    }
 }

@@ -347,7 +347,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
         Route::get('/list', 'index');
-        Route::post('/add', 'store');
+        Route::post('/add/{tipe_quotation}', 'store');
         Route::get('/view/{id}', 'show');
         Route::delete('/delete/{id}', 'destroy');
         Route::post('/{sourceId}/copy/{targetId}', 'copy');

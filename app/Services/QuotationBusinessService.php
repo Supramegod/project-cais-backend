@@ -195,7 +195,7 @@ class QuotationBusinessService
     /**
      * Generate nomor quotation berdasarkan jenis
      */
-    public function generateNomorByType($leadsId, $companyId, $tipeQuotation = 'baru', $quotationReferensi = null): string
+    public function generateNomorByType($leadsId, $companyId, $tipeQuotation , $quotationReferensi = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
@@ -206,15 +206,6 @@ class QuotationBusinessService
 
         // Base format: QUOT/[jenis jika ada]/[COMPANY_CODE]/[LEADS_NUMBER]-[MMYYYY]-[XXXXX]
         $base = "QUOT/";
-
-        // Tambahkan jenis quotation untuk revisi dan rekontrak
-        if ($tipeQuotation == 'revisi') {
-            $base .= "AD/";
-        } elseif ($tipeQuotation == 'rekontrak') {
-            $base .= "RK/";
-        }
-        // Untuk baru, tidak ada tambahan jenis
-
         // Tambahkan company code dan leads number
         if ($company) {
             $base .= $company->code . "/" . $dataLeads->nomor . "-" . $month . $year . "-";
