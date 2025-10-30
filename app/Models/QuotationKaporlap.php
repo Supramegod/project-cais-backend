@@ -17,4 +17,10 @@ class QuotationKaporlap extends Model
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+    public function scopeByBarangAndDetail($query, $barangId, $detailId)
+    {
+        return $query->whereNull('deleted_at')
+            ->where('barang_id', $barangId)
+            ->where('quotation_detail_id', $detailId);
+    }
 }

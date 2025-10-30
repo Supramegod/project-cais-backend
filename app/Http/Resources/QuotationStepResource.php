@@ -11,6 +11,7 @@ use App\Models\Quotation;
 use App\Models\QuotationDetailTunjangan;
 use App\Models\QuotationDevices;
 use App\Models\QuotationKaporlap;
+use App\Models\Umk;
 use App\Models\Ump;
 use App\Models\SalaryRule;
 use App\Models\Top;
@@ -38,6 +39,8 @@ class QuotationStepResource extends JsonResource
 
     public function toArray($request)
     {
+        $quotation = $this['quotation'] ?? $this->resource;
+        $step = $this->step;
         $baseData = [
             'id' => $this->id ?? $this['quotation']->id,
             'step' => $this->step,
@@ -50,8 +53,8 @@ class QuotationStepResource extends JsonResource
             $baseData['jumlah_site'] = $this->jumlah_site ?? $this['quotation']->jumlah_site;
         }
 
-        $stepData = $this->getStepSpecificData();
-        $additionalData = $this->getAdditionalData();
+        $stepData = $this->getStepSpecificData($quotation, $step);
+        $additionalData = $this->getAdditionalData($quotation,$step);
 
         return array_merge($baseData, [
             'step_data' => $stepData,
@@ -59,11 +62,10 @@ class QuotationStepResource extends JsonResource
         ]);
     }
 
-    private function getStepSpecificData()
+    private function getStepSpecificData($quotation, $step)
     {
-        $quotation = $this->resource instanceof Quotation ? $this->resource : $this['quotation'];
 
-        switch ($this->step) {
+        switch ($step) {
             case 1:
                 return [
                     'jenis_kontrak' => $quotation->jenis_kontrak,
@@ -100,33 +102,69 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 3:
-                return [
-                    'quotation_details' => $quotation->relationLoaded('quotationDetails') ?
-                        $quotation->quotationDetails->map(function ($detail) {
-                            return [
-                                'id' => $detail->id,
-                                'quotation_site_id' => $detail->quotation_site_id,
-                                'position_id' => $detail->position_id,
-                                'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
-                                'jumlah_hc' => $detail->jumlah_hc,
-                                'nominal_upah' => $detail->nominal_upah,
-                                'requirements' => $detail->relationLoaded('quotationDetailRequirements') ?
-                                    $detail->quotationDetailRequirements->pluck('requirement')->toArray() : [],
-                                'tunjangans' => $detail->relationLoaded('quotationDetailTunjangans') ?
-                                    $detail->quotationDetailTunjangans->map(function ($tunjangan) {
-                                        return [
-                                            'nama_tunjangan' => $tunjangan->nama_tunjangan,
-                                            'nominal' => $tunjangan->nominal,
-                                        ];
-                                    })->toArray() : [],
-                            ];
-                        })->toArray() : [],
-                ];
+                // PERBAIKI: Gunakan approach yang lebih robust
+                $quotationDetails = [];
 
+                if ($quotation->relationLoaded('quotationDetails')) {
+                    $quotationDetails = $quotation->quotationDetails->map(function ($detail) {
+                        $data = [
+                            'id' => $detail->id,
+                            'quotation_site_id' => $detail->quotation_site_id,
+                            'position_id' => $detail->position_id,
+                            'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
+                            'jumlah_hc' => $detail->jumlah_hc,
+                            'nominal_upah' => $detail->nominal_upah,
+                        ];
+
+                        // PERBAIKI: Cek relasi requirements dengan cara yang lebih reliable
+                        $requirements = [];
+                        if (method_exists($detail, 'quotationDetailRequirements') && $detail->relationLoaded('quotationDetailRequirements')) {
+                            $requirements = $detail->quotationDetailRequirements->pluck('requirement')->toArray();
+                        } else {
+                            // Fallback: load relasi jika belum dimuat
+                            try {
+                                $requirements = $detail->quotationDetailRequirements()->pluck('requirement')->toArray();
+                            } catch (\Exception $e) {
+                                $requirements = [];
+                            }
+                        }
+                        $data['requirements'] = $requirements;
+
+                        // PERBAIKI: Cek relasi tunjangan dengan cara yang lebih reliable
+                        $tunjangans = [];
+                        if (method_exists($detail, 'quotationDetailTunjangans') && $detail->relationLoaded('quotationDetailTunjangans')) {
+                            $tunjangans = $detail->quotationDetailTunjangans->map(function ($tunjangan) {
+                                return [
+                                    'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                                    'nominal' => $tunjangan->nominal,
+                                ];
+                            })->toArray();
+                        } else {
+                            // Fallback: load relasi jika belum dimuat
+                            try {
+                                $tunjangans = $detail->quotationDetailTunjangans()->get()->map(function ($tunjangan) {
+                                    return [
+                                        'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                                        'nominal' => $tunjangan->nominal,
+                                    ];
+                                })->toArray();
+                            } catch (\Exception $e) {
+                                $tunjangans = [];
+                            }
+                        }
+                        $data['tunjangans'] = $tunjangans;
+
+                        return $data;
+                    })->toArray();
+                }
+
+                return [
+                    'quotation_details' => $quotationDetails,
+                ];
             case 4:
                 return [
                     'upah' => $quotation->upah,
-                    'nominal_upah' => $quotation->nominal_upah,
+                    // 'nominal_upah' => $quotation->nominal_upah,
                     'hitungan_upah' => $quotation->hitungan_upah,
                     'management_fee_id' => $quotation->management_fee_id,
                     'persentase' => $quotation->persentase,
@@ -146,8 +184,20 @@ class QuotationStepResource extends JsonResource
                     'jenis_bayar_tunjangan_holiday' => $quotation->jenis_bayar_tunjangan_holiday,
                     'is_ppn' => $quotation->is_ppn,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
+                    // Tambahkan data upah per site
+                    'upah_per_site' => $quotation->relationLoaded('quotationSites') ?
+                        $quotation->quotationSites->map(function ($site) {
+                            return [
+                                'site_id' => $site->id,
+                                'site_name' => $site->nama_site,
+                                'nominal_upah' => $site->nominal_upah,
+                                'city_id' => $site->kota_id,
+                                'city_name' => $site->kota,
+                                'province_id' => $site->provinsi_id,
+                                'province_name' => $site->provinsi,
+                            ];
+                        })->toArray() : [],
                 ];
-
             case 5:
                 return [
                     'jenis_perusahaan_id' => $quotation->jenis_perusahaan_id,
@@ -261,11 +311,14 @@ class QuotationStepResource extends JsonResource
         }
     }
 
-    private function getAdditionalData()
+    private function getAdditionalData($quotation, $step)
     {
-        $quotation = $this->resource instanceof Quotation ? $this->resource : $this['quotation'];
+        // GUNAKAN: additional_data yang sudah dipersiapkan di service
+        if (isset($this['additional_data'])) {
+            return $this['additional_data'];
+        }
 
-        switch ($this->step) {
+        switch ($step) {
             case 1:
                 return [
                     'company_list' => Company::where('is_active', 1)->get(),
@@ -307,6 +360,44 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 4:
+                $quotation = $this->resource instanceof Quotation ? $this->resource : $this['quotation'];
+
+                // Data UMK per site menggunakan scope
+                $umkPerSite = [];
+                $umpPerSite = [];
+
+                if ($quotation->relationLoaded('quotationSites')) {
+                    foreach ($quotation->quotationSites as $site) {
+                        // Gunakan scope dari model Umk
+                        $umk = Umk::byCity($site->kota_id)
+                            ->active()
+                            ->first();
+
+                        $umkPerSite[$site->id] = [
+                            'site_id' => $site->id,
+                            'site_name' => $site->nama_site,
+                            'city_id' => $site->kota_id,
+                            'city_name' => $site->kota,
+                            'umk_value' => $umk ? $umk->umk : 0,
+                            'formatted_umk' => $umk->formatUmk()
+                        ];
+
+                        // Gunakan scope dari model Ump
+                        $ump = Ump::byProvince($site->provinsi_id)
+                            ->active()
+                            ->first();
+
+                        $umpPerSite[$site->id] = [
+                            'site_id' => $site->id,
+                            'site_name' => $site->nama_site,
+                            'province_id' => $site->provinsi_id,
+                            'province_name' => $site->provinsi,
+                            'ump_value' => $ump ? $ump->ump : 0,
+                            'formatted_ump' => $ump->formatUmp()
+                        ];
+                    }
+                }
+
                 return [
                     'management_fees' => ManagementFee::all(),
                     'upah_options' => ['UMP', 'UMK', 'Custom'],
@@ -314,6 +405,8 @@ class QuotationStepResource extends JsonResource
                     'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
                     'boolean_options' => ['Ada', 'Tidak Ada'],
                     'lembur_options' => ['Flat', 'Tidak Ada'],
+                    'umk_per_site' => $umkPerSite,
+                    'ump_per_site' => $umpPerSite,
                 ];
 
             case 5:
@@ -480,5 +573,29 @@ class QuotationStepResource extends JsonResource
             'training_list' => Training::all(),
             'jabatan_pic_list' => JabatanPic::all(),
         ];
+    }
+    private function getUmpData()
+    {
+        $quotation = $this->resource instanceof Quotation ? $this->resource : $this['quotation'];
+        $umpData = [];
+
+        if ($quotation->relationLoaded('quotationSites')) {
+            foreach ($quotation->quotationSites as $site) {
+                $ump = Ump::where('province_id', $site->provinsi_id)
+                    ->where('is_aktif', 1)
+                    ->first();
+
+                $umpData[$site->id] = [
+                    'site_id' => $site->id,
+                    'site_name' => $site->nama_site,
+                    'province_id' => $site->provinsi_id,
+                    'province_name' => $site->provinsi,
+                    'ump_value' => $ump ? $ump->ump : 0,
+                    'formatted_ump' => $ump ? $ump->formatUmp() : "Rp. 0",
+                ];
+            }
+        }
+
+        return $umpData;
     }
 }
