@@ -320,6 +320,10 @@ class QuotationStepService
 
         $cutiData = $this->prepareCutiData($request);
 
+        // Ambil persentase bunga bank dari TOP
+        $top = Top::find($request->top);
+        $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
+
         $quotation->update(array_merge([
             'mulai_kontrak' => $request->mulai_kontrak,
             'kontrak_selesai' => $request->kontrak_selesai,
@@ -336,6 +340,7 @@ class QuotationStepService
             'hari_kerja' => $request->hari_kerja,
             'shift_kerja' => $request->shift_kerja,
             'jam_kerja' => $request->jam_kerja,
+            'persen_bunga_bank' => $persenBungaBank,
             'updated_by' => Auth::user()->full_name
         ], $cutiData));
     }
