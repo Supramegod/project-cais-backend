@@ -257,39 +257,35 @@ class SpkController extends Controller
      *     )
      * )
      */
-    public function availableLeads()
+    public function availableLeads(Request $request)
     {
         try {
-            $data = QuotationSite::with(['quotation.leads.timSalesD'])
-                ->whereNull('deleted_at')
-                ->whereHas('quotation', function ($query) {
+            $data = Leads::whereHas('quotations.quotationSites', function ($query) {
+                $query->whereNull('deleted_at')
+                    ->whereDoesntHave('spkSite', function ($q) {
+                        $q->whereNull('deleted_at');
+                    });
+            })
+                ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
-                        ->where('is_aktif', 1)
-                        ->whereHas('leads.timSalesD', function ($q) {
-                            $q->where('user_id', Auth::user()->id);
-                        });
+                        ->where('is_aktif', 1);
                 })
-                ->whereDoesntHave('spkSite')
-                ->get()
-                ->map(function ($site) {
-                    $leads = $site->quotation->leads;
-                    return [
-                        'id' => $leads->id,
-                        'nomor' => $leads->nomor,
-                        'nama_perusahaan' => $leads->nama_perusahaan,
-                        'provinsi' => $leads->provinsi,
-                        'kota' => $leads->kota
-                    ];
-                });
+                ->whereHas('timSalesD', function ($query) {
+                    $query->where('user_id', Auth::user()->id);
+                })
+                ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+                ->distinct()
+                ->get();
 
             return $this->successResponse('Available leads retrieved successfully', $data);
 
         } catch (\Exception $e) {
+            \Log::error('Error in availableLeads: ' . $e->getMessage());
             return $this->errorResponse('Error fetching available leads', $e->getMessage());
         }
     }
 
-    /**
+    /**up
      * @OA\Post(
      *     path="/api/spk/add",
      *     summary="Membuat SPK baru",
