@@ -69,6 +69,8 @@ class QuotationStepResource extends JsonResource
             case 1:
                 return [
                     'jenis_kontrak' => $quotation->jenis_kontrak,
+                    'layanan_id' => $quotation->kebutuhan_id,
+                    'layanan_nama' => $quotation->kebutuhan->nama ?? null,
                 ];
 
             case 2:
