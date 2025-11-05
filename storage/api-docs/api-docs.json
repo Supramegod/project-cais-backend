@@ -19406,117 +19406,6 @@
                 ]
             }
         },
-        "/api/spk/add": {
-            "post": {
-                "tags": [
-                    "SPK"
-                ],
-                "summary": "Membuat SPK baru",
-                "description": "Endpoint untuk membuat SPK baru berdasarkan leads dan site yang dipilih.",
-                "operationId": "7ca37fa6dd173f08807c88edbb5470a2",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "leads_id",
-                                    "tanggal_spk",
-                                    "site_ids"
-                                ],
-                                "properties": {
-                                    "leads_id": {
-                                        "description": "ID Leads",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "tanggal_spk": {
-                                        "description": "Tanggal SPK",
-                                        "type": "string",
-                                        "format": "date",
-                                        "example": "2024-01-15"
-                                    },
-                                    "site_ids": {
-                                        "description": "Array ID Quotation Site",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "example": [
-                                            1,
-                                            2,
-                                            3
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "SPK berhasil dibuat",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "SPK created successfully"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nomor": {
-                                                    "type": "string",
-                                                    "example": "SPK/LEAD001-012024-00001"
-                                                },
-                                                "tgl_spk": {
-                                                    "type": "string",
-                                                    "example": "2024-01-15"
-                                                },
-                                                "status_spk_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "leads_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "spk_sites": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "object"
-                                                    }
-                                                },
-                                                "leads": {
-                                                    "type": "object"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/spk/view/{id}": {
             "get": {
                 "tags": [
@@ -20330,6 +20219,182 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Error fetching available sites"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Menghapus SPK berdasarkan ID (soft delete)",
+                "description": "Endpoint untuk menghapus SPK. Penghapusan dilakukan secara soft delete, sehingga data tidak benar-benar dihapus dari database.",
+                "operationId": "2925709fb2509847df4606fb8f382534",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID SPK yang akan dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SPK berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK deleted successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SPK tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error deleting SPK"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/delete-site/{siteId}": {
+            "delete": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Menghapus SpkSite berdasarkan ID (soft delete)",
+                "description": "Endpoint untuk menghapus SpkSite individual. Penghapusan dilakukan secara soft delete.",
+                "operationId": "78e0abb6ff9cdcc1d4508ccb7eb9c277",
+                "parameters": [
+                    {
+                        "name": "siteId",
+                        "in": "path",
+                        "description": "ID SpkSite yang akan dihapus",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SpkSite berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK site deleted successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SpkSite tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK site not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error deleting SPK site"
                                         }
                                     },
                                     "type": "object"
