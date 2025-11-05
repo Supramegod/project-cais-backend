@@ -17,12 +17,11 @@ class QuotationStepRequest extends FormRequest
 
         $rules = [
             'edit' => 'sometimes|boolean',
-            'id' => 'required|exists:sl_quotation,id'
         ];
 
         switch ($step) {
             case 1:
-                $rules['jenis_kontrak'] = 'required|string|in:PKWT,PKWTT,Reguler,HL';
+                $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
                 break;
             
             case 2:

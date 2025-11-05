@@ -11,6 +11,7 @@ use App\Models\JabatanPic;
 use App\Models\JenisBarang;
 use App\Models\JenisPerusahaan;
 use App\Models\ManagementFee;
+use App\Models\Position;
 use App\Models\Province;
 use App\Models\Quotation;
 use App\Models\QuotationAplikasi;
@@ -126,7 +127,7 @@ class QuotationStepService
 
             case 3:
                 // TAMBAHKAN data untuk step 3
-                $data['additional_data']['positions'] = \App\Models\Position::where('is_active', 1)
+                $data['additional_data']['positions'] = Position::where('is_active', 1)
                     ->where('layanan_id', $quotation->kebutuhan_id)
                     ->orderBy('name', 'asc')
                     ->get();
@@ -308,12 +309,44 @@ class QuotationStepService
 
     public function updateStep1(Quotation $quotation, Request $request): void
     {
-        $quotation->update([
-            'jenis_kontrak' => $request->jenis_kontrak,
-            'updated_by' => Auth::user()->full_name
+        \Log::info("Updating Step 1", [
+            'quotation_id' => $quotation->id,
+            'current_jenis_kontrak' => $quotation->jenis_kontrak,
+            'new_jenis_kontrak' => $request->jenis_kontrak,
+            'user' => Auth::user()->full_name
         ]);
-    }
 
+        try {
+            // Approach 1: Gunakan save() instead of update()
+            $quotation->jenis_kontrak = $request->jenis_kontrak;
+            $quotation->updated_by = Auth::user()->full_name;
+
+            $saved = $quotation->save();
+
+            \Log::info("Save result", [
+                'success' => $saved,
+                'changes' => $quotation->getChanges(),
+                'dirty' => $quotation->getDirty()
+            ]);
+
+            if (!$saved) {
+                throw new \Exception("Failed to save quotation step 1");
+            }
+
+            // Verifikasi dengan query langsung
+            $updatedQuotation = Quotation::find($quotation->id);
+            \Log::info("Database verification", [
+                'jenis_kontrak_in_db' => $updatedQuotation->jenis_kontrak
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in updateStep1", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
     public function updateStep2(Quotation $quotation, Request $request): void
     {
         $this->validateStep2($request);
