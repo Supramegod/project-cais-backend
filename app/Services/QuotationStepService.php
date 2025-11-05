@@ -390,11 +390,11 @@ class QuotationStepService
             'user' => Auth::user()->full_name
         ]);
 
-        // Jika request berisi data untuk menambah HC
-        if ($request->has('position_id') && $request->has('site_id') && $request->has('jumlah_hc')) {
-            // Tambahkan quotation_id ke request karena method addDetailHC membutuhkannya
-            $request->merge(['quotation_id' => $quotation->id]);
-            $this->addDetailHC($request);
+        // Jika request berisi headCountData array
+        if ($request->has('headCountData') && is_array($request->headCountData)) {
+            foreach ($request->headCountData as $detail) {
+                $this->addDetailHCFromArray($quotation, $detail);
+            }
         }
 
         \Log::info("Step 3 update completed");
@@ -964,117 +964,129 @@ class QuotationStepService
             }
         }
     }
+    public function addDetailHCFromArray(Quotation $quotation, array $detail)
+    {
+        try {
+            DB::beginTransaction();
 
+            $current_date_time = Carbon::now()->toDateTimeString();
 
-public function addDetailHC(Request $request)
-{
-    try {
-        DB::beginTransaction();
+            // Get position
+            $position = Position::where('id', $detail['position_id'])->first();
 
-        $current_date_time = Carbon::now()->toDateTimeString();
-        
-        // Get position from HRIS database
-        $position = Position::where('id', $request->position_id)
-            ->first();
-            
-        $quotation = Quotation::findOrFail($request->quotation_id);
-        $quotationSite = QuotationSite::where('quotation_id', $quotation->id)
-            ->where('id', $request->site_id)
-            ->first();
+            $quotationSite = QuotationSite::where('quotation_id', $quotation->id)
+                ->where('id', $detail['quotation_site_id'])
+                ->first();
 
-        // Check if data already exists
-        $checkExist = QuotationDetail::where('quotation_id', $quotation->id)
-            ->where('position_id', $request->position_id)
-            ->where('quotation_site_id', $request->site_id)
-            ->whereNull('deleted_at')
-            ->first();
+            // Check if data already exists
+            $checkExist = QuotationDetail::where('quotation_id', $quotation->id)
+                ->where('position_id', $detail['position_id'])
+                ->where('quotation_site_id', $detail['quotation_site_id'])
+                ->whereNull('deleted_at')
+                ->first();
 
-        if ($checkExist != null) {
-            // Update existing
-            $checkExist->update([
-                'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
-            ]);
-            
-            // Also update HPP and COSS
-            QuotationDetailHpp::where('quotation_detail_id', $checkExist->id)
-                ->update([
-                    'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
+            if ($checkExist != null) {
+                // Update existing
+                $checkExist->update([
+                    'jumlah_hc' => $detail['jumlah_hc'], // Gunakan value dari array, bukan increment
                     'updated_at' => $current_date_time,
                     'updated_by' => Auth::user()->full_name
                 ]);
-                
-            QuotationDetailCoss::where('quotation_detail_id', $checkExist->id)
-                ->update([
-                    'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
-                    'updated_at' => $current_date_time,
-                    'updated_by' => Auth::user()->full_name
-                ]);
-                
-        } else {
-            // Create new quotation detail
-            $detailBaru = QuotationDetail::create([
-                'quotation_id' => $quotation->id,
-                'quotation_site_id' => $request->site_id,
-                'nama_site' => $quotationSite->nama_site,
-                'position_id' => $request->position_id,
-                'kebutuhan' => $quotation->kebutuhan,
-                'jabatan_kebutuhan' => $position->name,
-                'jumlah_hc' => $request->jumlah_hc,
-                'created_at' => $current_date_time,
-                'created_by' => Auth::user()->full_name
-            ]);
 
-            // Create HPP record
-            QuotationDetailHpp::create([
-                'quotation_id' => $quotation->id,
-                'quotation_detail_id' => $detailBaru->id,
-                'leads_id' => $quotation->leads_id,
-                'position_id' => $request->position_id,
-                'jumlah_hc' => $request->jumlah_hc,
-                'created_at' => $current_date_time,
-                'created_by' => Auth::user()->full_name
-            ]);
-
-            // Create COSS record
-            QuotationDetailCoss::create([
-                'quotation_id' => $quotation->id,
-                'quotation_detail_id' => $detailBaru->id,
-                'leads_id' => $quotation->leads_id,
-                'position_id' => $request->position_id,
-                'jumlah_hc' => $request->jumlah_hc,
-                'created_at' => $current_date_time,
-                'created_by' => Auth::user()->full_name
-            ]);
-
-            // Insert tunjangan berdasarkan position
-            $listTunjangan = TunjanganPosisi::whereNull('deleted_at')
-                ->where('position_id', $request->position_id)
-                ->get();
-                
-            if ($listTunjangan->count() > 0) {
-                foreach ($listTunjangan as $tunjangan) {
-                    QuotationDetailTunjangan::create([
-                        'quotation_id' => $quotation->id,
-                        'quotation_detail_id' => $detailBaru->id,
-                        'tunjangan_id' => $tunjangan->id,
-                        'nama_tunjangan' => $tunjangan->nama,
-                        'nominal' => $tunjangan->nominal,
-                        'created_at' => $current_date_time,
-                        'created_by' => Auth::user()->full_name
+                // Also update HPP and COSS
+                QuotationDetailHpp::where('quotation_detail_id', $checkExist->id)
+                    ->update([
+                        'jumlah_hc' => $detail['jumlah_hc'],
+                        'updated_at' => $current_date_time,
+                        'updated_by' => Auth::user()->full_name
                     ]);
+
+                QuotationDetailCoss::where('quotation_detail_id', $checkExist->id)
+                    ->update([
+                        'jumlah_hc' => $detail['jumlah_hc'],
+                        'updated_at' => $current_date_time,
+                        'updated_by' => Auth::user()->full_name
+                    ]);
+
+            } else {
+                // Create new quotation detail
+                $detailBaru = QuotationDetail::create([
+                    'quotation_id' => $quotation->id,
+                    'quotation_site_id' => $detail['quotation_site_id'],
+                    'nama_site' => $detail['nama_site'],
+                    'position_id' => $detail['position_id'],
+                    'jabatan_kebutuhan' => $detail['jabatan_kebutuhan'],
+                    'jumlah_hc' => $detail['jumlah_hc'],
+                    'nominal_upah' => $detail['nominal_upah'] ?? 0,
+                    'created_at' => $current_date_time,
+                    'created_by' => Auth::user()->full_name
+                ]);
+
+                // Create HPP record
+                QuotationDetailHpp::create([
+                    'quotation_id' => $quotation->id,
+                    'quotation_detail_id' => $detailBaru->id,
+                    'leads_id' => $quotation->leads_id,
+                    'position_id' => $detail['position_id'],
+                    'jumlah_hc' => $detail['jumlah_hc'],
+                    'created_at' => $current_date_time,
+                    'created_by' => Auth::user()->full_name
+                ]);
+
+                // Create COSS record
+                QuotationDetailCoss::create([
+                    'quotation_id' => $quotation->id,
+                    'quotation_detail_id' => $detailBaru->id,
+                    'leads_id' => $quotation->leads_id,
+                    'position_id' => $detail['position_id'],
+                    'jumlah_hc' => $detail['jumlah_hc'],
+                    'created_at' => $current_date_time,
+                    'created_by' => Auth::user()->full_name
+                ]);
+
+                // Insert tunjangan berdasarkan position (jika ada di array)
+                if (isset($detail['tunjangans']) && is_array($detail['tunjangans'])) {
+                    foreach ($detail['tunjangans'] as $tunjangan) {
+                        QuotationDetailTunjangan::create([
+                            'quotation_id' => $quotation->id,
+                            'quotation_detail_id' => $detailBaru->id,
+                            'nama_tunjangan' => $tunjangan['nama_tunjangan'] ?? '',
+                            'nominal' => $tunjangan['nominal'] ?? 0,
+                            'created_at' => $current_date_time,
+                            'created_by' => Auth::user()->full_name
+                        ]);
+                    }
+                }
+
+                // Insert requirements berdasarkan position (jika ada di array)
+                if (isset($detail['requirements']) && is_array($detail['requirements'])) {
+                    foreach ($detail['requirements'] as $requirement) {
+                        // Sesuaikan dengan model requirements Anda
+                        DB::table('sl_quotation_detail_requirement')->insert([
+                            'quotation_id' => $quotation->id,
+                            'quotation_detail_id' => $detailBaru->id,
+                            'requirement' => $requirement,
+                            'created_at' => $current_date_time,
+                            'created_by' => Auth::user()->full_name
+                        ]);
+                    }
                 }
             }
-        }
 
-        DB::commit();
-        return "Data Berhasil Ditambahkan";
-        
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error("Error in addDetailHC: " . $e->getMessage());
-        throw $e;
+            DB::commit();
+            \Log::info("HC detail added from array", [
+                'quotation_id' => $quotation->id,
+                'position_id' => $detail['position_id'],
+                'site_id' => $detail['quotation_site_id'],
+                'jumlah_hc' => $detail['jumlah_hc']
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in addDetailHCFromArray: " . $e->getMessage());
+            throw new \Exception("Failed to add HC detail from array: " . $e->getMessage());
+        }
     }
-}
+
+
 }
