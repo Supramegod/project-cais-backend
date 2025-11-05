@@ -1058,6 +1058,166 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching available sites', $e->getMessage());
         }
     }
+    /**
+     * @OA\Delete(
+     *     path="/api/spk/delete/{id}",
+     *     summary="Menghapus SPK berdasarkan ID (soft delete)",
+     *     description="Endpoint untuk menghapus SPK. Penghapusan dilakukan secara soft delete, sehingga data tidak benar-benar dihapus dari database.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID SPK yang akan dihapus",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="SPK berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="SPK deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SPK tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error deleting SPK")
+     *         )
+     *     )
+     * )
+     */
+    public function delete($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $spk = Spk::find($id);
+
+            if (!$spk) {
+                return $this->notFoundResponse('SPK not found');
+            }
+
+            // Soft delete semua SpkSite yang terkait
+            SpkSite::where('spk_id', $id)
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
+
+            // Soft delete SPK
+            $spk->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name
+            ]);
+
+            // Catat aktivitas
+            $this->createDeleteActivity($spk);
+
+            DB::commit();
+
+            return $this->successResponse('SPK deleted successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Error deleting SPK', $e->getMessage());
+        }
+    }
+    /**
+     * @OA\Delete(
+     *     path="/api/spk/delete-site/{siteId}",
+     *     summary="Menghapus SpkSite berdasarkan ID (soft delete)",
+     *     description="Endpoint untuk menghapus SpkSite individual. Penghapusan dilakukan secara soft delete.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="siteId",
+     *         in="path",
+     *         required=true,
+     *         description="ID SpkSite yang akan dihapus",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="SpkSite berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="SPK site deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SpkSite tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK site not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error deleting SPK site")
+     *         )
+     *     )
+     * )
+     */
+    public function deleteSite($siteId)
+    {
+        try {
+            DB::beginTransaction();
+
+            $spkSite = SpkSite::find($siteId);
+
+            if (!$spkSite) {
+                return $this->notFoundResponse('SPK site not found');
+            }
+
+            // Soft delete SpkSite
+            $spkSite->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name
+            ]);
+
+            // Cek apakah SPK masih memiliki site aktif
+            $remainingSites = SpkSite::where('spk_id', $spkSite->spk_id)
+                ->whereNull('deleted_at')
+                ->count();
+
+            // Jika tidak ada site aktif lagi, hapus SPK juga
+            if ($remainingSites === 0) {
+                $spk = Spk::find($spkSite->spk_id);
+                if ($spk) {
+                    $spk->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => Auth::user()->full_name
+                    ]);
+
+                    $this->createDeleteActivity($spk);
+                }
+            }
+
+            DB::commit();
+
+            return $this->successResponse('SPK site deleted successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Error deleting SPK site', $e->getMessage());
+        }
+    }
 
     /**
      * =============================================
@@ -1411,6 +1571,27 @@ class SpkController extends Controller
         }
 
         return response()->json($response, $status);
+    }
+
+    /**
+     * Helper method untuk membuat aktivitas penghapusan SPK
+     */
+    private function createDeleteActivity($spk): void
+    {
+        $leads = Leads::find($spk->leads_id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'spk_id' => $spk->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $this->generateActivityNomor($leads->id),
+            'tipe' => 'SPK',
+            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'is_activity' => 0,
+            'user_id' => Auth::user()->id,
+            'created_by' => Auth::user()->full_name
+        ]);
     }
 
     private function errorResponse(string $message, string $error = null, int $status = 500)

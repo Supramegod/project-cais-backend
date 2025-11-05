@@ -298,6 +298,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/list-terhapus', 'listTerhapus');
         Route::get('/view/{id}', 'view');
         Route::post('/add', 'add');
+        Route::put('/delete-site/{id}', 'deleteSite');
+        Route::delete('/delete/{id}', 'delete');
 
         // Cetak SPK
         Route::get('/cetak/{id}', 'cetakSpk');
