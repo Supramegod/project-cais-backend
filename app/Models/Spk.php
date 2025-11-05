@@ -25,10 +25,10 @@ class Spk extends Model
         'status_spk_id',
         'created_by',
         'updated_by',
+        'deleted_at',
         'deleted_by'
     ];
 
-    protected $dates = ['deleted_at'];
 
     public function leads()
     {

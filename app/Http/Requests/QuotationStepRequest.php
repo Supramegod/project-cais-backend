@@ -23,7 +23,7 @@ class QuotationStepRequest extends FormRequest
             case 1:
                 $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
                 break;
-            
+
             case 2:
                 $rules['mulai_kontrak'] = 'required|date';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
@@ -48,7 +48,12 @@ class QuotationStepRequest extends FormRequest
                 $rules['hari_kerja'] = 'sometimes|string';
                 $rules['jam_kerja'] = 'sometimes|string';
                 break;
-            
+            case 3:
+                $rules['position_id'] = 'sometimes|required|integer';
+                $rules['quotation_site_id'] = 'sometimes|required|integer';
+                $rules['jumlah_hc'] = 'sometimes|required|integer|min:1';
+                break;
+
             case 4:
                 $rules['upah'] = 'required|string|in:UMP,UMK,Custom';
                 $rules['manajemen_fee'] = 'required|exists:m_management_fee,id';
@@ -72,7 +77,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['is_ppn'] = 'sometimes|boolean';
                 $rules['ppn_pph_dipotong'] = 'sometimes|boolean';
                 break;
-            
+
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
                 $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
@@ -91,12 +96,12 @@ class QuotationStepRequest extends FormRequest
                 $rules['nominal_takaful'] = 'sometimes|array';
                 $rules['nominal_takaful.*'] = 'sometimes|numeric|min:0';
                 break;
-            
+
             case 6:
                 $rules['aplikasi_pendukung'] = 'sometimes|array';
                 $rules['aplikasi_pendukung.*'] = 'exists:m_aplikasi_pendukung,id';
                 break;
-            
+
             case 10:
                 $rules['jumlah_kunjungan_operasional'] = 'required|integer|min:0';
                 $rules['bulan_tahun_kunjungan_operasional'] = 'required|string|in:Bulan,Tahun';
@@ -108,11 +113,11 @@ class QuotationStepRequest extends FormRequest
                 $rules['training'] = 'sometimes|string';
                 $rules['persen_bunga_bank'] = 'sometimes|numeric|min:0';
                 break;
-            
+
             case 11:
                 $rules['penagihan'] = 'required|string';
                 break;
-            
+
             case 12:
                 // Tidak ada field khusus, hanya konfirmasi final
                 break;
@@ -149,7 +154,7 @@ class QuotationStepRequest extends FormRequest
     {
         $validator->after(function ($validator) {
             $step = $this->route('step');
-            
+
             // Validasi custom untuk step 2
             if ($step == 2) {
                 if ($this->mulai_kontrak && $this->kontrak_selesai) {

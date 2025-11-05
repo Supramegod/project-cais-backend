@@ -111,6 +111,7 @@ class QuotationStepResource extends JsonResource
                     $quotationDetails = $quotation->quotationDetails->map(function ($detail) {
                         $data = [
                             'id' => $detail->id,
+                            'nama_site' => $detail->nama_site,
                             'quotation_site_id' => $detail->quotation_site_id,
                             'position_id' => $detail->position_id,
                             'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,

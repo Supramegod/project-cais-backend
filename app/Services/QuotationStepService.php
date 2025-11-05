@@ -20,8 +20,13 @@ use App\Models\QuotationKaporlap;
 use App\Models\QuotationDevices;
 use App\Models\QuotationChemical;
 use App\Models\QuotationOhc;
+use App\Models\QuotationSite;
 use App\Models\QuotationTraining;
 use App\Models\QuotationKerjasama;
+use App\Models\QuotationDetail;
+use App\Models\QuotationDetailHpp;
+use App\Models\QuotationDetailCoss;
+use App\Models\TunjanganPosisi;
 use App\Models\Barang;
 use App\Models\SalaryRule;
 use App\Models\Top;
@@ -377,10 +382,22 @@ class QuotationStepService
             'updated_by' => Auth::user()->full_name
         ], $cutiData));
     }
-
     public function updateStep3(Quotation $quotation, Request $request): void
     {
-        // Step 3 biasanya tidak membutuhkan update data tambahan
+        \Log::info("Updating Step 3", [
+            'quotation_id' => $quotation->id,
+            'request_data' => $request->all(),
+            'user' => Auth::user()->full_name
+        ]);
+
+        // Jika request berisi data untuk menambah HC
+        if ($request->has('position_id') && $request->has('site_id') && $request->has('jumlah_hc')) {
+            // Tambahkan quotation_id ke request karena method addDetailHC membutuhkannya
+            $request->merge(['quotation_id' => $quotation->id]);
+            $this->addDetailHC($request);
+        }
+
+        \Log::info("Step 3 update completed");
     }
 
     public function updateStep4(Quotation $quotation, Request $request): void
@@ -947,4 +964,117 @@ class QuotationStepService
             }
         }
     }
+
+
+public function addDetailHC(Request $request)
+{
+    try {
+        DB::beginTransaction();
+
+        $current_date_time = Carbon::now()->toDateTimeString();
+        
+        // Get position from HRIS database
+        $position = Position::where('id', $request->position_id)
+            ->first();
+            
+        $quotation = Quotation::findOrFail($request->quotation_id);
+        $quotationSite = QuotationSite::where('quotation_id', $quotation->id)
+            ->where('id', $request->site_id)
+            ->first();
+
+        // Check if data already exists
+        $checkExist = QuotationDetail::where('quotation_id', $quotation->id)
+            ->where('position_id', $request->position_id)
+            ->where('quotation_site_id', $request->site_id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($checkExist != null) {
+            // Update existing
+            $checkExist->update([
+                'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
+                'updated_at' => $current_date_time,
+                'updated_by' => Auth::user()->full_name
+            ]);
+            
+            // Also update HPP and COSS
+            QuotationDetailHpp::where('quotation_detail_id', $checkExist->id)
+                ->update([
+                    'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
+                    'updated_at' => $current_date_time,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+                
+            QuotationDetailCoss::where('quotation_detail_id', $checkExist->id)
+                ->update([
+                    'jumlah_hc' => $checkExist->jumlah_hc + $request->jumlah_hc,
+                    'updated_at' => $current_date_time,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+                
+        } else {
+            // Create new quotation detail
+            $detailBaru = QuotationDetail::create([
+                'quotation_id' => $quotation->id,
+                'quotation_site_id' => $request->site_id,
+                'nama_site' => $quotationSite->nama_site,
+                'position_id' => $request->position_id,
+                'kebutuhan' => $quotation->kebutuhan,
+                'jabatan_kebutuhan' => $position->name,
+                'jumlah_hc' => $request->jumlah_hc,
+                'created_at' => $current_date_time,
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            // Create HPP record
+            QuotationDetailHpp::create([
+                'quotation_id' => $quotation->id,
+                'quotation_detail_id' => $detailBaru->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $request->position_id,
+                'jumlah_hc' => $request->jumlah_hc,
+                'created_at' => $current_date_time,
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            // Create COSS record
+            QuotationDetailCoss::create([
+                'quotation_id' => $quotation->id,
+                'quotation_detail_id' => $detailBaru->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $request->position_id,
+                'jumlah_hc' => $request->jumlah_hc,
+                'created_at' => $current_date_time,
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            // Insert tunjangan berdasarkan position
+            $listTunjangan = TunjanganPosisi::whereNull('deleted_at')
+                ->where('position_id', $request->position_id)
+                ->get();
+                
+            if ($listTunjangan->count() > 0) {
+                foreach ($listTunjangan as $tunjangan) {
+                    QuotationDetailTunjangan::create([
+                        'quotation_id' => $quotation->id,
+                        'quotation_detail_id' => $detailBaru->id,
+                        'tunjangan_id' => $tunjangan->id,
+                        'nama_tunjangan' => $tunjangan->nama,
+                        'nominal' => $tunjangan->nominal,
+                        'created_at' => $current_date_time,
+                        'created_by' => Auth::user()->full_name
+                    ]);
+                }
+            }
+        }
+
+        DB::commit();
+        return "Data Berhasil Ditambahkan";
+        
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error("Error in addDetailHC: " . $e->getMessage());
+        throw $e;
+    }
+}
 }
