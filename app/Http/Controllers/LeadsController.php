@@ -201,87 +201,93 @@ class LeadsController extends Controller
         return true;
     }
 
-/**
- * @OA\Get(
- *     path="/api/leads/view/{id}",
- *     summary="Mendapatkan detail lead berdasarkan ID",
- *     description="Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, perusahaan group, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
- *     tags={"Leads"},
- *     security={{"bearerAuth":{}}},
- *     @OA\Parameter(
- *         name="id",
- *         in="path",
- *         description="ID unik dari lead yang ingin dilihat detailnya",
- *         required=true,
- *         @OA\Schema(type="integer", example=1)
- *     ),
- *     @OA\Response(
- *         response=200,
- *         description="Berhasil mengambil detail lead",
- *         @OA\JsonContent(
- *             @OA\Property(property="success", type="boolean", example=true),
- *             @OA\Property(property="message", type="string", example="Detail lead berhasil diambil"),
- *             @OA\Property(
- *                 property="data",
- *                 type="object",
- *                 @OA\Property(property="lead", type="object"),
- *                 @OA\Property(
- *                     property="perusahaan_groups",
- *                     type="array",
- *                     description="Daftar grup perusahaan yang memiliki lead ini",
- *                     @OA\Items(
- *                         type="object",
- *                         @OA\Property(property="group_id", type="integer", example=1),
- *                         @OA\Property(property="nama_grup", type="string", example="Grup ABC"),
- *                         @OA\Property(property="jumlah_perusahaan", type="integer", example=5),
- *                         @OA\Property(property="created_at", type="string", example="01-01-2025")
- *                     )
- *                 ),
- *                 @OA\Property(property="activities", type="array", @OA\Items(type="object"))
- *             )
- *         )
- *     ),
- *     @OA\Response(response=404, description="Lead tidak ditemukan"),
- *     @OA\Response(response=401, description="Unauthorized"),
- *     @OA\Response(response=500, description="Internal Server Error")
- * )
- */
-public function view($id)
-{
-    try {
-        $lead = Leads::with([
-            'branch', 'kebutuhan', 'timSales', 'timSalesD', 
-            'statusLeads', 'jenisPerusahaan', 'company', 'groupDetails'
-        ])->whereNull('customer_id')->find($id);
+    /**
+     * @OA\Get(
+     *     path="/api/leads/view/{id}",
+     *     summary="Mendapatkan detail lead berdasarkan ID",
+     *     description="Endpoint ini digunakan untuk mengambil informasi lengkap sebuah lead termasuk data perusahaan, PIC, kebutuhan, perusahaan group, dan 5 aktivitas terakhir. Hanya menampilkan lead yang belum menjadi customer.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID unik dari lead yang ingin dilihat detailnya",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil detail lead",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Detail lead berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="lead", type="object"),
+     *                 @OA\Property(
+     *                     property="perusahaan_groups",
+     *                     type="array",
+     *                     description="Daftar grup perusahaan yang memiliki lead ini",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="group_id", type="integer", example=1),
+     *                         @OA\Property(property="nama_grup", type="string", example="Grup ABC"),
+     *                         @OA\Property(property="jumlah_perusahaan", type="integer", example=5),
+     *                         @OA\Property(property="created_at", type="string", example="01-01-2025")
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="activities", type="array", @OA\Items(type="object"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Lead tidak ditemukan"),
+     *     @OA\Response(response=401, description="Unauthorized"),
+     *     @OA\Response(response=500, description="Internal Server Error")
+     * )
+     */
+    public function view($id)
+    {
+        try {
+            $lead = Leads::with([
+                'branch',
+                'kebutuhan',
+                'timSales',
+                'timSalesD',
+                'statusLeads',
+                'jenisPerusahaan',
+                'company',
+                'groupDetails'
+            ])->whereNull('customer_id')->find($id);
 
-        if (!$lead) {
-            return response()->json(['success' => false, 'message' => 'Lead tidak ditemukan'], 404);
+            if (!$lead) {
+                return response()->json(['success' => false, 'message' => 'Lead tidak ditemukan'], 404);
+            }
+
+            $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
+            $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
+            $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Detail lead berhasil diambil',
+                'data' => [
+                    'lead' => $lead,
+                    'activities' => CustomerActivity::where('leads_id', $id)
+                        ->latest()
+                        ->limit(5)
+                        ->get()
+                        ->map(function ($a) {
+                            $a->screated_at = Carbon::parse($a->created_at)->isoFormat('D MMMM Y HH:mm');
+                            $a->stgl_activity = Carbon::parse($a->tgl_activity)->isoFormat('D MMMM Y');
+                            return $a;
+                        })
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
         }
-
-        $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
-        $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
-        $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail lead berhasil diambil',
-            'data' => [
-                'lead' => $lead,
-                'activities' => CustomerActivity::where('leads_id', $id)
-                    ->latest()
-                    ->limit(5)
-                    ->get()
-                    ->map(function($a) {
-                        $a->screated_at = Carbon::parse($a->created_at)->isoFormat('D MMMM Y HH:mm');
-                        $a->stgl_activity = Carbon::parse($a->tgl_activity)->isoFormat('D MMMM Y');
-                        return $a;
-                    })
-            ]
-        ]);
-    } catch (\Exception $e) {
-        return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
     }
-}
 
     /**
      * @OA\Post(
@@ -372,7 +378,7 @@ public function view($id)
      */
     public function add(Request $request)
     {
-        try { 
+        try {
             set_time_limit(0);
             DB::beginTransaction();
 
@@ -396,12 +402,12 @@ public function view($id)
                 return response()->json([
                     'success' => false,
                     'message' => $validator->errors(),
-                    // 'errors' => $validator->errors()
                 ], 400);
             }
 
             $current_date_time = Carbon::now()->toDateTimeString();
 
+            // Get related data using models
             $provinsi = Province::find($request->provinsi);
             $kota = City::find($request->kota);
             $kecamatan = District::find($request->kecamatan);
@@ -413,6 +419,7 @@ public function view($id)
 
             $nomor = $this->generateNomor();
 
+            // Create lead using model
             $lead = Leads::create([
                 'nomor' => $nomor,
                 'tgl_leads' => $current_date_time,
@@ -447,12 +454,43 @@ public function view($id)
                 'created_by' => Auth::user()->full_name
             ]);
 
-
-            // Setelah $lead berhasil dibuat
+            // Sync kebutuhan using model relationship
             $lead->kebutuhan()->sync($request->kebutuhan);
 
+            // Create activity using model
+            $nomorActivity = $this->generateNomorActivity($lead->id);
+            $activity = CustomerActivity::create([
+                'leads_id' => $lead->id,
+                'branch_id' => $request->branch,
+                'tgl_activity' => $current_date_time,
+                'nomor' => $nomorActivity,
+                'notes' => 'Leads Terbentuk',
+                'tipe' => 'Leads',
+                'status_leads_id' => 1,
+                'is_activity' => 0,
+                'user_id' => Auth::id(),
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            // Find tim sales using model
+            $timSalesD = TimSalesDetail::where('user_id', Auth::user()->id)->first();
+
+            if ($timSalesD) {
+                // Update lead with tim sales info using model
+                $lead->update([
+                    'tim_sales_id' => $timSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $timSalesD->id
+                ]);
+
+                // Update activity with tim sales info using model
+                $activity->update([
+                    'tim_sales_id' => $timSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $timSalesD->id
+                ]);
+            }
 
             DB::commit();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Leads ' . $request->nama_perusahaan . ' berhasil disimpan',
@@ -466,7 +504,6 @@ public function view($id)
             ], 500);
         }
     }
-
     /**
      * @OA\Put(
      *     path="/api/leads/update/{id}",
@@ -579,6 +616,7 @@ public function view($id)
                     // 'errors' => $validator->errors()
                 ], 400);
             }
+            $current_date_time = Carbon::now()->toDateTimeString();
 
             $provinsi = Province::find($request->provinsi);
             $kota = City::find($request->kota);
@@ -622,6 +660,36 @@ public function view($id)
 
             // Setelah $lead berhasil dibuat
             $lead->kebutuhan()->sync($request->kebutuhan);
+            // Find tim sales using model
+            $nomorActivity = $this->generateNomorActivity($lead->id);
+            $activityupdt = CustomerActivity::create([
+                'leads_id' => $lead->id,
+                'branch_id' => $request->branch,
+                'tgl_activity' => $current_date_time,
+                'nomor' => $nomorActivity,
+                'notes' => 'Leads Terbentuk',
+                'tipe' => 'Leads',
+                'status_leads_id' => 1,
+                'is_activity' => 0,
+                'user_id' => Auth::id(),
+                'created_by' => Auth::user()->full_name
+            ]);
+            $timSalesD = TimSalesDetail::where('user_id', Auth::user()->id)->first();
+
+            if ($timSalesD) {
+                // Update lead with tim sales info using model
+                $lead->update([
+                    'tim_sales_id' => $timSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $timSalesD->id
+                ]);
+
+                // Update activity with tim sales info using model
+                $activityupdt->update([
+                    'tim_sales_id' => $timSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $timSalesD->id
+                ]);
+            }
+            // Create activity using model
 
 
             DB::commit();
