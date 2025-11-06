@@ -193,7 +193,7 @@ class MenuController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'nama' => 'required|string|max:100',
-            'menu_parent' => 'nullable|exists:sysmenu,id',
+            'parent_id' => 'nullable|exists:sysmenu,id',
             'url' => 'required|string|max:255',
             'icon' => 'nullable|string|max:100',
         ]);
@@ -209,7 +209,7 @@ class MenuController extends Controller
         try {
             $menu = Sysmenu::create([
                 'nama' => $request->nama,
-                'parent_id' => $request->menu_parent,
+                'parent_id' => $request->parent_id,
                 'url' => $request->url,
                 'icon' => $request->icon,
                 'created_at' => Carbon::now()->toDateTimeString(),
