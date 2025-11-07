@@ -268,7 +268,9 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/view/{id}', 'view');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
+        Route::put('/assign-sales/{id}', 'assignSales');
         Route::delete('/delete/{id}', 'delete');
+        Route::delete('/remove-sales/{id}', 'removeSales');
         Route::post('/restore/{id}', 'restore');
 
         // Additional endpoints
@@ -283,6 +285,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/export', 'exportExcel');
         Route::get('/template-import', 'templateImport');
         Route::post('/generate-null-kode', 'generateNullKode');
+
 
 
     });
@@ -358,7 +361,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/{id}/calculate', 'calculate');
         Route::get('/{id}/export-pdf', 'exportPdf');
         Route::get('/{id}/status', 'getStatus');
-        Route::get('/leads', 'getByLeads');
+        Route::get('/available-leads/{tipe_quotation}', 'availableLeads');
         Route::get('/reference/{leads_id}', 'getReferenceQuotations');
     });
 

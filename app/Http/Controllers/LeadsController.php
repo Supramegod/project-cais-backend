@@ -292,8 +292,11 @@ class LeadsController extends Controller
     /**
      * @OA\Post(
      *     path="/api/leads/add",
-     *     summary="Membuat lead baru",
-     *     description="Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi (similarity > 95%), generate nomor lead otomatis, membuat aktivitas pertama, dan assign ke tim sales jika user adalah sales. Juga mendukung pembuatan grup perusahaan baru.",
+     *     summary="Membuat lead baru dengan assign sales ke kebutuhan",
+     *     description="Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi, generate nomor lead otomatis, membuat aktivitas pertama, dan assign sales ke kebutuhan berdasarkan role user:
+     *                 - User role 29 (Sales): Auto assign ke semua kebutuhan
+     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan
+     *                 - User lainnya: Hanya sync kebutuhan tanpa sales",
      *     tags={"Leads"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
@@ -326,8 +329,25 @@ class LeadsController extends Controller
      *             @OA\Property(property="kelurahan", type="integer", example=9471083530, description="ID kelurahan/desa lokasi perusahaan"),
      *             @OA\Property(property="benua", type="integer", example=2, description="ID benua (untuk perusahaan luar negeri)"),
      *             @OA\Property(property="negara", type="integer", example=79, description="ID negara (untuk perusahaan luar negeri)"),
-     *             @OA\Property(property="perusahaan_group_id", type="integer", example=1, description="ID grup perusahaan jika ada. Gunakan '__new__' untuk membuat grup baru"),
-     *             @OA\Property(property="new_nama_grup", type="string", example="ABC Group", description="Nama grup baru jika perusahaan_group_id = '__new__'")
+     *             @OA\Property(
+     *                 property="assignments", 
+     *                 type="array",
+     *                 description="Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
+     *                 @OA\Items(
+     *                     @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID Tim Sales Detail"),
+     *                     @OA\Property(
+     *                         property="kebutuhan_ids", 
+     *                         type="array",
+     *                         @OA\Items(type="integer"),
+     *                         example={1,2},
+     *                         description="Array ID kebutuhan yang diassign ke sales ini"
+     *                     )
+     *                 ),
+     *                 example={
+     *                     {"tim_sales_d_id": 1, "kebutuhan_ids": {1,2}},
+     *                     {"tim_sales_d_id": 2, "kebutuhan_ids": {3,4}}
+     *                 }
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -339,9 +359,34 @@ class LeadsController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="nomor", type="string", example="AAAAB"),
-     *                 @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia")
+     *                 @OA\Property(property="lead", type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="AAAAB"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="tgl_leads", type="string", example="2024-01-15 10:30:00"),
+     *                     @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                     @OA\Property(property="tim_sales_d_id", type="integer", example=1)
+     *                 ),
+     *                 @OA\Property(
+     *                     property="assignments",
+     *                     type="array",
+     *                     description="Detail assignment sales yang berhasil dilakukan",
+     *                     @OA\Items(
+     *                         @OA\Property(property="type", type="string", example="auto_assign", description="auto_assign atau manual_assign"),
+     *                         @OA\Property(property="sales_assigned", type="object",
+     *                             @OA\Property(property="tim_sales_d_id", type="integer", example=1),
+     *                             @OA\Property(property="sales_name", type="string", example="John Sales"),
+     *                             @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                             @OA\Property(property="tim_sales_name", type="string", example="Tim Sales Jakarta")
+     *                         ),
+     *                         @OA\Property(
+     *                             property="kebutuhan_assigned",
+     *                             type="array",
+     *                             @OA\Items(type="integer"),
+     *                             example={1,2,3}
+     *                         )
+     *                     )
+     *                 )
      *             )
      *         )
      *     ),
@@ -401,10 +446,10 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors(),
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()->toArray()
                 ], 400);
             }
-
             $current_date_time = Carbon::now()->toDateTimeString();
 
             // Get related data using models
@@ -454,8 +499,21 @@ class LeadsController extends Controller
                 'created_by' => Auth::user()->full_name
             ]);
 
-            // Sync kebutuhan using model relationship
-            $lead->kebutuhan()->sync($request->kebutuhan);
+            $assignmentResults = [];
+
+            // PROSES ASSIGNMENT SALES
+            // CASE 1: Auto assign jika user adalah sales (role 29)
+            if (Auth::user()->role_id == 29) {
+                $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
+            }
+            // CASE 2: Manual assignment dari user yang berwenang
+            elseif ($request->has('assignments') && !empty($request->assignments)) {
+                $assignmentResults = $this->manualAssignSalesToKebutuhan($lead, $request->assignments);
+            }
+            // CASE 3: Tidak ada assignment, hanya sync kebutuhan tanpa sales
+            else {
+                $this->syncKebutuhanTanpaSales($lead, $request->kebutuhan);
+            }
 
             // Create activity using model
             $nomorActivity = $this->generateNomorActivity($lead->id);
@@ -464,7 +522,8 @@ class LeadsController extends Controller
                 'branch_id' => $request->branch,
                 'tgl_activity' => $current_date_time,
                 'nomor' => $nomorActivity,
-                'notes' => 'Leads Terbentuk',
+                'notes' => 'Leads Terbentuk' .
+                    (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
                 'tipe' => 'Leads',
                 'status_leads_id' => 1,
                 'is_activity' => 0,
@@ -472,30 +531,27 @@ class LeadsController extends Controller
                 'created_by' => Auth::user()->full_name
             ]);
 
-            // Find tim sales using model
-            $timSalesD = TimSalesDetail::where('user_id', Auth::user()->id)->first();
-
-            if ($timSalesD) {
-                // Update lead with tim sales info using model
-                $lead->update([
-                    'tim_sales_id' => $timSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $timSalesD->id
-                ]);
-
-                // Update activity with tim sales info using model
+            // Update activity dengan sales info jika ada
+            if ($lead->tim_sales_d_id) {
                 $activity->update([
-                    'tim_sales_id' => $timSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $timSalesD->id
+                    'tim_sales_id' => $lead->tim_sales_id,
+                    'tim_sales_d_id' => $lead->tim_sales_d_id
                 ]);
             }
 
             DB::commit();
 
-            return response()->json([
+            $response = [
                 'success' => true,
                 'message' => 'Leads ' . $request->nama_perusahaan . ' berhasil disimpan',
-                'data' => $lead
-            ]);
+                'data' => [
+                    'lead' => $lead,
+                    'assignments' => $assignmentResults
+                ]
+            ];
+
+            return response()->json($response);
+
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json([
@@ -507,8 +563,11 @@ class LeadsController extends Controller
     /**
      * @OA\Put(
      *     path="/api/leads/update/{id}",
-     *     summary="Mengupdate data lead yang sudah ada",
-     *     description="Endpoint ini digunakan untuk mengupdate informasi lead yang sudah ada berdasarkan ID. Semua field yang dikirim akan diupdate kecuali nomor lead, tanggal lead, dan status. Update dilakukan dalam database transaction untuk menjaga integritas data.",
+     *     summary="Mengupdate data lead yang sudah ada dengan assignment sales",
+     *     description="Endpoint ini digunakan untuk mengupdate informasi lead yang sudah ada berdasarkan ID. Semua field yang dikirim akan diupdate. Assignment sales dilakukan berdasarkan role user:
+     *                 - User role 29 (Sales): Auto assign jika lead belum memiliki sales
+     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan
+     *                 - User lainnya: Hanya sync kebutuhan dengan mempertahankan sales existing",
      *     tags={"Leads"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -528,7 +587,13 @@ class LeadsController extends Controller
      *             @OA\Property(property="bidang_perusahaan", type="integer", example=1),
      *             @OA\Property(property="branch", type="integer", example=1),
      *             @OA\Property(property="platform", type="integer", example=1),
-     *             @OA\Property(property="kebutuhan", type="array", @OA\Items(type="integer"), example={1,2}),
+     *             @OA\Property(
+     *                 property="kebutuhan", 
+     *                 type="array", 
+     *                 @OA\Items(type="integer"), 
+     *                 example={1,2,3},
+     *                 description="Array ID kebutuhan produk/layanan"
+     *             ),
      *             @OA\Property(property="alamat_perusahaan", type="string", example="Jl. Sudirman No. 123"),
      *             @OA\Property(property="pic", type="string", example="John Doe"),
      *             @OA\Property(property="jabatan_pic", type="string", example="Manager"),
@@ -541,7 +606,26 @@ class LeadsController extends Controller
      *             @OA\Property(property="kecamatan", type="integer", example=110101),
      *             @OA\Property(property="kelurahan", type="integer", example=11010101),
      *             @OA\Property(property="benua", type="integer", example=1),
-     *             @OA\Property(property="negara", type="integer", example=1)
+     *             @OA\Property(property="negara", type="integer", example=1),
+     *             @OA\Property(
+     *                 property="assignments", 
+     *                 type="array",
+     *                 description="Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
+     *                 @OA\Items(
+     *                     @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID Tim Sales Detail"),
+     *                     @OA\Property(
+     *                         property="kebutuhan_ids", 
+     *                         type="array",
+     *                         @OA\Items(type="integer"),
+     *                         example={1,2},
+     *                         description="Array ID kebutuhan yang diassign ke sales ini"
+     *                     )
+     *                 ),
+     *                 example={
+     *                     {"tim_sales_d_id": 1, "kebutuhan_ids": {1,2}},
+     *                     {"tim_sales_d_id": 2, "kebutuhan_ids": {3,4}}
+     *                 }
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -550,7 +634,37 @@ class LeadsController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Leads PT ABC Indonesia berhasil diupdate"),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="lead", type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="AAAAB"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                     @OA\Property(property="tim_sales_d_id", type="integer", example=1)
+     *                 ),
+     *                 @OA\Property(
+     *                     property="assignments",
+     *                     type="array",
+     *                     description="Detail assignment sales yang berhasil dilakukan",
+     *                     @OA\Items(
+     *                         @OA\Property(property="type", type="string", example="manual_assign"),
+     *                         @OA\Property(property="sales_assigned", type="object",
+     *                             @OA\Property(property="tim_sales_d_id", type="integer", example=1),
+     *                             @OA\Property(property="sales_name", type="string", example="John Sales"),
+     *                             @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                             @OA\Property(property="tim_sales_name", type="string", example="Tim Sales Jakarta")
+     *                         ),
+     *                         @OA\Property(
+     *                             property="kebutuhan_assigned",
+     *                             type="array",
+     *                             @OA\Items(type="integer"),
+     *                             example={1,2}
+     *                         )
+     *                     )
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -585,6 +699,7 @@ class LeadsController extends Controller
      *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
      *         )
      *     )
+     * 
      * )
      */
     public function update(Request $request, $id)
@@ -612,10 +727,11 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors(),
-                    // 'errors' => $validator->errors()
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()->toArray()
                 ], 400);
             }
+
             $current_date_time = Carbon::now()->toDateTimeString();
 
             $provinsi = Province::find($request->provinsi);
@@ -658,45 +774,55 @@ class LeadsController extends Controller
                 'updated_by' => Auth::user()->full_name
             ]);
 
-            // Setelah $lead berhasil dibuat
-            $lead->kebutuhan()->sync($request->kebutuhan);
-            // Find tim sales using model
+            $assignmentResults = [];
+
+            // PROSES ASSIGNMENT SALES (SAMA SEPERTI DI ADD)
+            // CASE 1: Auto assign jika user adalah sales (role 29) dan lead belum memiliki sales
+            if (Auth::user()->role_id == 29 && !$lead->tim_sales_d_id) {
+                $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
+            }
+            // CASE 2: Manual assignment dari user yang berwenang
+            elseif ($request->has('assignments') && !empty($request->assignments)) {
+                $assignmentResults = $this->manualAssignSalesToKebutuhan($lead, $request->assignments);
+            }
+            // CASE 3: Tidak ada assignment, hanya sync kebutuhan (pertahankan sales existing jika ada)
+            else {
+                $this->syncKebutuhanDenganSalesExisting($lead, $request->kebutuhan);
+            }
+
+            // Create activity untuk update
             $nomorActivity = $this->generateNomorActivity($lead->id);
-            $activityupdt = CustomerActivity::create([
+            $activity = CustomerActivity::create([
                 'leads_id' => $lead->id,
                 'branch_id' => $request->branch,
                 'tgl_activity' => $current_date_time,
                 'nomor' => $nomorActivity,
-                'notes' => 'Leads Terbentuk',
-                'tipe' => 'Leads',
-                'status_leads_id' => 1,
+                'notes' => 'Leads Diupdate' .
+                    (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
+                'tipe' => 'Leads Update',
+                'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name
             ]);
-            $timSalesD = TimSalesDetail::where('user_id', Auth::user()->id)->first();
 
-            if ($timSalesD) {
-                // Update lead with tim sales info using model
-                $lead->update([
-                    'tim_sales_id' => $timSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $timSalesD->id
-                ]);
-
-                // Update activity with tim sales info using model
-                $activityupdt->update([
-                    'tim_sales_id' => $timSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $timSalesD->id
+            // Update activity dengan sales info jika ada
+            if ($lead->tim_sales_d_id) {
+                $activity->update([
+                    'tim_sales_id' => $lead->tim_sales_id,
+                    'tim_sales_d_id' => $lead->tim_sales_d_id
                 ]);
             }
-            // Create activity using model
-
 
             DB::commit();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Leads ' . $request->nama_perusahaan . ' berhasil diupdate',
-                'data' => $lead
+                'data' => [
+                    'lead' => $lead,
+                    'assignments' => $assignmentResults
+                ]
             ]);
         } catch (\Exception $e) {
             DB::rollback();
@@ -705,78 +831,6 @@ class LeadsController extends Controller
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
-    }
-
-
-    private function generateNomor()
-    {
-        $lastLeads = Leads::latest('id')->first();
-
-        // Default nomor if no previous leads
-        if (!$lastLeads?->nomor) {
-            return 'AAAAA';
-        }
-
-        $nomor = $lastLeads->nomor;
-        $chars = str_split($nomor);
-
-        // Increment from right to left
-        for ($i = count($chars) - 1; $i >= 0; $i--) {
-            $current = $chars[$i];
-
-            // Handle digits (0-9)
-            if (is_numeric($current)) {
-                if ($current < '9') {
-                    $chars[$i] = (string) ($current + 1);
-                    break;
-                } else {
-                    $chars[$i] = 'A'; // 9 -> A
-                    break;
-                }
-            }
-
-            // Handle letters (A-Z)
-            if (ctype_alpha($current)) {
-                if ($current < 'Z') {
-                    $chars[$i] = chr(ord($current) + 1);
-                    break;
-                } else {
-                    $chars[$i] = '0'; // Z -> 0 (carry over)
-                    continue;
-                }
-            }
-        }
-
-        // Convert back to string and pad to 5 chars
-        return str_pad(implode('', $chars), 5, 'A', STR_PAD_RIGHT);
-    }
-
-    private function generateNomorActivity($leadsId)
-    {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-
-        $prefix = "CAT/";
-        if ($leads) {
-            $prefix .= match ($leads->kebutuhan_id) {
-                1 => "SG/",
-                2 => "LS/",
-                3 => "CS/",
-                4 => "LL/",
-                default => "NN/"
-            };
-            $prefix .= $leads->nomor . "-";
-        } else {
-            $prefix .= "NN/NNNNN-";
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $year = $now->year;
-
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
-        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-
-        return $prefix . $month . $year . "-" . $sequence;
     }
 
     /**
@@ -1970,7 +2024,436 @@ class LeadsController extends Controller
             ], 500);
         }
     }
+    /**
+     * @OA\Get(
+     *     path="/api/leads/sales-kebutuhan/{id}",
+     *     summary="Melihat sales yang diassign per kebutuhan untuk lead",
+     *     description="Endpoint ini digunakan untuk melihat sales yang sudah diassign untuk setiap kebutuhan pada suatu lead. Satu sales bisa memiliki lebih dari satu kebutuhan.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead yang ingin dilihat sales per kebutuhannya",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data sales per kebutuhan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data sales per kebutuhan berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="sales_summary",
+     *                     type="array",
+     *                     description="Ringkasan sales dan kebutuhannya",
+     *                     @OA\Items(
+     *                         @OA\Property(property="tim_sales_d_id", type="integer", example=1),
+     *                         @OA\Property(property="sales_name", type="string", example="John Doe"),
+     *                         @OA\Property(property="kebutuhan_count", type="integer", example=2),
+     *                         @OA\Property(
+     *                             property="kebutuhan_list",
+     *                             type="array",
+     *                             @OA\Items(
+     *                                 @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                                 @OA\Property(property="kebutuhan_nama", type="string", example="Kebutuhan A")
+     *                             )
+     *                         )
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="detailed_data",
+     *                     type="array",
+     *                     description="Data detail setiap record",
+     *                     @OA\Items(
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="leads_id", type="integer", example=1),
+     *                         @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                         @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                         @OA\Property(property="tim_sales_d_id", type="integer", example=1),
+     *                         @OA\Property(
+     *                             property="kebutuhan",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="nama", type="string", example="Kebutuhan A")
+     *                         ),
+     *                         @OA\Property(
+     *                             property="tim_sales_d",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="nama", type="string", example="Sales Name"),
+     *                             @OA\Property(
+     *                                 property="user",
+     *                                 type="object",
+     *                                 @OA\Property(property="id", type="integer", example=1),
+     *                                 @OA\Property(property="full_name", type="string", example="John Doe")
+     *                             )
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lead tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Lead tidak ditemukan")
+     *         )
+     *     )
+     * )
+     */
+    public function getSalesKebutuhan($id)
+    {
+        try {
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
 
+            // Ambil semua data sales per kebutuhan
+            $salesKebutuhan = LeadsKebutuhan::with([
+                'kebutuhan:id,nama',
+                'timSalesD.user:id,full_name',
+                'timSalesD.timSales:id,nama'
+            ])->where('leads_id', $id)->get();
+
+            // Group by sales untuk summary
+            $salesSummary = [];
+            $groupedBySales = $salesKebutuhan->groupBy('tim_sales_d_id');
+
+            foreach ($groupedBySales as $timSalesDId => $items) {
+                if ($timSalesDId) {
+                    $firstItem = $items->first();
+                    $salesSummary[] = [
+                        'tim_sales_d_id' => $timSalesDId,
+                        'sales_name' => $firstItem->timSalesD->user->full_name ?? $firstItem->timSalesD->nama,
+                        'tim_sales_name' => $firstItem->timSalesD->timSales->nama ?? 'N/A',
+                        'kebutuhan_count' => $items->count(),
+                        'kebutuhan_list' => $items->map(function ($item) {
+                            return [
+                                'kebutuhan_id' => $item->kebutuhan_id,
+                                'kebutuhan_nama' => $item->kebutuhan->nama ?? 'N/A'
+                            ];
+                        })->toArray()
+                    ];
+                }
+            }
+
+            // Juga tampilkan kebutuhan yang belum diassign sales
+            $unassignedKebutuhan = $salesKebutuhan->whereNull('tim_sales_d_id');
+            if ($unassignedKebutuhan->count() > 0) {
+                $salesSummary[] = [
+                    'tim_sales_d_id' => null,
+                    'sales_name' => 'Belum diassign',
+                    'tim_sales_name' => 'N/A',
+                    'kebutuhan_count' => $unassignedKebutuhan->count(),
+                    'kebutuhan_list' => $unassignedKebutuhan->map(function ($item) {
+                        return [
+                            'kebutuhan_id' => $item->kebutuhan_id,
+                            'kebutuhan_nama' => $item->kebutuhan->nama ?? 'N/A'
+                        ];
+                    })->toArray()
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data sales per kebutuhan berhasil diambil',
+                'data' => [
+                    'sales_summary' => $salesSummary,
+                    'detailed_data' => $salesKebutuhan
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Put(
+     *     path="/api/leads/assign-sales/{id}",
+     *     summary="Mengassign sales ke leads berdasarkan kebutuhan",
+     *     description="Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead yang akan diassign sales",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"assignments"},
+     *             @OA\Property(
+     *                 property="assignments",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(
+     *                         property="tim_sales_d_id", 
+     *                         type="integer", 
+     *                         example=1, 
+     *                         description="ID dari Tim Sales Detail"
+     *                     ),
+     *                     @OA\Property(
+     *                         property="kebutuhan_ids",
+     *                         type="array",
+     *                         @OA\Items(type="integer"),
+     *                         example={1, 2},
+     *                         description="Array ID kebutuhan yang akan diassign ke sales ini"
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sales berhasil diassign ke kebutuhan lead",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Sales berhasil diassign ke kebutuhan lead")
+     *         )
+     *     )
+     * )
+     */
+    public function assignSales(Request $request, $id)
+    {
+        try {
+            DB::beginTransaction();
+
+            // Cek lead
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // Cek authorization - hanya user dengan role_id tertentu yang bisa assign sales
+            $user = Auth::user();
+            $allowedRoles = [30, 31, 32, 33, 53, 96];
+
+            if (!in_array($user->role_id, $allowedRoles)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk mengassign sales'
+                ], 403);
+            }
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'assignments' => 'required|array|min:1',
+                'assignments.*.tim_sales_d_id' => 'required|exists:m_tim_sales_d,id',
+                'assignments.*.kebutuhan_ids' => 'required|array|min:1',
+                'assignments.*.kebutuhan_ids.*' => 'exists:m_kebutuhan,id'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $assignmentResults = [];
+            $allAssignedKebutuhan = [];
+
+            // Process each assignment
+            foreach ($request->assignments as $assignment) {
+                $timSalesD = TimSalesDetail::with('user', 'timSales')->find($assignment['tim_sales_d_id']);
+
+                if (!$timSalesD) {
+                    continue; // Skip jika sales tidak ditemukan
+                }
+
+                // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
+                $assignedKebutuhan = [];
+                foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
+                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
+                        [
+                            'leads_id' => $lead->id,
+                            'kebutuhan_id' => $kebutuhan_id
+                        ],
+                        [
+                            'tim_sales_id' => $timSalesD->tim_sales_id,
+                            'tim_sales_d_id' => $timSalesD->id
+                        ]
+                    );
+
+                    $assignedKebutuhan[] = $kebutuhan_id;
+                    $allAssignedKebutuhan[] = $kebutuhan_id;
+                }
+
+                $assignmentResults[] = [
+                    'sales_assigned' => [
+                        'tim_sales_d_id' => $timSalesD->id,
+                        'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
+                        'tim_sales_id' => $timSalesD->tim_sales_id,
+                        'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
+                    ],
+                    'kebutuhan_assigned' => $assignedKebutuhan
+                ];
+            }
+
+            // Buat activity untuk mencatat perubahan sales
+            $nomorActivity = $this->generateNomorActivity($lead->id);
+            CustomerActivity::create([
+                'leads_id' => $lead->id,
+                'branch_id' => $lead->branch_id,
+                'tgl_activity' => Carbon::now()->toDateTimeString(),
+                'nomor' => $nomorActivity,
+                'notes' => 'Sales diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhan)),
+                'tipe' => 'Assignment',
+                'status_leads_id' => $lead->status_leads_id,
+                'is_activity' => 0,
+                'user_id' => $user->id,
+                'created_by' => $user->full_name
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sales berhasil diassign ke kebutuhan lead',
+                'data' => [
+                    'lead_id' => $lead->id,
+                    'assignments' => $assignmentResults
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Delete(
+     *     path="/api/leads/remove-sales/{id}",
+     *     summary="Menghapus assignment sales dari kebutuhan tertentu",
+     *     description="Endpoint ini digunakan untuk menghapus assignment sales dari kebutuhan tertentu pada lead.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"kebutuhan_ids"},
+     *             @OA\Property(
+     *                 property="kebutuhan_ids",
+     *                 type="array",
+     *                 @OA\Items(type="integer"),
+     *                 example={1, 2},
+     *                 description="Array ID kebutuhan yang akan dihapus assignment sales-nya"
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Assignment sales berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Assignment sales berhasil dihapus dari kebutuhan")
+     *         )
+     *     )
+     * )
+     */
+    public function removeSales(Request $request, $id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'kebutuhan_ids' => 'required|array|min:1',
+                'kebutuhan_ids.*' => 'exists:m_kebutuhan,id'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            // Hapus assignment sales dari kebutuhan yang dipilih
+            $removedCount = LeadsKebutuhan::where('leads_id', $id)
+                ->whereIn('kebutuhan_id', $request->kebutuhan_ids)
+                ->update([
+                    'tim_sales_id' => null,
+                    'tim_sales_d_id' => null
+                ]);
+
+            // Buat activity log
+            $nomorActivity = $this->generateNomorActivity($lead->id);
+            CustomerActivity::create([
+                'leads_id' => $lead->id,
+                'branch_id' => $lead->branch_id,
+                'tgl_activity' => Carbon::now()->toDateTimeString(),
+                'nomor' => $nomorActivity,
+                'notes' => 'Assignment sales dihapus dari kebutuhan: ' . implode(', ', $request->kebutuhan_ids),
+                'tipe' => 'Assignment Removal',
+                'status_leads_id' => $lead->status_leads_id,
+                'is_activity' => 0,
+                'user_id' => Auth::id(),
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Assignment sales berhasil dihapus dari ' . $removedCount . ' kebutuhan',
+                'data' => [
+                    'lead_id' => $id,
+                    'removed_kebutuhan' => $request->kebutuhan_ids,
+                    'removed_count' => $removedCount
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    //==============================================================================//
 
 
     // Tambahkan method helper untuk generate nomor lanjutan
@@ -1998,4 +2481,213 @@ class LeadsController extends Controller
         }
         return $nomor;
     }
+
+
+    private function generateNomor()
+    {
+        $lastLeads = Leads::latest('id')->first();
+
+        // Default nomor if no previous leads
+        if (!$lastLeads?->nomor) {
+            return 'AAAAA';
+        }
+
+        $nomor = $lastLeads->nomor;
+        $chars = str_split($nomor);
+
+        // Increment from right to left
+        for ($i = count($chars) - 1; $i >= 0; $i--) {
+            $current = $chars[$i];
+
+            // Handle digits (0-9)
+            if (is_numeric($current)) {
+                if ($current < '9') {
+                    $chars[$i] = (string) ($current + 1);
+                    break;
+                } else {
+                    $chars[$i] = 'A'; // 9 -> A
+                    break;
+                }
+            }
+
+            // Handle letters (A-Z)
+            if (ctype_alpha($current)) {
+                if ($current < 'Z') {
+                    $chars[$i] = chr(ord($current) + 1);
+                    break;
+                } else {
+                    $chars[$i] = '0'; // Z -> 0 (carry over)
+                    continue;
+                }
+            }
+        }
+
+        // Convert back to string and pad to 5 chars
+        return str_pad(implode('', $chars), 5, 'A', STR_PAD_RIGHT);
+    }
+
+    private function generateNomorActivity($leadsId)
+    {
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        $prefix = "CAT/";
+        if ($leads) {
+            $prefix .= match ($leads->kebutuhan_id) {
+                1 => "SG/",
+                2 => "LS/",
+                3 => "CS/",
+                4 => "LL/",
+                default => "NN/"
+            };
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
+    }
+    /**
+     * Auto assign sales ke lead (untuk user dengan role 29)
+     */
+    private function autoAssignSalesToKebutuhan($lead, $kebutuhanIds)
+    {
+        $user = Auth::user();
+        $assignmentResults = [];
+
+        if ($user->role_id == 29) {
+            $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
+
+            if ($timSalesD) {
+                // Update lead dengan sales info
+                $lead->update([
+                    'tim_sales_id' => $timSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $timSalesD->id
+                ]);
+
+                // Assign sales ke SEMUA kebutuhan yang dipilih
+                $kebutuhanData = [];
+                foreach ($kebutuhanIds as $kebutuhan_id) {
+                    $kebutuhanData[$kebutuhan_id] = [
+                        'tim_sales_id' => $timSalesD->tim_sales_id,
+                        'tim_sales_d_id' => $timSalesD->id
+                    ];
+                }
+
+                $lead->kebutuhan()->sync($kebutuhanData);
+
+                $assignmentResults[] = [
+                    'type' => 'auto_assign',
+                    'sales_assigned' => [
+                        'tim_sales_d_id' => $timSalesD->id,
+                        'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
+                        'tim_sales_id' => $timSalesD->tim_sales_id
+                    ],
+                    'kebutuhan_assigned' => $kebutuhanIds
+                ];
+            }
+        }
+
+        return $assignmentResults;
+    }
+
+    /**
+     * Manual assignment sales ke kebutuhan (untuk user berwenang)
+     */
+    private function manualAssignSalesToKebutuhan($lead, $assignments)
+    {
+        $user = Auth::user();
+        $assignmentResults = [];
+        $allowedRoles = [30, 31, 32, 33, 53, 96];
+
+        if (!in_array($user->role_id, $allowedRoles)) {
+            return $assignmentResults;
+        }
+
+        foreach ($assignments as $assignment) {
+            $timSalesD = TimSalesDetail::with('user', 'timSales')->find($assignment['tim_sales_d_id']);
+
+            if ($timSalesD) {
+                // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
+                foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
+                    LeadsKebutuhan::updateOrCreate(
+                        [
+                            'leads_id' => $lead->id,
+                            'kebutuhan_id' => $kebutuhan_id
+                        ],
+                        [
+                            'tim_sales_id' => $timSalesD->tim_sales_id,
+                            'tim_sales_d_id' => $timSalesD->id
+                        ]
+                    );
+                }
+
+                $assignmentResults[] = [
+                    'type' => 'manual_assign',
+                    'sales_assigned' => [
+                        'tim_sales_d_id' => $timSalesD->id,
+                        'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
+                        'tim_sales_id' => $timSalesD->tim_sales_id,
+                        'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
+                    ],
+                    'kebutuhan_assigned' => $assignment['kebutuhan_ids']
+                ];
+            }
+        }
+
+        // Update lead dengan sales dari assignment pertama (untuk konsistensi)
+        if (!empty($assignments[0]['tim_sales_d_id'])) {
+            $firstTimSalesD = TimSalesDetail::find($assignments[0]['tim_sales_d_id']);
+            if ($firstTimSalesD) {
+                $lead->update([
+                    'tim_sales_id' => $firstTimSalesD->tim_sales_id,
+                    'tim_sales_d_id' => $firstTimSalesD->id
+                ]);
+            }
+        }
+
+        return $assignmentResults;
+    }
+
+    /**
+     * Sync kebutuhan tanpa assignment sales
+     */
+    private function syncKebutuhanTanpaSales($lead, $kebutuhanIds)
+    {
+        $lead->kebutuhan()->sync($kebutuhanIds);
+        return [];
+    }
+    /**
+     * Sync kebutuhan dengan mempertahankan sales existing
+     */
+    private function syncKebutuhanDenganSalesExisting($lead, $kebutuhanIds)
+    {
+        // Ambil data kebutuhan existing beserta sales-nya
+        $existingKebutuhan = LeadsKebutuhan::where('leads_id', $lead->id)
+            ->whereIn('kebutuhan_id', $kebutuhanIds)
+            ->get()
+            ->keyBy('kebutuhan_id');
+
+        $kebutuhanData = [];
+
+        foreach ($kebutuhanIds as $kebutuhan_id) {
+            $existing = $existingKebutuhan->get($kebutuhan_id);
+
+            $kebutuhanData[$kebutuhan_id] = [
+                'tim_sales_id' => $existing ? $existing->tim_sales_id : null,
+                'tim_sales_d_id' => $existing ? $existing->tim_sales_d_id : null
+            ];
+        }
+
+        $lead->kebutuhan()->sync($kebutuhanData);
+
+        return [];
+    }
+
 }

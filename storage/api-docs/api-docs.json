@@ -8959,8 +8959,8 @@
                 "tags": [
                     "Leads"
                 ],
-                "summary": "Membuat lead baru",
-                "description": "Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi (similarity > 95%), generate nomor lead otomatis, membuat aktivitas pertama, dan assign ke tim sales jika user adalah sales. Juga mendukung pembuatan grup perusahaan baru.",
+                "summary": "Membuat lead baru dengan assign sales ke kebutuhan",
+                "description": "Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi, generate nomor lead otomatis, membuat aktivitas pertama, dan assign sales ke kebutuhan berdasarkan role user:\n     *                 - User role 29 (Sales): Auto assign ke semua kebutuhan\n     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan\n     *                 - User lainnya: Hanya sync kebutuhan tanpa sales",
                 "operationId": "4214eac4602ababdf9addbc28de2d8c4",
                 "requestBody": {
                     "required": true,
@@ -9086,15 +9086,46 @@
                                         "type": "integer",
                                         "example": 79
                                     },
-                                    "perusahaan_group_id": {
-                                        "description": "ID grup perusahaan jika ada. Gunakan '__new__' untuk membuat grup baru",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "new_nama_grup": {
-                                        "description": "Nama grup baru jika perusahaan_group_id = '__new__'",
-                                        "type": "string",
-                                        "example": "ABC Group"
+                                    "assignments": {
+                                        "description": "Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "tim_sales_d_id": {
+                                                    "description": "ID Tim Sales Detail",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "kebutuhan_ids": {
+                                                    "description": "Array ID kebutuhan yang diassign ke sales ini",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "example": [
+                                                        1,
+                                                        2
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "example": [
+                                            {
+                                                "tim_sales_d_id": 1,
+                                                "kebutuhan_ids": [
+                                                    1,
+                                                    2
+                                                ]
+                                            },
+                                            {
+                                                "tim_sales_d_id": 2,
+                                                "kebutuhan_ids": [
+                                                    3,
+                                                    4
+                                                ]
+                                            }
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -9119,17 +9150,80 @@
                                         },
                                         "data": {
                                             "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
+                                                "lead": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nomor": {
+                                                            "type": "string",
+                                                            "example": "AAAAB"
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT ABC Indonesia"
+                                                        },
+                                                        "tgl_leads": {
+                                                            "type": "string",
+                                                            "example": "2024-01-15 10:30:00"
+                                                        },
+                                                        "tim_sales_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "tim_sales_d_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 },
-                                                "nomor": {
-                                                    "type": "string",
-                                                    "example": "AAAAB"
-                                                },
-                                                "nama_perusahaan": {
-                                                    "type": "string",
-                                                    "example": "PT ABC Indonesia"
+                                                "assignments": {
+                                                    "description": "Detail assignment sales yang berhasil dilakukan",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "type": {
+                                                                "description": "auto_assign atau manual_assign",
+                                                                "type": "string",
+                                                                "example": "auto_assign"
+                                                            },
+                                                            "sales_assigned": {
+                                                                "properties": {
+                                                                    "tim_sales_d_id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "sales_name": {
+                                                                        "type": "string",
+                                                                        "example": "John Sales"
+                                                                    },
+                                                                    "tim_sales_id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "tim_sales_name": {
+                                                                        "type": "string",
+                                                                        "example": "Tim Sales Jakarta"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "kebutuhan_assigned": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "example": [
+                                                                    1,
+                                                                    2,
+                                                                    3
+                                                                ]
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
                                                 }
                                             },
                                             "type": "object"
@@ -9228,8 +9322,8 @@
                 "tags": [
                     "Leads"
                 ],
-                "summary": "Mengupdate data lead yang sudah ada",
-                "description": "Endpoint ini digunakan untuk mengupdate informasi lead yang sudah ada berdasarkan ID. Semua field yang dikirim akan diupdate kecuali nomor lead, tanggal lead, dan status. Update dilakukan dalam database transaction untuk menjaga integritas data.",
+                "summary": "Mengupdate data lead yang sudah ada dengan assignment sales",
+                "description": "Endpoint ini digunakan untuk mengupdate informasi lead yang sudah ada berdasarkan ID. Semua field yang dikirim akan diupdate. Assignment sales dilakukan berdasarkan role user:\n     *                 - User role 29 (Sales): Auto assign jika lead belum memiliki sales\n     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan\n     *                 - User lainnya: Hanya sync kebutuhan dengan mempertahankan sales existing",
                 "operationId": "812efc9bf39e0e7486472880eb883a5d",
                 "parameters": [
                     {
@@ -9282,13 +9376,15 @@
                                         "example": 1
                                     },
                                     "kebutuhan": {
+                                        "description": "Array ID kebutuhan produk/layanan",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
                                         },
                                         "example": [
                                             1,
-                                            2
+                                            2,
+                                            3
                                         ]
                                     },
                                     "alamat_perusahaan": {
@@ -9342,6 +9438,47 @@
                                     "negara": {
                                         "type": "integer",
                                         "example": 1
+                                    },
+                                    "assignments": {
+                                        "description": "Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "tim_sales_d_id": {
+                                                    "description": "ID Tim Sales Detail",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "kebutuhan_ids": {
+                                                    "description": "Array ID kebutuhan yang diassign ke sales ini",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "example": [
+                                                        1,
+                                                        2
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "example": [
+                                            {
+                                                "tim_sales_d_id": 1,
+                                                "kebutuhan_ids": [
+                                                    1,
+                                                    2
+                                                ]
+                                            },
+                                            {
+                                                "tim_sales_d_id": 2,
+                                                "kebutuhan_ids": [
+                                                    3,
+                                                    4
+                                                ]
+                                            }
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -9365,6 +9502,77 @@
                                             "example": "Leads PT ABC Indonesia berhasil diupdate"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "lead": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nomor": {
+                                                            "type": "string",
+                                                            "example": "AAAAB"
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT ABC Indonesia"
+                                                        },
+                                                        "tim_sales_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "tim_sales_d_id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "assignments": {
+                                                    "description": "Detail assignment sales yang berhasil dilakukan",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "type": {
+                                                                "type": "string",
+                                                                "example": "manual_assign"
+                                                            },
+                                                            "sales_assigned": {
+                                                                "properties": {
+                                                                    "tim_sales_d_id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "sales_name": {
+                                                                        "type": "string",
+                                                                        "example": "John Sales"
+                                                                    },
+                                                                    "tim_sales_id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "tim_sales_name": {
+                                                                        "type": "string",
+                                                                        "example": "Tim Sales Jakarta"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "kebutuhan_assigned": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "example": [
+                                                                    1,
+                                                                    2
+                                                                ]
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -10934,6 +11142,348 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/sales-kebutuhan/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Melihat sales yang diassign per kebutuhan untuk lead",
+                "description": "Endpoint ini digunakan untuk melihat sales yang sudah diassign untuk setiap kebutuhan pada suatu lead. Satu sales bisa memiliki lebih dari satu kebutuhan.",
+                "operationId": "062024cb46623eed9f3cc502836f2dc4",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead yang ingin dilihat sales per kebutuhannya",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data sales per kebutuhan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data sales per kebutuhan berhasil diambil"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "sales_summary": {
+                                                    "description": "Ringkasan sales dan kebutuhannya",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "tim_sales_d_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "sales_name": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "kebutuhan_count": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "kebutuhan_list": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "properties": {
+                                                                        "kebutuhan_id": {
+                                                                            "type": "integer",
+                                                                            "example": 1
+                                                                        },
+                                                                        "kebutuhan_nama": {
+                                                                            "type": "string",
+                                                                            "example": "Kebutuhan A"
+                                                                        }
+                                                                    },
+                                                                    "type": "object"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "detailed_data": {
+                                                    "description": "Data detail setiap record",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "leads_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "kebutuhan_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "tim_sales_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "tim_sales_d_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "kebutuhan": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Kebutuhan A"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "tim_sales_d": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Sales Name"
+                                                                    },
+                                                                    "user": {
+                                                                        "properties": {
+                                                                            "id": {
+                                                                                "type": "integer",
+                                                                                "example": 1
+                                                                            },
+                                                                            "full_name": {
+                                                                                "type": "string",
+                                                                                "example": "John Doe"
+                                                                            }
+                                                                        },
+                                                                        "type": "object"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Lead tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Lead tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/assign-sales/{id}": {
+            "put": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mengassign sales ke leads berdasarkan kebutuhan",
+                "description": "Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
+                "operationId": "302b4ec882a47d5cc7bbf878c7ef4dbc",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead yang akan diassign sales",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "assignments"
+                                ],
+                                "properties": {
+                                    "assignments": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "tim_sales_d_id": {
+                                                    "description": "ID dari Tim Sales Detail",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "kebutuhan_ids": {
+                                                    "description": "Array ID kebutuhan yang akan diassign ke sales ini",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "example": [
+                                                        1,
+                                                        2
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Sales berhasil diassign ke kebutuhan lead",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Sales berhasil diassign ke kebutuhan lead"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/remove-sales/{id}": {
+            "delete": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Menghapus assignment sales dari kebutuhan tertentu",
+                "description": "Endpoint ini digunakan untuk menghapus assignment sales dari kebutuhan tertentu pada lead.",
+                "operationId": "4fe82e7e7fa9cdab88bd8de9ff64cab2",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "kebutuhan_ids"
+                                ],
+                                "properties": {
+                                    "kebutuhan_ids": {
+                                        "description": "Array ID kebutuhan yang akan dihapus assignment sales-nya",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Assignment sales berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Assignment sales berhasil dihapus dari kebutuhan"
                                         }
                                     },
                                     "type": "object"
@@ -16955,17 +17505,34 @@
                 ]
             }
         },
-        "/api/quotations/leads": {
+        "/api/quotations/available-leads/{tipe_quotation}": {
             "get": {
                 "tags": [
                     "Quotations"
                 ],
-                "summary": "Get quotations by leads",
-                "description": "Retrieves all quotations for a specific leads/company",
-                "operationId": "5b67e03147d0ce898d9400660bc99191",
+                "summary": "Mendapatkan daftar leads yang tersedia untuk aktivitas berdasarkan tipe quotation",
+                "description": "Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya.",
+                "operationId": "1aa239812cbc2fbde33b1a0dfc69810a",
+                "parameters": [
+                    {
+                        "name": "tipe_quotation",
+                        "in": "path",
+                        "description": "Tipe quotation untuk filter leads",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "revisi",
+                                "rekontrak"
+                            ],
+                            "example": "baru"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Quotations retrieved successfully",
+                        "description": "Berhasil mengambil data leads tersedia",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -16974,36 +17541,37 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data leads tersedia berhasil diambil"
+                                        },
                                         "data": {
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotations retrieved successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Leads not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Leads not found"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT ABC Indonesia"
+                                                    },
+                                                    "pic": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "wilayah": {
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "status_leads": {
+                                                        "type": "string",
+                                                        "example": "New Lead"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
                                         }
                                     },
                                     "type": "object"

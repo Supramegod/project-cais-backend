@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\TimSalesDetail;
 use App\Services\QuotationDuplicationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -1025,40 +1026,96 @@ class QuotationController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/quotations/leads",
+     *     path="/api/quotations/available-leads/{tipe_quotation}",
+     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas berdasarkan tipe quotation",
+     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya.",
      *     tags={"Quotations"},
-     *     summary="Get quotations by leads",
-     *     description="Retrieves all quotations for a specific leads/company",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Quotations retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotations retrieved successfully")
-     *         )
+     *     @OA\Parameter(
+     *         name="tipe_quotation",
+     *         in="path",
+     *         description="Tipe quotation untuk filter leads",
+     *         required=true,
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="baru")
      *     ),
      *     @OA\Response(
-     *         response=404,
-     *         description="Leads not found",
+     *         response=200,
+     *         description="Berhasil mengambil data leads tersedia",
      *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Leads not found"),
-     *             @OA\Property(property="error", type="string", example="Error details")
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="pic", type="string", example="John Doe"),
+     *                     @OA\Property(property="wilayah", type="string", example="Jakarta"),
+     *                     @OA\Property(property="status_leads", type="string", example="New Lead")
+     *                 )
+     *             )
      *         )
      *     )
      * )
      */
-    public function getByLeads(): JsonResponse
+    public function availableLeads($tipe_quotation)
     {
         try {
-            set_time_limit(0);
+            // Validasi parameter tipe_quotation
+            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, atau rekontrak'
+                ], 400);
+            }
 
-            $leads = Leads::with(['statusLeads', 'branch'])
-                ->withoutTrashed()
-                ->get();
+            $user = auth()->user();
 
+            // Base query dengan relasi yang diperlukan
+            $query = Leads::with([
+                'statusLeads',
+                'branch'
+            ]);
+
+            // Filter berdasarkan tipe quotation
+            if ($tipe_quotation === 'baru') {
+                $query->whereNull('customer_id'); // Leads baru yang belum menjadi customer
+            } else {
+                $query->whereNotNull('customer_id'); // Leads untuk revisi/rekontrak yang sudah menjadi customer
+            }
+
+            // Role-based filtering
+            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+                if ($user->role_id == 29) {
+                    $query->whereHas('timSalesD', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    });
+                } elseif ($user->role_id == 31) {
+                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
+                    if ($timSalesDetail) {
+                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
+                            ->pluck('user_id')
+                            ->toArray();
+                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
+                            $q->whereIn('user_id', $memberSalesUserIds);
+                        });
+                    } else {
+                        $query->whereRaw('1 = 0');
+                    }
+                }
+            } elseif (in_array($user->role_id, [54, 55, 56])) {
+                if ($user->role_id == 54) {
+                    $query->where('crm_id', $user->id);
+                }
+            }
+
+            // Order by terbaru
+            $query->orderBy('created_at', 'desc');
+
+            $leads = $query->get();
+
+            // Mapping data sederhana
             $data = $leads->map(function ($lead) {
                 return [
                     'id' => $lead->id,
@@ -1070,17 +1127,15 @@ class QuotationController extends Controller
             });
 
             return response()->json([
-                'message' => 'Leads retrieved successfully',
                 'success' => true,
-                'data' => $data,
-            ], 200);
-
+                'message' => "Data leads untuk quotation {$tipe_quotation} berhasil diambil",
+                'data' => $data
+            ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Leads not found',
-                'error' => $e->getMessage(),
-            ], 404);
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
         }
     }
 
