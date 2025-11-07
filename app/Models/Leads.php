@@ -81,6 +81,7 @@ class Leads extends Model
             'leads_id',                // foreign key di tabel pivot
             'kebutuhan_id'             // foreign key ke tabel kebutuhan
         )
+            ->withPivot('tim_sales_id', 'tim_sales_d_id')
             ->wherePivot('deleted_at', null); // Tambahkan kondisi ini
     }
 
