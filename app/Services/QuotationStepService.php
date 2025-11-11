@@ -384,26 +384,28 @@ class QuotationStepService
     }
     public function updateStep3(Quotation $quotation, Request $request): void
     {
-        // Jika request berisi headCountData array
+        // Kalau request kirim banyak data (headCountData)
         if ($request->has('headCountData') && is_array($request->headCountData)) {
-            foreach ($request->headCountData as $detail) {
-                $this->addDetailHCFromArray($quotation, $detail);
-            }
+            $this->syncDetailHCFromArray($quotation, $request->headCountData);
         }
-        // TAMBAHKAN: Handle data langsung (tanpa array headCountData)
-        if ($request->has('position_id') && $request->has('quotation_site_id')) {
+
+        // Kalau kirim satu data langsung
+        elseif ($request->has('position_id') && $request->has('quotation_site_id')) {
             $detailData = [
-                'quotation_site_id' => $request->quotation_site_id,
-                'position_id' => $request->position_id,
-                'jumlah_hc' => $request->jumlah_hc,
-                'jabatan_kebutuhan' => $request->jabatan_kebutuhan,
-                'nama_site' => $request->nama_site,
-                'nominal_upah' => $request->nominal_upah ?? 0 // tambahkan default value
+                [ // bungkus jadi array of array
+                    'quotation_site_id' => $request->quotation_site_id,
+                    'position_id' => $request->position_id,
+                    'jumlah_hc' => $request->jumlah_hc,
+                    'jabatan_kebutuhan' => $request->jabatan_kebutuhan,
+                    'nama_site' => $request->nama_site,
+                    'nominal_upah' => $request->nominal_upah ?? 0,
+                ]
             ];
 
-            $this->addDetailHCFromArray($quotation, $detailData);
+            $this->syncDetailHCFromArray($quotation, $detailData);
         }
     }
+
 
     public function updateStep4(Quotation $quotation, Request $request): void
     {
@@ -976,6 +978,69 @@ class QuotationStepService
             }
         }
     }
+    public function syncDetailHCFromArray(Quotation $quotation, array $details)
+    {
+        try {
+            DB::beginTransaction();
+
+            $current_date_time = Carbon::now()->toDateTimeString();
+            $user = Auth::user()->full_name;
+
+            // Ambil semua detail ID lama
+            $existingDetails = QuotationDetail::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->pluck('id', 'position_id'); // key = position_id biar gampang dicocokkan
+
+            $incomingPositionIds = collect($details)->pluck('position_id')->toArray();
+
+            // Soft delete yang tidak dikirim lagi
+            $toDelete = $existingDetails->keys()->diff($incomingPositionIds);
+            if ($toDelete->isNotEmpty()) {
+                $deletedDetails = QuotationDetail::where('quotation_id', $quotation->id)
+                    ->whereIn('position_id', $toDelete)
+                    ->get();
+
+                foreach ($deletedDetails as $detail) {
+                    $detail->update([
+                        'deleted_at' => $current_date_time,
+                        'deleted_by' => $user
+                    ]);
+
+                    QuotationDetailHpp::where('quotation_detail_id', $detail->id)->update([
+                        'deleted_at' => $current_date_time,
+                        'deleted_by' => $user
+                    ]);
+                    QuotationDetailCoss::where('quotation_detail_id', $detail->id)->update([
+                        'deleted_at' => $current_date_time,
+                        'deleted_by' => $user
+                    ]);
+                    QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)->update([
+                        'deleted_at' => $current_date_time,
+                        'deleted_by' => $user
+                    ]);
+                    DB::table('sl_quotation_detail_requirement')
+                        ->where('quotation_detail_id', $detail->id)
+                        ->update([
+                            'deleted_at' => $current_date_time,
+                            'deleted_by' => $user
+                        ]);
+                }
+            }
+
+            // === Masuk ke loop data baru ===
+            foreach ($details as $detail) {
+                $this->addDetailHCFromArray($quotation, $detail); // pakai fungsi yang sudah kamu buat
+            }
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in syncDetailHCFromArray: " . $e->getMessage());
+            throw new \Exception("Failed to sync HC details: " . $e->getMessage());
+        }
+    }
+
     public function addDetailHCFromArray(Quotation $quotation, array $detail)
     {
         try {
