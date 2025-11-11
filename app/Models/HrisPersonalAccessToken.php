@@ -44,4 +44,9 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
     {
         return !$this->isValid();
     }
+    public function refreshToken()
+    {
+        return $this->hasOne(RefreshTokens::class, 'access_token_id');
+    }
+
 }

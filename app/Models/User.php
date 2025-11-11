@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -79,5 +80,48 @@ class User extends Authenticatable
     public function customerActivities()
     {
         return $this->hasMany(CustomerActivity::class, 'user_id');
+    }
+    // Method untuk membuat token pair dengan Sanctum
+    public function createTokenPair($name = 'auth_token', array $abilities = ['*'])
+    {
+        // Hapus token lama yang expired
+        $this->tokens()->where('expires_at', '<', now())->delete();
+
+        // Buat access token dengan Sanctum (2 jam expiry)
+        $accessToken = $this->createToken($name, $abilities, now()->addHours(2));
+
+        // Buat refresh token
+        $refreshToken = RefreshTokens::create([
+            'access_token_id' => $accessToken->accessToken->id,
+            'token' => hash('sha256', $plainRefreshToken = \Illuminate\Support\Str::random(40)),
+            // 'expires_at' => now()->addDays(7)
+        ]);
+
+        return [
+            'access_token' => $accessToken,
+            'refresh_token' => $plainRefreshToken,
+            'refresh_token_model' => $refreshToken
+        ];
+    }
+
+    // Relasi ke refresh tokens melalui access tokens
+    public function refreshTokens()
+    {
+        return $this->hasManyThrough(
+            RefreshTokens::class,
+            HrisPersonalAccessToken::class,
+            'tokenable_id', // Foreign key pada personal_access_tokens
+            'access_token_id', // Foreign key pada refresh_tokens
+            'id', // Local key pada users
+            'id' // Local key pada personal_access_tokens
+        );
+    }
+
+    public function scopeCheckLogin(Builder $query, $username, $password)
+    {
+        $hashedPassword = md5('SHELTER-' . $password . '-SHELTER');
+
+        return $query->where('username', $username)
+            ->where('password', $hashedPassword);
     }
 }

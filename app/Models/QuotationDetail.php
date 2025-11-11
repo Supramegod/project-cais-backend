@@ -17,4 +17,20 @@ class QuotationDetail extends Model
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+    // App/Models/QuotationDetail.php
+    public function quotationDetailRequirements()
+    {
+        return $this->hasMany(QuotationDetailRequirement::class, 'quotation_detail_id', 'id');
+    }
+
+    public function quotationDetailTunjangans()
+    {
+        return $this->hasMany(QuotationDetailTunjangan::class, 'quotation_detail_id', 'id');
+    }
+
+    public function position()
+    {
+        return $this->belongsTo(Position::class, 'position_id', 'id');
+    }
+
 }

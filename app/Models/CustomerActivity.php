@@ -17,6 +17,7 @@ class CustomerActivity extends Model
         'branch_id',
         'nomor',
         'leads_id',
+        'spk_id',
         'pks_id',
         'tim_sales_id',
         'tim_sales_d_id',

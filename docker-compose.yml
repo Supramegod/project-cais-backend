@@ -1,0 +1,29 @@
+services:
+ cais-be-dev:
+   build:
+     context: /home/data/development/project-cais-backend
+     dockerfile: Dockerfile
+   #image: hris-dev:latest
+   container_name: cais-backend-dev
+   ports:
+     - "8282:80"
+     - "9001:9000"
+   working_dir: /var/www
+   volumes:
+     - /home/data/development/project-cais-backend:/var/www/laravel
+     - /home/data/development/project-cais-backend/storage:/var/www/laravel/storage
+     #- .:/var/www
+     #- /home/data/hris-shelter/files:/var/www/html/files
+   #command: sh -c "php artisan queue:work --sleep=3 --tries=3"
+   #command: php artisan queue:work --sleep=3 --tries=3
+   #command: >
+   #   sh -c "
+   #     php artisan migrate --force &&
+   #     php artisan storage:link &&
+   #     php-fpm
+   #   "
+
+networks:
+  default:
+    external:
+      name: shelter-network

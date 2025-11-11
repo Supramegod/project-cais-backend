@@ -181,7 +181,6 @@ class CustomerController extends Controller
                 $error = 'Tanggal dari tidak boleh melebihi tanggal sampai';
             }
 
-            // Data master untuk dropdown
 
             // Query base dengan role-based filtering
             $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD'])
@@ -206,7 +205,7 @@ class CustomerController extends Controller
             $customers = $query->get()->map(function ($item) use ($tim) {
                 // Format tambahan untuk response
                 $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->sales = $item->timSalesDetail->nama ?? null;
+                $item->sales = $item->timSalesD->nama ?? null;
                 $item->status_name = $item->statusLeads->nama ?? null;
                 $item->branch_name = $item->branch->name ?? null;
                 $item->platform_name = $item->platform->nama ?? null;
@@ -468,7 +467,7 @@ class CustomerController extends Controller
                     'kebutuhan:id,nama',
                     'branch:id,name',
                     'timSales:id,nama',
-                    'timSalesDetail:id,nama,tim_sales_id,user_id'
+                    'timSalesD:id,nama,tim_sales_id,user_id'
                 ]);
 
             // Apply role-based filtering
@@ -543,7 +542,7 @@ class CustomerController extends Controller
         // Sales division filtering
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
             if ($roleId == 29) { // Sales
-                $query->whereHas('timSalesDetail', function ($q) {
+                $query->whereHas('timSalesD', function ($q) {
                     $q->where('user_id', Auth::id());
                 });
             } else if ($roleId == 31) { // SPV Sales
@@ -589,7 +588,7 @@ class CustomerController extends Controller
         // divisi sales
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
             if ($roleId == 29) { // sales
-                $query->whereHas('timSalesDetail', function ($q) {
+                $query->whereHas('timSalesD', function ($q) {
                     $q->where('user_id', Auth::id());
                 });
             } else if ($roleId == 31) { // spv sales

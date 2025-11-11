@@ -22,4 +22,8 @@ class Issue extends Model
     {
         return $this->belongsTo(Pks::class, 'pks_id');
     }
+      public function lead()
+    {
+        return $this->belongsTo(Leads::class, 'leads_id');
+    }
 }

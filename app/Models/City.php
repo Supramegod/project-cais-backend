@@ -15,7 +15,7 @@ class City extends Model
     
     protected $fillable = [
         'province_id',
-        'nama',
+        'name',
         'kode',
         'is_active'
     ];
@@ -33,5 +33,13 @@ class City extends Model
     public function leads()
     {
         return $this->hasMany(Leads::class, 'kota_id');
+    }
+
+    /**
+     * Scope untuk filter berdasarkan province
+     */
+    public function scopeByProvince($query, $provinceId)
+    {
+        return $query->where('province_id', $provinceId);
     }
 }

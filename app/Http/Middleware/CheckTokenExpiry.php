@@ -5,7 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
-use App\Models\HrisPersonalAccessToken;
+use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Log;
 
 class CheckTokenExpiry
@@ -23,8 +23,8 @@ class CheckTokenExpiry
 
         $token = $user->currentAccessToken();
         
-        if ($token && $token instanceof HrisPersonalAccessToken && $token->isExpired()) {
-            Log::warning('Token expired attempt', [
+        if ($token && $token->expires_at && now()->gt($token->expires_at)) {
+            Log::warning('Access token expired attempt', [
                 'user_id' => $user->id,
                 'username' => $user->username,
                 'token_id' => $token->id,
@@ -33,7 +33,7 @@ class CheckTokenExpiry
 
             return response()->json([
                 'success' => false,
-                'message' => 'Token telah kadaluarsa'
+                'message' => 'Access token telah kadaluarsa, silakan gunakan refresh token'
             ], 401);
         }
 

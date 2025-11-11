@@ -14,6 +14,7 @@ class Spk extends Model
     protected $table = 'sl_spk';
     protected $fillable = [
         'leads_id',
+        'nomor_quotation',
         'quotation_id',
         'nomor',
         'tgl_spk',
@@ -24,10 +25,10 @@ class Spk extends Model
         'status_spk_id',
         'created_by',
         'updated_by',
+        'deleted_at',
         'deleted_by'
     ];
 
-    protected $dates = ['deleted_at'];
 
     public function leads()
     {

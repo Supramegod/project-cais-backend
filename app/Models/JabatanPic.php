@@ -28,9 +28,9 @@ class JabatanPic extends Model
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
 
     // Casts (Opsional, sesuaikan jika ada boolean atau tipe data lain)
-    protected $casts = [
-        'is_active' => 'boolean',
-    ];
+    // protected $casts = [
+    //     'is_active' => 'boolean',
+    // ];
 
     // Accessor untuk formatting tanggal (opsional, jika diperlukan)
     public function getCreatedAtAttribute($value)

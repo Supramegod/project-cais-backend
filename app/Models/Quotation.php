@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class Quotation extends Model
 {
@@ -13,12 +14,113 @@ class Quotation extends Model
 
     protected $table = 'sl_quotation';
     protected $fillable = [
-        'leads_id', 'nomor', 'tanggal', 'status_quotation_id', 'total_harga',
-        'created_by', 'updated_by', 'deleted_by', 'npwp', 'tgl_penempatan',
-        'company_id', 'kebutuhan', 'kebutuhan_id', 'jumlah_site', 'revisi',
-        'alasan_revisi', 'quotation_asal_id', 'is_aktif', 'step', 'top', 'persentase',
-        'tgl_quotation', 'nama_perusahaan', 'tim_sales_id', 'tim_sales_d_id','tgl_quotation',
-        'ot1', 'ot2', 'ot3' // TAMBAHKAN FIELD INI
+        // Kolom yang sudah ada
+        'leads_id',
+        'nomor',
+        'status_quotation_id',
+        'total_harga',
+        'created_by',
+        'updated_by',
+        'deleted_by',
+        'npwp',
+        'tgl_penempatan',
+        'company_id',
+        'kebutuhan',
+        'kebutuhan_id',
+        'jumlah_site',
+        'revisi',
+        'alasan_revisi',
+        'quotation_asal_id',
+        'is_aktif',
+        'step',
+        'top',
+        'persentase',
+        'tgl_quotation',
+        'nama_perusahaan',
+        'tim_sales_id',
+        'tim_sales_d_id',
+        'ot1',
+        'ot2',
+        'ot3',
+        // Kolom baru yang ditambahkan
+        'quotation_client_id',
+        'layanan_id',
+        'layanan',
+        'nama_site',
+        'company',
+        'mulai_kontrak',
+        'kontrak_selesai',
+        'penempatan',
+        'salary_rule_id',
+        'tipe_hari_invoice',
+        'jumlah_hari_invoice',
+        'alamat_npwp',
+        'pic_invoice',
+        'telp_pic_invoice',
+        'email_pic_invoice',
+        'evaluasi_kontrak',
+        'durasi_kerjasama',
+        'durasi_karyawan',
+        'evaluasi_karyawan',
+        'rule_thr_id',
+        'materai',
+        'shift_kerja',
+        'hari_kerja',
+        'jam_kerja',
+        'mulai_kerja',
+        'selesai_kerja',
+        'sistem_kerja',
+        'cuti',
+        'hari_cuti_kematian',
+        'hari_istri_melahirkan',
+        'hari_cuti_menikah',
+        'gaji_saat_cuti',
+        'prorate',
+        'kunjungan_operasional',
+        'kunjungan_tim_crm',
+        'keterangan_kunjungan_tim_crm',
+        'keterangan_kunjungan_operasional',
+        'training',
+        'kompensasi',
+        'joker_reliever',
+        'syarat_invoice',
+        'lembur',
+        'nominal_lembur',
+        'jenis_bayar_lembur',
+        'jam_per_bulan_lembur',
+        'alamat_penagihan_invoice',
+        'catatan_site',
+        'status_serikat',
+        'tunjangan_holiday',
+        'nominal_tunjangan_holiday',
+        'jenis_bayar_tunjangan_holiday',
+        'ppn_pph_dipotong',
+        'penagihan',
+        'provinsi_id',
+        'provinsi',
+        'kota_id',
+        'kota',
+        'upah',
+        'nominal_upah',
+        'hitungan_upah',
+        'management_fee_id',
+        'jenis_perusahaan_id',
+        'jenis_perusahaan',
+        'bidang_perusahaan_id',
+        'bidang_perusahaan',
+        'resiko',
+        'penjamin',
+        'program_bpjs',
+        'nominal_takaful',
+        'persen_insentif',
+        'persen_bunga_bank',
+        'note_harga_jual',
+        'lembur_ditagihkan',
+        'is_ppn',
+        'pks_id',
+        'ot4',
+        'ot5',
+        'is_sandbox',
     ];
     protected $dates = ['deleted_at'];
 
@@ -73,8 +175,6 @@ class Quotation extends Model
     {
         return $this->belongsTo(StatusQuotation::class, 'status_quotation_id');
     }
-
-    // RELASI BARU YANG DIPERLUKAN:
 
     // Relasi ke QuotationSite
     public function quotationSites()
@@ -226,5 +326,96 @@ class Quotation extends Model
     public function quotationRevisions()
     {
         return $this->hasMany(Quotation::class, 'quotation_asal_id');
+    }
+    // Alternatif yang lebih clean di Quotation.php
+    public function scopeByUserRole($query, $user = null)
+    {
+        $user = $user ?: Auth::user();
+
+        if (!$user) {
+            return $query;
+        }
+
+        // Sales division
+        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+            if ($user->role_id == 29) {
+                // Sales
+                $query->whereHas('leads.timSalesD', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            } elseif ($user->role_id == 31) {
+                // SPV Sales - menggunakan model dengan scope
+                $tim = TimSalesDetail::where('user_id', $user->id)->first();
+                if ($tim) {
+                    $memberSales = TimSalesDetail::byTeam($tim->tim_sales_id)
+                        ->active() // hanya yang aktif
+                        ->pluck('user_id');
+                    $query->whereHas('leads.timSalesD', function ($q) use ($memberSales) {
+                        $q->whereIn('user_id', $memberSales);
+                    });
+                }
+            }
+        } elseif (in_array($user->role_id, [4, 5])) {
+            // RO
+            $query->whereHas('leads', function ($q) use ($user) {
+                $q->where('ro_id', $user->id);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by date range
+     */
+    public function scopeDateRange($query, $startDate = null, $endDate = null)
+    {
+        $startDate = $startDate ?: Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
+        $endDate = $endDate ?: Carbon::now()->toDateString();
+
+        return $query->whereBetween('tgl_quotation', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope untuk filter by company
+     */
+    public function scopeByCompany($query, $companyId = null)
+    {
+        if ($companyId) {
+            return $query->where('company_id', $companyId);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by kebutuhan
+     */
+    public function scopeByKebutuhan($query, $kebutuhanId = null)
+    {
+        if ($kebutuhanId) {
+            return $query->where('kebutuhan_id', $kebutuhanId);
+        }
+        return $query;
+    }
+
+    /**
+     * Scope untuk filter by status
+     */
+    public function scopeByStatus($query, $statusId = null)
+    {
+        if ($statusId) {
+            return $query->where('status_quotation_id', $statusId);
+        }
+        return $query;
+    }
+    // Tambahkan relasi
+    public function quotationReferensi()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_referensi_id');
+    }
+
+    public function quotationTurunan()
+    {
+        return $this->hasMany(Quotation::class, 'quotation_referensi_id');
     }
 }

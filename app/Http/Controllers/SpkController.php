@@ -108,7 +108,8 @@ class SpkController extends Controller
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
             $query = Spk::with(['leads', 'statusSpk', 'spkSites'])
-                ->whereNull('deleted_at');
+                ->whereNull('deleted_at')
+                ->orderBy('created_at', 'desc');
 
             if (!empty($request->status)) {
                 $query->where('status_spk_id', $request->status);
@@ -188,14 +189,6 @@ class SpkController extends Controller
      *                 @OA\Property(property="layanan", type="string", example="Security Service")
      *             ))
      *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Error server",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Error fetching available quotations")
-     *         )
      *     )
      * )
      */
@@ -232,7 +225,6 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching available quotations', $e->getMessage());
         }
     }
-
     /**
      * @OA\Get(
      *     path="/api/spk/available-leads",
@@ -265,51 +257,46 @@ class SpkController extends Controller
      *     )
      * )
      */
-    public function availableLeads()
+    public function availableLeads(Request $request)
     {
         try {
-            $data = QuotationSite::with(['quotation.leads.timSalesD'])
-                ->whereNull('deleted_at')
-                ->whereHas('quotation', function ($query) {
+            $data = Leads::whereHas('quotations.quotationSites', function ($query) {
+                $query->whereNull('deleted_at')
+                    ->whereDoesntHave('spkSite', function ($q) {
+                        $q->whereNull('deleted_at');
+                    });
+            })
+                ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
-                        ->where('is_aktif', 1)
-                        ->whereHas('leads.timSalesD', function ($q) {
-                            $q->where('user_id', Auth::user()->id);
-                        });
+                        ->where('is_aktif', 1);
                 })
-                ->whereDoesntHave('spkSite')
-                ->get()
-                ->map(function ($site) {
-                    $leads = $site->quotation->leads;
-                    return [
-                        'id' => $leads->id,
-                        'nomor' => $leads->nomor,
-                        'nama_perusahaan' => $leads->nama_perusahaan,
-                        'provinsi' => $leads->provinsi,
-                        'kota' => $leads->kota
-                    ];
-                });
+                ->whereHas('timSalesD', function ($query) {
+                    $query->where('user_id', Auth::user()->id);
+                })
+                ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+                ->distinct()
+                ->get();
 
             return $this->successResponse('Available leads retrieved successfully', $data);
 
         } catch (\Exception $e) {
+            \Log::error('Error in availableLeads: ' . $e->getMessage());
             return $this->errorResponse('Error fetching available leads', $e->getMessage());
         }
     }
 
-    /**
+    /**up
      * @OA\Post(
      *     path="/api/spk/add",
      *     summary="Membuat SPK baru",
-     *     description="Endpoint untuk membuat SPK baru berdasarkan leads dan quotation site yang dipilih.",
+     *     description="Endpoint untuk membuat SPK baru berdasarkan leads dan site yang dipilih.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"leads_id", "quotation_id", "tanggal_spk", "site_ids"},
+     *             required={"leads_id", "tanggal_spk", "site_ids"},
      *             @OA\Property(property="leads_id", type="integer", example=1, description="ID Leads"),
-     *             @OA\Property(property="quotation_id", type="integer", example=1, description="ID Quotation"),
      *             @OA\Property(property="tanggal_spk", type="string", format="date", example="2024-01-15", description="Tanggal SPK"),
      *             @OA\Property(property="site_ids", type="array", @OA\Items(type="integer"), example={1,2,3}, description="Array ID Quotation Site")
      *         )
@@ -326,28 +313,9 @@ class SpkController extends Controller
      *                 @OA\Property(property="tgl_spk", type="string", example="2024-01-15"),
      *                 @OA\Property(property="status_spk_id", type="integer", example=1),
      *                 @OA\Property(property="leads_id", type="integer", example=1),
-     *                 @OA\Property(property="quotation_id", type="integer", example=1),
      *                 @OA\Property(property="spk_sites", type="array", @OA\Items(type="object")),
-     *                 @OA\Property(property="leads", type="object"),
-     *                 @OA\Property(property="quotation", type="object")
+     *                 @OA\Property(property="leads", type="object")
      *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Validasi error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validation error"),
-     *             @OA\Property(property="errors", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Error server",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Error creating SPK")
      *         )
      *     )
      * )
@@ -356,9 +324,8 @@ class SpkController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'leads_id' => 'required|exists:sl_leads,id',
-            'quotation_id' => 'required|exists:sl_quotation,id', // TAMBAHKAN INI
             'tanggal_spk' => 'required|date',
-            'site_ids' => 'required|array',
+            'site_ids' => 'required|array|min:1',
             'site_ids.*' => 'exists:sl_quotation_site,id'
         ]);
 
@@ -369,14 +336,35 @@ class SpkController extends Controller
         try {
             DB::beginTransaction();
 
-            $leads = Leads::find($request->leads_id);
-            $quotation = Quotation::find($request->quotation_id); // AMBIL QUOTATION
-            $spkNomor = $this->generateNomorNew($request->leads_id);
+            $leads = Leads::whereNull('deleted_at')->find($request->leads_id);
 
-            // Create SPK
+            if (!$leads) {
+                throw new \Exception("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
+            }
+
+            // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih dan belum memiliki SPK
+            $invalidSites = QuotationSite::whereIn('id', $request->site_ids)
+                ->where('leads_id', '!=', $request->leads_id)
+                ->exists();
+
+            if ($invalidSites) {
+                throw new \Exception("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+            }
+
+            // Validasi: pastikan site belum memiliki SPK
+            $sitesWithSPK = QuotationSite::whereIn('id', $request->site_ids)
+                ->whereHas('spkSite')
+                ->exists();
+
+            if ($sitesWithSPK) {
+                throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
+            }
+
+            $spkNomor = $this->generateNomorNew($leads->id);
+
+            // Buat SPK TANPA quotation_id
             $spk = Spk::create([
                 'leads_id' => $leads->id,
-                'quotation_id' => $quotation->id, // SIMPAN QUOTATION_ID
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,
@@ -384,18 +372,15 @@ class SpkController extends Controller
                 'tim_sales_d_id' => $leads->tim_sales_d_id,
                 'link_spk_disetujui' => null,
                 'status_spk_id' => 1,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name ?? 'System'
             ]);
 
-            // Create SPK Sites
-            $this->createSpkSites($spk->id, $request->site_ids);
-
-            // Create customer activity
+            $this->createSpkSites($spk, $request->site_ids);
             $this->createCustomerActivity($leads, $spk, $spkNomor);
 
             DB::commit();
 
-            return $this->successResponse('SPK created successfully', $spk->load(['spkSites', 'leads', 'quotation']), 201);
+            return $this->successResponse('SPK created successfully', $spk->load(['spkSites', 'leads']), 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -685,7 +670,7 @@ class SpkController extends Controller
      * @OA\Post(
      *     path="/api/spk/ajukan-ulang/{spkId}",
      *     summary="Mengajukan ulang quotation dari SPK",
-     *     description="Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Akan membuat quotation baru dan menghapus SPK yang lama.",
+     *     description="Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Jika hanya sebagian site yang diajukan ulang, SPK tetap dipertahankan. Jika semua site diajukan ulang, SPK akan dihapus.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -698,8 +683,9 @@ class SpkController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"alasan"},
-     *             @OA\Property(property="alasan", type="string", example="Perubahan harga material", description="Alasan pengajuan ulang quotation")
+     *             required={"alasan", "quotation_site_ids"},
+     *             @OA\Property(property="alasan", type="string", example="Perubahan harga material", description="Alasan pengajuan ulang quotation"),
+     *             @OA\Property(property="quotation_site_ids", type="array", @OA\Items(type="integer"), example={1,2,3}, description="Array ID Quotation Site yang akan diajukan ulang")
      *         )
      *     ),
      *     @OA\Response(
@@ -711,7 +697,10 @@ class SpkController extends Controller
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="quotation_baru_id", type="integer", example=1),
      *                 @OA\Property(property="quotation_baru_nomor", type="string", example="QUOT/COMP001-012024-00002"),
-     *                 @OA\Property(property="spk_id", type="integer", example=1)
+     *                 @OA\Property(property="spk_id", type="integer", example=1),
+     *                 @OA\Property(property="spk_dihapus", type="boolean", example=false),
+     *                 @OA\Property(property="spk_sites_dihapus", type="array", @OA\Items(type="integer"), example={1,2,3}),
+     *                 @OA\Property(property="quotation_sites_dihapus", type="array", @OA\Items(type="integer"), example={4,5,6})
      *             )
      *         )
      *     ),
@@ -728,8 +717,9 @@ class SpkController extends Controller
     public function ajukanUlangQuotation(Request $request, $spkId)
     {
         $validator = Validator::make($request->all(), [
-            'alasan' => 'required|string|max:500'
-            // HAPUS quotation_id KARENA SUDAH BISA DIAMBIL DARI SPK
+            'alasan' => 'required|string|max:500',
+            'quotation_site_ids' => 'required|array|min:1',
+            'quotation_site_ids.*' => 'exists:sl_quotation_site,id'
         ]);
 
         if ($validator->fails()) {
@@ -739,49 +729,115 @@ class SpkController extends Controller
         try {
             DB::beginTransaction();
 
-            $spk = Spk::with('quotation')->find($spkId);
+            // Cari SPK beserta spk_sites dan quotation dari spk_sites
+            $spk = Spk::with(['spkSites.quotation', 'spkSites.quotationSite'])->find($spkId);
+
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
-            $quotationAsal = $spk->quotation; // LANGSUNG DARI RELASI
-            if (!$quotationAsal) {
-                return $this->notFoundResponse('Quotation not found for this SPK');
+            // Ambil semua spk_sites yang terkait dengan SPK
+            $allSpkSites = $spk->spkSites;
+
+            if ($allSpkSites->isEmpty()) {
+                return $this->errorResponse('Tidak ada site yang terkait dengan SPK ini.');
             }
 
-            // Generate new quotation number
-            $nomorQuotationBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id);
+            // Filter spk_sites yang akan diajukan ulang berdasarkan quotation_site_ids
+            $spkSitesToResubmit = $allSpkSites->whereIn('quotation_site_id', $request->quotation_site_ids);
 
-            // Create new quotation based on the original one
-            $newQuotation = $this->createNewQuotation($quotationAsal, $nomorQuotationBaru, $request->alasan);
+            if ($spkSitesToResubmit->isEmpty()) {
+                return $this->errorResponse('Tidak ada site yang valid untuk diajukan ulang.');
+            }
 
-            // Copy all related data
-            $this->copyQuotationRelatedData($quotationAsal->id, $newQuotation->id);
+            // Kelompokkan berdasarkan quotation_id
+            $quotationGroups = $spkSitesToResubmit->groupBy('quotation_id');
 
-            // Update SPK dengan quotation baru
-            $spk->update([
-                'quotation_id' => $newQuotation->id,
-                'updated_by' => Auth::user()->full_name
-            ]);
+            $newQuotations = [];
+            $deletedSpkSiteIds = [];
+            $deletedQuotationSiteIds = [];
 
-            // Soft delete original quotation
-            $quotationAsal->update([
-                'deleted_at' => now(),
-                'deleted_by' => Auth::user()->full_name
-            ]);
+            foreach ($quotationGroups as $quotationId => $spkSites) {
+                $quotationAsal = $spkSites->first()->quotation;
+
+                if (!$quotationAsal) {
+                    continue;
+                }
+
+                // Generate new quotation number
+                $nomorQuotationBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id);
+
+                // Create new quotation based on the original one
+                $newQuotation = $this->createNewQuotation($quotationAsal, $nomorQuotationBaru, $request->alasan);
+                $newQuotations[] = $newQuotation;
+
+                // Copy all related data
+                $this->copyQuotationRelatedData($quotationAsal->id, $newQuotation->id);
+
+                // Kumpulkan spk_site_ids dan quotation_site_ids yang akan dihapus
+                foreach ($spkSites as $spkSite) {
+                    $deletedSpkSiteIds[] = $spkSite->id;
+                    $deletedQuotationSiteIds[] = $spkSite->quotation_site_id;
+                }
+
+                // Soft delete original quotation
+                $quotationAsal->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
+
+                // Soft delete quotation sites yang terkait
+                QuotationSite::whereIn('id', $deletedQuotationSiteIds)
+                    ->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => Auth::user()->full_name
+                    ]);
+            }
+
+            // Hapus spk_sites yang dipilih
+            SpkSite::whereIn('id', $deletedSpkSiteIds)
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
+
+            // Cek apakah masih ada spk_sites yang aktif di SPK ini
+            $remainingSpkSites = SpkSite::where('spk_id', $spk->id)
+                ->whereNull('deleted_at')
+                ->count();
+
+            $spkDeleted = false;
+
+            // Kondisi 1: Jika semua site di SPK diajukan ulang, hapus SPK
+            // Kondisi 2: Jika hanya sebagian site yang diajukan ulang, SPK tetap dipertahankan
+            if ($remainingSpkSites === 0) {
+                // Hapus SPK (soft delete) karena semua site sudah diajukan ulang
+                $spk->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
+                $spkDeleted = true;
+            }
 
             // Create customer activities
-            $this->createResubmissionActivities($quotationAsal, $newQuotation, $spk);
+            $this->createResubmissionActivities($quotationAsal, $newQuotation, $spk, $spkDeleted, $deletedSpkSiteIds, $deletedQuotationSiteIds);
 
             DB::commit();
 
             $responseData = [
                 'quotation_baru_id' => $newQuotation->id,
                 'quotation_baru_nomor' => $newQuotation->nomor,
-                'spk_id' => $spk->id
+                'spk_id' => $spk->id,
+                'spk_dihapus' => $spkDeleted,
+                'spk_sites_dihapus' => $deletedSpkSiteIds,
+                'quotation_sites_dihapus' => $deletedQuotationSiteIds
             ];
 
-            return $this->successResponse('Quotation successfully resubmitted', $responseData);
+            $message = $spkDeleted
+                ? 'Quotation successfully resubmitted and SPK deleted'
+                : 'Quotation successfully resubmitted for selected sites';
+
+            return $this->successResponse($message, $responseData);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -789,6 +845,86 @@ class SpkController extends Controller
         }
     }
 
+
+
+
+    /**
+     * @OA\Get(
+     *     path="/api/spk/deleted-sites/{spkId}",
+     *     summary="Mendapatkan daftar SPK sites yang sudah dihapus",
+     *     description="Endpoint untuk mengambil data SPK sites yang telah dihapus (soft delete) berdasarkan ID SPK.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="spkId",
+     *         in="path",
+     *         required=true,
+     *         description="ID SPK",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sukses mengambil data SPK sites yang dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Deleted SPK sites retrieved successfully"),
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nama_site", type="string", example="Site Jakarta Pusat"),
+     *                 @OA\Property(property="quotation_site_id", type="integer", example=5),
+     *                 @OA\Property(property="deleted_at", type="string", format="date-time", example="2024-01-20 15:30:00"),
+     *                 @OA\Property(property="deleted_by", type="string", example="John Doe")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SPK tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error fetching deleted SPK sites")
+     *         )
+     *     )
+     * )
+     */
+    public function getDeletedSpkSites($spkId)
+    {
+        try {
+            // Validasi apakah SPK exists (termasuk yang sudah dihapus)
+            $spkExists = Spk::withTrashed()->where('id', $spkId)->exists();
+
+            if (!$spkExists) {
+                return $this->notFoundResponse('SPK not found');
+            }
+
+            $deletedSites = SpkSite::onlyTrashed()
+                ->where('spk_id', $spkId)
+                ->with(['quotation', 'quotationSite'])
+                ->get()
+                ->map(function ($site) {
+                    return [
+                        'id' => $site->id,
+                        'nama_site' => $site->nama_site,
+                        'quotation_site_id' => $site->quotation_site_id,
+                        'deleted_at' => $site->deleted_at,
+                        'deleted_by' => $site->deleted_by
+                    ];
+                });
+
+            return $this->successResponse('Deleted SPK sites retrieved successfully', $deletedSites);
+
+        } catch (\Exception $e) {
+            return $this->errorResponse('Error fetching deleted SPK sites', $e->getMessage());
+        }
+    }
     /**
      * @OA\Get(
      *     path="/api/spk/site-list/{id}",
@@ -900,7 +1036,7 @@ class SpkController extends Controller
             $sites = QuotationSite::with(['quotation'])
                 ->where('leads_id', $leadsId)
                 ->whereNull('deleted_at')
-                ->whereDoesntHave('spkSite')
+                // ->whereDoesntHave('spkSite')
                 ->get()
                 ->map(function ($site) {
                     return [
@@ -922,6 +1058,166 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching available sites', $e->getMessage());
         }
     }
+    /**
+     * @OA\Delete(
+     *     path="/api/spk/delete/{id}",
+     *     summary="Menghapus SPK berdasarkan ID (soft delete)",
+     *     description="Endpoint untuk menghapus SPK. Penghapusan dilakukan secara soft delete, sehingga data tidak benar-benar dihapus dari database.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID SPK yang akan dihapus",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="SPK berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="SPK deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SPK tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error deleting SPK")
+     *         )
+     *     )
+     * )
+     */
+    public function delete($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $spk = Spk::find($id);
+
+            if (!$spk) {
+                return $this->notFoundResponse('SPK not found');
+            }
+
+            // Soft delete semua SpkSite yang terkait
+            SpkSite::where('spk_id', $id)
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
+
+            // Soft delete SPK
+            $spk->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name
+            ]);
+
+            // Catat aktivitas
+            $this->createDeleteActivity($spk);
+
+            DB::commit();
+
+            return $this->successResponse('SPK deleted successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Error deleting SPK', $e->getMessage());
+        }
+    }
+    /**
+     * @OA\Delete(
+     *     path="/api/spk/delete-site/{siteId}",
+     *     summary="Menghapus SpkSite berdasarkan ID (soft delete)",
+     *     description="Endpoint untuk menghapus SpkSite individual. Penghapusan dilakukan secara soft delete.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="siteId",
+     *         in="path",
+     *         required=true,
+     *         description="ID SpkSite yang akan dihapus",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="SpkSite berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="SPK site deleted successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SpkSite tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK site not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error deleting SPK site")
+     *         )
+     *     )
+     * )
+     */
+    public function deleteSite($siteId)
+    {
+        try {
+            DB::beginTransaction();
+
+            $spkSite = SpkSite::find($siteId);
+
+            if (!$spkSite) {
+                return $this->notFoundResponse('SPK site not found');
+            }
+
+            // Soft delete SpkSite
+            $spkSite->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name
+            ]);
+
+            // Cek apakah SPK masih memiliki site aktif
+            $remainingSites = SpkSite::where('spk_id', $spkSite->spk_id)
+                ->whereNull('deleted_at')
+                ->count();
+
+            // Jika tidak ada site aktif lagi, hapus SPK juga
+            if ($remainingSites === 0) {
+                $spk = Spk::find($spkSite->spk_id);
+                if ($spk) {
+                    $spk->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => Auth::user()->full_name
+                    ]);
+
+                    $this->createDeleteActivity($spk);
+                }
+            }
+
+            DB::commit();
+
+            return $this->successResponse('SPK site deleted successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->errorResponse('Error deleting SPK site', $e->getMessage());
+        }
+    }
 
     /**
      * =============================================
@@ -929,17 +1225,23 @@ class SpkController extends Controller
      * =============================================
      */
 
-    private function createSpkSites($spkId, $siteIds): void
+    private function createSpkSites(Spk $spk, $siteIds): void
     {
-        $spk = Spk::find($spkId);
-
         foreach ($siteIds as $siteId) {
-            $quotationSite = QuotationSite::find($siteId);
-            $quotation = $spk->quotation; // GUNAKAN QUOTATION DARI SPK
+            $quotationSite = QuotationSite::with('quotation')->find($siteId);
+
+            if (!$quotationSite) {
+                throw new \Exception("Quotation site dengan ID {$siteId} tidak ditemukan.");
+            }
+
+            // Pastikan quotation site termasuk dalam leads yang sama dengan SPK
+            if ($quotationSite->leads_id != $spk->leads_id) {
+                throw new \Exception("Quotation site dengan ID {$siteId} tidak termasuk dalam leads yang dipilih.");
+            }
 
             SpkSite::create([
-                'spk_id' => $spkId,
-                'quotation_id' => $spk->quotation_id, // GUNAKAN QUOTATION_ID DARI SPK
+                'spk_id' => $spk->id,
+                'quotation_id' => $quotationSite->quotation_id, // Ambil dari quotation_site
                 'quotation_site_id' => $quotationSite->id,
                 'leads_id' => $quotationSite->leads_id,
                 'nama_site' => $quotationSite->nama_site,
@@ -947,15 +1249,16 @@ class SpkController extends Controller
                 'provinsi' => $quotationSite->provinsi,
                 'kota_id' => $quotationSite->kota_id,
                 'kota' => $quotationSite->kota,
+                ~
                 'ump' => $quotationSite->ump,
                 'umk' => $quotationSite->umk,
                 'nominal_upah' => $quotationSite->nominal_upah,
                 'penempatan' => $quotationSite->penempatan,
-                'kebutuhan_id' => $quotation->kebutuhan_id,
-                'kebutuhan' => $quotation->kebutuhan,
-                'jenis_site' => $quotation->jumlah_site,
-                'nomor_quotation' => $quotation->nomor,
-                'created_by' => Auth::user()->full_name
+                'kebutuhan_id' => $quotationSite->quotation->kebutuhan_id,
+                'kebutuhan' => $quotationSite->quotation->kebutuhan,
+                'jenis_site' => $quotationSite->quotation->jumlah_site,
+                'nomor_quotation' => $quotationSite->quotation->nomor,
+                'created_by' => Auth::user()->full_name ?? 'System'
             ]);
         }
     }
@@ -992,7 +1295,11 @@ class SpkController extends Controller
     private function generateNomorNew($leadsId)
     {
         $now = Carbon::now();
-        $leads = Leads::find($leadsId);
+        // Tambahkan pengecekan null untuk leads
+        $leads = Leads::whereNull('deleted_at')->find($leadsId);
+        if (!$leads) {
+            throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan");
+        }
 
         $baseNumber = "SPK/" . $leads->nomor . "-";
         $month = $now->month < 10 ? "0" . $now->month : $now->month;
@@ -1005,8 +1312,30 @@ class SpkController extends Controller
 
     private function generateActivityNomor($leadsId)
     {
-        $count = CustomerActivity::where('leads_id', $leadsId)->count();
-        return sprintf("%03d", $count + 1);
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        $prefix = "CAT/";
+        if ($leads) {
+            $prefix .= match ($leads->kebutuhan_id) {
+                1 => "SG/",
+                2 => "LS/",
+                3 => "CS/",
+                4 => "LL/",
+                default => "NN/"
+            };
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
 
     private function getQuotationDetails($quotationId)
@@ -1072,20 +1401,25 @@ class SpkController extends Controller
         $newQuotationData['updated_at'] = null;
         $newQuotationData['updated_by'] = null;
 
-        // Reset some fields - SEKARANG BISA DIPAKAI KARENA SUDAH DITAMBAHKAN DI MODEL
+        // Reset approval fields
         $newQuotationData['ot1'] = null;
         $newQuotationData['ot2'] = null;
         $newQuotationData['ot3'] = null;
+        // ✅ SOLUSI SEDERHANA: Reset tanggal ke hari ini
+        $newQuotationData['tgl_quotation'] = now()->format('Y-m-d');
+        $newQuotationData['tgl_penempatan'] = null; // atau now()->format('Y-m-d')
 
-        // Determine status based on conditions
+
+        // Determine status based on conditions - SESUAI CONTROLLER LAMA
         $isAktif = 1;
         $statusQuotation = 1;
 
-        // Periksa apakah field top dan persentase ada sebelum mengaksesnya
-        if (isset($quotationAsal->top) && $quotationAsal->top == "Lebih Dari 7 Hari") {
+        if ($quotationAsal->top == "Lebih Dari 7 Hari") {
             $isAktif = 0;
             $statusQuotation = 2;
-        } elseif (isset($quotationAsal->persentase) && $quotationAsal->persentase < 7) {
+        }
+
+        if ($quotationAsal->persentase < 7) {
             $isAktif = 0;
             $statusQuotation = 2;
         }
@@ -1134,7 +1468,10 @@ class SpkController extends Controller
             $newRecord->save();
         }
     }
-    private function createResubmissionActivities($quotationAsal, $newQuotation, $spk): void
+    /**
+     * Update method createResubmissionActivities untuk menangani kedua kondisi dan mencatat SPK sites & quotation sites yang dihapus
+     */
+    private function createResubmissionActivities($quotationAsal, $newQuotation, $spk, $spkDeleted, $deletedSpkSiteIds, $deletedQuotationSiteIds): void
     {
         $leads = Leads::find($quotationAsal->leads_id);
 
@@ -1165,8 +1502,57 @@ class SpkController extends Controller
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name
         ]);
-    }
 
+        // Activity untuk SPK sites yang dihapus
+        if (!empty($deletedSpkSiteIds)) {
+            $spkSiteCount = count($deletedSpkSiteIds);
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'spk_id' => $spk->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $this->generateActivityNomor($leads->id),
+                'tipe' => 'SPK Site',
+                'notes' => $spkSiteCount . ' SPK site dihapus karena quotation diajukan ulang',
+                'is_activity' => 0,
+                'user_id' => Auth::user()->id,
+                'created_by' => Auth::user()->full_name
+            ]);
+        }
+
+        // Activity untuk Quotation sites yang dihapus
+        if (!empty($deletedQuotationSiteIds)) {
+            $quotationSiteCount = count($deletedQuotationSiteIds);
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'quotation_id' => $quotationAsal->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $this->generateActivityNomor($leads->id),
+                'tipe' => 'Quotation Site',
+                'notes' => $quotationSiteCount . ' Quotation site dihapus karena diajukan ulang',
+                'is_activity' => 0,
+                'user_id' => Auth::user()->id,
+                'created_by' => Auth::user()->full_name
+            ]);
+        }
+
+        // Activity untuk SPK hanya jika dihapus
+        if ($spkDeleted) {
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'spk_id' => $spk->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $this->generateActivityNomor($leads->id),
+                'tipe' => 'SPK',
+                'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus karena semua quotation site diajukan ulang',
+                'is_activity' => 0,
+                'user_id' => Auth::user()->id,
+                'created_by' => Auth::user()->full_name
+            ]);
+        }
+    }
     /**
      * =============================================
      * RESPONSE HELPER METHODS
@@ -1185,6 +1571,27 @@ class SpkController extends Controller
         }
 
         return response()->json($response, $status);
+    }
+
+    /**
+     * Helper method untuk membuat aktivitas penghapusan SPK
+     */
+    private function createDeleteActivity($spk): void
+    {
+        $leads = Leads::find($spk->leads_id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'spk_id' => $spk->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $this->generateActivityNomor($leads->id),
+            'tipe' => 'SPK',
+            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'is_activity' => 0,
+            'user_id' => Auth::user()->id,
+            'created_by' => Auth::user()->full_name
+        ]);
     }
 
     private function errorResponse(string $message, string $error = null, int $status = 500)
