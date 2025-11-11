@@ -313,20 +313,46 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 10:
+                // Parse kunjungan_operasional yang disimpan sebagai "jumlah periode"
+                $kunjunganOperasional = $quotation->kunjungan_operasional ?? '';
+                $jumlahKunjunganOperasional = '';
+                $bulanTahunKunjunganOperasional = '';
+
+                if (!empty($kunjunganOperasional)) {
+                    $parts = explode(' ', $kunjunganOperasional, 2);
+                    $jumlahKunjunganOperasional = $parts[0] ?? '';
+                    $bulanTahunKunjunganOperasional = $parts[1] ?? '';
+                }
+
+                // Parse kunjungan_tim_crm yang disimpan sebagai "jumlah periode"
+                $kunjunganTimCrm = $quotation->kunjungan_tim_crm ?? '';
+                $jumlahKunjunganTimCrm = '';
+                $bulanTahunKunjunganTimCrm = '';
+
+                if (!empty($kunjunganTimCrm)) {
+                    $parts = explode(' ', $kunjunganTimCrm, 2);
+                    $jumlahKunjunganTimCrm = $parts[0] ?? '';
+                    $bulanTahunKunjunganTimCrm = $parts[1] ?? '';
+                }
+
+                // Untuk ada_training, kita bisa infer dari field training
+                $adaTraining = !empty($quotation->training) ? 'Ada' : 'Tidak Ada';
+
                 return [
-                    'jumlah_kunjungan_operasional' => $quotation->jumlah_kunjungan_operasional,
-                    'bulan_tahun_kunjungan_operasional' => $quotation->bulan_tahun_kunjungan_operasional,
-                    'jumlah_kunjungan_tim_crm' => $quotation->jumlah_kunjungan_tim_crm,
-                    'bulan_tahun_kunjungan_tim_crm' => $quotation->bulan_tahun_kunjungan_tim_crm,
+                    'jumlah_kunjungan_operasional' => $jumlahKunjunganOperasional,
+                    'bulan_tahun_kunjungan_operasional' => $bulanTahunKunjunganOperasional,
+                    'jumlah_kunjungan_tim_crm' => $jumlahKunjunganTimCrm,
+                    'bulan_tahun_kunjungan_tim_crm' => $bulanTahunKunjunganTimCrm,
                     'keterangan_kunjungan_operasional' => $quotation->keterangan_kunjungan_operasional,
                     'keterangan_kunjungan_tim_crm' => $quotation->keterangan_kunjungan_tim_crm,
-                    'ada_training' => $quotation->ada_training,
+                    'ada_training' => $adaTraining,
                     'training' => $quotation->training,
                     'persen_bunga_bank' => $quotation->persen_bunga_bank,
                     'quotation_ohcs' => $quotation->relationLoaded('quotationOhcs') ?
                         $quotation->quotationOhcs->map(function ($ohc) {
                             return [
                                 'id' => $ohc->id,
+                                'nama' => $ohc->nama,
                                 'barang_id' => $ohc->barang_id,
                                 'jumlah' => $ohc->jumlah,
                                 'harga' => $ohc->harga,
@@ -335,7 +361,6 @@ class QuotationStepResource extends JsonResource
                     'quotation_trainings' => $quotation->relationLoaded('quotationTrainings') ?
                         $quotation->quotationTrainings->pluck('training_id')->toArray() : [],
                 ];
-
             case 11:
                 return [
                     'penagihan' => $quotation->penagihan,

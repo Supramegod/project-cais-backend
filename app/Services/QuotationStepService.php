@@ -432,47 +432,47 @@ class QuotationStepService
             'updated_by' => Auth::user()->full_name
         ]);
     }
-  public function updateStep5(Quotation $quotation, Request $request): void
-{
-    // Update BPJS data untuk setiap detail (position)
-    foreach ($quotation->quotationDetails as $detail) {
-        $detailId = $detail->id;
-        $penjamin = $request->penjamin[$detailId] ?? null;
-        
-        // Tentukan nominal_takaful berdasarkan penjamin
-        $nominalTakaful = 0;
-        if ($penjamin === 'Asuransi Swasta' || $penjamin === 'Takaful') {
-            $nominalTakaful = $request->nominal_takaful[$detailId] ?? 0;
-            // Convert string to integer jika diperlukan
-            if (is_string($nominalTakaful)) {
-                $nominalTakaful = (int) str_replace('.', '', $nominalTakaful);
+    public function updateStep5(Quotation $quotation, Request $request): void
+    {
+        // Update BPJS data untuk setiap detail (position)
+        foreach ($quotation->quotationDetails as $detail) {
+            $detailId = $detail->id;
+            $penjamin = $request->penjamin[$detailId] ?? null;
+
+            // Tentukan nominal_takaful berdasarkan penjamin
+            $nominalTakaful = 0;
+            if ($penjamin === 'Asuransi Swasta' || $penjamin === 'Takaful') {
+                $nominalTakaful = $request->nominal_takaful[$detailId] ?? 0;
+                // Convert string to integer jika diperlukan
+                if (is_string($nominalTakaful)) {
+                    $nominalTakaful = (int) str_replace('.', '', $nominalTakaful);
+                }
             }
+
+            $detail->update([
+                'penjamin_kesehatan' => $penjamin,
+                'is_bpjs_jkk' => $this->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0,
+                'is_bpjs_jkm' => $this->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0,
+                'is_bpjs_jht' => $this->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0,
+                'is_bpjs_jp' => $this->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0,
+                'nominal_takaful' => $nominalTakaful, // Tambahkan field ini
+                'updated_by' => Auth::user()->full_name
+            ]);
         }
 
-        $detail->update([
-            'penjamin_kesehatan' => $penjamin,
-            'is_bpjs_jkk' => $this->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0,
-            'is_bpjs_jkm' => $this->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0,
-            'is_bpjs_jht' => $this->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0,
-            'is_bpjs_jp' => $this->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0,
-            'nominal_takaful' => $nominalTakaful, // Tambahkan field ini
+        $companyData = $this->prepareCompanyData($request);
+
+        $quotation->update(array_merge([
+            'is_aktif' => $this->calculateIsAktif($quotation, $request),
+            'program_bpjs' => $request->input('program-bpjs'),
             'updated_by' => Auth::user()->full_name
-        ]);
+        ], $companyData));
+
+        // Update leads data
+        if ($quotation->leads) {
+            $quotation->leads->update($companyData);
+        }
     }
-
-    $companyData = $this->prepareCompanyData($request);
-
-    $quotation->update(array_merge([
-        'is_aktif' => $this->calculateIsAktif($quotation, $request),
-        'program_bpjs' => $request->input('program-bpjs'),
-        'updated_by' => Auth::user()->full_name
-    ], $companyData));
-
-    // Update leads data
-    if ($quotation->leads) {
-        $quotation->leads->update($companyData);
-    }
-}
     public function updateStep6(Quotation $quotation, Request $request): void
     {
         $currentDateTime = Carbon::now();
@@ -548,7 +548,7 @@ class QuotationStepService
         // Update training
         $this->updateTrainingData($quotation, $request, $currentDateTime);
 
-        // Update data kunjungan
+        // Update data kunjungan - format: "jumlah periode"
         $quotation->update([
             'kunjungan_operasional' => $request->jumlah_kunjungan_operasional . " " . $request->bulan_tahun_kunjungan_operasional,
             'kunjungan_tim_crm' => $request->jumlah_kunjungan_tim_crm . " " . $request->bulan_tahun_kunjungan_tim_crm,
