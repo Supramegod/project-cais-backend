@@ -384,20 +384,25 @@ class QuotationStepService
     }
     public function updateStep3(Quotation $quotation, Request $request): void
     {
-        \Log::info("Updating Step 3", [
-            'quotation_id' => $quotation->id,
-            'request_data' => $request->all(),
-            'user' => Auth::user()->full_name
-        ]);
-
         // Jika request berisi headCountData array
         if ($request->has('headCountData') && is_array($request->headCountData)) {
             foreach ($request->headCountData as $detail) {
                 $this->addDetailHCFromArray($quotation, $detail);
             }
         }
+        // TAMBAHKAN: Handle data langsung (tanpa array headCountData)
+        if ($request->has('position_id') && $request->has('quotation_site_id')) {
+            $detailData = [
+                'quotation_site_id' => $request->quotation_site_id,
+                'position_id' => $request->position_id,
+                'jumlah_hc' => $request->jumlah_hc,
+                'jabatan_kebutuhan' => $request->jabatan_kebutuhan,
+                'nama_site' => $request->nama_site,
+                'nominal_upah' => $request->nominal_upah ?? 0 // tambahkan default value
+            ];
 
-        \Log::info("Step 3 update completed");
+            $this->addDetailHCFromArray($quotation, $detailData);
+        }
     }
 
     public function updateStep4(Quotation $quotation, Request $request): void
@@ -423,24 +428,23 @@ class QuotationStepService
             'updated_by' => Auth::user()->full_name
         ], $upahData));
 
-        // Update nominal upah di semua detail
-        $quotation->quotationDetails()->update([
-            'nominal_upah' => $upahData['nominal_upah'],
-            'updated_by' => Auth::user()->full_name
-        ]);
+        // HAPUS: Update nominal upah di semua detail dengan nilai yang sama
+        // GUNAKAN: Update nominal upah per position berdasarkan site yang terkait
+        $this->updateUpahPerPosition($quotation);
     }
 
     public function updateStep5(Quotation $quotation, Request $request): void
     {
-        // Update BPJS data untuk setiap detail
+        // Update BPJS data untuk setiap detail (position)
         foreach ($quotation->quotationDetails as $detail) {
+            $detailId = $detail->id;
+
             $detail->update([
-                'penjamin_kesehatan' => $request->penjamin[$detail->id] ?? null,
-                'is_bpjs_jkk' => isset($request->jkk[$detail->id]) ? 1 : 0,
-                'is_bpjs_jkm' => isset($request->jkm[$detail->id]) ? 1 : 0,
-                'is_bpjs_jht' => isset($request->jht[$detail->id]) ? 1 : 0,
-                'is_bpjs_jp' => isset($request->jp[$detail->id]) ? 1 : 0,
-                'nominal_takaful' => $request->nominal_takaful[$detail->id] ?? null,
+                'penjamin_kesehatan' => $request->penjamin[$detailId] ?? null,
+                'is_bpjs_jkk' => isset($request->jkk[$detailId]) ? 1 : 0,
+                'is_bpjs_jkm' => isset($request->jkm[$detailId]) ? 1 : 0,
+                'is_bpjs_jht' => isset($request->jht[$detailId]) ? 1 : 0,
+                'is_bpjs_jp' => isset($request->jp[$detailId]) ? 1 : 0,
                 'updated_by' => Auth::user()->full_name
             ]);
         }
@@ -449,13 +453,14 @@ class QuotationStepService
 
         $quotation->update(array_merge([
             'is_aktif' => $this->calculateIsAktif($quotation, $request),
+            'program_bpjs' => $request->program_bpjs, // Tetap simpan program_bpjs di level quotation
             'updated_by' => Auth::user()->full_name
         ], $companyData));
 
         // Update leads data
         $quotation->leads->update($companyData);
-    }
 
+    }
     public function updateStep6(Quotation $quotation, Request $request): void
     {
         $currentDateTime = Carbon::now();
@@ -644,14 +649,16 @@ class QuotationStepService
             $hitunganUpah = $request->hitungan_upah;
             $customUpah = str_replace(".", "", $request->custom_upah);
 
+            // Konversi ke bulanan berdasarkan hitungan
             if ($hitunganUpah == "Per Hari") {
-                $customUpah = $customUpah * 21;
+                $customUpah = $customUpah * 21; // 21 hari kerja
             } else if ($hitunganUpah == "Per Jam") {
-                $customUpah = $customUpah * 21 * 8;
+                $customUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
             }
 
             $nominalUpah = $customUpah;
 
+            // Update semua site dengan nilai custom yang sama
             foreach ($quotation->quotationSites as $site) {
                 $site->update([
                     'nominal_upah' => $nominalUpah,
@@ -659,16 +666,14 @@ class QuotationStepService
                 ]);
             }
         } else {
-            // Update nominal upah di setiap site berdasarkan UMP/UMK masing-masing menggunakan scope
+            // Update nominal upah di setiap site berdasarkan UMP/UMK masing-masing
             foreach ($quotation->quotationSites as $site) {
                 if ($request->upah == "UMP") {
-                    // Gunakan scope dari model Ump
                     $dataUmp = Ump::byProvince($site->provinsi_id)
                         ->active()
                         ->first();
                     $nominalUpah = $dataUmp ? $dataUmp->ump : 0;
                 } else if ($request->upah == "UMK") {
-                    // Gunakan scope dari model Umk
                     $dataUmk = Umk::byCity($site->kota_id)
                         ->active()
                         ->first();
@@ -679,11 +684,18 @@ class QuotationStepService
                     'nominal_upah' => $nominalUpah,
                     'updated_by' => Auth::user()->full_name
                 ]);
+
+                \Log::info("Updated site upah", [
+                    'site_id' => $site->id,
+                    'site_name' => $site->nama_site,
+                    'upah_type' => $request->upah,
+                    'nominal_upah' => $nominalUpah
+                ]);
             }
         }
 
         return [
-            'nominal_upah' => $nominalUpah,
+            'nominal_upah' => $nominalUpah, // Nilai ini sekarang hanya untuk referensi
             'hitungan_upah' => $hitunganUpah
         ];
     }
@@ -1087,6 +1099,46 @@ class QuotationStepService
             throw new \Exception("Failed to add HC detail from array: " . $e->getMessage());
         }
     }
+    /**
+     * Update nominal upah untuk setiap position berdasarkan site yang terkait
+     */
+    private function updateUpahPerPosition(Quotation $quotation): void
+    {
+        try {
+            // Ambil semua quotation details dengan relasi site
+            $quotationDetails = QuotationDetail::with('quotationSite')
+                ->where('quotation_id', $quotation->id)
+                ->get();
 
+            foreach ($quotationDetails as $detail) {
+                // Jika detail memiliki quotation site, gunakan nominal_upah dari site tersebut
+                if ($detail->quotationSite) {
+                    $detail->update([
+                        'nominal_upah' => $detail->quotationSite->nominal_upah,
+                        'updated_by' => Auth::user()->full_name
+                    ]);
+
+                    \Log::info("Updated upah for position", [
+                        'detail_id' => $detail->id,
+                        'position_id' => $detail->position_id,
+                        'site_id' => $detail->quotation_site_id,
+                        'nominal_upah' => $detail->quotationSite->nominal_upah
+                    ]);
+                }
+            }
+
+            \Log::info("Successfully updated upah for all positions per site", [
+                'quotation_id' => $quotation->id,
+                'total_details_updated' => $quotationDetails->count()
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating upah per position", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw new \Exception("Failed to update upah per position: " . $e->getMessage());
+        }
+    }
 
 }

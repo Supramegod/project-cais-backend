@@ -54,7 +54,7 @@ class QuotationStepResource extends JsonResource
         }
 
         $stepData = $this->getStepSpecificData($quotation, $step);
-        $additionalData = $this->getAdditionalData($quotation,$step);
+        $additionalData = $this->getAdditionalData($quotation, $step);
 
         return array_merge($baseData, [
             'step_data' => $stepData,
@@ -167,7 +167,6 @@ class QuotationStepResource extends JsonResource
             case 4:
                 return [
                     'upah' => $quotation->upah,
-                    // 'nominal_upah' => $quotation->nominal_upah,
                     'hitungan_upah' => $quotation->hitungan_upah,
                     'management_fee_id' => $quotation->management_fee_id,
                     'persentase' => $quotation->persentase,
@@ -187,7 +186,7 @@ class QuotationStepResource extends JsonResource
                     'jenis_bayar_tunjangan_holiday' => $quotation->jenis_bayar_tunjangan_holiday,
                     'is_ppn' => $quotation->is_ppn,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                    // Tambahkan data upah per site
+                    // Data upah per site
                     'upah_per_site' => $quotation->relationLoaded('quotationSites') ?
                         $quotation->quotationSites->map(function ($site) {
                             return [
@@ -200,19 +199,47 @@ class QuotationStepResource extends JsonResource
                                 'province_name' => $site->provinsi,
                             ];
                         })->toArray() : [],
+                    // Data upah per position (BARU)
+                    'upah_per_position' => $quotation->relationLoaded('quotationDetails') ?
+                        $quotation->quotationDetails->map(function ($detail) {
+                            return [
+                                'detail_id' => $detail->id,
+                                'position_id' => $detail->position_id,
+                                'position_name' => $detail->jabatan_kebutuhan,
+                                'site_id' => $detail->quotation_site_id,
+                                'site_name' => $detail->nama_site,
+                                'nominal_upah' => $detail->nominal_upah,
+                                'jumlah_hc' => $detail->jumlah_hc,
+                            ];
+                        })->toArray() : [],
                 ];
             case 5:
+                // Data BPJS per position (dari quotation_details)
+                $bpjsPerPosition = [];
+                if ($quotation->relationLoaded('quotationDetails')) {
+                    $bpjsPerPosition = $quotation->quotationDetails->map(function ($detail) {
+                        return [
+                            'detail_id' => $detail->id,
+                            'position_id' => $detail->position_id,
+                            'position_name' => $detail->jabatan_kebutuhan,
+                            'site_id' => $detail->quotation_site_id,
+                            'site_name' => $detail->nama_site,
+                            'penjamin' => $detail->penjamin_kesehatan,
+                            'jkk' => (bool) $detail->is_bpjs_jkk,
+                            'jkm' => (bool) $detail->is_bpjs_jkm,
+                            'jht' => (bool) $detail->is_bpjs_jht,
+                            'jp' => (bool) $detail->is_bpjs_jp,
+                        ];
+                    })->toArray();
+                }
+
                 return [
                     'jenis_perusahaan_id' => $quotation->jenis_perusahaan_id,
                     'bidang_perusahaan_id' => $quotation->bidang_perusahaan_id,
                     'resiko' => $quotation->resiko,
-                    'program_bpjs' => $quotation->program_bpjs,
-                    'penjamin' => $quotation->penjamin,
-                    'jkk' => $quotation->jkk,
-                    'jkm' => $quotation->jkm,
-                    'jht' => $quotation->jht,
-                    'jp' => $quotation->jp,
-                    'nominal_takaful' => $quotation->nominal_takaful,
+                    'program_bpjs' => $quotation->program_bpjs, // Tetap di level quotation
+                    // Data BPJS per position
+                    'bpjs_per_position' => $bpjsPerPosition,
                 ];
 
             case 6:
@@ -249,17 +276,48 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 9:
+                $chemicalsData = [];
+                $totalAll = 0;
+                $jumlah_item = 0;
+
+                if ($quotation->relationLoaded('quotationChemicals')) {
+                    foreach ($quotation->quotationChemicals as $chemical) {
+                        $jumlah_pertahun = (int) $chemical->jumlah / (int) $chemical->masa_pakai * 12;
+                        $total_per_item = $chemical->harga * $chemical->jumlah / $chemical->masa_pakai;
+                        $totalAll += $total_per_item;
+                        $jumlah_item += $chemical->jumlah;
+                       
+
+                        $chemicalsData[] = [
+                            'id' => $chemical->id,
+                            'barang_id' => $chemical->barang_id,
+                            'jumlah' => $chemical->jumlah,
+                            'harga' => $chemical->harga,
+                            'harga_formatted' => "Rp " . number_format($chemical->harga, 0, ",", "."),
+                            'masa_pakai' => $chemical->masa_pakai,
+                            'masa_pakai_formatted' => $chemical->masa_pakai . " Bulan",
+                            'jumlah_pertahun' => $jumlah_pertahun,
+                            'total_per_item' => $total_per_item,
+                            'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
+                            'jenis_barang_id' => $chemical->jenis_barang_id,
+                            'jenis_barang' => $chemical->jenis_barang,
+                            'nama' => $chemical->nama,
+                        ];
+                    }
+
+                    // Tambahkan baris total keseluruhan
+                    $chemicalsData[] = [  
+                        'jumlah_item' =>$jumlah_item,
+                        'total_all' => $totalAll,
+                        'total_formatted' => "Rp " . number_format($totalAll, 0, ",", "."),
+                        'jenis_barang_id' => 100,
+                        'jenis_barang' => 'TOTAL',
+                        'is_total' => true, // Flag untuk menandai ini adalah baris total
+                    ];
+                }
+
                 return [
-                    'quotation_chemicals' => $quotation->relationLoaded('quotationChemicals') ?
-                        $quotation->quotationChemicals->map(function ($chemical) {
-                            return [
-                                'id' => $chemical->id,
-                                'barang_id' => $chemical->barang_id,
-                                'jumlah' => $chemical->jumlah,
-                                'harga' => $chemical->harga,
-                                'masa_pakai' => $chemical->masa_pakai,
-                            ];
-                        })->toArray() : [],
+                    'quotation_chemicals' => $chemicalsData,
                 ];
 
             case 10:
@@ -432,15 +490,23 @@ class QuotationStepResource extends JsonResource
                 return $this->getDevicesData();
 
             case 9:
+                $chemicalList = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
+                    ->ordered()
+                    ->get()
+                    ->map(function ($chemical) {
+                        $chemical->harga_formatted = number_format($chemical->harga, 0, ",", ".");
+
+                        // Tambahkan field default untuk form
+                        $chemical->jumlah = 0;
+                        $chemical->masa_pakai = $chemical->masa_pakai ?? 12; // Default 12 bulan jika tidak ada
+                        $chemical->jumlah_pertahun = 0;
+                        $chemical->total_formatted = "Rp 0";
+
+                        return $chemical;
+                    });
+
                 return [
-                    'chemicals' => Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-                        ->orderBy("urutan", "asc")
-                        ->orderBy("nama", "asc")
-                        ->get()
-                        ->map(function ($chemical) {
-                            $chemical->harga_formatted = number_format($chemical->harga, 0, ",", ".");
-                            return $chemical;
-                        }),
+                    'chemicals' => $chemicalList,
                 ];
 
             case 10:

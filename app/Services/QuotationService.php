@@ -163,9 +163,11 @@ class QuotationService
             }
         }
 
+        // Apply BPJS opt-out berdasarkan data dari quotation detail
         $this->applyBpjsOptOut($detail);
         $this->updateQuotationBpjs($detail, $quotation);
     }
+
 
     private function calculateExtras($detail, $quotation, $hpp)
     {
@@ -364,20 +366,20 @@ class QuotationService
     }
 
     private function finalizeCalculations(&$quotation, $suffix)
-{
-    $quotation->{"total_invoice{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} +
-        $quotation->{"ppn{$suffix}"} + $quotation->{"pph{$suffix}"};
-    $quotation->{"pembulatan{$suffix}"} = ceil($quotation->{"total_invoice{$suffix}"} / 1000) * 1000;
+    {
+        $quotation->{"total_invoice{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} +
+            $quotation->{"ppn{$suffix}"} + $quotation->{"pph{$suffix}"};
+        $quotation->{"pembulatan{$suffix}"} = ceil($quotation->{"total_invoice{$suffix}"} / 1000) * 1000;
 
-    $quotation->{"margin{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} - $quotation->total_sebelum_management_fee;
-    
-    // FIX: Tambahkan pengecekan untuk menghindari division by zero
-    if ($quotation->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
-        $quotation->{"gpm{$suffix}"} = $quotation->{"margin{$suffix}"} / $quotation->{"grand_total_sebelum_pajak{$suffix}"} * 100;
-    } else {
-        $quotation->{"gpm{$suffix}"} = 0; // atau nilai default lainnya
+        $quotation->{"margin{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} - $quotation->total_sebelum_management_fee;
+
+        // FIX: Tambahkan pengecekan untuk menghindari division by zero
+        if ($quotation->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
+            $quotation->{"gpm{$suffix}"} = $quotation->{"margin{$suffix}"} / $quotation->{"grand_total_sebelum_pajak{$suffix}"} * 100;
+        } else {
+            $quotation->{"gpm{$suffix}"} = 0; // atau nilai default lainnya
+        }
     }
-}
 
     // ============================ HELPER METHODS ============================
     private function calculateProvisi($durasiKerjasama)
