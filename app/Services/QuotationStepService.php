@@ -432,34 +432,47 @@ class QuotationStepService
             'updated_by' => Auth::user()->full_name
         ]);
     }
-    public function updateStep5(Quotation $quotation, Request $request): void
-    {
-        // Update BPJS data untuk setiap detail (position)
-        foreach ($quotation->quotationDetails as $detail) {
-            $detailId = $detail->id;
-
-            $detail->update([
-                'penjamin_kesehatan' => $request->penjamin[$detailId] ?? null,
-                'is_bpjs_jkk' => isset($request->jkk[$detailId]) ? 1 : 0,
-                'is_bpjs_jkm' => isset($request->jkm[$detailId]) ? 1 : 0,
-                'is_bpjs_jht' => isset($request->jht[$detailId]) ? 1 : 0,
-                'is_bpjs_jp' => isset($request->jp[$detailId]) ? 1 : 0,
-                'updated_by' => Auth::user()->full_name
-            ]);
+  public function updateStep5(Quotation $quotation, Request $request): void
+{
+    // Update BPJS data untuk setiap detail (position)
+    foreach ($quotation->quotationDetails as $detail) {
+        $detailId = $detail->id;
+        $penjamin = $request->penjamin[$detailId] ?? null;
+        
+        // Tentukan nominal_takaful berdasarkan penjamin
+        $nominalTakaful = 0;
+        if ($penjamin === 'Asuransi Swasta' || $penjamin === 'Takaful') {
+            $nominalTakaful = $request->nominal_takaful[$detailId] ?? 0;
+            // Convert string to integer jika diperlukan
+            if (is_string($nominalTakaful)) {
+                $nominalTakaful = (int) str_replace('.', '', $nominalTakaful);
+            }
         }
 
-        $companyData = $this->prepareCompanyData($request);
-
-        $quotation->update(array_merge([
-            'is_aktif' => $this->calculateIsAktif($quotation, $request),
-            'program_bpjs' => $request->program_bpjs, // Tetap simpan program_bpjs di level quotation
+        $detail->update([
+            'penjamin_kesehatan' => $penjamin,
+            'is_bpjs_jkk' => $this->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0,
+            'is_bpjs_jkm' => $this->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0,
+            'is_bpjs_jht' => $this->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0,
+            'is_bpjs_jp' => $this->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0,
+            'nominal_takaful' => $nominalTakaful, // Tambahkan field ini
             'updated_by' => Auth::user()->full_name
-        ], $companyData));
-
-        // Update leads data
-        $quotation->leads->update($companyData);
-
+        ]);
     }
+
+    $companyData = $this->prepareCompanyData($request);
+
+    $quotation->update(array_merge([
+        'is_aktif' => $this->calculateIsAktif($quotation, $request),
+        'program_bpjs' => $request->input('program-bpjs'),
+        'updated_by' => Auth::user()->full_name
+    ], $companyData));
+
+    // Update leads data
+    if ($quotation->leads) {
+        $quotation->leads->update($companyData);
+    }
+}
     public function updateStep6(Quotation $quotation, Request $request): void
     {
         $currentDateTime = Carbon::now();
@@ -685,19 +698,31 @@ class QuotationStepService
     }
     private function prepareCompanyData(Request $request): array
     {
+        // Gunakan input() untuk field dengan dash
+        $jenisPerusahaanId = $request->input('jenis-perusahaan');
+        $bidangPerusahaanId = $request->input('bidang-perusahaan');
+
         $data = [
-            'jenis_perusahaan_id' => $request->jenis_perusahaan,
-            'bidang_perusahaan_id' => $request->bidang_perusahaan,
-            'resiko' => $request->resiko
+            'jenis_perusahaan_id' => $jenisPerusahaanId,
+            'bidang_perusahaan_id' => $bidangPerusahaanId,
+            'resiko' => $request->input('resiko')
         ];
 
-        if ($request->jenis_perusahaan) {
-            $jenisPerusahaan = DB::table('m_jenis_perusahaan')->where('id', $request->jenis_perusahaan)->first();
+        \Log::info('Preparing company data', [
+            'jenis_perusahaan_id' => $jenisPerusahaanId,
+            'bidang_perusahaan_id' => $bidangPerusahaanId,
+            'resiko' => $request->input('resiko')
+        ]);
+
+        // Get nama jenis perusahaan
+        if ($jenisPerusahaanId) {
+            $jenisPerusahaan = JenisPerusahaan::where('id', $jenisPerusahaanId)->first();
             $data['jenis_perusahaan'] = $jenisPerusahaan ? $jenisPerusahaan->nama : null;
         }
 
-        if ($request->bidang_perusahaan) {
-            $bidangPerusahaan = DB::table('m_bidang_perusahaan')->where('id', $request->bidang_perusahaan)->first();
+        // Get nama bidang perusahaan
+        if ($bidangPerusahaanId) {
+            $bidangPerusahaan = BidangPerusahaan::where('id', $bidangPerusahaanId)->first();
             $data['bidang_perusahaan'] = $bidangPerusahaan ? $bidangPerusahaan->nama : null;
         }
 
@@ -707,6 +732,11 @@ class QuotationStepService
     private function calculateIsAktif(Quotation $quotation, Request $request): int
     {
         $isAktif = $quotation->is_aktif;
+
+        \Log::info('Calculate is_aktif', [
+            'current_is_aktif' => $isAktif,
+            'new_is_aktif' => ($isAktif == 2) ? 1 : $isAktif
+        ]);
 
         if ($isAktif == 2) {
             $isAktif = 1;
@@ -1262,6 +1292,25 @@ class QuotationStepService
             'upah' => $positionData['upah'] ?? 'null'
         ]);
     }
+    /**
+     * Helper method to convert various boolean representations to proper boolean
+     */
+    private function toBoolean($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
 
+        if (is_int($value)) {
+            return $value === 1;
+        }
+
+        if (is_string($value)) {
+            $value = strtolower(trim($value));
+            return in_array($value, ['true', '1', 'yes', 'on']);
+        }
+
+        return (bool) $value;
+    }
 
 }

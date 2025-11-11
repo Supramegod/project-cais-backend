@@ -204,8 +204,8 @@ class QuotationStepResource extends JsonResource
                 return [
                     'position_data' => $positionData,
                 ];
+            // Di method getStepSpecificData untuk case 5
             case 5:
-                // Data BPJS per position (dari quotation_details)
                 $bpjsPerPosition = [];
                 if ($quotation->relationLoaded('quotationDetails')) {
                     $bpjsPerPosition = $quotation->quotationDetails->map(function ($detail) {
@@ -220,6 +220,7 @@ class QuotationStepResource extends JsonResource
                             'jkm' => (bool) $detail->is_bpjs_jkm,
                             'jht' => (bool) $detail->is_bpjs_jht,
                             'jp' => (bool) $detail->is_bpjs_jp,
+                            'nominal_takaful' => $detail->nominal_takaful // Tambahkan ini
                         ];
                     })->toArray();
                 }

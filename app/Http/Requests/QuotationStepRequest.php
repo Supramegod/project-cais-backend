@@ -81,7 +81,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['position_data.*.is_ppn'] = 'sometimes|string';
                 $rules['position_data.*.ppn_pph_dipotong'] = 'sometimes|string';
                 break;
-
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
                 $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
@@ -100,7 +99,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['nominal_takaful'] = 'sometimes|array';
                 $rules['nominal_takaful.*'] = 'sometimes|numeric|min:0';
                 break;
-
             case 6:
                 $rules['aplikasi_pendukung'] = 'sometimes|array';
                 $rules['aplikasi_pendukung.*'] = 'exists:m_aplikasi_pendukung,id';
