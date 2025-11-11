@@ -165,53 +165,44 @@ class QuotationStepResource extends JsonResource
                     'quotation_details' => $quotationDetails,
                 ];
             case 4:
+                $positionData = [];
+
+                if ($quotation->relationLoaded('quotationDetails')) {
+                    foreach ($quotation->quotationDetails as $detail) {
+                        $wage = $detail->wage; // Ambil data dari relasi wage
+
+                        $positionData[] = [
+                            'quotation_detail_id' => $detail->id,
+                            'position_id' => $detail->position_id,
+                            'position_name' => $detail->jabatan_kebutuhan,
+                            'site_id' => $detail->quotation_site_id,
+                            'site_name' => $detail->nama_site,
+                            'jumlah_hc' => $detail->jumlah_hc,
+                            'nominal_upah' => $detail->nominal_upah,
+
+                            // Step 4 fields dari tabel wage - semua sebagai string
+                            'upah' => $wage->upah ?? null,
+                            'hitungan_upah' => $wage->hitungan_upah ?? null,
+                            'management_fee_id' => $wage->management_fee_id ?? null,
+                            'persentase' => $wage->persentase ?? null,
+                            'lembur' => $wage->lembur ?? null,
+                            'nominal_lembur' => $wage->nominal_lembur ?? null,
+                            'jenis_bayar_lembur' => $wage->jenis_bayar_lembur ?? null,
+                            'jam_per_bulan_lembur' => $wage->jam_per_bulan_lembur ?? null,
+                            'lembur_ditagihkan' => $wage->lembur_ditagihkan ?? null,
+                            'kompensasi' => $wage->kompensasi ?? null,
+                            'thr' => $wage->thr ?? null,
+                            'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
+                            'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? null,
+                            'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
+                            'is_ppn' => $wage->is_ppn ?? null,
+                            'ppn_pph_dipotong' => $wage->ppn_pph_dipotong ?? null,
+                        ];
+                    }
+                }
+
                 return [
-                    'upah' => $quotation->upah,
-                    'hitungan_upah' => $quotation->hitungan_upah,
-                    'management_fee_id' => $quotation->management_fee_id,
-                    'persentase' => $quotation->persentase,
-                    'ada_lembur' => $quotation->ada_lembur,
-                    'lembur' => $quotation->lembur,
-                    'nominal_lembur' => $quotation->nominal_lembur,
-                    'jenis_bayar_lembur' => $quotation->jenis_bayar_lembur,
-                    'jam_per_bulan_lembur' => $quotation->jam_per_bulan_lembur,
-                    'lembur_ditagihkan' => $quotation->lembur_ditagihkan,
-                    'ada_kompensasi' => $quotation->ada_kompensasi,
-                    'kompensasi' => $quotation->kompensasi,
-                    'ada_thr' => $quotation->ada_thr,
-                    'thr' => $quotation->thr,
-                    'ada_tunjangan_holiday' => $quotation->ada_tunjangan_holiday,
-                    'tunjangan_holiday' => $quotation->tunjangan_holiday,
-                    'nominal_tunjangan_holiday' => $quotation->nominal_tunjangan_holiday,
-                    'jenis_bayar_tunjangan_holiday' => $quotation->jenis_bayar_tunjangan_holiday,
-                    'is_ppn' => $quotation->is_ppn,
-                    'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                    // Data upah per site
-                    'upah_per_site' => $quotation->relationLoaded('quotationSites') ?
-                        $quotation->quotationSites->map(function ($site) {
-                            return [
-                                'site_id' => $site->id,
-                                'site_name' => $site->nama_site,
-                                'nominal_upah' => $site->nominal_upah,
-                                'city_id' => $site->kota_id,
-                                'city_name' => $site->kota,
-                                'province_id' => $site->provinsi_id,
-                                'province_name' => $site->provinsi,
-                            ];
-                        })->toArray() : [],
-                    // Data upah per position (BARU)
-                    'upah_per_position' => $quotation->relationLoaded('quotationDetails') ?
-                        $quotation->quotationDetails->map(function ($detail) {
-                            return [
-                                'detail_id' => $detail->id,
-                                'position_id' => $detail->position_id,
-                                'position_name' => $detail->jabatan_kebutuhan,
-                                'site_id' => $detail->quotation_site_id,
-                                'site_name' => $detail->nama_site,
-                                'nominal_upah' => $detail->nominal_upah,
-                                'jumlah_hc' => $detail->jumlah_hc,
-                            ];
-                        })->toArray() : [],
+                    'position_data' => $positionData,
                 ];
             case 5:
                 // Data BPJS per position (dari quotation_details)
@@ -286,7 +277,7 @@ class QuotationStepResource extends JsonResource
                         $total_per_item = $chemical->harga * $chemical->jumlah / $chemical->masa_pakai;
                         $totalAll += $total_per_item;
                         $jumlah_item += $chemical->jumlah;
-                       
+
 
                         $chemicalsData[] = [
                             'id' => $chemical->id,
@@ -306,8 +297,8 @@ class QuotationStepResource extends JsonResource
                     }
 
                     // Tambahkan baris total keseluruhan
-                    $chemicalsData[] = [  
-                        'jumlah_item' =>$jumlah_item,
+                    $chemicalsData[] = [
+                        'jumlah_item' => $jumlah_item,
                         'total_all' => $totalAll,
                         'total_formatted' => "Rp " . number_format($totalAll, 0, ",", "."),
                         'jenis_barang_id' => 100,
@@ -440,7 +431,7 @@ class QuotationStepResource extends JsonResource
                             'city_id' => $site->kota_id,
                             'city_name' => $site->kota,
                             'umk_value' => $umk ? $umk->umk : 0,
-                            'formatted_umk' => $umk->formatUmk()
+                            'formatted_umk' => $umk ? $umk->formatUmk() : "UMK : Rp. 0"
                         ];
 
                         // Gunakan scope dari model Ump
@@ -454,7 +445,7 @@ class QuotationStepResource extends JsonResource
                             'province_id' => $site->provinsi_id,
                             'province_name' => $site->provinsi,
                             'ump_value' => $ump ? $ump->ump : 0,
-                            'formatted_ump' => $ump->formatUmp()
+                            'formatted_ump' => $ump ? $ump->formatUmp() : "UMP : Rp. 0"
                         ];
                     }
                 }
@@ -464,10 +455,26 @@ class QuotationStepResource extends JsonResource
                     'upah_options' => ['UMP', 'UMK', 'Custom'],
                     'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
                     'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
-                    'boolean_options' => ['Ada', 'Tidak Ada'],
                     'lembur_options' => ['Flat', 'Tidak Ada'],
+                    'kompensasi_options' => ['Flat', 'Tidak Ada'],
+                    'thr_options' => ['Flat', 'Tidak Ada'],
+                    'tunjangan_holiday_options' => ['Flat', 'Tidak Ada'],
+                    'is_ppn_options' => ['Ya', 'Tidak'],
+                    'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'], // Sesuaikan dengan nilai yang ada
                     'umk_per_site' => $umkPerSite,
                     'ump_per_site' => $umpPerSite,
+                    'quotation_details' => $quotation->relationLoaded('quotationDetails') ?
+                        $quotation->quotationDetails->map(function ($detail) {
+                            return [
+                                'id' => $detail->id,
+                                'position_id' => $detail->position_id,
+                                'position_name' => $detail->jabatan_kebutuhan,
+                                'site_id' => $detail->quotation_site_id,
+                                'site_name' => $detail->nama_site,
+                                'jumlah_hc' => $detail->jumlah_hc,
+                                'nominal_upah' => $detail->nominal_upah,
+                            ];
+                        })->toArray() : [],
                 ];
 
             case 5:

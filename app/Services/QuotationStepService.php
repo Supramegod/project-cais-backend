@@ -16,6 +16,7 @@ use App\Models\Province;
 use App\Models\Quotation;
 use App\Models\QuotationAplikasi;
 use App\Models\QuotationDetailTunjangan;
+use App\Models\QuotationDetailWage;
 use App\Models\QuotationKaporlap;
 use App\Models\QuotationDevices;
 use App\Models\QuotationChemical;
@@ -67,6 +68,10 @@ class QuotationStepService
             $additionalRelations[] = 'quotationDetails.quotationDetailRequirements';
             $additionalRelations[] = 'quotationDetails.quotationDetailTunjangans';
             $additionalRelations[] = 'quotationDetails.position';
+        }
+        if ($step == 4) {
+            $additionalRelations[] = 'quotationDetails.wage';
+            $additionalRelations[] = 'quotationDetails.wage.managementFee';
         }
 
         if ($step >= 6) {
@@ -409,32 +414,24 @@ class QuotationStepService
 
     public function updateStep4(Quotation $quotation, Request $request): void
     {
-        $upahData = $this->calculateUpahData($quotation, $request);
+        \Log::info("Updating Step 4 per position", [
+            'quotation_id' => $quotation->id,
+            'position_data_count' => count($request->position_data ?? [])
+        ]);
 
-        $quotation->update(array_merge([
-            'upah' => $request->upah,
-            'management_fee_id' => $request->manajemen_fee,
-            'persentase' => $request->persentase,
-            'thr' => $request->thr,
-            'kompensasi' => $request->kompensasi,
-            'lembur' => $request->lembur,
-            'is_ppn' => $request->is_ppn,
-            'ppn_pph_dipotong' => $request->ppn_pph_dipotong,
-            'tunjangan_holiday' => $request->tunjangan_holiday,
-            'nominal_lembur' => $request->nominal_lembur ? str_replace('.', '', $request->nominal_lembur) : null,
-            'nominal_tunjangan_holiday' => $request->nominal_tunjangan_holiday ? str_replace('.', '', $request->nominal_tunjangan_holiday) : null,
-            'jenis_bayar_tunjangan_holiday' => $request->jenis_bayar_tunjangan_holiday,
-            'jenis_bayar_lembur' => $request->jenis_bayar_lembur,
-            'lembur_ditagihkan' => $request->lembur_ditagihkan,
-            'jam_per_bulan_lembur' => $request->jam_per_bulan_lembur,
+        if ($request->has('position_data') && is_array($request->position_data)) {
+            foreach ($request->position_data as $positionData) {
+                $this->updatePositionStep4($quotation, $positionData);
+            }
+
+            // Synchronize upah for all positions after update
+            $this->updateUpahPerPosition($quotation);
+        }
+
+        $quotation->update([
             'updated_by' => Auth::user()->full_name
-        ], $upahData));
-
-        // HAPUS: Update nominal upah di semua detail dengan nilai yang sama
-        // GUNAKAN: Update nominal upah per position berdasarkan site yang terkait
-        $this->updateUpahPerPosition($quotation);
+        ]);
     }
-
     public function updateStep5(Quotation $quotation, Request $request): void
     {
         // Update BPJS data untuk setiap detail (position)
@@ -642,66 +639,50 @@ class QuotationStepService
         return $data;
     }
 
-    private function calculateUpahData(Quotation $quotation, Request $request): array
+    private function calculateUpahForPosition(QuotationDetail $detail, array $positionData): array
     {
-        $nominalUpah = 0;
+        $nominalUpah = $detail->nominal_upah;
         $hitunganUpah = "Per Bulan";
 
-        if ($request->upah == "Custom") {
-            $hitunganUpah = $request->hitungan_upah;
-            $customUpah = str_replace(".", "", $request->custom_upah);
+        if (($positionData['upah'] ?? null) == "Custom") {
+            $hitunganUpah = $positionData['hitungan_upah'] ?? "Per Bulan";
+            $customUpah = isset($positionData['custom_upah']) ? str_replace('.', '', $positionData['custom_upah']) : 0;
 
-            // Konversi ke bulanan berdasarkan hitungan
             if ($hitunganUpah == "Per Hari") {
-                $customUpah = $customUpah * 21; // 21 hari kerja
+                $customUpah = $customUpah * 21;
             } else if ($hitunganUpah == "Per Jam") {
-                $customUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
+                $customUpah = $customUpah * 21 * 8;
             }
 
             $nominalUpah = $customUpah;
-
-            // Update semua site dengan nilai custom yang sama
-            foreach ($quotation->quotationSites as $site) {
-                $site->update([
-                    'nominal_upah' => $nominalUpah,
-                    'updated_by' => Auth::user()->full_name
-                ]);
-            }
         } else {
-            // Update nominal upah di setiap site berdasarkan UMP/UMK masing-masing
-            foreach ($quotation->quotationSites as $site) {
-                if ($request->upah == "UMP") {
+            $site = QuotationSite::find($detail->quotation_site_id);
+            if ($site) {
+                if (($positionData['upah'] ?? null) == "UMP") {
                     $dataUmp = Ump::byProvince($site->provinsi_id)
                         ->active()
                         ->first();
                     $nominalUpah = $dataUmp ? $dataUmp->ump : 0;
-                } else if ($request->upah == "UMK") {
+                } else if (($positionData['upah'] ?? null) == "UMK") {
                     $dataUmk = Umk::byCity($site->kota_id)
                         ->active()
                         ->first();
                     $nominalUpah = $dataUmk ? $dataUmk->umk : 0;
                 }
 
+                // Update site dengan nilai yang sesuai
                 $site->update([
                     'nominal_upah' => $nominalUpah,
                     'updated_by' => Auth::user()->full_name
-                ]);
-
-                \Log::info("Updated site upah", [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'upah_type' => $request->upah,
-                    'nominal_upah' => $nominalUpah
                 ]);
             }
         }
 
         return [
-            'nominal_upah' => $nominalUpah, // Nilai ini sekarang hanya untuk referensi
+            'nominal_upah' => $nominalUpah,
             'hitungan_upah' => $hitunganUpah
         ];
     }
-
     private function prepareCompanyData(Request $request): array
     {
         $data = [
@@ -1170,24 +1151,39 @@ class QuotationStepService
     private function updateUpahPerPosition(Quotation $quotation): void
     {
         try {
-            // Ambil semua quotation details dengan relasi site
-            $quotationDetails = QuotationDetail::with('quotationSite')
+            // Ambil semua quotation details dengan relasi site dan wage
+            $quotationDetails = QuotationDetail::with(['quotationSite', 'wage'])
                 ->where('quotation_id', $quotation->id)
                 ->get();
 
             foreach ($quotationDetails as $detail) {
                 // Jika detail memiliki quotation site, gunakan nominal_upah dari site tersebut
                 if ($detail->quotationSite) {
+                    $newNominalUpah = $detail->quotationSite->nominal_upah;
+
+                    // Update nominal_upah di quotation_detail
                     $detail->update([
-                        'nominal_upah' => $detail->quotationSite->nominal_upah,
+                        'nominal_upah' => $newNominalUpah,
                         'updated_by' => Auth::user()->full_name
                     ]);
+
+                    // Jika ada data wage, update juga hitungan_upah jika diperlukan
+                    if ($detail->wage) {
+                        // Jika upah type adalah UMP/UMK, update hitungan_upah ke "Per Bulan"
+                        if (in_array($detail->wage->upah, ['UMP', 'UMK'])) {
+                            $detail->wage->update([
+                                'hitungan_upah' => 'Per Bulan',
+                                'updated_by' => Auth::user()->full_name
+                            ]);
+                        }
+                    }
 
                     \Log::info("Updated upah for position", [
                         'detail_id' => $detail->id,
                         'position_id' => $detail->position_id,
                         'site_id' => $detail->quotation_site_id,
-                        'nominal_upah' => $detail->quotationSite->nominal_upah
+                        'nominal_upah' => $newNominalUpah,
+                        'upah_type' => $detail->wage->upah ?? 'N/A'
                     ]);
                 }
             }
@@ -1205,5 +1201,67 @@ class QuotationStepService
             throw new \Exception("Failed to update upah per position: " . $e->getMessage());
         }
     }
+
+    private function updatePositionStep4(Quotation $quotation, array $positionData): void
+    {
+        $detail = QuotationDetail::where('id', $positionData['quotation_detail_id'])
+            ->where('quotation_id', $quotation->id)
+            ->first();
+
+        if (!$detail) {
+            \Log::warning("Quotation detail not found", [
+                'quotation_detail_id' => $positionData['quotation_detail_id'],
+                'quotation_id' => $quotation->id
+            ]);
+            return;
+        }
+
+        // Calculate upah data untuk position ini
+        $upahData = $this->calculateUpahForPosition($detail, $positionData);
+
+        // Data untuk wage table - semua field sebagai string
+        $wageData = [
+            'quotation_id' => $quotation->id,
+            'upah' => $positionData['upah'] ?? null,
+            'hitungan_upah' => $upahData['hitungan_upah'] ?? null,
+            'management_fee_id' => $positionData['manajemen_fee'] ?? null,
+            'persentase' => $positionData['persentase'] ?? null,
+            'lembur' => $positionData['lembur'] ?? null,
+            'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
+            'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
+            'jam_per_bulan_lembur' => $positionData['jam_per_bulan_lembur'] ?? null,
+            'lembur_ditagihkan' => $positionData['lembur_ditagihkan'] ?? null,
+            'kompensasi' => $positionData['kompensasi'] ?? null,
+            'thr' => $positionData['thr'] ?? null,
+            'tunjangan_holiday' => $positionData['tunjangan_holiday'] ?? null,
+            'nominal_tunjangan_holiday' => isset($positionData['nominal_tunjangan_holiday']) ? str_replace('.', '', $positionData['nominal_tunjangan_holiday']) : null,
+            'jenis_bayar_tunjangan_holiday' => $positionData['jenis_bayar_tunjangan_holiday'] ?? null,
+            'is_ppn' => $positionData['is_ppn'] ?? null,
+            'ppn_pph_dipotong' => $positionData['ppn_pph_dipotong'] ?? null,
+            'updated_by' => Auth::user()->full_name
+        ];
+
+        // Update atau create wage data
+        if ($detail->wage) {
+            $detail->wage->update($wageData);
+        } else {
+            $wageData['quotation_detail_id'] = $detail->id;
+            $wageData['created_by'] = Auth::user()->full_name;
+            QuotationDetailWage::create($wageData);
+        }
+
+        // Update nominal_upah di quotation_detail (akan di-sync lagi oleh updateUpahPerPosition)
+        $detail->update([
+            'nominal_upah' => $upahData['nominal_upah'],
+            'updated_by' => Auth::user()->full_name
+        ]);
+
+        \Log::info("Updated step 4 wage for position", [
+            'quotation_detail_id' => $detail->id,
+            'position_id' => $detail->position_id,
+            'upah' => $positionData['upah'] ?? 'null'
+        ]);
+    }
+
 
 }

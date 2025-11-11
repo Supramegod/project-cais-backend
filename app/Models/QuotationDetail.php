@@ -32,5 +32,11 @@ class QuotationDetail extends Model
     {
         return $this->belongsTo(Position::class, 'position_id', 'id');
     }
+public function wage()
+{
+    return $this->hasOne(QuotationDetailWage::class, 'quotation_detail_id', 'id');
+}
+
+
 
 }
