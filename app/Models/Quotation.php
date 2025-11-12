@@ -418,4 +418,8 @@ class Quotation extends Model
     {
         return $this->hasMany(Quotation::class, 'quotation_referensi_id');
     }
+        public function wage()
+    {
+        return $this->hasOne(QuotationDetailWage::class);
+    }
 }

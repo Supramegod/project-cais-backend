@@ -31,4 +31,8 @@ class ManagementFee extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+        public function wage()
+    {
+        return $this->hasOne(QuotationDetailWage::class);
+    }
 }

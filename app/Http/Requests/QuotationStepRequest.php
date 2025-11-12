@@ -55,33 +55,32 @@ class QuotationStepRequest extends FormRequest
                 $rules['headCountData.*.jumlah_hc'] = 'sometimes|required|integer|min:1';
                 $rules['headCountData.*.jabatan_kebutuhan'] = 'sometimes|required|string';
                 $rules['headCountData.*.nama_site'] = 'sometimes|required|string';
-                
+
                 break;
 
             case 4:
-                $rules['upah'] = 'required|string|in:UMP,UMK,Custom';
-                $rules['manajemen_fee'] = 'required|exists:m_management_fee,id';
-                $rules['persentase'] = 'required|numeric|min:0|max:100';
-                $rules['hitungan_upah'] = 'required_if:upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['custom-upah'] = 'required_if:upah,Custom|string';
-                $rules['ada_lembur'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['lembur'] = 'sometimes|string|in:Flat,Tidak Ada';
-                $rules['nominal_lembur'] = 'required_if:lembur,Flat|numeric|min:0';
-                $rules['jenis_bayar_lembur'] = 'required_if:lembur,Flat|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['jam_per_bulan_lembur'] = 'required_if:lembur,Flat|integer|min:0';
-                $rules['lembur_ditagihkan'] = 'sometimes|boolean';
-                $rules['ada_kompensasi'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['kompensasi'] = 'sometimes|string|in:Flat,Tidak Ada';
-                $rules['ada_thr'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['thr'] = 'sometimes|string|in:Flat,Tidak Ada';
-                $rules['ada_tunjangan_holiday'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['tunjangan_holiday'] = 'sometimes|string|in:Flat,Tidak Ada';
-                $rules['nominal_tunjangan_holiday'] = 'required_if:tunjangan_holiday,Flat|numeric|min:0';
-                $rules['jenis_bayar_tunjangan_holiday'] = 'required_if:tunjangan_holiday,Flat|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['is_ppn'] = 'sometimes|boolean';
-                $rules['ppn_pph_dipotong'] = 'sometimes|boolean';
-                break;
+                $rules['position_data'] = 'required|array';
+                $rules['position_data.*.quotation_detail_id'] = 'required|exists:sl_quotation_detail,id';
+                $rules['position_data.*.upah'] = 'required|string|in:UMP,UMK,Custom';
+                $rules['position_data.*.manajemen_fee'] = 'required|exists:m_management_fee,id';
+                $rules['position_data.*.persentase'] = 'required|numeric|min:0|max:100';
+                $rules['position_data.*.hitungan_upah'] = 'required_if:position_data.*.upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
+                $rules['position_data.*.custom_upah'] = 'required_if:position_data.*.upah,Custom|string';
 
+                // Field yang sekarang bertipe string
+                $rules['position_data.*.lembur'] = 'sometimes|string';
+                $rules['position_data.*.nominal_lembur'] = 'sometimes|numeric|min:0';
+                $rules['position_data.*.jenis_bayar_lembur'] = 'sometimes|string';
+                $rules['position_data.*.jam_per_bulan_lembur'] = 'sometimes|integer|min:0';
+                $rules['position_data.*.lembur_ditagihkan'] = 'sometimes|string';
+                $rules['position_data.*.kompensasi'] = 'sometimes|string';
+                $rules['position_data.*.thr'] = 'sometimes|string';
+                $rules['position_data.*.tunjangan_holiday'] = 'sometimes|string';
+                $rules['position_data.*.nominal_tunjangan_holiday'] = 'sometimes|numeric|min:0';
+                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|string';
+                $rules['position_data.*.is_ppn'] = 'sometimes|string';
+                $rules['position_data.*.ppn_pph_dipotong'] = 'sometimes|string';
+                break;
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
                 $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
@@ -100,7 +99,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['nominal_takaful'] = 'sometimes|array';
                 $rules['nominal_takaful.*'] = 'sometimes|numeric|min:0';
                 break;
-
             case 6:
                 $rules['aplikasi_pendukung'] = 'sometimes|array';
                 $rules['aplikasi_pendukung.*'] = 'exists:m_aplikasi_pendukung,id';
