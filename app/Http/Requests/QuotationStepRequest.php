@@ -103,6 +103,19 @@ class QuotationStepRequest extends FormRequest
                 $rules['aplikasi_pendukung'] = 'sometimes|array';
                 $rules['aplikasi_pendukung.*'] = 'exists:m_aplikasi_pendukung,id';
                 break;
+            case 9:
+                // Validasi untuk single chemical
+                $rules['barang_id'] = 'sometimes|required_without:chemicals|exists:m_barang,id';
+                $rules['jumlah'] = 'sometimes|required_without:chemicals|integer|min:0';
+                $rules['masa_pakai'] = 'sometimes|integer|min:1';
+                $rules['harga'] = 'sometimes|numeric|min:0';
+                // Validasi untuk multiple chemicals
+                $rules['chemicals'] = 'sometimes|array';
+                $rules['chemicals.*.barang_id'] = 'required_with:chemicals|exists:m_barang,id';
+                $rules['chemicals.*.jumlah'] = 'required_with:chemicals|integer|min:0';
+                $rules['chemicals.*.masa_pakai'] = 'sometimes|integer|min:1';
+                $rules['chemicals.*.harga'] = 'sometimes|numeric|min:0';
+                break;
 
             case 10:
                 $rules['jumlah_kunjungan_operasional'] = 'required|integer|min:0';
