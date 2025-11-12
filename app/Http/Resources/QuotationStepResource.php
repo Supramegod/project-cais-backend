@@ -279,7 +279,6 @@ class QuotationStepResource extends JsonResource
                         $totalAll += $total_per_item;
                         $jumlah_item += $chemical->jumlah;
 
-
                         $chemicalsData[] = [
                             'id' => $chemical->id,
                             'barang_id' => $chemical->barang_id,
@@ -296,22 +295,19 @@ class QuotationStepResource extends JsonResource
                             'nama' => $chemical->nama,
                         ];
                     }
-
-                    // Tambahkan baris total keseluruhan
-                    $chemicalsData[] = [
-                        'jumlah_item' => $jumlah_item,
-                        'total_all' => $totalAll,
-                        'total_formatted' => "Rp " . number_format($totalAll, 0, ",", "."),
-                        'jenis_barang_id' => 100,
-                        'jenis_barang' => 'TOTAL',
-                        'is_total' => true, // Flag untuk menandai ini adalah baris total
-                    ];
                 }
+
+                // Buat array terpisah untuk total
+                $chemicalsTotal = [
+                    'jumlah_item' => $jumlah_item,
+                    'total_all' => $totalAll,
+                    'total_formatted' => "Rp " . number_format($totalAll, 0, ",", "."),
+                ];
 
                 return [
                     'quotation_chemicals' => $chemicalsData,
+                    'chemicals_total' => $chemicalsTotal, // Array terpisah untuk total
                 ];
-
             case 10:
                 // Parse kunjungan_operasional yang disimpan sebagai "jumlah periode"
                 $kunjunganOperasional = $quotation->kunjungan_operasional ?? '';
