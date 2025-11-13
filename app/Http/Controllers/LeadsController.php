@@ -2182,6 +2182,173 @@ class LeadsController extends Controller
         }
     }
     /**
+     * @OA\Get(
+     *     path="/api/leads/available-sales/{id}",
+     *     summary="Mendapatkan daftar tim sales yang available untuk diassign ke lead tertentu",
+     *     description="Endpoint ini digunakan untuk mengambil daftar tim sales yang dapat diassign ke lead tertentu berdasarkan branch_id dari lead tersebut.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead yang akan diassign sales",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data tim sales",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data tim sales berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="John Sales"),
+     *                     @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                     @OA\Property(property="user_id", type="integer", example=10),
+     *                     @OA\Property(property="is_leader", type="boolean", example=false),
+     *                     @OA\Property(property="is_active", type="boolean", example=true),
+     *                     @OA\Property(
+     *                         property="user",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=10),
+     *                         @OA\Property(property="full_name", type="string", example="John Doe"),
+     *                         @OA\Property(property="email", type="string", example="john@example.com")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="tim_sales",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama", type="string", example="Tim Sales Jakarta"),
+     *                         @OA\Property(property="branch_id", type="integer", example=1),
+     *                         @OA\Property(
+     *                             property="branch",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="nama", type="string", example="Jakarta")
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=403, description="Forbidden - Tidak memiliki akses"),
+     *     @OA\Response(response=404, description="Lead tidak ditemukan"),
+     *     @OA\Response(response=500, description="Internal Server Error")
+     * )
+     */
+    public function availableSales($id)
+    {
+        try {
+            $user = Auth::user();
+            $allowedRoles = [30, 31, 32, 33, 53, 96];
+
+            // Cek apakah user memiliki akses
+            if (!in_array($user->role_id, $allowedRoles)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk melihat daftar tim sales'
+                ], 403);
+            }
+
+            // Cari lead untuk mendapatkan branch_id
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // Pastikan branch_id adalah integer
+            if (!is_numeric($lead->branch_id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak memiliki branch_id yang valid'
+                ], 400);
+            }
+
+            $query = TimSalesDetail::with([
+                'user:id,full_name',
+                'timSales:id,nama,branch_id',
+                'timSales.branch:id,name'
+            ]);
+
+            // Filter berdasarkan role
+            if ($user->role_id == 31) { // Sales Leader
+                // Dapatkan tim sales leader
+                $leaderTim = TimSalesDetail::where('user_id', $user->id)
+                    ->first();
+
+                if ($leaderTim) {
+                    // Hanya tampilkan anggota tim yang sama
+                    $query->where('tim_sales_id', $leaderTim->tim_sales_id);
+                } else {
+                    // Jika leader tidak memiliki tim, return empty
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Data tim sales berhasil diambil',
+                        'data' => []
+                    ]);
+                }
+            }
+
+            // Filter berdasarkan branch_id dari lead
+            $query->whereHas('timSales', function ($q) use ($lead) {
+                $q->where('branch_id', (int) $lead->branch_id);
+            });
+
+            $sales = $query->get();
+
+            // Transform data untuk response
+            $salesData = $sales->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'tim_sales_id' => $item->tim_sales_id,
+                    'user_id' => $item->user_id,
+                    'is_leader' => (bool) $item->is_leader,
+                    'is_active' => (bool) $item->is_active,
+                    'user' => $item->user ? [
+                        'id' => $item->user->id,
+                        'full_name' => $item->user->full_name,
+                    ] : null,
+                    'tim_sales' => $item->timSales ? [
+                        'id' => $item->timSales->id,
+                        'nama' => $item->timSales->nama,
+                        'branch_id' => $item->timSales->branch_id,
+                        'branch' => $item->timSales->branch ? [
+                            'id' => $item->timSales->branch->id,
+                            'nama' => $item->timSales->branch->name
+                        ] : null
+                    ] : null
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data tim sales berhasil diambil',
+                'data' => $salesData,
+                'debug' => [
+                    'lead_id' => $lead->id,
+                    'branch_id' => $lead->branch_id,
+                    'total_sales' => $salesData->count()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
+    }
+    /**
      * @OA\Put(
      *     path="/api/leads/assign-sales/{id}",
      *     summary="Mengassign sales ke leads berdasarkan kebutuhan",

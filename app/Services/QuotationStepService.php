@@ -42,11 +42,14 @@ use Carbon\Carbon;
 
 class QuotationStepService
 {
-    protected $quotationService;
 
-    public function __construct(QuotationService $quotationService)
+    protected $quotationService;
+    protected $quotationBarangService;
+
+    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
     {
         $this->quotationService = $quotationService;
+        $this->quotationBarangService = $quotationBarangService;
     }
 
     /**
@@ -487,68 +490,90 @@ class QuotationStepService
             ]);
         }
     }
-
     public function updateStep7(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data kaporlap existing
-        QuotationKaporlap::where('quotation_id', $quotation->id)->update([
-            'deleted_at' => $currentDateTime,
-            'deleted_by' => Auth::user()->full_name
+        if ($request->has('kaporlaps') && is_array($request->kaporlaps)) {
+            $barangData = $request->kaporlaps;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'kaporlap');
+        }
+
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
         ]);
-
-        // Insert data kaporlap baru
-        $this->insertKaporlapData($quotation, $request, $currentDateTime);
     }
 
     public function updateStep8(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data devices existing (kecuali aplikasi pendukung)
-        QuotationDevices::where('quotation_id', $quotation->id)
-            ->whereNotIn('barang_id', [192, 194, 195, 196])
-            ->update([
-                'deleted_at' => $currentDateTime,
-                'deleted_by' => Auth::user()->full_name
-            ]);
+        if ($request->has('devices') && is_array($request->devices)) {
+            $barangData = $request->devices;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'devices');
+        }
 
-        // Insert data devices baru
-        $this->insertDevicesData($quotation, $request, $currentDateTime);
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
+        ]);
     }
 
     public function updateStep9(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data chemical existing
-        QuotationChemical::where('quotation_id', $quotation->id)->update([
-            'deleted_at' => $currentDateTime,
-            'deleted_by' => Auth::user()->full_name
+        if ($request->has('chemicals') && is_array($request->chemicals)) {
+            $barangData = $request->chemicals;
+        } elseif ($request->has('barang_id') && $request->has('jumlah')) {
+            $barangData = [
+                [
+                    'barang_id' => $request->barang_id,
+                    'jumlah' => $request->jumlah,
+                    'masa_pakai' => $request->masa_pakai,
+                    'harga' => $request->harga
+                ]
+            ];
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'chemicals');
+        }
+
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
         ]);
-
-        // Insert data chemical baru
-        $this->insertChemicalData($quotation, $request, $currentDateTime);
     }
 
     public function updateStep10(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data OHC existing
-        QuotationOhc::where('quotation_id', $quotation->id)->update([
-            'deleted_at' => $currentDateTime,
-            'deleted_by' => Auth::user()->full_name
-        ]);
+        if ($request->has('ohcs') && is_array($request->ohcs)) {
+            $barangData = $request->ohcs;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'ohc');
+        }
 
-        // Insert data OHC baru
-        $this->insertOhcData($quotation, $request, $currentDateTime);
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
+        }
 
-        // Update training
-        $this->updateTrainingData($quotation, $request, $currentDateTime);
+        // Update training data
+        $this->updateTrainingData($quotation, $request, Carbon::now());
 
-        // Update data kunjungan - format: "jumlah periode"
+        // Update data kunjungan
         $quotation->update([
             'kunjungan_operasional' => $request->jumlah_kunjungan_operasional . " " . $request->bulan_tahun_kunjungan_operasional,
             'kunjungan_tim_crm' => $request->jumlah_kunjungan_tim_crm . " " . $request->bulan_tahun_kunjungan_tim_crm,
@@ -825,34 +850,6 @@ class QuotationStepService
                     'jenis_barang' => $barang->jenis_barang,
                     'created_by' => Auth::user()->full_name
                 ]);
-            }
-        }
-    }
-
-    private function insertChemicalData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
-    {
-        $listChemical = Barang::whereNull('deleted_at')
-            ->ordered()
-            ->get();
-
-        foreach ($listChemical as $barang) {
-            foreach ($quotation->quotationDetails as $detail) {
-                $fieldName = 'jumlah_' . $barang->id . '_' . $detail->id;
-                $jumlah = $request->$fieldName;
-
-                if ($jumlah && $jumlah > 0) {
-                    QuotationChemical::create([
-                        'quotation_detail_id' => $detail->id,
-                        'quotation_id' => $quotation->id,
-                        'barang_id' => $barang->id,
-                        'jumlah' => $jumlah,
-                        'harga' => $barang->harga,
-                        'nama' => $barang->nama,
-                        'jenis_barang_id' => $barang->jenis_barang_id,
-                        'jenis_barang' => $barang->jenis_barang,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
             }
         }
     }
@@ -1312,5 +1309,232 @@ class QuotationStepService
 
         return (bool) $value;
     }
+    /**
+     * Method untuk sync single chemical - TANPA quotation_detail_id
+     */
+    private function syncChemicalData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
+    {
+        \Log::info("Starting single chemical data sync - WITHOUT DETAIL ID");
 
+        // Validasi barang_id
+        if (!$request->has('barang_id')) {
+            \Log::warning("Request missing 'barang_id' field");
+            return;
+        }
+
+        $barang_id = (int) $request->barang_id;
+        $jumlah = (int) ($request->jumlah ?? 0);
+
+        // Skip jika jumlah 0
+        if ($jumlah <= 0) {
+            \Log::info("Skipping chemical with zero quantity", [
+                'barang_id' => $barang_id,
+                'jumlah' => $jumlah
+            ]);
+            return;
+        }
+
+        // Cari barang
+        $barang = Barang::where('id', $barang_id)
+            ->whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
+            ->first();
+
+        if (!$barang) {
+            \Log::warning("Barang not found", ['barang_id' => $barang_id]);
+            return;
+        }
+
+        // Parse data
+        $masa_pakai = $request->masa_pakai ? (int) $request->masa_pakai : ($barang->masa_pakai ?? 12);
+
+        $harga = $barang->harga;
+        if ($request->has('harga')) {
+            if (is_string($request->harga)) {
+                $harga = (float) str_replace(['.', ','], ['', '.'], $request->harga);
+            } else {
+                $harga = (float) $request->harga;
+            }
+        }
+
+        // Cari data existing - TANPA quotation_detail_id
+        $existingChemical = QuotationChemical::where('quotation_id', $quotation->id)
+            ->where('barang_id', $barang_id)
+            ->whereNull('quotation_detail_id') // Hanya cari yang global
+            ->first();
+
+        if ($existingChemical) {
+            // UPDATE data existing
+            $existingChemical->update([
+                'jumlah' => $jumlah,
+                'harga' => $harga,
+                'masa_pakai' => $masa_pakai,
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            \Log::info("Updated existing chemical", [
+                'chemical_id' => $existingChemical->id,
+                'barang_id' => $barang_id,
+                'jumlah' => $jumlah
+            ]);
+        } else {
+            // CREATE data baru - TANPA quotation_detail_id
+            $newChemical = QuotationChemical::create([
+                'quotation_id' => $quotation->id,
+                'barang_id' => $barang_id,
+                'jumlah' => $jumlah,
+                'harga' => $harga,
+                'nama' => $barang->nama,
+                'jenis_barang_id' => $barang->jenis_barang_id,
+                'jenis_barang' => $barang->jenis_barang,
+                'masa_pakai' => $masa_pakai,
+                'created_by' => Auth::user()->full_name
+                // TIDAK ADA quotation_detail_id
+            ]);
+
+            \Log::info("Created new chemical", [
+                'chemical_id' => $newChemical->id,
+                'barang_id' => $barang_id,
+                'barang_nama' => $barang->nama,
+                'jumlah' => $jumlah
+            ]);
+        }
+    }
+
+    /**
+     * Method untuk sync multiple chemicals - TANPA quotation_detail_id
+     */
+    private function syncMultipleChemicalData(Quotation $quotation, array $chemicals, Carbon $currentDateTime): void
+    {
+        \Log::info("Starting multiple chemical data sync - FIXED UPDATE/INSERT", [
+            'chemicals_count' => count($chemicals),
+            'quotation_id' => $quotation->id
+        ]);
+        $chemicalBarangIds = collect($chemicals)->pluck('barang_id')->filter()->toArray();
+
+        // Soft delete data yang tidak lagi dikirim
+        QuotationChemical::where('quotation_id', $quotation->id)
+            ->whereNotIn('barang_id', $chemicalBarangIds)
+            ->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name,
+            ]);
+
+        $createdCount = 0;
+        $updatedCount = 0;
+        $skippedCount = 0;
+
+        foreach ($chemicals as $index => $chemicalData) {
+            \Log::debug("Processing chemical #{$index}", $chemicalData);
+
+            // Validasi data minimal
+            if (!isset($chemicalData['barang_id']) || !isset($chemicalData['jumlah'])) {
+                \Log::warning("Chemical data missing required fields", [
+                    'index' => $index,
+                    'data' => $chemicalData
+                ]);
+                $skippedCount++;
+                continue;
+            }
+
+            $barang_id = (int) $chemicalData['barang_id'];
+            $jumlah = isset($chemicalData['jumlah']) ? (int) $chemicalData['jumlah'] : 0;
+
+            // Skip jika jumlah 0 atau negatif
+            if ($jumlah <= 0) {
+                \Log::info("Skipping chemical with zero/negative quantity", [
+                    'barang_id' => $barang_id,
+                    'jumlah' => $jumlah
+                ]);
+                $skippedCount++;
+                continue;
+            }
+
+            // Cari barang
+            $barang = Barang::where('id', $barang_id)
+                ->whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
+                ->first();
+
+            if (!$barang) {
+                \Log::warning("Barang not found", [
+                    'barang_id' => $barang_id,
+                    'chemical_index' => $index
+                ]);
+                $skippedCount++;
+                continue;
+            }
+
+            // Parse data
+            $masa_pakai = isset($chemicalData['masa_pakai']) ? (int) $chemicalData['masa_pakai'] : ($barang->masa_pakai ?? 12);
+
+            // Handle harga
+            $harga = $barang->harga;
+            if (isset($chemicalData['harga'])) {
+                if (is_string($chemicalData['harga'])) {
+                    $harga = (float) str_replace(['.', ','], ['', '.'], $chemicalData['harga']);
+                } else {
+                    $harga = (float) $chemicalData['harga'];
+                }
+            }
+
+            // **FIX: Cari data existing dengan query yang lebih spesifik**
+            $existingChemical = QuotationChemical::where('quotation_id', $quotation->id)
+                ->where('barang_id', $barang_id)
+                ->first();
+
+            \Log::debug("Existing chemical search", [
+                'quotation_id' => $quotation->id,
+                'barang_id' => $barang_id,
+                'found' => $existingChemical ? true : false,
+                'existing_id' => $existingChemical ? $existingChemical->id : null
+            ]);
+
+            if ($existingChemical) {
+                // UPDATE data existing
+                $existingChemical->update([
+                    'jumlah' => $jumlah,
+                    'harga' => $harga,
+                    'masa_pakai' => $masa_pakai,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+                $updatedCount++;
+
+                \Log::info("Updated existing chemical", [
+                    'chemical_id' => $existingChemical->id,
+                    'barang_id' => $barang_id,
+                    'jumlah' => $jumlah,
+                    'harga' => $harga
+                ]);
+            } else {
+                // CREATE data baru
+                $newChemical = QuotationChemical::create([
+                    'quotation_id' => $quotation->id,
+                    'barang_id' => $barang_id,
+                    'jumlah' => $jumlah,
+                    'harga' => $harga,
+                    'nama' => $barang->nama,
+                    'jenis_barang_id' => $barang->jenis_barang_id,
+                    'jenis_barang' => $barang->jenis_barang,
+                    'masa_pakai' => $masa_pakai,
+                    'created_by' => Auth::user()->full_name
+                ]);
+                $createdCount++;
+
+                \Log::info("Created new chemical", [
+                    'chemical_id' => $newChemical->id,
+                    'barang_id' => $barang_id,
+                    'barang_nama' => $barang->nama,
+                    'jumlah' => $jumlah,
+                    'harga' => $harga
+                ]);
+            }
+        }
+
+        \Log::info("Multiple chemical sync completed - FIXED UPDATE/INSERT", [
+            'quotation_id' => $quotation->id,
+            'total_processed' => count($chemicals),
+            'created' => $createdCount,
+            'updated' => $updatedCount,
+            'skipped' => $skippedCount
+        ]);
+    }
 }
