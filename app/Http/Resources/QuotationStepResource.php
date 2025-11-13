@@ -23,18 +23,21 @@ use App\Models\AplikasiPendukung;
 use App\Models\Barang;
 use App\Models\Training;
 use App\Models\JabatanPic;
+use App\Services\QuotationBarangService;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class QuotationStepResource extends JsonResource
 {
-    private $step;
+   private $step;
+    private $barangService; // ADD THIS
 
     public function __construct($resource, $step = null)
     {
         parent::__construct($resource);
         $this->step = $step ?: ($resource['step'] ?? null);
+        $this->barangService = new QuotationBarangService(); // ADD THIS
     }
 
     public function toArray($request)
@@ -241,72 +244,24 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 7:
+                $kaporlapData = $this->barangService->prepareBarangData($quotation, 'kaporlap');
                 return [
-                    'quotation_kaporlaps' => $quotation->relationLoaded('quotationKaporlaps') ?
-                        $quotation->quotationKaporlaps->map(function ($kaporlap) {
-                            return [
-                                'id' => $kaporlap->id,
-                                'barang_id' => $kaporlap->barang_id,
-                                'quotation_detail_id' => $kaporlap->quotation_detail_id,
-                                'jumlah' => $kaporlap->jumlah,
-                                'harga' => $kaporlap->harga,
-                            ];
-                        })->toArray() : [],
+                    'quotation_kaporlaps' => $kaporlapData['data'],
+                    'kaporlap_total' => $kaporlapData['total'],
                 ];
 
             case 8:
+                $devicesData = $this->barangService->prepareBarangData($quotation, 'devices');
                 return [
-                    'quotation_devices' => $quotation->relationLoaded('quotationDevices') ?
-                        $quotation->quotationDevices->map(function ($device) {
-                            return [
-                                'id' => $device->id,
-                                'barang_id' => $device->barang_id,
-                                'jumlah' => $device->jumlah,
-                                'harga' => $device->harga,
-                            ];
-                        })->toArray() : [],
+                    'quotation_devices' => $devicesData['data'],
+                    'devices_total' => $devicesData['total'],
                 ];
 
             case 9:
-                $chemicalsData = [];
-                $totalAll = 0;
-                $jumlah_item = 0;
-
-                if ($quotation->relationLoaded('quotationChemicals')) {
-                    foreach ($quotation->quotationChemicals as $chemical) {
-                        $jumlah_pertahun = (int) $chemical->jumlah / (int) $chemical->masa_pakai * 12;
-                        $total_per_item = $chemical->harga * $chemical->jumlah / $chemical->masa_pakai;
-                        $totalAll += $total_per_item;
-                        $jumlah_item += $chemical->jumlah;
-
-                        $chemicalsData[] = [
-                            'id' => $chemical->id,
-                            'barang_id' => $chemical->barang_id,
-                            'jumlah' => $chemical->jumlah,
-                            'harga' => $chemical->harga,
-                            'harga_formatted' => "Rp " . number_format($chemical->harga, 0, ",", "."),
-                            'masa_pakai' => $chemical->masa_pakai,
-                            'masa_pakai_formatted' => $chemical->masa_pakai . " Bulan",
-                            'jumlah_pertahun' => $jumlah_pertahun,
-                            'total_per_item' => $total_per_item,
-                            'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
-                            'jenis_barang_id' => $chemical->jenis_barang_id,
-                            'jenis_barang' => $chemical->jenis_barang,
-                            'nama' => $chemical->nama,
-                        ];
-                    }
-                }
-
-                // Buat array terpisah untuk total
-                $chemicalsTotal = [
-                    'jumlah_item' => $jumlah_item,
-                    'total_all' => $totalAll,
-                    'total_formatted' => "Rp " . number_format($totalAll, 0, ",", "."),
-                ];
-
+                $chemicalData = $this->barangService->prepareBarangData($quotation, 'chemicals');
                 return [
-                    'quotation_chemicals' => $chemicalsData,
-                    'chemicals_total' => $chemicalsTotal, // Array terpisah untuk total
+                    'quotation_chemicals' => $chemicalData['data'],
+                    'chemicals_total' => $chemicalData['total'],
                 ];
             case 10:
                 // Parse kunjungan_operasional yang disimpan sebagai "jumlah periode"
@@ -334,26 +289,32 @@ class QuotationStepResource extends JsonResource
                 // Untuk ada_training, kita bisa infer dari field training
                 $adaTraining = !empty($quotation->training) ? 'Ada' : 'Tidak Ada';
 
+                // Dapatkan data OHC dari service
+                $ohcData = $this->barangService->prepareBarangData($quotation, 'ohc');
+
                 return [
+                    // Field kunjungan operasional
                     'jumlah_kunjungan_operasional' => $jumlahKunjunganOperasional,
                     'bulan_tahun_kunjungan_operasional' => $bulanTahunKunjunganOperasional,
+                    'keterangan_kunjungan_operasional' => $quotation->keterangan_kunjungan_operasional,
+
+                    // Field kunjungan tim CRM
                     'jumlah_kunjungan_tim_crm' => $jumlahKunjunganTimCrm,
                     'bulan_tahun_kunjungan_tim_crm' => $bulanTahunKunjunganTimCrm,
-                    'keterangan_kunjungan_operasional' => $quotation->keterangan_kunjungan_operasional,
                     'keterangan_kunjungan_tim_crm' => $quotation->keterangan_kunjungan_tim_crm,
+
+                    // Field training
                     'ada_training' => $adaTraining,
                     'training' => $quotation->training,
+
+                    // Field bunga bank
                     'persen_bunga_bank' => $quotation->persen_bunga_bank,
-                    'quotation_ohcs' => $quotation->relationLoaded('quotationOhcs') ?
-                        $quotation->quotationOhcs->map(function ($ohc) {
-                            return [
-                                'id' => $ohc->id,
-                                'nama' => $ohc->nama,
-                                'barang_id' => $ohc->barang_id,
-                                'jumlah' => $ohc->jumlah,
-                                'harga' => $ohc->harga,
-                            ];
-                        })->toArray() : [],
+
+                    // Data OHC dari service
+                    'quotation_ohcs' => $ohcData['data'],
+                    'ohc_total' => $ohcData['total'],
+
+                    // Data training (untuk checkbox)
                     'quotation_trainings' => $quotation->relationLoaded('quotationTrainings') ?
                         $quotation->quotationTrainings->pluck('training_id')->toArray() : [],
                 ];

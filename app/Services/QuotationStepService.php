@@ -42,11 +42,14 @@ use Carbon\Carbon;
 
 class QuotationStepService
 {
-    protected $quotationService;
 
-    public function __construct(QuotationService $quotationService)
+    protected $quotationService;
+    protected $quotationBarangService;
+
+    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
     {
         $this->quotationService = $quotationService;
+        $this->quotationBarangService = $quotationBarangService;
     }
 
     /**
@@ -487,110 +490,90 @@ class QuotationStepService
             ]);
         }
     }
-
     public function updateStep7(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data kaporlap existing
-        QuotationKaporlap::where('quotation_id', $quotation->id)->update([
-            'deleted_at' => $currentDateTime,
-            'deleted_by' => Auth::user()->full_name
+        if ($request->has('kaporlaps') && is_array($request->kaporlaps)) {
+            $barangData = $request->kaporlaps;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'kaporlap');
+        }
+
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
         ]);
-
-        // Insert data kaporlap baru
-        $this->insertKaporlapData($quotation, $request, $currentDateTime);
     }
 
     public function updateStep8(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data devices existing (kecuali aplikasi pendukung)
-        QuotationDevices::where('quotation_id', $quotation->id)
-            ->whereNotIn('barang_id', [192, 194, 195, 196])
-            ->update([
-                'deleted_at' => $currentDateTime,
-                'deleted_by' => Auth::user()->full_name
-            ]);
+        if ($request->has('devices') && is_array($request->devices)) {
+            $barangData = $request->devices;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'devices');
+        }
 
-        // Insert data devices baru
-        $this->insertDevicesData($quotation, $request, $currentDateTime);
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
+        ]);
     }
 
     public function updateStep9(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        \Log::info("=== STEP 9 UPDATE START ===", [
-            'quotation_id' => $quotation->id,
-            'request_method' => $request->method(),
-            'has_chemicals' => $request->has('chemicals'),
-            'has_barang_id' => $request->has('barang_id')
-        ]);
-
-        try {
-            DB::beginTransaction();
-
-            // Handle multiple chemicals format (PRIORITAS)
-            if ($request->has('chemicals') && is_array($request->chemicals) && count($request->chemicals) > 0) {
-                \Log::info("Processing multiple chemicals format", [
-                    'count' => count($request->chemicals)
-                ]);
-
-                $this->syncMultipleChemicalData($quotation, $request->chemicals, $currentDateTime);
-            }
-            // Handle single chemical format
-            elseif ($request->has('barang_id') && $request->has('jumlah')) {
-                \Log::info("Processing single chemical format");
-
-                $this->syncChemicalData($quotation, $request, $currentDateTime);
-            }
-            // Jika tidak ada data yang valid
-            else {
-                \Log::warning("No valid chemical data provided in request");
-            }
-
-            $quotation->update([
-                'updated_by' => Auth::user()->full_name
-            ]);
-
-            DB::commit();
-
-            \Log::info("=== STEP 9 UPDATE SUCCESS ===", [
-                'quotation_id' => $quotation->id
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            \Log::error("=== STEP 9 UPDATE FAILED ===", [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            throw $e;
+        if ($request->has('chemicals') && is_array($request->chemicals)) {
+            $barangData = $request->chemicals;
+        } elseif ($request->has('barang_id') && $request->has('jumlah')) {
+            $barangData = [
+                [
+                    'barang_id' => $request->barang_id,
+                    'jumlah' => $request->jumlah,
+                    'masa_pakai' => $request->masa_pakai,
+                    'harga' => $request->harga
+                ]
+            ];
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'chemicals');
         }
+
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
+        }
+
+        $quotation->update([
+            'updated_by' => Auth::user()->full_name
+        ]);
     }
 
     public function updateStep10(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        $barangData = [];
 
-        // Hapus data OHC existing
-        QuotationOhc::where('quotation_id', $quotation->id)->update([
-            'deleted_at' => $currentDateTime,
-            'deleted_by' => Auth::user()->full_name
-        ]);
+        if ($request->has('ohcs') && is_array($request->ohcs)) {
+            $barangData = $request->ohcs;
+        } else {
+            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'ohc');
+        }
 
-        // Insert data OHC baru
-        $this->insertOhcData($quotation, $request, $currentDateTime);
+        if (!empty($barangData)) {
+            $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
+        }
 
-        // Update training
-        $this->updateTrainingData($quotation, $request, $currentDateTime);
+        // Update training data
+        $this->updateTrainingData($quotation, $request, Carbon::now());
 
-        // Update data kunjungan - format: "jumlah periode"
+        // Update data kunjungan
         $quotation->update([
             'kunjungan_operasional' => $request->jumlah_kunjungan_operasional . " " . $request->bulan_tahun_kunjungan_operasional,
             'kunjungan_tim_crm' => $request->jumlah_kunjungan_tim_crm . " " . $request->bulan_tahun_kunjungan_tim_crm,
@@ -869,60 +852,6 @@ class QuotationStepService
                 ]);
             }
         }
-    }
-
-    private function insertChemicalData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
-    {
-        $listChemical = Barang::whereNull('deleted_at')
-            ->whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->ordered()
-            ->get();
-
-        $insertedCount = 0;
-
-        foreach ($listChemical as $barang) {
-            foreach ($quotation->quotationDetails as $detail) {
-                $fieldName = 'jumlah_' . $barang->id . '_' . $detail->id;
-                $jumlah = $request->$fieldName;
-
-                // Debug logging
-                \Log::debug("Checking chemical field", [
-                    'field_name' => $fieldName,
-                    'jumlah_value' => $jumlah,
-                    'barang_id' => $barang->id,
-                    'detail_id' => $detail->id
-                ]);
-
-                if ($jumlah && $jumlah > 0) {
-                    QuotationChemical::create([
-                        'quotation_detail_id' => $detail->id,
-                        'quotation_id' => $quotation->id,
-                        'barang_id' => $barang->id,
-                        'jumlah' => $jumlah,
-                        'harga' => $barang->harga,
-                        'nama' => $barang->nama,
-                        'jenis_barang_id' => $barang->jenis_barang_id,
-                        'jenis_barang' => $barang->jenis_barang,
-                        'masa_pakai' => $barang->masa_pakai ?? 12, // Tambahkan masa_pakai
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                    $insertedCount++;
-
-                    \Log::debug("Chemical data inserted", [
-                        'barang_id' => $barang->id,
-                        'detail_id' => $detail->id,
-                        'jumlah' => $jumlah
-                    ]);
-                }
-            }
-        }
-
-        \Log::info("Chemical data insertion completed", [
-            'quotation_id' => $quotation->id,
-            'total_inserted' => $insertedCount,
-            'total_chemicals' => $listChemical->count(),
-            'total_details' => $quotation->quotationDetails->count()
-        ]);
     }
 
     private function insertOhcData(Quotation $quotation, Request $request, Carbon $currentDateTime): void

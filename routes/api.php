@@ -274,6 +274,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/restore/{id}', 'restore');
 
         // Additional endpoints
+        Route::get('/available-sales/{id}', 'availableSales');
+        Route::get('/sales-kebutuhan/{id}', 'getSalesKebutuhan');
         Route::get('/deleted', 'listTerhapus');
         Route::get('/child/{id}', 'childLeads');
         Route::post('/child/{id}', 'saveChildLeads');
@@ -285,9 +287,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/export', 'exportExcel');
         Route::get('/template-import', 'templateImport');
         Route::post('/generate-null-kode', 'generateNullKode');
-
-
-
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');

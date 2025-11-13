@@ -11336,6 +11336,143 @@
                 ]
             }
         },
+        "/api/leads/available-sales/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar tim sales yang available untuk diassign ke lead tertentu",
+                "description": "Endpoint ini digunakan untuk mengambil daftar tim sales yang dapat diassign ke lead tertentu berdasarkan branch_id dari lead tersebut.",
+                "operationId": "d289a5456a06cd6b6f732cbdf26248c1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead yang akan diassign sales",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data tim sales",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tim sales berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "John Sales"
+                                                    },
+                                                    "tim_sales_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 10
+                                                    },
+                                                    "is_leader": {
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    },
+                                                    "is_active": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "user": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "full_name": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "email": {
+                                                                "type": "string",
+                                                                "example": "john@example.com"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "tim_sales": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama": {
+                                                                "type": "string",
+                                                                "example": "Tim Sales Jakarta"
+                                                            },
+                                                            "branch_id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "branch": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 1
+                                                                    },
+                                                                    "nama": {
+                                                                        "type": "string",
+                                                                        "example": "Jakarta"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - Tidak memiliki akses"
+                    },
+                    "404": {
+                        "description": "Lead tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/leads/assign-sales/{id}": {
             "put": {
                 "tags": [
