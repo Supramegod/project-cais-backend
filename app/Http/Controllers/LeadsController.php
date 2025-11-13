@@ -446,8 +446,7 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()->toArray()
+                    'message' => $validator->errors()->toArray()
                 ], 400);
             }
             $current_date_time = Carbon::now()->toDateTimeString();
@@ -727,8 +726,7 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()->toArray()
+                    'message' =>  $validator->errors()->toArray()
                 ], 400);
             }
 
