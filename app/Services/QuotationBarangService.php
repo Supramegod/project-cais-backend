@@ -258,85 +258,181 @@ class QuotationBarangService
     {
         $modelConfig = $this->getModelConfig($jenisBarang);
         $relationName = $this->getRelationName($jenisBarang);
+        $useDetailId = $modelConfig['use_detail_id'];
 
         $barangData = [];
         $totalAll = 0;
         $jumlah_item = 0;
 
-        // Buat mapping jabatan_kebutuhan dari quotation_details
-        $jabatanKebutuhanMap = [];
-        if ($quotation->relationLoaded('quotationDetails')) {
-            $jabatanKebutuhanMap = $quotation->quotationDetails->pluck('jabatan_kebutuhan', 'id')->toArray();
+        // DEBUG: Log informasi awal
+        \Log::info("=== prepareBarangData START ===", [
+            'jenis_barang' => $jenisBarang,
+            'quotation_id' => $quotation->id,
+            'relation_name' => $relationName,
+            'use_detail_id' => $useDetailId
+        ]);
+
+        // PASTIKAN: quotationDetails dimuat jika diperlukan
+        if ($useDetailId && !$quotation->relationLoaded('quotationDetails')) {
+            \Log::info("Loading quotationDetails relation...");
+            $quotation->load('quotationDetails');
         }
 
-        if ($quotation->relationLoaded($relationName)) {
-            $items = $quotation->$relationName;
+        // Buat mapping data dari quotation_details
+        $quotationDetailsMap = [];
+        if ($quotation->relationLoaded('quotationDetails')) {
+            \Log::info("quotationDetails relation is loaded", [
+                'details_count' => $quotation->quotationDetails->count()
+            ]);
 
-            foreach ($items as $item) {
-                // HANYA chemical yang menggunakan masa_pakai dalam perhitungan
-                if ($jenisBarang === 'chemicals') {
-                    // CEK: Pastikan masa_pakai tidak 0 untuk chemical
-                    $masa_pakai = (int) $item->masa_pakai;
-                    if ($masa_pakai <= 0) {
-                        $masa_pakai = 1; // Default ke 1 bulan untuk menghindari error
-                    }
+            foreach ($quotation->quotationDetails as $detail) {
+                $quotationDetailsMap[$detail->id] = [
+                    'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
+                    'jumlah_hc' => $detail->jumlah_hc,
+                    'nama_site' => $detail->nama_site,
+                    'position_id' => $detail->position_id
+                ];
+            }
 
-                    $jumlah_pertahun = (int) $item->jumlah / $masa_pakai * 12;
-                    $total_per_item = $item->harga * $item->jumlah / $masa_pakai;
+            \Log::info("QuotationDetails mapping created", [
+                'mapped_ids' => array_keys($quotationDetailsMap)
+            ]);
+        } else {
+            \Log::warning("quotationDetails relation is NOT loaded");
+        }
 
-                    $itemData = [
-                        'id' => $item->id,
-                        'barang_id' => $item->barang_id,
-                        'jumlah' => $item->jumlah,
-                        'harga' => $item->harga,
-                        'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
-                        'masa_pakai' => $item->masa_pakai,
-                        'masa_pakai_formatted' => $item->masa_pakai . " Bulan",
-                        'jumlah_pertahun' => $jumlah_pertahun,
-                        'total_per_item' => $total_per_item,
-                        'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
-                        'jenis_barang_id' => $item->jenis_barang_id,
-                        'jenis_barang' => $item->jenis_barang,
-                        'nama' => $item->nama,
-                    ];
+        // Cek apakah relasi barang dimuat
+        if (!$quotation->relationLoaded($relationName)) {
+            \Log::warning("Relation {$relationName} is NOT loaded");
+            return [
+                'data' => [],
+                'total' => [
+                    'jumlah_item' => 0,
+                    'total_all' => 0,
+                    'total_formatted' => "Rp 0",
+                ]
+            ];
+        }
 
-                    $totalAll += $total_per_item;
-                } else {
-                    // UNTUK NON-CHEMICAL (kaporlap, devices, ohc): tidak pakai masa_pakai
-                    $total_per_item = $item->harga * $item->jumlah;
+        $items = $quotation->$relationName;
+        \Log::info("Processing items", [
+            'items_count' => $items->count(),
+            'relation_loaded' => $quotation->relationLoaded($relationName)
+        ]);
 
-                    $itemData = [
-                        'id' => $item->id,
-                        'barang_id' => $item->barang_id,
-                        'jumlah' => $item->jumlah,
-                        'harga' => $item->harga,
-                        'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
-                        'jenis_barang_id' => $item->jenis_barang_id,
-                        'jenis_barang' => $item->jenis_barang,
-                        'nama' => $item->nama,
-                        'total_per_item' => $total_per_item,
-                        'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
-                    ];
+        foreach ($items as $index => $item) {
+            \Log::debug("Processing item #{$index}", [
+                'item_id' => $item->id,
+                'barang_id' => $item->barang_id,
+                'quotation_detail_id' => $item->quotation_detail_id ?? 'NULL',
+                'nama' => $item->nama
+            ]);
 
-                    $totalAll += $total_per_item;
+            // HANYA chemical yang menggunakan masa_pakai dalam perhitungan
+            if ($jenisBarang === 'chemicals') {
+                // CEK: Pastikan masa_pakai tidak 0 untuk chemical
+                $masa_pakai = (int) $item->masa_pakai;
+                if ($masa_pakai <= 0) {
+                    $masa_pakai = 1; // Default ke 1 bulan untuk menghindari error
                 }
 
-                // TAMBAHKAN: jabatan_kebutuhan untuk item yang memiliki quotation_detail_id
-                if (isset($item->quotation_detail_id) && isset($jabatanKebutuhanMap[$item->quotation_detail_id])) {
-                    $itemData['jabatan_kebutuhan'] = $jabatanKebutuhanMap[$item->quotation_detail_id];
+                $jumlah_pertahun = (int) $item->jumlah / $masa_pakai * 12;
+                $total_per_item = $item->harga * $item->jumlah / $masa_pakai;
+
+                $itemData = [
+                    'id' => $item->id,
+                    'barang_id' => $item->barang_id,
+                    'jumlah' => $item->jumlah,
+                    'harga' => $item->harga,
+                    'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
+                    'masa_pakai' => $item->masa_pakai,
+                    'masa_pakai_formatted' => $item->masa_pakai . " Bulan",
+                    'jumlah_pertahun' => $jumlah_pertahun,
+                    'total_per_item' => $total_per_item,
+                    'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
+                    'jenis_barang_id' => $item->jenis_barang_id,
+                    'jenis_barang' => $item->jenis_barang,
+                    'nama' => $item->nama,
+                ];
+
+                $totalAll += $total_per_item;
+            } else {
+                // UNTUK NON-CHEMICAL (kaporlap, devices, ohc): tidak pakai masa_pakai
+                $total_per_item = $item->harga * $item->jumlah;
+
+                $itemData = [
+                    'id' => $item->id,
+                    'barang_id' => $item->barang_id,
+                    'jumlah' => $item->jumlah,
+                    'harga' => $item->harga,
+                    'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
+                    'jenis_barang_id' => $item->jenis_barang_id,
+                    'jenis_barang' => $item->jenis_barang,
+                    'nama' => $item->nama,
+                    'total_per_item' => $total_per_item,
+                    'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
+                ];
+
+                $totalAll += $total_per_item;
+            }
+
+            // TAMBAHKAN: jabatan_kebutuhan dan jumlah_hc untuk item yang memiliki quotation_detail_id
+            if ($useDetailId && isset($item->quotation_detail_id)) {
+                $detailId = $item->quotation_detail_id;
+
+                if (isset($quotationDetailsMap[$detailId])) {
+                    $detailData = $quotationDetailsMap[$detailId];
+                    $itemData['jabatan_kebutuhan'] = $detailData['jabatan_kebutuhan'];
+                    $itemData['jumlah_hc'] = $detailData['jumlah_hc'];
+                    $itemData['nama_site'] = $detailData['nama_site'];
+                    $itemData['position_id'] = $detailData['position_id'];
+
+                    \Log::debug("✅ Successfully mapped detail data", [
+                        'detail_id' => $detailId,
+                        'jabatan_kebutuhan' => $detailData['jabatan_kebutuhan'],
+                        'jumlah_hc' => $detailData['jumlah_hc']
+                    ]);
                 } else {
                     $itemData['jabatan_kebutuhan'] = null;
+                    $itemData['jumlah_hc'] = null;
+                    $itemData['nama_site'] = null;
+                    $itemData['position_id'] = null;
+
+                    \Log::warning("❌ Detail mapping not found", [
+                        'detail_id' => $detailId,
+                        'available_details' => array_keys($quotationDetailsMap)
+                    ]);
                 }
+            } else {
+                $itemData['jabatan_kebutuhan'] = null;
+                $itemData['jumlah_hc'] = null;
+                $itemData['nama_site'] = null;
+                $itemData['position_id'] = null;
 
-                $jumlah_item += $item->jumlah;
-
-                if (isset($item->quotation_detail_id)) {
-                    $itemData['quotation_detail_id'] = $item->quotation_detail_id;
+                if ($useDetailId) {
+                    \Log::debug("ℹ️ No quotation_detail_id for this item", [
+                        'item_id' => $item->id,
+                        'has_quotation_detail_id' => isset($item->quotation_detail_id)
+                    ]);
                 }
-
-                $barangData[] = $itemData;
             }
+
+            $jumlah_item += $item->jumlah;
+
+            if (isset($item->quotation_detail_id)) {
+                $itemData['quotation_detail_id'] = $item->quotation_detail_id;
+            }
+
+            $barangData[] = $itemData;
         }
+
+        // DEBUG: Log hasil akhir
+        \Log::info("=== prepareBarangData COMPLETED ===", [
+            'jenis_barang' => $jenisBarang,
+            'items_processed' => count($barangData),
+            'total_all' => $totalAll,
+            'use_detail_id' => $useDetailId
+        ]);
 
         return [
             'data' => $barangData,

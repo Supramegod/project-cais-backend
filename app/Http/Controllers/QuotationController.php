@@ -408,7 +408,7 @@ class QuotationController extends Controller
                 'leads',
                 'statusQuotation',
                 'quotationSites',
-                'quotationDetails',
+                'quotationDetails.wage', // Pastikan relasi wage dimuat
                 'quotationPics',
                 'quotationAplikasis',
                 'quotationKaporlaps',
@@ -438,7 +438,6 @@ class QuotationController extends Controller
             ], 404);
         }
     }
-
     /**
      * @OA\Delete(
      *     path="/api/quotations/delete/{id}",
