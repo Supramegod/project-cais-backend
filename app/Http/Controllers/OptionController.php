@@ -389,11 +389,18 @@ class OptionController extends Controller
     }
     /**
      * @OA\Get(
-     *     path="/api/options/branches",
+     *     path="/api/options/branches/{provinceId}",
      *     tags={"Option"},
-     *     summary="Mendapatkan daftar branch",
-     *     description="Mengambil daftar branch yang aktif",
+     *     summary="Mendapatkan daftar branch berdasarkan provinsi",
+     *     description="Mengambil daftar branch yang aktif berdasarkan ID provinsi",
      *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="provinceId",
+     *         in="path",
+     *         description="ID provinsi yang dipilih",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=11)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil daftar branch",
@@ -407,6 +414,97 @@ class OptionController extends Controller
      *                     @OA\Property(property="id", type="integer", example=2),
      *                     @OA\Property(property="name", type="string", example="Jakarta Pusat"),
      *                     @OA\Property(property="description", type="string", example="JKT"),
+     *                     @OA\Property(property="city_id", type="integer", example=3171),
+     *                     @OA\Property(property="is_active", type="integer", example=1),
+     *                     @OA\Property(
+     *                         property="city",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=3171),
+     *                         @OA\Property(property="name", type="string", example="JAKARTA PUSAT"),
+     *                         @OA\Property(property="province_id", type="integer", example=31)
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Data tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Tidak ada branch untuk provinsi ini")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan saat mengambil data branch")
+     *         )
+     *     )
+     * )
+     */
+    public function getBranchesByProvince($provinceId)
+    {
+        try {
+            $branches = Branch::where('is_active', 1)
+                ->byProvince($provinceId)
+                ->with(['city:id,name,province_id'])
+                ->select('id', 'name', 'description', 'city_id', 'is_active')
+                ->get();
+
+            if ($branches->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada branch untuk provinsi ini',
+                    'data' => []
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar branch berhasil diambil',
+                'data' => $branches
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data branch',
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/branches",
+     *     tags={"Option"},
+     *     summary="Mendapatkan daftar branch",
+     *     description="Mengambil daftar branch yang aktif, bisa difilter berdasarkan provinsi (optional)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="province_id",
+     *         in="query",
+     *         description="ID provinsi untuk filter (optional)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=31)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil daftar branch",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Daftar branch berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=2),
+     *                     @OA\Property(property="name", type="string", example="Jakarta Pusat"),
+     *                     @OA\Property(property="description", type="string", example="JKT"),
+     *                     @OA\Property(property="city_id", type="integer", example=3171),
      *                     @OA\Property(property="is_active", type="integer", example=1)
      *                 )
      *             )
@@ -414,11 +512,17 @@ class OptionController extends Controller
      *     )
      * )
      */
-    public function getBranches()
+    public function getBranches(Request $request)
     {
         try {
-            $branches = Branch::where('is_active', 1)
-                ->select('id', 'name', 'description', 'is_active')
+            $query = Branch::where('is_active', 1);
+
+            // Filter berdasarkan province_id jika ada
+            if ($request->has('province_id') && !empty($request->province_id)) {
+                $query->byProvince($request->province_id);
+            }
+
+            $branches = $query->select('id', 'name', 'description', 'city_id', 'is_active')
                 ->get();
 
             return response()->json([
@@ -431,7 +535,7 @@ class OptionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan saat mengambil data branch',
-                'error' => $e->getMessage()
+                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
             ], 500);
         }
     }

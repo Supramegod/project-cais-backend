@@ -382,6 +382,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/entitas', 'listEntitas');
         Route::get('/entitas/{layanan_id}', 'getEntitas');
         Route::get('/status-quotation', 'getStatusQuotation');
+        Route::get('/branches/{provinceId}', 'getBranchesByProvince');
         // Location data endpoints
         Route::get('/provinsi', 'getProvinsi');
         Route::get('/kota/{provinsiId}', 'getKota');

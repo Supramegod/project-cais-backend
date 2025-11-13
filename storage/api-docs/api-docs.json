@@ -13137,14 +13137,26 @@
                 ]
             }
         },
-        "/api/options/branches": {
+        "/api/options/branches/{provinceId}": {
             "get": {
                 "tags": [
                     "Option"
                 ],
-                "summary": "Mendapatkan daftar branch",
-                "description": "Mengambil daftar branch yang aktif",
-                "operationId": "da4758b73f2d5c773cddba4beac08b00",
+                "summary": "Mendapatkan daftar branch berdasarkan provinsi",
+                "description": "Mengambil daftar branch yang aktif berdasarkan ID provinsi",
+                "operationId": "ac7e7b054b13eafb40dec58a9eddaa03",
+                "parameters": [
+                    {
+                        "name": "provinceId",
+                        "in": "path",
+                        "description": "ID provinsi yang dipilih",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 11
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Berhasil mengambil daftar branch",
@@ -13175,6 +13187,144 @@
                                                     "description": {
                                                         "type": "string",
                                                         "example": "JKT"
+                                                    },
+                                                    "city_id": {
+                                                        "type": "integer",
+                                                        "example": 3171
+                                                    },
+                                                    "is_active": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "city": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 3171
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "JAKARTA PUSAT"
+                                                            },
+                                                            "province_id": {
+                                                                "type": "integer",
+                                                                "example": 31
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Data tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Tidak ada branch untuk provinsi ini"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan saat mengambil data branch"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/branches": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar branch",
+                "description": "Mengambil daftar branch yang aktif, bisa difilter berdasarkan provinsi (optional)",
+                "operationId": "da4758b73f2d5c773cddba4beac08b00",
+                "parameters": [
+                    {
+                        "name": "province_id",
+                        "in": "query",
+                        "description": "ID provinsi untuk filter (optional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 31
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Daftar branch berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Jakarta Pusat"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "JKT"
+                                                    },
+                                                    "city_id": {
+                                                        "type": "integer",
+                                                        "example": 3171
                                                     },
                                                     "is_active": {
                                                         "type": "integer",
