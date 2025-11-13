@@ -500,9 +500,8 @@ class QuotationStepService
             $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'kaporlap');
         }
 
-        if (!empty($barangData)) {
-            $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
-        }
+        // Selakukan sync meskipun barangData kosong (untuk menghapus semua data)
+        $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
 
         $quotation->update([
             'updated_by' => Auth::user()->full_name
@@ -519,9 +518,7 @@ class QuotationStepService
             $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'devices');
         }
 
-        if (!empty($barangData)) {
-            $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
-        }
+        $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
 
         $quotation->update([
             'updated_by' => Auth::user()->full_name
@@ -547,9 +544,7 @@ class QuotationStepService
             $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'chemicals');
         }
 
-        if (!empty($barangData)) {
-            $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
-        }
+        $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
 
         $quotation->update([
             'updated_by' => Auth::user()->full_name
@@ -566,9 +561,7 @@ class QuotationStepService
             $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'ohc');
         }
 
-        if (!empty($barangData)) {
-            $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
-        }
+        $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
 
         // Update training data
         $this->updateTrainingData($quotation, $request, Carbon::now());
@@ -797,87 +790,6 @@ class QuotationStepService
                         'deleted_at' => null
                     ]
                 );
-            }
-        }
-    }
-
-    private function insertKaporlapData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
-    {
-        $listKaporlap = Barang::whereNull('deleted_at')
-            ->ordered()
-            ->get();
-
-        foreach ($listKaporlap as $barang) {
-            foreach ($quotation->quotationDetails as $detail) {
-                $fieldName = 'jumlah_' . $barang->id . '_' . $detail->id;
-                $jumlah = $request->$fieldName;
-
-                if ($jumlah && $jumlah > 0) {
-                    QuotationKaporlap::create([
-                        'quotation_detail_id' => $detail->id,
-                        'quotation_id' => $quotation->id,
-                        'barang_id' => $barang->id,
-                        'jumlah' => $jumlah,
-                        'harga' => $barang->harga,
-                        'nama' => $barang->nama,
-                        'jenis_barang_id' => $barang->jenis_barang_id,
-                        'jenis_barang' => $barang->jenis_barang,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
-            }
-        }
-    }
-
-    private function insertDevicesData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
-    {
-        $listDevices = Barang::whereNull('deleted_at')
-            ->ordered()
-            ->get();
-
-        foreach ($listDevices as $barang) {
-            $fieldName = 'jumlah_' . $barang->id;
-            $jumlah = $request->$fieldName;
-
-            if ($jumlah && $jumlah > 0) {
-                QuotationDevices::create([
-                    'quotation_id' => $quotation->id,
-                    'barang_id' => $barang->id,
-                    'jumlah' => $jumlah,
-                    'harga' => $barang->harga,
-                    'nama' => $barang->nama,
-                    'jenis_barang_id' => $barang->jenis_barang_id,
-                    'jenis_barang' => $barang->jenis_barang,
-                    'created_by' => Auth::user()->full_name
-                ]);
-            }
-        }
-    }
-
-    private function insertOhcData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
-    {
-        $listOhc = Barang::whereNull('deleted_at')
-            ->ordered()
-            ->get();
-
-        foreach ($listOhc as $barang) {
-            foreach ($quotation->quotationDetails as $detail) {
-                $fieldName = 'jumlah_' . $barang->id . '_' . $detail->id;
-                $jumlah = $request->$fieldName;
-
-                if ($jumlah && $jumlah > 0) {
-                    QuotationOhc::create([
-                        'quotation_detail_id' => $detail->id,
-                        'quotation_id' => $quotation->id,
-                        'barang_id' => $barang->id,
-                        'jumlah' => $jumlah,
-                        'harga' => $barang->harga,
-                        'nama' => $barang->nama,
-                        'jenis_barang_id' => $barang->jenis_barang_id,
-                        'jenis_barang' => $barang->jenis_barang,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
             }
         }
     }

@@ -29,13 +29,13 @@ class QuotationBarangService
             $jenisBarangIds = $modelConfig['jenis_barang_ids'];
             $useDetailId = $modelConfig['use_detail_id'];
 
-            // Hapus data existing
+            // Hapus semua data existing untuk quotation ini dan jenis barang ini
             $deletedCount = $modelClass::where('quotation_id', $quotation->id)->delete();
 
             $createdCount = 0;
             $skippedCount = 0;
 
-            // Insert data baru
+            // Insert data baru hanya untuk jumlah > 0
             foreach ($barangData as $data) {
                 $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId);
 
@@ -61,7 +61,6 @@ class QuotationBarangService
             throw $e;
         }
     }
-
     /**
      * Process individual barang item
      */
@@ -103,22 +102,16 @@ class QuotationBarangService
             }
         }
 
-        // =============================================
-        // HANDLE MASA PAKAI - HANYA UNTUK CHEMICAL
-        // =============================================
-        $masa_pakai = 1; // Default untuk non-chemical
-
+        // Handle masa pakai - hanya untuk chemical
+        $masa_pakai = 1;
         if ($jenisBarang === 'chemicals') {
             $masa_pakai = isset($data['masa_pakai']) ? (int) $data['masa_pakai'] : ($barang->masa_pakai ?? 12);
-
-            // Validasi masa_pakai tidak boleh 0 atau negatif
             if ($masa_pakai <= 0) {
-                $masa_pakai = 3; // Default 12 bulan
+                $masa_pakai = 12;
             }
         }
 
         $harga = $barang->harga;
-
         if (isset($data['harga'])) {
             if (is_string($data['harga'])) {
                 $harga = (float) str_replace(['.', ','], ['', '.'], $data['harga']);
@@ -126,6 +119,7 @@ class QuotationBarangService
                 $harga = (float) $data['harga'];
             }
         }
+
         $createData = [
             'quotation_id' => $quotation->id,
             'barang_id' => $barang_id,
@@ -144,18 +138,7 @@ class QuotationBarangService
 
         $modelClass::create($createData);
 
-        return [
-            'success' => true,
-            'data_created' => [
-                'barang_id' => $barang_id,
-                'barang_nama' => $barang->nama,
-                'jumlah' => $jumlah,
-                'harga' => $harga,
-                'masa_pakai' => $masa_pakai,
-                'use_detail_id' => $useDetailId,
-                'quotation_detail_id' => $useDetailId ? $quotation_detail_id : null
-            ]
-        ];
+        return ['success' => true];
     }
     /**
      * Get model configuration for different barang types
