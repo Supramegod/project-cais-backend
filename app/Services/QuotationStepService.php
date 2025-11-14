@@ -74,7 +74,6 @@ class QuotationStepService
         }
         if ($step == 4) {
             $additionalRelations[] = 'quotationDetails.wage';
-            $additionalRelations[] = 'quotationDetails.wage.managementFee';
         }
 
         if ($step >= 6) {
@@ -157,8 +156,6 @@ class QuotationStepService
                 break;
             case 4:
                 $data['additional_data']['manajemen_fee_list'] = ManagementFee::all();
-                $data['additional_data']['province_list'] = Province::all();
-
                 // Data UMK per site
                 $data['additional_data']['umk_per_site'] = [];
                 foreach ($quotation->quotationSites as $site) {
@@ -175,19 +172,6 @@ class QuotationStepService
                         'umk_display' => $umk->formatUmk(),
                     ];
                 }
-
-                // Data kota untuk referensi (opsional)
-                $data['additional_data']['city_list'] = City::all()->map(function ($city) {
-                    $umk = Umk::byCity($city->id)
-                        ->active()
-                        ->first();
-
-                    $city->umk_display = $umk
-                        ? $umk->formatted_umk
-                        : "UMK : Rp. 0";
-
-                    return $city;
-                });
                 break;
 
             case 5:
@@ -414,7 +398,6 @@ class QuotationStepService
         }
     }
 
-
     public function updateStep4(Quotation $quotation, Request $request): void
     {
         \Log::info("Updating Step 4 per position", [
@@ -423,6 +406,20 @@ class QuotationStepService
         ]);
 
         if ($request->has('position_data') && is_array($request->position_data)) {
+            // UPDATE QUOTATION GLOBAL DATA DARI POSITION PERTAMA
+            if (count($request->position_data) > 0) {
+                $firstPosition = $request->position_data[0];
+
+                $quotation->update([
+                    'is_ppn' => $firstPosition['is_ppn'] ?? null,
+                    'ppn_pph_dipotong' => $firstPosition['ppn_pph_dipotong'] ?? null,
+                    'management_fee_id' => $firstPosition['manajemen_fee'] ?? null,
+                    'persentase' => $firstPosition['persentase'] ?? null,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+            }
+
+            // Update setiap position (TANPA 4 kolom global)
             foreach ($request->position_data as $positionData) {
                 $this->updatePositionStep4($quotation, $positionData);
             }
@@ -435,6 +432,7 @@ class QuotationStepService
             'updated_by' => Auth::user()->full_name
         ]);
     }
+
     public function updateStep5(Quotation $quotation, Request $request): void
     {
         // Update BPJS data untuk setiap detail (position)
@@ -1117,20 +1115,9 @@ class QuotationStepService
                         }
                     }
 
-                    \Log::info("Updated upah for position", [
-                        'detail_id' => $detail->id,
-                        'position_id' => $detail->position_id,
-                        'site_id' => $detail->quotation_site_id,
-                        'nominal_upah' => $newNominalUpah,
-                        'upah_type' => $detail->wage->upah ?? 'N/A'
-                    ]);
                 }
             }
 
-            \Log::info("Successfully updated upah for all positions per site", [
-                'quotation_id' => $quotation->id,
-                'total_details_updated' => $quotationDetails->count()
-            ]);
 
         } catch (\Exception $e) {
             \Log::error("Error updating upah per position", [
@@ -1140,7 +1127,6 @@ class QuotationStepService
             throw new \Exception("Failed to update upah per position: " . $e->getMessage());
         }
     }
-
     private function updatePositionStep4(Quotation $quotation, array $positionData): void
     {
         $detail = QuotationDetail::where('id', $positionData['quotation_detail_id'])
@@ -1158,13 +1144,11 @@ class QuotationStepService
         // Calculate upah data untuk position ini
         $upahData = $this->calculateUpahForPosition($detail, $positionData);
 
-        // Data untuk wage table - semua field sebagai string
+        // Data untuk wage table - TANPA 4 KOLOM GLOBAL
         $wageData = [
             'quotation_id' => $quotation->id,
             'upah' => $positionData['upah'] ?? null,
             'hitungan_upah' => $upahData['hitungan_upah'] ?? null,
-            'management_fee_id' => $positionData['manajemen_fee'] ?? null,
-            'persentase' => $positionData['persentase'] ?? null,
             'lembur' => $positionData['lembur'] ?? null,
             'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
             'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
@@ -1175,9 +1159,9 @@ class QuotationStepService
             'tunjangan_holiday' => $positionData['tunjangan_holiday'] ?? null,
             'nominal_tunjangan_holiday' => isset($positionData['nominal_tunjangan_holiday']) ? str_replace('.', '', $positionData['nominal_tunjangan_holiday']) : null,
             'jenis_bayar_tunjangan_holiday' => $positionData['jenis_bayar_tunjangan_holiday'] ?? null,
-            'is_ppn' => $positionData['is_ppn'] ?? null,
-            'ppn_pph_dipotong' => $positionData['ppn_pph_dipotong'] ?? null,
             'updated_by' => Auth::user()->full_name
+            // HAPUS 4 KOLOM GLOBAL:
+            // 'is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'
         ];
 
         // Update atau create wage data
@@ -1189,7 +1173,7 @@ class QuotationStepService
             QuotationDetailWage::create($wageData);
         }
 
-        // Update nominal_upah di quotation_detail (akan di-sync lagi oleh updateUpahPerPosition)
+        // Update nominal_upah di quotation_detail
         $detail->update([
             'nominal_upah' => $upahData['nominal_upah'],
             'updated_by' => Auth::user()->full_name

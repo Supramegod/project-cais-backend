@@ -155,8 +155,6 @@ class QuotationResource extends JsonResource
                         $wageData = [
                             'upah' => null,
                             'hitungan_upah' => null,
-                            'management_fee_id' => null,
-                            'persentase' => null,
                             'lembur' => null,
                             'nominal_lembur' => null,
                             'jenis_bayar_lembur' => null,
@@ -167,15 +165,11 @@ class QuotationResource extends JsonResource
                             'tunjangan_holiday' => null,
                             'nominal_tunjangan_holiday' => null,
                             'jenis_bayar_tunjangan_holiday' => null,
-                            'is_ppn' => null,
-                            'ppn_pph_dipotong' => null,
                         ];
                     } else {
                         $wageData = [
                             'upah' => $wage->upah,
                             'hitungan_upah' => $wage->hitungan_upah,
-                            'management_fee_id' => $wage->management_fee_id,
-                            'persentase' => $wage->persentase,
                             'lembur' => $wage->lembur,
                             'nominal_lembur' => $wage->nominal_lembur,
                             'jenis_bayar_lembur' => $wage->jenis_bayar_lembur,
@@ -186,8 +180,6 @@ class QuotationResource extends JsonResource
                             'tunjangan_holiday' => $wage->tunjangan_holiday,
                             'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday,
                             'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday,
-                            'is_ppn' => $wage->is_ppn,
-                            'ppn_pph_dipotong' => $wage->ppn_pph_dipotong,
                         ];
                     }
 
@@ -210,8 +202,6 @@ class QuotationResource extends JsonResource
                         // Data dari wage table (gunakan $wageData)
                         'upah' => $wageData['upah'],
                         'hitungan_upah' => $wageData['hitungan_upah'],
-                        'management_fee_id' => $wageData['management_fee_id'],
-                        'persentase' => $wageData['persentase'],
                         'lembur' => $wageData['lembur'],
                         'nominal_lembur' => $wageData['nominal_lembur'],
                         'jenis_bayar_lembur' => $wageData['jenis_bayar_lembur'],
@@ -222,8 +212,6 @@ class QuotationResource extends JsonResource
                         'tunjangan_holiday' => $wageData['tunjangan_holiday'],
                         'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
                         'jenis_bayar_tunjangan_holiday' => $wageData['jenis_bayar_tunjangan_holiday'],
-                        'is_ppn' => $wageData['is_ppn'],
-                        'ppn_pph_dipotong' => $wageData['ppn_pph_dipotong'],
 
                         'requirements' => $detail->relationLoaded('quotationDetailRequirements') ? $detail->quotationDetailRequirements->map(function ($requirement) {
                             return [

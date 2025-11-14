@@ -136,7 +136,7 @@ class QuotationService
                 $wage->jenis_bayar_tunjangan_holiday = null;
                 $wage->is_ppn = "Tidak";
                 $wage->ppn_pph_dipotong = "Management Fee";
-                
+
                 \Log::warning("Created fallback wage for detail ID: " . $detail->id);
             }
 
@@ -156,12 +156,8 @@ class QuotationService
         $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
         $detail->insentif = $hpp->insentif ?? 0;
-        
-        // SET VALUES DARI WAGE - PASTIKAN MENGGUNAKAN NULL COALESCING
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
-        $detail->management_fee_id = $wage->management_fee_id ?? null;
-        $detail->persentase = $wage->persentase ?? 0;
         $detail->lembur = $wage->lembur ?? "Tidak";
         $detail->nominal_lembur = $wage->nominal_lembur ?? 0;
         $detail->jenis_bayar_lembur = $wage->jenis_bayar_lembur ?? null;
@@ -172,9 +168,8 @@ class QuotationService
         $detail->tunjangan_holiday = $wage->tunjangan_holiday ?? "Tidak";
         $detail->nominal_tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
         $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
-        $detail->is_ppn = $wage->is_ppn ?? "Tidak";
-        $detail->ppn_pph_dipotong = $wage->ppn_pph_dipotong ?? "Management Fee";
     }
+
 
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage)
     {
@@ -383,6 +378,7 @@ class QuotationService
 
     private function calculateManagementFee(&$quotation, $suffix)
     {
+        // GUNAKAN DATA DARI QUOTATION, BUKAN DARI WAGE
         $managementFeeCalculations = [
             1 => fn() => $quotation->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
             4 => fn() => $quotation->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
@@ -417,18 +413,12 @@ class QuotationService
         }
     }
 
+
     private function calculateDefaultTaxes(&$quotation, $suffix)
     {
-        // GUNAKAN DATA DARI WAGE JIKA ADA
-        $ppnPphDipotong = $quotation->ppn_pph_dipotong;
-        
-        // Jika tidak ada di quotation, coba ambil dari detail pertama yang punya wage
-        if (!$ppnPphDipotong) {
-            $firstDetailWithWage = $quotation->quotation_detail->first(function ($detail) {
-                return $detail->wage && $detail->wage->ppn_pph_dipotong;
-            });
-            $ppnPphDipotong = $firstDetailWithWage ? $firstDetailWithWage->wage->ppn_pph_dipotong : "Management Fee";
-        }
+        // GUNAKAN DATA DARI QUOTATION
+        $ppnPphDipotong = $quotation->ppn_pph_dipotong ?? "Management Fee";
+        $isPpn = $quotation->is_ppn ?? "Tidak";
 
         $baseAmount = $ppnPphDipotong == "Management Fee"
             ? $quotation->{"nominal_management_fee{$suffix}"}
@@ -436,9 +426,10 @@ class QuotationService
 
         $quotation->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
 
-        if ($quotation->{"ppn{$suffix}"} == 0) {
+        if ($quotation->{"ppn{$suffix}"} == 0 && $isPpn == "Ya") {
             $quotation->{"ppn{$suffix}"} = $quotation->{"dpp{$suffix}"} * 12 / 100;
         }
+
         if ($quotation->{"pph{$suffix}"} == 0) {
             $quotation->{"pph{$suffix}"} = $baseAmount * -2 / 100;
         }
@@ -497,11 +488,11 @@ class QuotationService
     {
         if ($hpp->lembur !== null)
             return $hpp->lembur;
-            
+
         $lemburValue = $wage->lembur ?? "Tidak";
         if ($lemburValue != "Flat")
             return 0;
-            
+
         $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
         if ($lemburDitagihkan == "Ditagihkan Terpisah")
             return 0;
