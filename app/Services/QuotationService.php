@@ -29,9 +29,15 @@ class QuotationService
             $this->initializeQuotation($quotation);
             $this->loadQuotationData($quotation);
 
+            // FIX: Ensure every detail has wage data
+            foreach ($quotation->quotation_detail as $detail) {
+                if (!$detail->wage) {
+                    $this->createDefaultWage($detail);
+                }
+            }
+
             // Cek apakah ada quotation details
             if ($quotation->quotation_detail->isEmpty()) {
-                \Log::warning("No quotation details found for quotation ID: " . $quotation->id);
                 return $quotation;
             }
 
@@ -53,6 +59,36 @@ class QuotationService
         }
     }
 
+    private function createDefaultWage($detail)
+    {
+        try {
+            $wage = QuotationDetailWage::create([
+                'quotation_detail_id' => $detail->id,
+                'quotation_id' => $detail->quotation_id,
+                'upah' => null,
+                'hitungan_upah' => null,
+                'lembur' => 'Tidak',
+                'nominal_lembur' => 0,
+                'jenis_bayar_lembur' => null,
+                'jam_per_bulan_lembur' => 0,
+                'lembur_ditagihkan' => 'Tidak Ditagihkan',
+                'kompensasi' => 'Tidak',
+                'thr' => 'Tidak',
+                'tunjangan_holiday' => 'Tidak',
+                'nominal_tunjangan_holiday' => 0,
+                'jenis_bayar_tunjangan_holiday' => null,
+                'created_by' => 'system-auto'
+            ]);
+
+            // Reload the relation
+            $detail->load('wage');
+
+            return $wage;
+        } catch (\Exception $e) {
+            \Log::error("Failed to create default wage for detail {$detail->id}: " . $e->getMessage());
+            return null;
+        }
+    }
     // ============================ INITIALIZATION ============================
     private function initializeQuotation($quotation)
     {
@@ -76,9 +112,6 @@ class QuotationService
         // Get management fee
         $managementFee = ManagementFee::find($quotation->management_fee_id);
         $quotation->management_fee = $managementFee->nama ?? '';
-
-        // Debug info
-        \Log::info("Loaded {$quotation->quotation_detail->count()} quotation details");
     }
 
     // ============================ CORE CALCULATION METHODS ============================
@@ -105,7 +138,12 @@ class QuotationService
     private function processAllDetails($quotation, $daftarTunjangan, $jumlahHc)
     {
         $quotation->quotation_detail->each(function ($detail) use ($quotation, $daftarTunjangan, $jumlahHc) {
-            $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc);
+            try {
+                $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc);
+            } catch (\Exception $e) {
+                \Log::error("Failed to process detail {$detail->id}, skipping: " . $e->getMessage());
+                // Skip this detail but continue with others
+            }
         });
     }
 
@@ -122,8 +160,6 @@ class QuotationService
                 $wage = new \stdClass();
                 $wage->upah = null;
                 $wage->hitungan_upah = null;
-                $wage->management_fee_id = null;
-                $wage->persentase = 0;
                 $wage->lembur = "Tidak";
                 $wage->nominal_lembur = 0;
                 $wage->jenis_bayar_lembur = null;
@@ -134,17 +170,14 @@ class QuotationService
                 $wage->tunjangan_holiday = "Tidak";
                 $wage->nominal_tunjangan_holiday = 0;
                 $wage->jenis_bayar_tunjangan_holiday = null;
-                $wage->is_ppn = "Tidak";
-                $wage->ppn_pph_dipotong = "Management Fee";
-
-                \Log::warning("Created fallback wage for detail ID: " . $detail->id);
             }
 
             $this->initializeDetail($detail, $hpp, $site, $wage);
             $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage);
+
         } catch (\Exception $e) {
             \Log::error("Error processing detail ID {$detail->id}: " . $e->getMessage());
-            \Log::error("Detail wage status: " . ($detail->wage ? 'exists' : 'null'));
+            \Log::error("Stack trace: " . $e->getTraceAsString());
             throw $e;
         }
     }
@@ -156,6 +189,7 @@ class QuotationService
         $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
         $detail->insentif = $hpp->insentif ?? 0;
+
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
         $detail->lembur = $wage->lembur ?? "Tidak";
@@ -170,21 +204,28 @@ class QuotationService
         $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
     }
 
-
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage)
     {
-        // Calculate core components
-        $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
-        $this->calculateBpjs($detail, $quotation, $hpp);
-        $this->calculateExtras($detail, $quotation, $hpp, $wage);
+        try {
+            // Calculate core components
+            $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
 
-        // Calculate items
-        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
+            $this->calculateBpjs($detail, $quotation, $hpp);
 
-        // Final totals
-        $this->calculateFinalTotals($detail, $quotation, $totalTunjangan);
+            $this->calculateExtras($detail, $quotation, $hpp, $wage);
+
+            // Calculate items
+            $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
+
+            // Final totals
+            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateDetailComponents for detail {$detail->id}: " . $e->getMessage());
+            \Log::error("Stack trace in calculateDetailComponents: " . $e->getTraceAsString());
+            throw $e;
+        }
     }
-
     // ============================ COMPONENT CALCULATIONS ============================
     private function calculateTunjangan($detail, $daftarTunjangan)
     {
@@ -228,27 +269,36 @@ class QuotationService
         $this->applyBpjsOptOut($detail);
         $this->updateQuotationBpjs($detail, $quotation);
     }
-
     private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
-        // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $thrValue = $wage->thr ?? "Tidak";
-        $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
-            ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+        try {
+            // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $thrValue = $wage->thr ?? "Tidak";
 
-        $kompensasiValue = $wage->kompensasi ?? "Tidak";
-        $detail->kompensasi = $hpp->kompensasi ??
-            ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+            $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
+                ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
 
-        // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
-        $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
-            ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
-            : 0;
+            $kompensasiValue = $wage->kompensasi ?? "Tidak";
 
-        // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
+            $detail->kompensasi = $hpp->kompensasi ??
+                ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+
+            // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
+
+            $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
+                ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
+                : 0;
+
+            // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
+            throw $e;
+        }
     }
+
 
     private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
     {
@@ -483,29 +533,35 @@ class QuotationService
         ];
         return $percentages[$resiko] ?? 0.24;
     }
-
     private function calculateLembur($detail, $quotation, $hpp, $wage)
     {
-        if ($hpp->lembur !== null)
+        if ($hpp && $hpp->lembur !== null) {
             return $hpp->lembur;
+        }
 
         $lemburValue = $wage->lembur ?? "Tidak";
-        if ($lemburValue != "Flat")
+
+        if ($lemburValue != "Flat") {
             return 0;
+        }
 
         $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
-        if ($lemburDitagihkan == "Ditagihkan Terpisah")
+
+        if ($lemburDitagihkan == "Ditagihkan Terpisah") {
             return 0;
+        }
 
         $jenisBayar = $wage->jenis_bayar_lembur ?? null;
         $nominalLembur = $wage->nominal_lembur ?? 0;
         $jamPerBulan = $wage->jam_per_bulan_lembur ?? 0;
 
-        return match ($jenisBayar) {
+        $result = match ($jenisBayar) {
             "Per Jam" => $nominalLembur * $jamPerBulan,
             "Per Hari" => $nominalLembur * 25,
             default => $nominalLembur
         };
+
+        return $result;
     }
 
     private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
