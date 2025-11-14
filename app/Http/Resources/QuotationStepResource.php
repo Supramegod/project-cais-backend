@@ -30,7 +30,7 @@ use Carbon\Carbon;
 
 class QuotationStepResource extends JsonResource
 {
-   private $step;
+    private $step;
     private $barangService; // ADD THIS
 
     public function __construct($resource, $step = null)
@@ -167,12 +167,13 @@ class QuotationStepResource extends JsonResource
                 return [
                     'quotation_details' => $quotationDetails,
                 ];
+
             case 4:
                 $positionData = [];
 
                 if ($quotation->relationLoaded('quotationDetails')) {
                     foreach ($quotation->quotationDetails as $detail) {
-                        $wage = $detail->wage; // Ambil data dari relasi wage
+                        $wage = $detail->wage;
 
                         $positionData[] = [
                             'quotation_detail_id' => $detail->id,
@@ -183,11 +184,9 @@ class QuotationStepResource extends JsonResource
                             'jumlah_hc' => $detail->jumlah_hc,
                             'nominal_upah' => $detail->nominal_upah,
 
-                            // Step 4 fields dari tabel wage - semua sebagai string
+                            // Data dari wage (TANPA 4 kolom global)
                             'upah' => $wage->upah ?? null,
                             'hitungan_upah' => $wage->hitungan_upah ?? null,
-                            'management_fee_id' => $wage->management_fee_id ?? null,
-                            'persentase' => $wage->persentase ?? null,
                             'lembur' => $wage->lembur ?? null,
                             'nominal_lembur' => $wage->nominal_lembur ?? null,
                             'jenis_bayar_lembur' => $wage->jenis_bayar_lembur ?? null,
@@ -198,14 +197,20 @@ class QuotationStepResource extends JsonResource
                             'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
                             'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? null,
                             'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
-                            'is_ppn' => $wage->is_ppn ?? null,
-                            'ppn_pph_dipotong' => $wage->ppn_pph_dipotong ?? null,
+                            // HAPUS 4 KOLOM GLOBAL:
+                            // 'is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'
                         ];
                     }
                 }
 
                 return [
                     'position_data' => $positionData,
+                    'global_data' => [
+                        'is_ppn' => $quotation->is_ppn,
+                        'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
+                        'management_fee_id' => $quotation->management_fee_id,
+                        'persentase' => $quotation->persentase,
+                    ]
                 ];
             // Di method getStepSpecificData untuk case 5
             case 5:
