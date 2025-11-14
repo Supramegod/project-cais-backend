@@ -14,6 +14,7 @@ use App\Models\{
     QuotationOhc,
     QuotationKaporlap,
     QuotationDevices,
+    QuotationDetailWage,
     User
 };
 use Carbon\Carbon;
@@ -24,20 +25,32 @@ class QuotationService
     // ============================ MAIN CALCULATION FLOW ============================
     public function calculateQuotation($quotation)
     {
-        $this->initializeQuotation($quotation);
-        $this->loadQuotationData($quotation);
+        try {
+            $this->initializeQuotation($quotation);
+            $this->loadQuotationData($quotation);
 
-        $jumlahHc = $quotation->quotation_detail->sum('jumlah_hc');
-        $quotation->jumlah_hc = $jumlahHc;
-        $quotation->provisi = $this->calculateProvisi($quotation->durasi_kerjasama);
+            // Cek apakah ada quotation details
+            if ($quotation->quotation_detail->isEmpty()) {
+                \Log::warning("No quotation details found for quotation ID: " . $quotation->id);
+                return $quotation;
+            }
 
-        // First pass calculation
-        $this->calculateFirstPass($quotation, $jumlahHc);
+            $jumlahHc = $quotation->quotation_detail->sum('jumlah_hc');
+            $quotation->jumlah_hc = $jumlahHc;
+            $quotation->provisi = $this->calculateProvisi($quotation->durasi_kerjasama);
 
-        // Recalculate with gross-up adjustments
-        $this->recalculateWithGrossUp($quotation, $jumlahHc);
+            // First pass calculation
+            $this->calculateFirstPass($quotation, $jumlahHc);
 
-        return $quotation;
+            // Recalculate with gross-up adjustments
+            $this->recalculateWithGrossUp($quotation, $jumlahHc);
+
+            return $quotation;
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateQuotation: " . $e->getMessage());
+            \Log::error("Stack trace: " . $e->getTraceAsString());
+            throw $e;
+        }
     }
 
     // ============================ INITIALIZATION ============================
@@ -49,7 +62,9 @@ class QuotationService
 
     private function loadQuotationData($quotation)
     {
-        $quotation->quotation_detail = QuotationDetail::where('quotation_id', $quotation->id)->get();
+        // Load dengan relasi wage
+        $quotation->quotation_detail = QuotationDetail::with('wage')
+            ->where('quotation_id', $quotation->id)->get();
         $quotation->quotation_site = QuotationSite::where('quotation_id', $quotation->id)->get();
 
         // Calculate site details count
@@ -61,6 +76,9 @@ class QuotationService
         // Get management fee
         $managementFee = ManagementFee::find($quotation->management_fee_id);
         $quotation->management_fee = $managementFee->nama ?? '';
+
+        // Debug info
+        \Log::info("Loaded {$quotation->quotation_detail->count()} quotation details");
     }
 
     // ============================ CORE CALCULATION METHODS ============================
@@ -93,29 +111,77 @@ class QuotationService
 
     private function processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc)
     {
-        $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-        $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
-        $site = QuotationSite::find($detail->quotation_site_id);
+        try {
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+            $site = QuotationSite::find($detail->quotation_site_id);
+            $wage = $detail->wage;
 
-        $this->initializeDetail($detail, $hpp, $site);
-        $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss);
+            // Jika wage null, buat object kosong untuk menghindari error
+            if (!$wage) {
+                $wage = new \stdClass();
+                $wage->upah = null;
+                $wage->hitungan_upah = null;
+                $wage->management_fee_id = null;
+                $wage->persentase = 0;
+                $wage->lembur = "Tidak";
+                $wage->nominal_lembur = 0;
+                $wage->jenis_bayar_lembur = null;
+                $wage->jam_per_bulan_lembur = 0;
+                $wage->lembur_ditagihkan = "Tidak Ditagihkan";
+                $wage->kompensasi = "Tidak";
+                $wage->thr = "Tidak";
+                $wage->tunjangan_holiday = "Tidak";
+                $wage->nominal_tunjangan_holiday = 0;
+                $wage->jenis_bayar_tunjangan_holiday = null;
+                $wage->is_ppn = "Tidak";
+                $wage->ppn_pph_dipotong = "Management Fee";
+                
+                \Log::warning("Created fallback wage for detail ID: " . $detail->id);
+            }
+
+            $this->initializeDetail($detail, $hpp, $site, $wage);
+            $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage);
+        } catch (\Exception $e) {
+            \Log::error("Error processing detail ID {$detail->id}: " . $e->getMessage());
+            \Log::error("Detail wage status: " . ($detail->wage ? 'exists' : 'null'));
+            throw $e;
+        }
     }
 
-    private function initializeDetail($detail, $hpp, $site)
+    private function initializeDetail($detail, $hpp, $site, $wage)
     {
-        $detail->nominal_upah = $hpp->gaji_pokok ?? $site->nominal_upah;
-        $detail->umk = $site->umk;
-        $detail->ump = $site->ump;
+        $detail->nominal_upah = $hpp->gaji_pokok ?? $site->nominal_upah ?? 0;
+        $detail->umk = $site->umk ?? 0;
+        $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
         $detail->insentif = $hpp->insentif ?? 0;
+        
+        // SET VALUES DARI WAGE - PASTIKAN MENGGUNAKAN NULL COALESCING
+        $detail->upah = $wage->upah ?? null;
+        $detail->hitungan_upah = $wage->hitungan_upah ?? null;
+        $detail->management_fee_id = $wage->management_fee_id ?? null;
+        $detail->persentase = $wage->persentase ?? 0;
+        $detail->lembur = $wage->lembur ?? "Tidak";
+        $detail->nominal_lembur = $wage->nominal_lembur ?? 0;
+        $detail->jenis_bayar_lembur = $wage->jenis_bayar_lembur ?? null;
+        $detail->jam_per_bulan_lembur = $wage->jam_per_bulan_lembur ?? 0;
+        $detail->lembur_ditagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
+        $detail->kompensasi = $wage->kompensasi ?? "Tidak";
+        $detail->thr = $wage->thr ?? "Tidak";
+        $detail->tunjangan_holiday = $wage->tunjangan_holiday ?? "Tidak";
+        $detail->nominal_tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
+        $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
+        $detail->is_ppn = $wage->is_ppn ?? "Tidak";
+        $detail->ppn_pph_dipotong = $wage->ppn_pph_dipotong ?? "Management Fee";
     }
 
-    private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss)
+    private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage)
     {
         // Calculate core components
         $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
         $this->calculateBpjs($detail, $quotation, $hpp);
-        $this->calculateExtras($detail, $quotation, $hpp);
+        $this->calculateExtras($detail, $quotation, $hpp, $wage);
 
         // Calculate items
         $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
@@ -168,23 +234,25 @@ class QuotationService
         $this->updateQuotationBpjs($detail, $quotation);
     }
 
-
-    private function calculateExtras($detail, $quotation, $hpp)
+    private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
-        // THR & Kompensasi
+        // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+        $thrValue = $wage->thr ?? "Tidak";
         $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
-            ($quotation->thr == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+            ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
 
+        $kompensasiValue = $wage->kompensasi ?? "Tidak";
         $detail->kompensasi = $hpp->kompensasi ??
-            ($quotation->kompensasi == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+            ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
 
-        // Tunjangan Holiday
-        $detail->tunjangan_holiday = $quotation->tunjangan_holiday == "Flat"
-            ? ($hpp->tunjangan_hari_libur_nasional ?? $quotation->nominal_tunjangan_holiday)
+        // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+        $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
+        $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
+            ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
             : 0;
 
-        // Lembur
-        $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp);
+        // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+        $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
     }
 
     private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
@@ -351,7 +419,18 @@ class QuotationService
 
     private function calculateDefaultTaxes(&$quotation, $suffix)
     {
-        $baseAmount = $quotation->ppn_pph_dipotong == "Management Fee"
+        // GUNAKAN DATA DARI WAGE JIKA ADA
+        $ppnPphDipotong = $quotation->ppn_pph_dipotong;
+        
+        // Jika tidak ada di quotation, coba ambil dari detail pertama yang punya wage
+        if (!$ppnPphDipotong) {
+            $firstDetailWithWage = $quotation->quotation_detail->first(function ($detail) {
+                return $detail->wage && $detail->wage->ppn_pph_dipotong;
+            });
+            $ppnPphDipotong = $firstDetailWithWage ? $firstDetailWithWage->wage->ppn_pph_dipotong : "Management Fee";
+        }
+
+        $baseAmount = $ppnPphDipotong == "Management Fee"
             ? $quotation->{"nominal_management_fee{$suffix}"}
             : $quotation->{"grand_total_sebelum_pajak{$suffix}"};
 
@@ -377,7 +456,7 @@ class QuotationService
         if ($quotation->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
             $quotation->{"gpm{$suffix}"} = $quotation->{"margin{$suffix}"} / $quotation->{"grand_total_sebelum_pajak{$suffix}"} * 100;
         } else {
-            $quotation->{"gpm{$suffix}"} = 0; // atau nilai default lainnya
+            $quotation->{"gpm{$suffix}"} = 0;
         }
     }
 
@@ -414,19 +493,27 @@ class QuotationService
         return $percentages[$resiko] ?? 0.24;
     }
 
-    private function calculateLembur($detail, $quotation, $hpp)
+    private function calculateLembur($detail, $quotation, $hpp, $wage)
     {
         if ($hpp->lembur !== null)
             return $hpp->lembur;
-        if ($quotation->lembur != "Flat")
+            
+        $lemburValue = $wage->lembur ?? "Tidak";
+        if ($lemburValue != "Flat")
             return 0;
-        if ($quotation->lembur_ditagihkan == "Ditagihkan Terpisah")
+            
+        $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
+        if ($lemburDitagihkan == "Ditagihkan Terpisah")
             return 0;
 
-        return match ($quotation->jenis_bayar_lembur) {
-            "Per Jam" => $quotation->nominal_lembur * $quotation->jam_per_bulan_lembur,
-            "Per Hari" => $quotation->nominal_lembur * 25,
-            default => $quotation->nominal_lembur
+        $jenisBayar = $wage->jenis_bayar_lembur ?? null;
+        $nominalLembur = $wage->nominal_lembur ?? 0;
+        $jamPerBulan = $wage->jam_per_bulan_lembur ?? 0;
+
+        return match ($jenisBayar) {
+            "Per Jam" => $nominalLembur * $jamPerBulan,
+            "Per Hari" => $nominalLembur * 25,
+            default => $nominalLembur
         };
     }
 
@@ -480,7 +567,6 @@ class QuotationService
             $detail->persen_bpjs_kesehatan = 0;
         }
     }
-
     // ============================ OTHER SERVICE METHODS ============================
 
     /**
