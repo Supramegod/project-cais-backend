@@ -423,7 +423,7 @@ class QuotationController extends Controller
                 ->findOrFail($id);
 
             $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
-
+            
             return response()->json([
                 'success' => true,
                 'data' => new QuotationResource($calculatedQuotation),
