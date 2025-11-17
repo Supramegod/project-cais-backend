@@ -400,10 +400,6 @@ class QuotationStepService
 
     public function updateStep4(Quotation $quotation, Request $request): void
     {
-        \Log::info("Updating Step 4 per position", [
-            'quotation_id' => $quotation->id,
-            'position_data_count' => count($request->position_data ?? [])
-        ]);
 
         if ($request->has('position_data') && is_array($request->position_data)) {
             // UPDATE QUOTATION GLOBAL DATA DARI POSITION PERTAMA
@@ -490,90 +486,176 @@ class QuotationStepService
     }
     public function updateStep7(Quotation $quotation, Request $request): void
     {
-        $barangData = [];
+        DB::beginTransaction();
+        try {
+            $barangData = [];
 
-        if ($request->has('kaporlaps') && is_array($request->kaporlaps)) {
-            $barangData = $request->kaporlaps;
-        } else {
-            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'kaporlap');
+            if ($request->has('kaporlaps') && is_array($request->kaporlaps)) {
+                $barangData = $request->kaporlaps;
+            } else {
+                $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'kaporlap');
+            }
+
+            // Sync barang data
+            $syncResult = $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
+
+            \Log::info("Kaporlap Sync Result", $syncResult);
+
+            $quotation->update([
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            DB::commit(); // ✅ TAMBAHKAN INI
+
+            \Log::info("Step 7 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'kaporlap_items' => count($barangData)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error updating step 7", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        // Selakukan sync meskipun barangData kosong (untuk menghapus semua data)
-        $this->quotationBarangService->syncBarangData($quotation, 'kaporlap', $barangData);
-
-        $quotation->update([
-            'updated_by' => Auth::user()->full_name
-        ]);
     }
-
     public function updateStep8(Quotation $quotation, Request $request): void
     {
-        $barangData = [];
+        DB::beginTransaction();
+        try {
+            $barangData = [];
 
-        if ($request->has('devices') && is_array($request->devices)) {
-            $barangData = $request->devices;
-        } else {
-            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'devices');
+            if ($request->has('devices') && is_array($request->devices)) {
+                $barangData = $request->devices;
+            } else {
+                $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'devices');
+            }
+
+            // Sync barang data
+            $syncResult = $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
+
+            \Log::info("Devices Sync Result", $syncResult);
+
+            $quotation->update([
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            DB::commit(); // ✅ TAMBAHKAN INI
+
+            \Log::info("Step 8 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'devices_items' => count($barangData)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error updating step 8", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        $this->quotationBarangService->syncBarangData($quotation, 'devices', $barangData);
-
-        $quotation->update([
-            'updated_by' => Auth::user()->full_name
-        ]);
     }
-
     public function updateStep9(Quotation $quotation, Request $request): void
     {
-        $barangData = [];
+        DB::beginTransaction();
+        try {
+            $barangData = [];
 
-        if ($request->has('chemicals') && is_array($request->chemicals)) {
-            $barangData = $request->chemicals;
-        } elseif ($request->has('barang_id') && $request->has('jumlah')) {
-            $barangData = [
-                [
-                    'barang_id' => $request->barang_id,
-                    'jumlah' => $request->jumlah,
-                    'masa_pakai' => $request->masa_pakai,
-                    'harga' => $request->harga
-                ]
-            ];
-        } else {
-            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'chemicals');
+            if ($request->has('chemicals') && is_array($request->chemicals)) {
+                $barangData = $request->chemicals;
+            } elseif ($request->has('barang_id') && $request->has('jumlah')) {
+                $barangData = [
+                    [
+                        'barang_id' => $request->barang_id,
+                        'jumlah' => $request->jumlah,
+                        'masa_pakai' => $request->masa_pakai,
+                        'harga' => $request->harga
+                    ]
+                ];
+            } else {
+                $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'chemicals');
+            }
+
+            // Sync barang data
+            $syncResult = $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
+
+            \Log::info("Chemicals Sync Result", $syncResult);
+
+            $quotation->update([
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            DB::commit(); // ✅ TAMBAHKAN INI
+
+            \Log::info("Step 9 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'chemical_items' => count($barangData)
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error updating step 9", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        $this->quotationBarangService->syncBarangData($quotation, 'chemicals', $barangData);
-
-        $quotation->update([
-            'updated_by' => Auth::user()->full_name
-        ]);
     }
-
     public function updateStep10(Quotation $quotation, Request $request): void
     {
-        $barangData = [];
+        DB::beginTransaction();
 
-        if ($request->has('ohcs') && is_array($request->ohcs)) {
-            $barangData = $request->ohcs;
-        } else {
-            $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'ohc');
+        try {
+            $barangData = [];
+
+            if ($request->has('ohcs') && is_array($request->ohcs)) {
+                $barangData = $request->ohcs;
+            } else {
+                $barangData = $this->quotationBarangService->processLegacyFormat($quotation, $request, 'ohc');
+            }
+
+            // Sync barang data dengan approach baru
+            $syncResult = $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
+
+            \Log::info("OHC Sync Result", $syncResult);
+
+            // Update training data
+            $this->updateTrainingData($quotation, $request, Carbon::now());
+
+            // Update data kunjungan
+            $quotation->update([
+                'kunjungan_operasional' => $request->jumlah_kunjungan_operasional . " " . $request->bulan_tahun_kunjungan_operasional,
+                'kunjungan_tim_crm' => $request->jumlah_kunjungan_tim_crm . " " . $request->bulan_tahun_kunjungan_tim_crm,
+                'keterangan_kunjungan_operasional' => $request->keterangan_kunjungan_operasional,
+                'keterangan_kunjungan_tim_crm' => $request->keterangan_kunjungan_tim_crm,
+                'training' => $request->training,
+                'persen_bunga_bank' => $request->persen_bunga_bank ?: 1.3,
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            DB::commit();
+
+            \Log::info("Step 10 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'ohc_items' => count($barangData),
+                'training' => $request->training
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error updating step 10", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        $this->quotationBarangService->syncBarangData($quotation, 'ohc', $barangData);
-
-        // Update training data
-        $this->updateTrainingData($quotation, $request, Carbon::now());
-
-        // Update data kunjungan
-        $quotation->update([
-            'kunjungan_operasional' => $request->jumlah_kunjungan_operasional . " " . $request->bulan_tahun_kunjungan_operasional,
-            'kunjungan_tim_crm' => $request->jumlah_kunjungan_tim_crm . " " . $request->bulan_tahun_kunjungan_tim_crm,
-            'keterangan_kunjungan_operasional' => $request->keterangan_kunjungan_operasional,
-            'keterangan_kunjungan_tim_crm' => $request->keterangan_kunjungan_tim_crm,
-            'training' => $request->training,
-            'persen_bunga_bank' => $quotation->persen_bunga_bank ?: 1.3,
-            'updated_by' => Auth::user()->full_name
-        ]);
     }
 
     public function updateStep11(Quotation $quotation, Request $request): void

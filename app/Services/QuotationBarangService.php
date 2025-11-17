@@ -29,20 +29,43 @@ class QuotationBarangService
             $jenisBarangIds = $modelConfig['jenis_barang_ids'];
             $useDetailId = $modelConfig['use_detail_id'];
 
-            // Hapus semua data existing untuk quotation ini dan jenis barang ini
-            $deletedCount = $modelClass::where('quotation_id', $quotation->id)->delete();
+            // 1. FIRST, collect all incoming barang_ids
+            $incomingBarangIds = collect($barangData)
+                ->pluck('barang_id')
+                ->filter()
+                ->unique()
+                ->toArray();
+
+            // 2. SOFT DELETE only items that are NOT in the incoming data
+            $modelClass::where('quotation_id', $quotation->id)
+                ->whereNotIn('barang_id', $incomingBarangIds)
+                ->update([
+                    'deleted_at' => now(),
+                    'deleted_by' => Auth::user()->full_name
+                ]);
 
             $createdCount = 0;
+            $updatedCount = 0;
             $skippedCount = 0;
 
-            // Insert data baru hanya untuk jumlah > 0
+            // 3. PROCESS each incoming item
             foreach ($barangData as $data) {
                 $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId);
 
                 if ($result['success']) {
-                    $createdCount++;
+                    if ($result['action'] === 'created') {
+                        $createdCount++;
+                    } else {
+                        $updatedCount++;
+                    }
                 } else {
                     $skippedCount++;
+                    \Log::warning("Skipped barang item", [
+                        'quotation_id' => $quotation->id,
+                        'jenis_barang' => $jenisBarang,
+                        'data' => $data,
+                        'reason' => $result['reason']
+                    ]);
                 }
             }
 
@@ -52,12 +75,19 @@ class QuotationBarangService
                 'success' => true,
                 'jenis_barang' => $jenisBarang,
                 'created' => $createdCount,
-                'deleted' => $deletedCount,
+                'updated' => $updatedCount,
+                'deleted' => count($incomingBarangIds), // items that were soft deleted
                 'skipped' => $skippedCount
             ];
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error("Error syncing barang data", [
+                'quotation_id' => $quotation->id,
+                'jenis_barang' => $jenisBarang,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             throw $e;
         }
     }
@@ -89,6 +119,7 @@ class QuotationBarangService
         }
 
         // Validasi quotation_detail_id jika diperlukan
+        $quotation_detail_id = null;
         if ($useDetailId) {
             if (!isset($data['quotation_detail_id'])) {
                 return ['success' => false, 'reason' => 'missing_quotation_detail_id'];
@@ -129,16 +160,33 @@ class QuotationBarangService
             'jenis_barang_id' => $barang->jenis_barang_id,
             'jenis_barang' => $barang->jenis_barang,
             'masa_pakai' => $masa_pakai,
-            'created_by' => Auth::user()->full_name
+            'updated_by' => Auth::user()->full_name
         ];
 
         if ($useDetailId) {
             $createData['quotation_detail_id'] = $quotation_detail_id;
         }
 
-        $modelClass::create($createData);
+        // Cari data existing untuk update
+        $existingQuery = $modelClass::where('quotation_id', $quotation->id)
+            ->where('barang_id', $barang_id);
 
-        return ['success' => true];
+        if ($useDetailId) {
+            $existingQuery->where('quotation_detail_id', $quotation_detail_id);
+        }
+
+        $existing = $existingQuery->first();
+
+        if ($existing) {
+            // UPDATE data existing
+            $existing->update($createData);
+            return ['success' => true, 'action' => 'updated'];
+        } else {
+            // CREATE data baru
+            $createData['created_by'] = Auth::user()->full_name;
+            $modelClass::create($createData);
+            return ['success' => true, 'action' => 'created'];
+        }
     }
     /**
      * Get model configuration for different barang types
