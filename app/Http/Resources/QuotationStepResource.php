@@ -464,13 +464,12 @@ class QuotationStepResource extends JsonResource
                             ];
                         })->toArray() : [],
                 ];
-
             case 5:
                 return [
                     'jenis_perusahaan' => JenisPerusahaan::all(),
                     'bidang_perusahaan' => BidangPerusahaan::all(),
                     'resiko_options' => ['Rendah', 'Sedang', 'Tinggi'],
-                    'program_bpjs_options' => ['BPJS Kesehatan', 'BPJS Ketenagakerjaan', 'BPU'],
+                    'program_bpjs_options' => ['Asuransi swasta', 'BPJS', 'BPU'], // DIUBAH
                 ];
 
             case 6:

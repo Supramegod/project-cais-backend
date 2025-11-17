@@ -244,6 +244,26 @@ class QuotationService
 
     private function calculateBpjs($detail, $quotation, $hpp)
     {
+        if ($quotation->program_bpjs === 'BPU') {
+            // BPU = potong 16 ribu dari nominal upah, tidak ada BPJS sama sekali
+            $detail->bpjs_jkk = 0;
+            $detail->bpjs_jkm = 0;
+            $detail->bpjs_jht = 0;
+            $detail->bpjs_jp = 0;
+            $detail->bpjs_kes = 0;
+
+            $detail->persen_bpjs_jkk = 0;
+            $detail->persen_bpjs_jkm = 0;
+            $detail->persen_bpjs_jht = 0;
+            $detail->persen_bpjs_jp = 0;
+            $detail->persen_bpjs_kes = 0;
+
+            // Potong 16 ribu dari nominal upah
+            $detail->nominal_upah = $detail->nominal_upah - 16000;
+
+            $this->updateQuotationBpjs($detail, $quotation);
+            return;
+        }
         $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
 
         $bpjsConfig = [
@@ -333,16 +353,23 @@ class QuotationService
     // ============================ FINAL TOTALS ============================
     private function calculateFinalTotals($detail, $quotation, $totalTunjangan)
     {
+        // Hitung potongan BPU jika ada
+        $potonganBpu = 0;
+        if ($quotation->program_bpjs === 'BPU') {
+            $potonganBpu = 16000; // Fixed 16 ribu
+            $detail->potongan_bpu = $potonganBpu;
+        }
+
         // HPP Calculations
         $detail->total_personil = $detail->nominal_upah + $totalTunjangan + $detail->tunjangan_hari_raya +
             $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur + $detail->nominal_takaful +
             $detail->bpjs_ketenagakerjaan + $detail->bpjs_kesehatan + $detail->personil_kaporlap +
             $detail->personil_devices + $detail->personil_chemical + $detail->personil_ohc +
-            $detail->bunga_bank + $detail->insentif;
+            $detail->bunga_bank + $detail->insentif - $potonganBpu;
 
         $detail->sub_total_personil = $detail->total_personil * $detail->jumlah_hc;
 
-        // COSS Calculations
+        // COSS Calculations - sama seperti sebelumnya
         $detail->total_base_manpower = round($detail->nominal_upah + $detail->total_tunjangan, 2);
 
         $detail->total_exclude_base_manpower = round(
@@ -353,7 +380,7 @@ class QuotationService
             2
         );
 
-        $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss, 2);
+        $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss - $potonganBpu, 2);
         $detail->sub_total_personil_coss = round($detail->total_personil_coss * $detail->jumlah_hc, 2);
     }
 
