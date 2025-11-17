@@ -346,33 +346,61 @@ class QuotationStepService
     }
     public function updateStep2(Quotation $quotation, Request $request): void
     {
-        $this->validateStep2($request);
+        DB::beginTransaction();
+        try {
+            \Log::info('Starting updateStep2', [
+                'quotation_id' => $quotation->id,
+                'request_data' => $request->all()
+            ]);
 
-        $cutiData = $this->prepareCutiData($request);
+            $this->validateStep2($request);
 
-        // Ambil persentase bunga bank dari TOP
-        $top = Top::find($request->top);
-        $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
+            $cutiData = $this->prepareCutiData($request);
 
-        $quotation->update(array_merge([
-            'mulai_kontrak' => $request->mulai_kontrak,
-            'kontrak_selesai' => $request->kontrak_selesai,
-            'tgl_penempatan' => $request->tgl_penempatan,
-            'salary_rule_id' => $request->salary_rule,
-            'pembayaran_invoice' => $request->pembayaran_invoice,
-            'top' => $request->top,
-            'jumlah_hari_invoice' => $request->jumlah_hari_invoice,
-            'tipe_hari_invoice' => $request->tipe_hari_invoice,
-            'evaluasi_kontrak' => $request->evaluasi_kontrak,
-            'durasi_kerjasama' => $request->durasi_kerjasama,
-            'durasi_karyawan' => $request->durasi_karyawan,
-            'evaluasi_karyawan' => $request->evaluasi_karyawan,
-            'hari_kerja' => $request->hari_kerja,
-            'shift_kerja' => $request->shift_kerja,
-            'jam_kerja' => $request->jam_kerja,
-            'persen_bunga_bank' => $persenBungaBank,
-            'updated_by' => Auth::user()->full_name
-        ], $cutiData));
+            // Ambil persentase bunga bank dari TOP
+            $top = Top::find($request->top);
+            $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
+
+            $updateData = array_merge([
+                'mulai_kontrak' => $request->mulai_kontrak,
+                'kontrak_selesai' => $request->kontrak_selesai,
+                'tgl_penempatan' => $request->tgl_penempatan,
+                'salary_rule_id' => $request->salary_rule,
+                'pembayaran_invoice' => $request->pembayaran_invoice,
+                'top' => $request->top,
+                'jumlah_hari_invoice' => $request->jumlah_hari_invoice,
+                'tipe_hari_invoice' => $request->tipe_hari_invoice,
+                'evaluasi_kontrak' => $request->evaluasi_kontrak,
+                'durasi_kerjasama' => $request->durasi_kerjasama,
+                'durasi_karyawan' => $request->durasi_karyawan,
+                'evaluasi_karyawan' => $request->evaluasi_karyawan,
+                'hari_kerja' => $request->hari_kerja,
+                'shift_kerja' => $request->shift_kerja,
+                'jam_kerja' => $request->jam_kerja,
+                'persen_bunga_bank' => $persenBungaBank,
+                'updated_by' => Auth::user()->full_name
+            ], $cutiData);
+
+            \Log::debug('Final data to update quotation:', $updateData);
+
+            $quotation->update($updateData);
+
+            DB::commit();
+
+            \Log::info('Step 2 updated successfully', [
+                'quotation_id' => $quotation->id,
+                'cuti_data' => $cutiData
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep2", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
     public function updateStep3(Quotation $quotation, Request $request): void
     {
@@ -712,7 +740,6 @@ class QuotationStepService
     private function prepareCutiData(Request $request): array
     {
         $data = [];
-
         if ($request->ada_cuti == "Tidak Ada") {
             $data['cuti'] = "Tidak Ada";
             $data['gaji_saat_cuti'] = null;
@@ -736,20 +763,23 @@ class QuotationStepService
             if (in_array("Cuti Melahirkan", $cuti)) {
                 if ($request->gaji_saat_cuti != "Prorate") {
                     $data['prorate'] = null;
+                } else {
+                    $data['prorate'] = $request->prorate;
                 }
+                $data['gaji_saat_cuti'] = $request->gaji_saat_cuti;
             } else {
-                $data['gaji_saat_cuti'] = null;
-                $data['prorate'] = null;
+                $data['gaji_saat_cuti'] = $request->gaji_saat_cuti;
+                $data['prorate'] = $request->prorate;
             }
 
-            $data['hari_cuti_kematian'] = in_array("Cuti Kematian", $cuti) ? $request->hari_cuti_kematian : null;
-            $data['hari_istri_melahirkan'] = in_array("Istri Melahirkan", $cuti) ? $request->hari_istri_melahirkan : null;
-            $data['hari_cuti_menikah'] = in_array("Cuti Menikah", $cuti) ? $request->hari_cuti_menikah : null;
+            // $data['hari_cuti_kematian'] = in_array("Cuti Kematian", $cuti) ? $request->hari_cuti_kematian : null;
+            // $data['hari_istri_melahirkan'] = in_array("Istri Melahirkan", $cuti) ? $request->hari_istri_melahirkan : null;
+            // $data['hari_cuti_menikah'] = in_array("Cuti Menikah", $cuti) ? $request->hari_cuti_menikah : null;
+
         }
 
         return $data;
     }
-
     private function calculateUpahForPosition(QuotationDetail $detail, array $positionData): array
     {
         $nominalUpah = $detail->nominal_upah;
