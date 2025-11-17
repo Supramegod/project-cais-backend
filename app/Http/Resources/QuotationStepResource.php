@@ -470,7 +470,7 @@ class QuotationStepResource extends JsonResource
                     'jenis_perusahaan' => JenisPerusahaan::all(),
                     'bidang_perusahaan' => BidangPerusahaan::all(),
                     'resiko_options' => ['Rendah', 'Sedang', 'Tinggi'],
-                    'program_bpjs_options' => ['BPJS Kesehatan', 'BPJS Ketenagakerjaan', 'Keduanya'],
+                    'program_bpjs_options' => ['BPJS Kesehatan', 'BPJS Ketenagakerjaan', 'BPU'],
                 ];
 
             case 6:
