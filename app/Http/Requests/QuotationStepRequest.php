@@ -31,7 +31,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['top'] = 'required|string';
                 $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
                 $rules['jumlah_hari_invoice'] = 'sometimes|integer|min:1';
-                $rules['tipe_hari_invoice'] = 'sometimes|string|in:Hari Kerja,Hari Kalender';
+                $rules['tipe_hari_invoice'] = 'sometimes|string|in:Kerja,Kalender';
                 $rules['evaluasi_kontrak'] = 'sometimes|string';
                 $rules['durasi_kerjasama'] = 'sometimes|string';
                 $rules['durasi_karyawan'] = 'sometimes|string';
