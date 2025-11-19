@@ -168,6 +168,7 @@ class QuotationStepResource extends JsonResource
                     'quotation_details' => $quotationDetails,
                 ];
 
+            // Di method getStepSpecificData - case 4:
             case 4:
                 $positionData = [];
 
@@ -184,7 +185,7 @@ class QuotationStepResource extends JsonResource
                             'jumlah_hc' => $detail->jumlah_hc,
                             'nominal_upah' => $detail->nominal_upah,
 
-                            // Data dari wage (TANPA 4 kolom global)
+                            // Data dari wage (sesuai dengan perhitungan di service)
                             'upah' => $wage->upah ?? null,
                             'hitungan_upah' => $wage->hitungan_upah ?? null,
                             'lembur' => $wage->lembur ?? null,
@@ -197,8 +198,12 @@ class QuotationStepResource extends JsonResource
                             'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
                             'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? null,
                             'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
-                            // HAPUS 4 KOLOM GLOBAL:
-                            // 'is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'
+                            // Tambahkan field untuk perhitungan BPJS
+                            'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? null,
+                            'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? null,
+                            'is_bpjs_jht' => $detail->is_bpjs_jht ?? null,
+                            'is_bpjs_jp' => $detail->is_bpjs_jp ?? null,
+                            'penjamin_kesehatan' => $detail->penjamin_kesehatan ?? null,
                         ];
                     }
                 }
@@ -212,7 +217,7 @@ class QuotationStepResource extends JsonResource
                         'persentase' => $quotation->persentase,
                     ]
                 ];
-            // Di method getStepSpecificData untuk case 5
+            // Di method getStepSpecificData - case 5:
             case 5:
                 $bpjsPerPosition = [];
                 if ($quotation->relationLoaded('quotationDetails')) {
@@ -223,12 +228,12 @@ class QuotationStepResource extends JsonResource
                             'position_name' => $detail->jabatan_kebutuhan,
                             'site_id' => $detail->quotation_site_id,
                             'site_name' => $detail->nama_site,
-                            'penjamin' => $detail->penjamin_kesehatan,
-                            'jkk' => (bool) $detail->is_bpjs_jkk,
-                            'jkm' => (bool) $detail->is_bpjs_jkm,
-                            'jht' => (bool) $detail->is_bpjs_jht,
-                            'jp' => (bool) $detail->is_bpjs_jp,
-                            'nominal_takaful' => $detail->nominal_takaful // Tambahkan ini
+                            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                            'is_bpjs_jkk' => (bool) $detail->is_bpjs_jkk,
+                            'is_bpjs_jkm' => (bool) $detail->is_bpjs_jkm,
+                            'is_bpjs_jht' => (bool) $detail->is_bpjs_jht,
+                            'is_bpjs_jp' => (bool) $detail->is_bpjs_jp,
+                            'nominal_takaful' => $detail->nominal_takaful
                         ];
                     })->toArray();
                 }
@@ -237,11 +242,9 @@ class QuotationStepResource extends JsonResource
                     'jenis_perusahaan_id' => $quotation->jenis_perusahaan_id,
                     'bidang_perusahaan_id' => $quotation->bidang_perusahaan_id,
                     'resiko' => $quotation->resiko,
-                    'program_bpjs' => $quotation->program_bpjs, // Tetap di level quotation
-                    // Data BPJS per position
+                    'program_bpjs' => $quotation->program_bpjs,
                     'bpjs_per_position' => $bpjsPerPosition,
                 ];
-
             case 6:
                 return [
                     'aplikasi_pendukung' => $quotation->relationLoaded('quotationAplikasis') ?
@@ -323,7 +326,11 @@ class QuotationStepResource extends JsonResource
                     'quotation_trainings' => $quotation->relationLoaded('quotationTrainings') ?
                         $quotation->quotationTrainings->pluck('training_id')->toArray() : [],
                 ];
+            // Di method getStepSpecificData - case 11:
             case 11:
+                // Gunakan calculated_quotation dari additional_data yang sudah dihitung oleh service
+                $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
+
                 return [
                     'penagihan' => $quotation->penagihan,
                     'quotation_pics' => $quotation->relationLoaded('quotationPics') ?
@@ -337,15 +344,72 @@ class QuotationStepResource extends JsonResource
                                 'is_kuasa' => $pic->is_kuasa,
                             ];
                         })->toArray() : [],
+                    // Data perhitungan dari service
+                    'calculation' => $calculatedQuotation ? [
+                        'hpp' => [
+                            'total_sebelum_management_fee' => $calculatedQuotation->total_sebelum_management_fee,
+                            'nominal_management_fee' => $calculatedQuotation->nominal_management_fee,
+                            'grand_total_sebelum_pajak' => $calculatedQuotation->grand_total_sebelum_pajak,
+                            'ppn' => $calculatedQuotation->ppn,
+                            'pph' => $calculatedQuotation->pph,
+                            'total_invoice' => $calculatedQuotation->total_invoice,
+                            'pembulatan' => $calculatedQuotation->pembulatan,
+                            'margin' => $calculatedQuotation->margin,
+                            'gpm' => $calculatedQuotation->gpm,
+                        ],
+                        'coss' => [
+                            'total_sebelum_management_fee_coss' => $calculatedQuotation->total_sebelum_management_fee_coss,
+                            'nominal_management_fee_coss' => $calculatedQuotation->nominal_management_fee_coss,
+                            'grand_total_sebelum_pajak_coss' => $calculatedQuotation->grand_total_sebelum_pajak_coss,
+                            'ppn_coss' => $calculatedQuotation->ppn_coss,
+                            'pph_coss' => $calculatedQuotation->pph_coss,
+                            'total_invoice_coss' => $calculatedQuotation->total_invoice_coss,
+                            'pembulatan_coss' => $calculatedQuotation->pembulatan_coss,
+                            'margin_coss' => $calculatedQuotation->margin_coss,
+                            'gpm_coss' => $calculatedQuotation->gpm_coss,
+                        ],
+                        'quotation_details' => $calculatedQuotation->quotation_detail->map(function ($detail) {
+                            return [
+                                'id' => $detail->id,
+                                'position_name' => $detail->jabatan_kebutuhan,
+                                'jumlah_hc' => $detail->jumlah_hc,
+                                'nominal_upah' => $detail->nominal_upah,
+                                'total_tunjangan' => $detail->total_tunjangan,
+                                'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+                                'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                                'kompensasi' => $detail->kompensasi,
+                                'lembur' => $detail->lembur,
+                                'total_personil' => $detail->total_personil,
+                                'sub_total_personil' => $detail->sub_total_personil,
+                            ];
+                        })->toArray()
+                    ] : null,
                 ];
-
             case 12:
-                return [
+                $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
+
+                $finalData = [
                     'quotation_kerjasamas' => $quotation->relationLoaded('quotationKerjasamas') ?
                         $quotation->quotationKerjasamas->pluck('perjanjian')->toArray() : [],
                     'final_confirmation' => true,
                 ];
+                if ($calculatedQuotation) {
+                    $finalData['final_calculation'] = [
+                        'total_invoice' => $calculatedQuotation->total_invoice,
+                        'total_invoice_coss' => $calculatedQuotation->total_invoice_coss,
+                        'pembulatan' => $calculatedQuotation->pembulatan,
+                        'pembulatan_coss' => $calculatedQuotation->pembulatan_coss,
+                        'grand_total_sebelum_pajak' => $calculatedQuotation->grand_total_sebelum_pajak,
+                        'grand_total_sebelum_pajak_coss' => $calculatedQuotation->grand_total_sebelum_pajak_coss,
+                        'margin' => $calculatedQuotation->margin,
+                        'margin_coss' => $calculatedQuotation->margin_coss,
+                        'gpm' => $calculatedQuotation->gpm,
+                        'gpm_coss' => $calculatedQuotation->gpm_coss,
+                    ];
+                }
 
+                return $finalData;
             default:
                 return [];
         }
@@ -398,7 +462,7 @@ class QuotationStepResource extends JsonResource
                             ];
                         })->toArray() : [],
                 ];
-
+            // Di method getAdditionalData - case 4:
             case 4:
                 $quotation = $this->resource instanceof Quotation ? $this->resource : $this['quotation'];
 
@@ -443,12 +507,20 @@ class QuotationStepResource extends JsonResource
                     'upah_options' => ['UMP', 'UMK', 'Custom'],
                     'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
                     'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
-                    'lembur_options' => ['Flat', 'Tidak Ada'],
-                    'kompensasi_options' => ['Flat', 'Tidak Ada'],
-                    'thr_options' => ['Flat', 'Tidak Ada'],
-                    'tunjangan_holiday_options' => ['Flat', 'Tidak Ada'],
+
+                    // ✅ SESUAI DENGAN SERVICE
+                    'lembur_options' => ['Tidak', 'Flat'],
+                    'kompensasi_options' => ['Tidak', 'Diprovisikan'],
+                    'thr_options' => ['Tidak', 'Diprovisikan'],
+                    'tunjangan_holiday_options' => ['Tidak', 'Flat'],
+
+                    // ✅ OPTIONS TAMBAHAN YANG DIGUNAKAN DI SERVICE
+                    'lembur_ditagihkan_options' => ['Tidak Ditagihkan', 'Ditagihkan Terpisah'],
+
+
                     'is_ppn_options' => ['Ya', 'Tidak'],
-                    'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'], // Sesuaikan dengan nilai yang ada
+                    'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'],
+
                     'umk_per_site' => $umkPerSite,
                     'ump_per_site' => $umpPerSite,
                     'quotation_details' => $quotation->relationLoaded('quotationDetails') ?
@@ -517,8 +589,21 @@ class QuotationStepResource extends JsonResource
                     'bulan_tahun_options' => ['Bulan', 'Tahun'],
                     'ada_training_options' => ['Ada', 'Tidak Ada'],
                 ];
-
+                
             case 11:
+                // Gunakan additional_data yang sudah dihitung oleh service
+                if (isset($this['additional_data'])) {
+                    $additionalData = $this['additional_data'];
+
+                    // Format data training dan jabatan pic untuk frontend
+                    return array_merge($additionalData, [
+                        'training_list' => $additionalData['training_list'] ?? [],
+                        'jabatan_pic_list' => $additionalData['jabatan_pic_list'] ?? [],
+                        'daftar_tunjangan' => $additionalData['daftar_tunjangan'] ?? [],
+                    ]);
+                }
+
+                // Fallback jika additional_data tidak ada
                 return $this->getCalculationData();
 
             case 12:
