@@ -39,9 +39,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['ada_cuti'] = 'sometimes|string|in:Ada,Tidak Ada';
                 $rules['cuti'] = 'sometimes|array';
                 $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah';
-                $rules['hari_cuti_kematian'] = 'sometimes|integer|min:0';
-                $rules['hari_istri_melahirkan'] = 'sometimes|integer|min:0';
-                $rules['hari_cuti_menikah'] = 'sometimes|integer|min:0';
                 $rules['gaji_saat_cuti'] = 'sometimes|string|in:Full Pay,Prorate';
                 $rules['prorate'] = 'sometimes|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
