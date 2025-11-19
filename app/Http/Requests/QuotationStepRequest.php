@@ -37,10 +37,10 @@ class QuotationStepRequest extends FormRequest
                 $rules['durasi_karyawan'] = 'sometimes|string';
                 $rules['evaluasi_karyawan'] = 'sometimes|string';
                 $rules['ada_cuti'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['cuti'] = 'sometimes|array';
-                $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah';
-                $rules['gaji_saat_cuti'] = 'sometimes|string|in:Full Pay,Prorate';
-                $rules['prorate'] = 'sometimes|integer|min:0';
+                $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
+                $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Tidak Ada';
+                $rules['gaji_saat_cuti'] = 'required_if:ada_cuti,Ada|string|in:No Work No Pay,Prorate';
+                $rules['prorate'] = 'required_if:gaji_saat_cuti,Prorate|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
                 $rules['hari_kerja'] = 'sometimes|string';
                 $rules['jam_kerja'] = 'sometimes|string';
