@@ -80,11 +80,8 @@ class QuotationStepResource extends JsonResource
                 return [
                     'jenis_kontrak' => $quotation->jenis_kontrak,
                     'mulai_kontrak' => $quotation->mulai_kontrak,
-                    'mulai_kontrak_formatted' => $quotation->mulai_kontrak ? Carbon::parse($quotation->mulai_kontrak)->isoFormat('D MMMM Y') : null,
                     'kontrak_selesai' => $quotation->kontrak_selesai,
-                    'kontrak_selesai_formatted' => $quotation->kontrak_selesai ? Carbon::parse($quotation->kontrak_selesai)->isoFormat('D MMMM Y') : null,
-                    'tgl_penempatan' => $quotation->tgl_penempatan,
-                    'tgl_penempatan_formatted' => $quotation->tgl_penempatan ? Carbon::parse($quotation->tgl_penempatan)->isoFormat('D MMMM Y') : null,
+                    'tgl_penempatan' => $quotation->tgl_penempatan ? Carbon::parse($quotation->tgl_penempatan)->isoFormat('Y-MM-DD') : null,
                     'top' => $quotation->top,
                     'salary_rule_id' => $quotation->salary_rule_id,
                     'pembayaran_invoice' => $quotation->pembayaran_invoice,
@@ -333,6 +330,7 @@ class QuotationStepResource extends JsonResource
 
                 return [
                     'penagihan' => $quotation->penagihan,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
                     'quotation_pics' => $quotation->relationLoaded('quotationPics') ?
                         $quotation->quotationPics->map(function ($pic) {
                             return [
@@ -373,15 +371,52 @@ class QuotationStepResource extends JsonResource
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
                                 'jumlah_hc' => $detail->jumlah_hc,
-                                'nominal_upah' => $detail->nominal_upah,
-                                'total_tunjangan' => $detail->total_tunjangan,
-                                'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
-                                'bpjs_kesehatan' => $detail->bpjs_kesehatan,
-                                'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
-                                'kompensasi' => $detail->kompensasi,
-                                'lembur' => $detail->lembur,
-                                'total_personil' => $detail->total_personil,
-                                'sub_total_personil' => $detail->sub_total_personil,
+
+                                // ✅ DATA HPP
+                                'hpp' => [
+                                    'nominal_upah' => $detail->nominal_upah,
+                                    'total_tunjangan' => $detail->total_tunjangan,
+                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                                    'kompensasi' => $detail->kompensasi,
+                                    'lembur' => $detail->lembur,
+                                    'nominal_takaful' => $detail->nominal_takaful,
+                                    'tunjangan_holiday' => $detail->tunjangan_holiday,
+                                    'bunga_bank' => $detail->bunga_bank,
+                                    'insentif' => $detail->insentif,
+                                    'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
+                                    'personil_devices' => $detail->personil_devices ?? 0,
+                                    'personil_ohc' => $detail->personil_ohc ?? 0,
+                                    'personil_chemical' => $detail->personil_chemical ?? 0,
+                                    'total_personil' => $detail->total_personil,
+                                    'sub_total_personil' => $detail->sub_total_personil,
+                                    'total_base_manpower' => $detail->total_base_manpower ?? 0,
+                                    'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                                ],
+
+                                // ✅ DATA COSS
+                                'coss' => [
+                                    'nominal_upah' => $detail->nominal_upah, // Sama dengan HPP
+                                    'total_tunjangan' => $detail->total_tunjangan, // Sama dengan HPP
+                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan, // Sama dengan HPP
+                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan, // Sama dengan HPP
+                                    'tunjangan_hari_raya' => $detail->tunjangan_hari_raya, // Sama dengan HPP
+                                    'kompensasi' => $detail->kompensasi, // Sama dengan HPP
+                                    'lembur' => $detail->lembur, // Sama dengan HPP
+                                    'nominal_takaful' => $detail->nominal_takaful, // Sama dengan HPP
+                                    'tunjangan_holiday' => $detail->tunjangan_holiday, // Sama dengan HPP
+                                    'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
+                                    'insentif' => $detail->insentif, // Sama dengan HPP
+                                    'personil_kaporlap' => $detail->personil_kaporlap_coss ?? 0,
+                                    'personil_devices' => $detail->personil_devices_coss ?? 0,
+                                    'personil_ohc' => $detail->personil_ohc_coss ?? 0,
+                                    'personil_chemical' => $detail->personil_chemical_coss ?? 0,
+                                    'total_personil' => $detail->total_personil_coss ?? 0,
+                                    'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
+                                    'total_base_manpower' => $detail->total_base_manpower ?? 0,
+                                    'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                                ]
                             ];
                         })->toArray()
                     ] : null,
@@ -589,7 +624,7 @@ class QuotationStepResource extends JsonResource
                     'bulan_tahun_options' => ['Bulan', 'Tahun'],
                     'ada_training_options' => ['Ada', 'Tidak Ada'],
                 ];
-                
+
             case 11:
                 // Gunakan additional_data yang sudah dihitung oleh service
                 if (isset($this['additional_data'])) {
