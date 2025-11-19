@@ -189,7 +189,6 @@ class QuotationService
         $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
         $detail->insentif = $hpp->insentif ?? 0;
-
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
         $detail->lembur = $wage->lembur ?? "Tidak";
