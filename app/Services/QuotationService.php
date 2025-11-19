@@ -483,19 +483,23 @@ class QuotationService
                 $quotation->{"pph{$suffix}"} += $detail->pph ?? 0;
             }
         });
-
         // Calculate taxes if not set
         if ($quotation->{"ppn{$suffix}"} == 0 || $quotation->{"pph{$suffix}"} == 0) {
             $this->calculateDefaultTaxes($quotation, $suffix);
         }
     }
 
-
     private function calculateDefaultTaxes(&$quotation, $suffix)
     {
-        // GUNAKAN DATA DARI QUOTATION
         $ppnPphDipotong = $quotation->ppn_pph_dipotong ?? "Management Fee";
         $isPpn = $quotation->is_ppn ?? "Tidak";
+
+        $isPpnBoolean = false;
+        if (is_numeric($isPpn)) {
+            $isPpnBoolean = (int) $isPpn === 1;
+        } else {
+            $isPpnBoolean = $isPpn === "Ya";
+        }
 
         $baseAmount = $ppnPphDipotong == "Management Fee"
             ? $quotation->{"nominal_management_fee{$suffix}"}
@@ -503,15 +507,16 @@ class QuotationService
 
         $quotation->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
 
-        if ($quotation->{"ppn{$suffix}"} == 0 && $isPpn == "Ya") {
+        if ($quotation->{"ppn{$suffix}"} == 0 && $isPpnBoolean) {
             $quotation->{"ppn{$suffix}"} = $quotation->{"dpp{$suffix}"} * 12 / 100;
         }
 
         if ($quotation->{"pph{$suffix}"} == 0) {
             $quotation->{"pph{$suffix}"} = $baseAmount * -2 / 100;
         }
-    }
 
+
+    }
     private function finalizeCalculations(&$quotation, $suffix)
     {
         $quotation->{"total_invoice{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} +
