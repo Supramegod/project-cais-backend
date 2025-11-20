@@ -699,17 +699,43 @@ class QuotationStepService
 
     public function updateStep12(Quotation $quotation, Request $request): void
     {
-        $statusData = $this->calculateFinalStatus($quotation);
+        DB::beginTransaction();
+        try {
+            $currentDateTime = Carbon::now();
+            $user = Auth::user()->full_name;
 
-        $quotation->update(array_merge([
-            'step' => 100,
-            'updated_by' => Auth::user()->full_name
-        ], $statusData));
+            $statusData = $this->calculateFinalStatus($quotation);
 
-        // Insert requirements jika belum ada
-        $this->insertRequirements($quotation);
+            // Update quotation status
+            $quotation->update(array_merge([
+                'step' => 100,
+                'updated_by' => $user
+            ], $statusData));
+
+            // Update kerjasama data - menggunakan pendekatan pengecekan seperti training
+            $this->updateKerjasamaData($quotation, $request, $currentDateTime);
+
+            // Insert requirements jika belum ada
+            $this->insertRequirements($quotation);
+
+            DB::commit();
+
+            \Log::info("Step 12 completed successfully", [
+                'quotation_id' => $quotation->id,
+                'final_status' => $statusData,
+                'step' => 100
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep12", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
-
     // ============================
     // HELPER METHODS
     // ============================
@@ -1317,232 +1343,104 @@ class QuotationStepService
 
         return (bool) $value;
     }
+
     /**
-     * Method untuk sync single chemical - TANPA quotation_detail_id
+     * Manage quotation kerjasama (create, update, delete) - menggunakan pendekatan pengecekan seperti updateTrainingData
      */
-    private function syncChemicalData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
+    public function updateKerjasamaData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
     {
-        \Log::info("Starting single chemical data sync - WITHOUT DETAIL ID");
+        $user = Auth::user()->full_name;
 
-        // Validasi barang_id
-        if (!$request->has('barang_id')) {
-            \Log::warning("Request missing 'barang_id' field");
-            return;
+        // Jika ada data kerjasama dari request, sync dengan database
+        if ($request->has('quotation_kerjasamas') && is_array($request->quotation_kerjasamas)) {
+            $this->syncKerjasamaData($quotation, $request->quotation_kerjasamas, $currentDateTime, $user);
         }
-
-        $barang_id = (int) $request->barang_id;
-        $jumlah = (int) ($request->jumlah ?? 0);
-
-        // Skip jika jumlah 0
-        if ($jumlah <= 0) {
-            \Log::info("Skipping chemical with zero quantity", [
-                'barang_id' => $barang_id,
-                'jumlah' => $jumlah
-            ]);
-            return;
-        }
-
-        // Cari barang
-        $barang = Barang::where('id', $barang_id)
-            ->whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->first();
-
-        if (!$barang) {
-            \Log::warning("Barang not found", ['barang_id' => $barang_id]);
-            return;
-        }
-
-        // Parse data
-        $masa_pakai = $request->masa_pakai ? (int) $request->masa_pakai : ($barang->masa_pakai ?? 12);
-
-        $harga = $barang->harga;
-        if ($request->has('harga')) {
-            if (is_string($request->harga)) {
-                $harga = (float) str_replace(['.', ','], ['', '.'], $request->harga);
-            } else {
-                $harga = (float) $request->harga;
-            }
-        }
-
-        // Cari data existing - TANPA quotation_detail_id
-        $existingChemical = QuotationChemical::where('quotation_id', $quotation->id)
-            ->where('barang_id', $barang_id)
-            ->whereNull('quotation_detail_id') // Hanya cari yang global
-            ->first();
-
-        if ($existingChemical) {
-            // UPDATE data existing
-            $existingChemical->update([
-                'jumlah' => $jumlah,
-                'harga' => $harga,
-                'masa_pakai' => $masa_pakai,
-                'updated_by' => Auth::user()->full_name
-            ]);
-
-            \Log::info("Updated existing chemical", [
-                'chemical_id' => $existingChemical->id,
-                'barang_id' => $barang_id,
-                'jumlah' => $jumlah
-            ]);
-        } else {
-            // CREATE data baru - TANPA quotation_detail_id
-            $newChemical = QuotationChemical::create([
-                'quotation_id' => $quotation->id,
-                'barang_id' => $barang_id,
-                'jumlah' => $jumlah,
-                'harga' => $harga,
-                'nama' => $barang->nama,
-                'jenis_barang_id' => $barang->jenis_barang_id,
-                'jenis_barang' => $barang->jenis_barang,
-                'masa_pakai' => $masa_pakai,
-                'created_by' => Auth::user()->full_name
-                // TIDAK ADA quotation_detail_id
-            ]);
-
-            \Log::info("Created new chemical", [
-                'chemical_id' => $newChemical->id,
-                'barang_id' => $barang_id,
-                'barang_nama' => $barang->nama,
-                'jumlah' => $jumlah
-            ]);
+        // Jika tidak ada data kerjasama di request, hapus semua yang existing (soft delete)
+        else {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
         }
     }
 
     /**
-     * Method untuk sync multiple chemicals - TANPA quotation_detail_id
+     * Sync kerjasama data - mirip dengan updateTrainingData
      */
-    private function syncMultipleChemicalData(Quotation $quotation, array $chemicals, Carbon $currentDateTime): void
+    private function syncKerjasamaData(Quotation $quotation, array $kerjasamas, Carbon $currentDateTime, string $user): void
     {
-        \Log::info("Starting multiple chemical data sync - FIXED UPDATE/INSERT", [
-            'chemicals_count' => count($chemicals),
-            'quotation_id' => $quotation->id
+        \Log::info("Starting kerjasama data sync", [
+            'quotation_id' => $quotation->id,
+            'kerjasamas_count' => count($kerjasamas)
         ]);
-        $chemicalBarangIds = collect($chemicals)->pluck('barang_id')->filter()->toArray();
 
-        // Soft delete data yang tidak lagi dikirim
-        QuotationChemical::where('quotation_id', $quotation->id)
-            ->whereNotIn('barang_id', $chemicalBarangIds)
-            ->update([
-                'deleted_at' => now(),
-                'deleted_by' => Auth::user()->full_name,
-            ]);
+        // Get existing kerjasama IDs untuk quotation ini
+        $existingKerjasamaIds = QuotationKerjasama::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->pluck('id')
+            ->toArray();
 
+        $incomingKerjasamaIds = [];
         $createdCount = 0;
         $updatedCount = 0;
-        $skippedCount = 0;
+        $deletedCount = 0;
 
-        foreach ($chemicals as $index => $chemicalData) {
-            \Log::debug("Processing chemical #{$index}", $chemicalData);
-
-            // Validasi data minimal
-            if (!isset($chemicalData['barang_id']) || !isset($chemicalData['jumlah'])) {
-                \Log::warning("Chemical data missing required fields", [
-                    'index' => $index,
-                    'data' => $chemicalData
-                ]);
-                $skippedCount++;
+        foreach ($kerjasamas as $kerjasamaData) {
+            // Skip jika perjanjian kosong
+            if (empty(trim($kerjasamaData['perjanjian'] ?? ''))) {
                 continue;
             }
 
-            $barang_id = (int) $chemicalData['barang_id'];
-            $jumlah = isset($chemicalData['jumlah']) ? (int) $chemicalData['jumlah'] : 0;
+            $kerjasamaId = $kerjasamaData['id'] ?? null;
+            $perjanjian = trim($kerjasamaData['perjanjian']);
+            $isDelete = $kerjasamaData['is_delete'] ?? 1;
 
-            // Skip jika jumlah 0 atau negatif
-            if ($jumlah <= 0) {
-                \Log::info("Skipping chemical with zero/negative quantity", [
-                    'barang_id' => $barang_id,
-                    'jumlah' => $jumlah
-                ]);
-                $skippedCount++;
-                continue;
-            }
-
-            // Cari barang
-            $barang = Barang::where('id', $barang_id)
-                ->whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-                ->first();
-
-            if (!$barang) {
-                \Log::warning("Barang not found", [
-                    'barang_id' => $barang_id,
-                    'chemical_index' => $index
-                ]);
-                $skippedCount++;
-                continue;
-            }
-
-            // Parse data
-            $masa_pakai = isset($chemicalData['masa_pakai']) ? (int) $chemicalData['masa_pakai'] : ($barang->masa_pakai ?? 12);
-
-            // Handle harga
-            $harga = $barang->harga;
-            if (isset($chemicalData['harga'])) {
-                if (is_string($chemicalData['harga'])) {
-                    $harga = (float) str_replace(['.', ','], ['', '.'], $chemicalData['harga']);
-                } else {
-                    $harga = (float) $chemicalData['harga'];
+            // Jika ada ID, update existing
+            if ($kerjasamaId && in_array($kerjasamaId, $existingKerjasamaIds)) {
+                $kerjasama = QuotationKerjasama::find($kerjasamaId);
+                if ($kerjasama) {
+                    $kerjasama->update([
+                        'perjanjian' => $perjanjian,
+                        'is_delete' => $isDelete,
+                        'updated_at' => $currentDateTime,
+                        'updated_by' => $user
+                    ]);
+                    $updatedCount++;
                 }
+
+                $incomingKerjasamaIds[] = $kerjasamaId;
             }
-
-            // **FIX: Cari data existing dengan query yang lebih spesifik**
-            $existingChemical = QuotationChemical::where('quotation_id', $quotation->id)
-                ->where('barang_id', $barang_id)
-                ->first();
-
-            \Log::debug("Existing chemical search", [
-                'quotation_id' => $quotation->id,
-                'barang_id' => $barang_id,
-                'found' => $existingChemical ? true : false,
-                'existing_id' => $existingChemical ? $existingChemical->id : null
-            ]);
-
-            if ($existingChemical) {
-                // UPDATE data existing
-                $existingChemical->update([
-                    'jumlah' => $jumlah,
-                    'harga' => $harga,
-                    'masa_pakai' => $masa_pakai,
-                    'updated_by' => Auth::user()->full_name
-                ]);
-                $updatedCount++;
-
-                \Log::info("Updated existing chemical", [
-                    'chemical_id' => $existingChemical->id,
-                    'barang_id' => $barang_id,
-                    'jumlah' => $jumlah,
-                    'harga' => $harga
-                ]);
-            } else {
-                // CREATE data baru
-                $newChemical = QuotationChemical::create([
+            // Jika tidak ada ID, create baru
+            else {
+                QuotationKerjasama::create([
                     'quotation_id' => $quotation->id,
-                    'barang_id' => $barang_id,
-                    'jumlah' => $jumlah,
-                    'harga' => $harga,
-                    'nama' => $barang->nama,
-                    'jenis_barang_id' => $barang->jenis_barang_id,
-                    'jenis_barang' => $barang->jenis_barang,
-                    'masa_pakai' => $masa_pakai,
-                    'created_by' => Auth::user()->full_name
+                    'perjanjian' => $perjanjian,
+                    'is_delete' => $isDelete,
+                    'created_at' => $currentDateTime,
+                    'created_by' => $user
                 ]);
                 $createdCount++;
-
-                \Log::info("Created new chemical", [
-                    'chemical_id' => $newChemical->id,
-                    'barang_id' => $barang_id,
-                    'barang_nama' => $barang->nama,
-                    'jumlah' => $jumlah,
-                    'harga' => $harga
-                ]);
             }
         }
 
-        \Log::info("Multiple chemical sync completed - FIXED UPDATE/INSERT", [
+        // Soft delete kerjasama yang tidak ada dalam incoming data tapi masih ada di database
+        $toDeleteIds = array_diff($existingKerjasamaIds, $incomingKerjasamaIds);
+        if (!empty($toDeleteIds)) {
+            QuotationKerjasama::whereIn('id', $toDeleteIds)
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+            $deletedCount = count($toDeleteIds);
+        }
+
+        \Log::info("Kerjasama data sync completed", [
             'quotation_id' => $quotation->id,
-            'total_processed' => count($chemicals),
             'created' => $createdCount,
             'updated' => $updatedCount,
-            'skipped' => $skippedCount
+            'deleted' => $deletedCount
         ]);
     }
 }

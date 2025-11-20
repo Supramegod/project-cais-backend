@@ -25,6 +25,7 @@ class QuotationStepRequest extends FormRequest
                 break;
 
             case 2:
+            case 2:
                 $rules['mulai_kontrak'] = 'required|date';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
                 $rules['tgl_penempatan'] = 'required|date';
@@ -39,11 +40,12 @@ class QuotationStepRequest extends FormRequest
                 $rules['ada_cuti'] = 'sometimes|string|in:Ada,Tidak Ada';
                 $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
                 $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Cuti Roster,Tidak Ada';
-                $rules['gaji_saat_cuti'] = 'required_if:cuti,Cuti Melahirkan|string|in:No Work No Pay,Prorate';
+                $rules['gaji_saat_cuti'] = 'required_if:ada_cuti,Ada|string|in:No Work No Pay,Prorate';
                 $rules['prorate'] = 'required_if:gaji_saat_cuti,Prorate|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
                 $rules['hari_kerja'] = 'sometimes|string';
                 $rules['jam_kerja'] = 'sometimes|string';
+                break;
                 break;
             case 3:
                 $rules['headCountData'] = 'sometimes|array';
@@ -162,25 +164,30 @@ class QuotationStepRequest extends FormRequest
         ];
     }
 
-    public function withValidator($validator)
-    {
-        $validator->after(function ($validator) {
-            $step = $this->route('step');
+public function withValidator($validator)
+{
+    $validator->after(function ($validator) {
+        $step = $this->route('step');
 
-            // Validasi custom untuk step 2
-            if ($step == 2) {
-                if ($this->mulai_kontrak && $this->kontrak_selesai) {
-                    if ($this->mulai_kontrak > $this->kontrak_selesai) {
-                        $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
-                    }
-                    if ($this->tgl_penempatan < $this->mulai_kontrak) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
-                    }
-                    if ($this->tgl_penempatan > $this->kontrak_selesai) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
-                    }
+        // Validasi custom untuk step 2
+        if ($step == 2) {
+            if ($this->mulai_kontrak && $this->kontrak_selesai) {
+                if ($this->mulai_kontrak > $this->kontrak_selesai) {
+                    $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
+                }
+                if ($this->tgl_penempatan < $this->mulai_kontrak) {
+                    $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
+                }
+                if ($this->tgl_penempatan > $this->kontrak_selesai) {
+                    $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
                 }
             }
-        });
-    }
+
+            // Validasi tambahan untuk memastikan gaji_saat_cuti diisi jika ada cuti
+            if ($this->ada_cuti === 'Ada' && empty($this->gaji_saat_cuti)) {
+                $validator->errors()->add('gaji_saat_cuti', 'Gaji saat cuti harus diisi ketika memilih ada cuti.');
+            }
+        }
+    });
+}
 }
