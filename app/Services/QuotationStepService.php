@@ -254,7 +254,7 @@ class QuotationStepService
 
             case 10:
                 $data['additional_data']['jenis_barang_list'] = JenisBarang::whereIn('id', [6, 7, 8])->get();
-
+                $data['additional_data']['training_list'] = Training::all();
                 $data['additional_data']['ohc_list'] = Barang::whereIn('jenis_barang_id', [6, 7, 8])
                     ->ordered()
                     ->get()

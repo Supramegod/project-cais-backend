@@ -23,8 +23,6 @@ class QuotationStepRequest extends FormRequest
             case 1:
                 $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
                 break;
-
-            case 2:
             case 2:
                 $rules['mulai_kontrak'] = 'required|date';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
@@ -37,7 +35,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['durasi_kerjasama'] = 'sometimes|string';
                 $rules['durasi_karyawan'] = 'sometimes|string';
                 $rules['evaluasi_karyawan'] = 'sometimes|string';
-                $rules['ada_cuti'] = 'sometimes|string|in:Ada,Tidak Ada';
+                $rules['ada_cuti'] = 'required|string|in:Ada,Tidak Ada';
                 $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
                 $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Cuti Roster,Tidak Ada';
                 $rules['gaji_saat_cuti'] = 'required_if:ada_cuti,Ada|string|in:No Work No Pay,Prorate';
@@ -46,7 +44,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['hari_kerja'] = 'sometimes|string';
                 $rules['jam_kerja'] = 'sometimes|string';
                 break;
-                break;
             case 3:
                 $rules['headCountData'] = 'sometimes|array';
                 $rules['headCountData.*.quotation_site_id'] = 'sometimes|required|integer';
@@ -54,7 +51,6 @@ class QuotationStepRequest extends FormRequest
                 $rules['headCountData.*.jumlah_hc'] = 'sometimes|required|integer|min:1';
                 $rules['headCountData.*.jabatan_kebutuhan'] = 'sometimes|required|string';
                 $rules['headCountData.*.nama_site'] = 'sometimes|required|string';
-
                 break;
 
             case 4:
@@ -143,51 +139,136 @@ class QuotationStepRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'mulai_kontrak.required' => 'Mulai Kontrak harus diisi',
-            'kontrak_selesai.required' => 'Kontrak Selesai harus diisi',
-            'kontrak_selesai.after_or_equal' => 'Kontrak Selesai harus setelah atau sama dengan Mulai Kontrak',
-            'tgl_penempatan.required' => 'Tanggal Penempatan harus diisi',
+            // Step 1 Messages
+            'jenis_kontrak.required' => 'Jenis kontrak harus diisi',
+            'jenis_kontrak.string' => 'Jenis kontrak harus berupa teks',
+            'jenis_kontrak.in' => 'Jenis kontrak harus salah satu dari: Reguler, Event Gaji Harian, PKHL, Borongan',
+
+            // Step 2 Messages
+            'mulai_kontrak.required' => 'Mulai kontrak harus diisi',
+            'mulai_kontrak.date' => 'Mulai kontrak harus berupa tanggal yang valid',
+            'kontrak_selesai.required' => 'Kontrak selesai harus diisi',
+            'kontrak_selesai.date' => 'Kontrak selesai harus berupa tanggal yang valid',
+            'kontrak_selesai.after_or_equal' => 'Kontrak selesai harus setelah atau sama dengan mulai kontrak',
+            'tgl_penempatan.required' => 'Tanggal penempatan harus diisi',
+            'tgl_penempatan.date' => 'Tanggal penempatan harus berupa tanggal yang valid',
             'top.required' => 'TOP harus diisi',
-            'salary_rule.required' => 'Salary Rule harus diisi',
-            'salary_rule.exists' => 'Salary Rule tidak valid',
-            'upah.required' => 'Jenis upah harus dipilih',
-            'manajemen_fee.required' => 'Manajemen Fee harus dipilih',
-            'manajemen_fee.exists' => 'Manajemen Fee tidak valid',
-            'persentase.required' => 'Persentase harus diisi',
-            'persentase.numeric' => 'Persentase harus berupa angka',
-            'persentase.min' => 'Persentase tidak boleh kurang dari 0',
-            'custom-upah.required_if' => 'Nominal upah custom harus diisi',
+            'salary_rule.required' => 'Salary rule harus diisi',
+            'salary_rule.exists' => 'Salary rule tidak valid',
+            'ada_cuti.required' => 'Status cuti harus dipilih',
+            'ada_cuti.in' => 'Status cuti harus Ada atau Tidak Ada',
+            'cuti.required_if' => 'Jenis cuti harus dipilih ketika memilih ada cuti',
+            'cuti.array' => 'Jenis cuti harus berupa array',
+            'cuti.*.in' => 'Jenis cuti tidak valid',
+            'gaji_saat_cuti.required_if' => 'Gaji saat cuti harus diisi ketika memilih ada cuti',
+            'gaji_saat_cuti.in' => 'Gaji saat cuti harus salah satu dari: No Work No Pay, Prorate',
+            'prorate.required_if' => 'Prorate harus diisi ketika memilih gaji saat cuti Prorate',
+            'prorate.integer' => 'Prorate harus berupa angka',
+            'prorate.min' => 'Prorate tidak boleh kurang dari 0',
+
+            // Step 3 Messages
+            'headCountData.*.quotation_site_id.required' => 'Site ID harus diisi',
+            'headCountData.*.quotation_site_id.integer' => 'Site ID harus berupa angka',
+            'headCountData.*.position_id.required' => 'Position ID harus diisi',
+            'headCountData.*.position_id.integer' => 'Position ID harus berupa angka',
+            'headCountData.*.jumlah_hc.required' => 'Jumlah HC harus diisi',
+            'headCountData.*.jumlah_hc.integer' => 'Jumlah HC harus berupa angka',
+            'headCountData.*.jumlah_hc.min' => 'Jumlah HC minimal 1',
+            'headCountData.*.jabatan_kebutuhan.required' => 'Jabatan kebutuhan harus diisi',
+            'headCountData.*.jabatan_kebutuhan.string' => 'Jabatan kebutuhan harus berupa teks',
+            'headCountData.*.nama_site.required' => 'Nama site harus diisi',
+            'headCountData.*.nama_site.string' => 'Nama site harus berupa teks',
+
+            // Step 4 Messages
+            'position_data.required' => 'Data posisi harus diisi',
+            'position_data.array' => 'Data posisi harus berupa array',
+            'position_data.*.quotation_detail_id.required' => 'Quotation detail ID harus diisi',
+            'position_data.*.quotation_detail_id.exists' => 'Quotation detail ID tidak valid',
+            'position_data.*.upah.required' => 'Jenis upah harus dipilih',
+            'position_data.*.upah.in' => 'Jenis upah harus salah satu dari: UMP, UMK, Custom',
+            'position_data.*.manajemen_fee.required' => 'Manajemen fee harus dipilih',
+            'position_data.*.manajemen_fee.exists' => 'Manajemen fee tidak valid',
+            'position_data.*.persentase.required' => 'Persentase harus diisi',
+            'position_data.*.persentase.numeric' => 'Persentase harus berupa angka',
+            'position_data.*.persentase.min' => 'Persentase tidak boleh kurang dari 0',
+            'position_data.*.persentase.max' => 'Persentase tidak boleh lebih dari 100',
+            'position_data.*.hitungan_upah.required_if' => 'Hitungan upah harus diisi ketika memilih upah custom',
+            'position_data.*.hitungan_upah.in' => 'Hitungan upah harus salah satu dari: Per Bulan, Per Hari, Per Jam',
+            'position_data.*.custom_upah.required_if' => 'Nominal upah custom harus diisi ketika memilih upah custom',
+
+            // Step 5 Messages
             'jenis-perusahaan.required' => 'Jenis perusahaan harus dipilih',
+            'jenis-perusahaan.exists' => 'Jenis perusahaan tidak valid',
             'bidang-perusahaan.required' => 'Bidang perusahaan harus dipilih',
+            'bidang-perusahaan.exists' => 'Bidang perusahaan tidak valid',
             'resiko.required' => 'Resiko harus diisi',
             'program-bpjs.required' => 'Program BPJS harus diisi',
+
+            // Step 6 Messages
+            'aplikasi_pendukung.*.exists' => 'Aplikasi pendukung tidak valid',
+
+            // Step 9 Messages
+            'barang_id.required_without' => 'Barang ID harus diisi',
+            'barang_id.exists' => 'Barang tidak valid',
+            'jumlah.required_without' => 'Jumlah harus diisi',
+            'jumlah.integer' => 'Jumlah harus berupa angka',
+            'jumlah.min' => 'Jumlah tidak boleh kurang dari 0',
+            'masa_pakai.integer' => 'Masa pakai harus berupa angka',
+            'masa_pakai.min' => 'Masa pakai minimal 1',
+            'harga.numeric' => 'Harga harus berupa angka',
+            'harga.min' => 'Harga tidak boleh kurang dari 0',
+            'chemicals.*.barang_id.required_with' => 'Barang ID harus diisi',
+            'chemicals.*.barang_id.exists' => 'Barang tidak valid',
+            'chemicals.*.jumlah.required_with' => 'Jumlah harus diisi',
+            'chemicals.*.jumlah.integer' => 'Jumlah harus berupa angka',
+            'chemicals.*.jumlah.min' => 'Jumlah tidak boleh kurang dari 0',
+
+            // Step 10 Messages
+            'jumlah_kunjungan_operasional.required' => 'Jumlah kunjungan operasional harus diisi',
+            'jumlah_kunjungan_operasional.integer' => 'Jumlah kunjungan operasional harus berupa angka',
+            'jumlah_kunjungan_operasional.min' => 'Jumlah kunjungan operasional tidak boleh kurang dari 0',
+            'bulan_tahun_kunjungan_operasional.required' => 'Periode kunjungan operasional harus dipilih',
+            'bulan_tahun_kunjungan_operasional.in' => 'Periode kunjungan operasional harus Bulan atau Tahun',
+            'jumlah_kunjungan_tim_crm.required' => 'Jumlah kunjungan tim CRM harus diisi',
+            'jumlah_kunjungan_tim_crm.integer' => 'Jumlah kunjungan tim CRM harus berupa angka',
+            'jumlah_kunjungan_tim_crm.min' => 'Jumlah kunjungan tim CRM tidak boleh kurang dari 0',
+            'bulan_tahun_kunjungan_tim_crm.required' => 'Periode kunjungan tim CRM harus dipilih',
+            'bulan_tahun_kunjungan_tim_crm.in' => 'Periode kunjungan tim CRM harus Bulan atau Tahun',
+
+            // Step 11 Messages
+            'penagihan.required' => 'Metode penagihan harus diisi',
         ];
     }
 
-public function withValidator($validator)
-{
-    $validator->after(function ($validator) {
-        $step = $this->route('step');
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            $step = $this->route('step');
 
-        // Validasi custom untuk step 2
-        if ($step == 2) {
-            if ($this->mulai_kontrak && $this->kontrak_selesai) {
-                if ($this->mulai_kontrak > $this->kontrak_selesai) {
-                    $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
+            // Validasi custom untuk step 2
+            if ($step == 2) {
+                if ($this->mulai_kontrak && $this->kontrak_selesai) {
+                    if ($this->mulai_kontrak > $this->kontrak_selesai) {
+                        $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
+                    }
+                    if ($this->tgl_penempatan < $this->mulai_kontrak) {
+                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
+                    }
+                    if ($this->tgl_penempatan > $this->kontrak_selesai) {
+                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+                    }
                 }
-                if ($this->tgl_penempatan < $this->mulai_kontrak) {
-                    $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
-                }
-                if ($this->tgl_penempatan > $this->kontrak_selesai) {
-                    $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+
+                // Validasi khusus: gaji_saat_cuti hanya wajib jika ada Cuti Melahirkan
+                if (
+                    $this->ada_cuti === 'Ada' &&
+                    is_array($this->cuti) &&
+                    in_array('Cuti Melahirkan', $this->cuti) &&
+                    empty($this->gaji_saat_cuti)
+                ) {
+                    $validator->errors()->add('gaji_saat_cuti', 'Gaji saat cuti harus diisi ketika memilih Cuti Melahirkan.');
                 }
             }
-
-            // Validasi tambahan untuk memastikan gaji_saat_cuti diisi jika ada cuti
-            if ($this->ada_cuti === 'Ada' && empty($this->gaji_saat_cuti)) {
-                $validator->errors()->add('gaji_saat_cuti', 'Gaji saat cuti harus diisi ketika memilih ada cuti.');
-            }
-        }
-    });
-}
+        });
+    }
 }
