@@ -18,6 +18,7 @@ use App\Models\{
     User
 };
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class QuotationService
@@ -67,17 +68,17 @@ class QuotationService
                 'quotation_id' => $detail->quotation_id,
                 'upah' => null,
                 'hitungan_upah' => null,
-                'lembur' => 'Tidak',
+                'lembur' => 'Tidak Ada',
                 'nominal_lembur' => 0,
                 'jenis_bayar_lembur' => null,
                 'jam_per_bulan_lembur' => 0,
                 'lembur_ditagihkan' => 'Tidak Ditagihkan',
-                'kompensasi' => 'Tidak',
-                'thr' => 'Tidak',
-                'tunjangan_holiday' => 'Tidak',
+                'kompensasi' => 'Tidak Ada',
+                'thr' => 'Tidak Ada',
+                'tunjangan_holiday' => 'Tidak Ada',
                 'nominal_tunjangan_holiday' => 0,
                 'jenis_bayar_tunjangan_holiday' => null,
-                'created_by' => 'system-auto'
+                'created_by' => Auth::user()->full_name,
             ]);
 
             // Reload the relation
