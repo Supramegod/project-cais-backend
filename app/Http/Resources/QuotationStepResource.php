@@ -84,7 +84,7 @@ class QuotationStepResource extends JsonResource
                     'tgl_penempatan' => $quotation->tgl_penempatan ? Carbon::parse($quotation->tgl_penempatan)->isoFormat('Y-MM-DD') : null,
                     'top' => $quotation->top,
                     'salary_rule_id' => $quotation->salary_rule_id,
-                    'pembayaran_invoice' => $quotation->pembayaran_invoice,
+                    'pengiriman_invoice' => $quotation->pengiriman_invoice,
                     'jumlah_hari_invoice' => $quotation->jumlah_hari_invoice,
                     'tipe_hari_invoice' => $quotation->tipe_hari_invoice,
                     'evaluasi_kontrak' => $quotation->evaluasi_kontrak,
@@ -476,7 +476,7 @@ class QuotationStepResource extends JsonResource
                 return [
                     'salary_rules' => SalaryRule::all(),
                     'top_list' => Top::orderBy('nama', 'asc')->get(),
-                    'pembayaran_invoice' => Quotation::distinct()->pluck('pembayaran_invoice'),
+                    'pengiriman_invoice' => Quotation::distinct()->pluck('pengiriman_invoice'),
 
                 ];
 

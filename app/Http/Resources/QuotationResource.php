@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\SalaryRule;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
 
@@ -26,6 +27,7 @@ class QuotationResource extends JsonResource
             'revisi' => $this->revisi,
             'alasan_revisi' => $this->alasan_revisi,
             'quotation_asal_id' => $this->quotation_asal_id,
+            'pengiriman_invoice' => $this->pengiriman_invoice,
 
             // Contract details
             'jenis_kontrak' => $this->jenis_kontrak,
@@ -128,6 +130,7 @@ class QuotationResource extends JsonResource
                     'nama' => $this->statusQuotation->nama,
                 ];
             }),
+            'salary_rule' => SalaryRule::find($this->salary_rule_id),
 
             'quotation_sites' => $this->whenLoaded('quotationSites', function () {
                 return $this->quotationSites->map(function ($site) {
