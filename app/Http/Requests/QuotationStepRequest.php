@@ -54,15 +54,24 @@ class QuotationStepRequest extends FormRequest
                 break;
 
             case 4:
-                $rules['position_data'] = 'required|array';
-                $rules['position_data.*.quotation_detail_id'] = 'required|exists:sl_quotation_detail,id';
-                $rules['position_data.*.upah'] = 'required|string|in:UMP,UMK,Custom';
-                $rules['position_data.*.manajemen_fee'] = 'required|exists:m_management_fee,id';
-                $rules['position_data.*.persentase'] = 'required|numeric|min:0|max:100';
+                // ============================================================
+                // RULES FOR GLOBAL DATA (optional - bisa dikirim terpisah)
+                // ============================================================
+                $rules['is_ppn'] = 'sometimes|string';
+                $rules['ppn_pph_dipotong'] = 'sometimes|string';
+                $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
+                $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
+
+                // ============================================================
+                // RULES FOR POSITION DATA (optional - bisa dikirim terpisah)
+                // ============================================================
+                $rules['position_data'] = 'sometimes|array';
+                $rules['position_data.*.quotation_detail_id'] = 'required_with:position_data|exists:sl_quotation_detail,id';
+                $rules['position_data.*.upah'] = 'required_with:position_data|string|in:UMP,UMK,Custom';
                 $rules['position_data.*.hitungan_upah'] = 'required_if:position_data.*.upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
                 $rules['position_data.*.custom_upah'] = 'required_if:position_data.*.upah,Custom|string';
 
-                // Field yang sekarang bertipe string
+                // Field untuk wage data
                 $rules['position_data.*.lembur'] = 'sometimes|string';
                 $rules['position_data.*.nominal_lembur'] = 'sometimes|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_lembur'] = 'sometimes|string';
@@ -73,9 +82,11 @@ class QuotationStepRequest extends FormRequest
                 $rules['position_data.*.tunjangan_holiday'] = 'sometimes|string';
                 $rules['position_data.*.nominal_tunjangan_holiday'] = 'sometimes|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|string';
-                $rules['position_data.*.is_ppn'] = 'sometimes|string';
-                $rules['position_data.*.ppn_pph_dipotong'] = 'sometimes|string';
+
+                // HAPUS RULES UNTUK DATA GLOBAL DARI POSITION_DATA
+                // (karena sudah dipindah ke level atas)
                 break;
+
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
                 $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
@@ -179,19 +190,19 @@ class QuotationStepRequest extends FormRequest
             'headCountData.*.nama_site.required' => 'Nama site harus diisi',
             'headCountData.*.nama_site.string' => 'Nama site harus berupa teks',
 
-            // Step 4 Messages
-            'position_data.required' => 'Data posisi harus diisi',
-            'position_data.array' => 'Data posisi harus berupa array',
-            'position_data.*.quotation_detail_id.required' => 'Quotation detail ID harus diisi',
+            // Step 4 Messages - GLOBAL DATA
+            'is_ppn.string' => 'Status PPN harus berupa teks',
+            'ppn_pph_dipotong.string' => 'PPN PPH dipotong harus berupa teks',
+            'management_fee_id.exists' => 'Management fee tidak valid',
+            'persentase.numeric' => 'Persentase harus berupa angka',
+            'persentase.min' => 'Persentase tidak boleh kurang dari 0',
+            'persentase.max' => 'Persentase tidak boleh lebih dari 100',
+
+            // Step 4 Messages - POSITION DATA
+            'position_data.*.quotation_detail_id.required_with' => 'Quotation detail ID harus diisi',
             'position_data.*.quotation_detail_id.exists' => 'Quotation detail ID tidak valid',
-            'position_data.*.upah.required' => 'Jenis upah harus dipilih',
+            'position_data.*.upah.required_with' => 'Jenis upah harus dipilih',
             'position_data.*.upah.in' => 'Jenis upah harus salah satu dari: UMP, UMK, Custom',
-            'position_data.*.manajemen_fee.required' => 'Manajemen fee harus dipilih',
-            'position_data.*.manajemen_fee.exists' => 'Manajemen fee tidak valid',
-            'position_data.*.persentase.required' => 'Persentase harus diisi',
-            'position_data.*.persentase.numeric' => 'Persentase harus berupa angka',
-            'position_data.*.persentase.min' => 'Persentase tidak boleh kurang dari 0',
-            'position_data.*.persentase.max' => 'Persentase tidak boleh lebih dari 100',
             'position_data.*.hitungan_upah.required_if' => 'Hitungan upah harus diisi ketika memilih upah custom',
             'position_data.*.hitungan_upah.in' => 'Hitungan upah harus salah satu dari: Per Bulan, Per Hari, Per Jam',
             'position_data.*.custom_upah.required_if' => 'Nominal upah custom harus diisi ketika memilih upah custom',
@@ -268,6 +279,40 @@ class QuotationStepRequest extends FormRequest
                     $validator->errors()->add('gaji_saat_cuti', 'Gaji saat cuti harus diisi ketika memilih Cuti Melahirkan.');
                 }
             }
+
+            // Validasi custom untuk step 4 - minimal satu data harus dikirim
+            if ($step == 4) {
+                $hasGlobalData = $this->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase']);
+                $hasPositionData = $this->has('position_data') && !empty($this->position_data);
+
+                if (!$hasGlobalData && !$hasPositionData) {
+                    $validator->errors()->add('base', 'Minimal satu data (global data atau position data) harus dikirim untuk step 4.');
+                }
+            }
         });
+    }
+
+    /**
+     * Prepare the data for validation.
+     * Untuk handle field dengan nama yang berbeda di frontend vs backend
+     */
+    protected function prepareForValidation()
+    {
+        $step = $this->route('step');
+
+        // Untuk step 4, handle field management_fee_id yang mungkin dikirim sebagai manajemen_fee
+        if ($step == 4 && $this->has('manajemen_fee')) {
+            $this->merge([
+                'management_fee_id' => $this->manajemen_fee
+            ]);
+        }
+
+        // Convert empty strings to null untuk field optional
+        $this->merge([
+            'is_ppn' => $this->is_ppn ?: null,
+            'ppn_pph_dipotong' => $this->ppn_pph_dipotong ?: null,
+            'management_fee_id' => $this->management_fee_id ?: null,
+            'persentase' => $this->persentase ?: null,
+        ]);
     }
 }
