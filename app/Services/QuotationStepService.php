@@ -15,6 +15,7 @@ use App\Models\Position;
 use App\Models\Province;
 use App\Models\Quotation;
 use App\Models\QuotationAplikasi;
+use App\Models\QuotationDetailRequirement;
 use App\Models\QuotationDetailTunjangan;
 use App\Models\QuotationDetailWage;
 use App\Models\QuotationKaporlap;
@@ -404,28 +405,69 @@ class QuotationStepService
     }
     public function updateStep3(Quotation $quotation, Request $request): void
     {
-        // Kalau request kirim banyak data (headCountData)
-        if ($request->has('headCountData') && is_array($request->headCountData)) {
-            $this->syncDetailHCFromArray($quotation, $request->headCountData);
-        }
+        DB::beginTransaction();
+        try {
+            $currentDateTime = Carbon::now()->toDateTimeString();
+            $user = Auth::user()->full_name;
 
-        // Kalau kirim satu data langsung
-        elseif ($request->has('position_id') && $request->has('quotation_site_id')) {
-            $detailData = [
-                [ // bungkus jadi array of array
-                    'quotation_site_id' => $request->quotation_site_id,
-                    'position_id' => $request->position_id,
-                    'jumlah_hc' => $request->jumlah_hc,
-                    'jabatan_kebutuhan' => $request->jabatan_kebutuhan,
-                    'nama_site' => $request->nama_site,
-                    'nominal_upah' => $request->nominal_upah ?? 0,
-                ]
-            ];
+            // ============================================================
+            // DETERMINE DATA TO PROCESS
+            // ============================================================
 
-            $this->syncDetailHCFromArray($quotation, $detailData);
+            $dataToProcess = null;
+
+            // CASE 1: headCountData exists (bulk format)
+            if ($request->has('headCountData') && is_array($request->headCountData)) {
+                $dataToProcess = $request->headCountData;
+            }
+            // CASE 2: Legacy single data format
+            elseif ($request->has('position_id') && $request->has('quotation_site_id')) {
+                $dataToProcess = [
+                    [
+                        'quotation_site_id' => $request->quotation_site_id,
+                        'position_id' => $request->position_id,
+                        'jumlah_hc' => $request->jumlah_hc ?? 0,
+                        'jabatan_kebutuhan' => $request->jabatan_kebutuhan ?? null,
+                        'nama_site' => $request->nama_site ?? null,
+                        'nominal_upah' => $request->nominal_upah ?? 0,
+                    ]
+                ];
+            }
+            // CASE 3: No data sent - will delete all
+            else {
+                $dataToProcess = [];
+            }
+
+            // ============================================================
+            // PROCESS DATA
+            // ============================================================
+
+            if (empty($dataToProcess)) {
+                // Delete all existing details
+                $this->softDeleteAllQuotationDetails($quotation, $currentDateTime, $user);
+            } else {
+                // Sync data (will handle create/update/delete)
+                $this->syncDetailHCFromArray($quotation, $dataToProcess, $currentDateTime, $user);
+            }
+
+            // Update quotation timestamp
+            $quotation->update([
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ]);
+
+            DB::commit();
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep3", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
-
     public function updateStep4(Quotation $quotation, Request $request): void
     {
 
@@ -1034,190 +1076,226 @@ class QuotationStepService
             }
         }
     }
-    public function syncDetailHCFromArray(Quotation $quotation, array $details)
+    /**
+     * Sync HC details with composite key checking (position_id + quotation_site_id)
+     */
+    public function syncDetailHCFromArray(Quotation $quotation, array $details, string $timestamp, string $user): void
     {
         try {
-            DB::beginTransaction();
+            \Log::info("Starting syncDetailHCFromArray", [
+                'quotation_id' => $quotation->id,
+                'incoming_count' => count($details)
+            ]);
 
-            $current_date_time = Carbon::now()->toDateTimeString();
-            $user = Auth::user()->full_name;
+            // ============================================================
+            // GET EXISTING DATA WITH COMPOSITE KEY
+            // ============================================================
 
-            // Ambil semua detail ID lama
             $existingDetails = QuotationDetail::where('quotation_id', $quotation->id)
                 ->whereNull('deleted_at')
-                ->pluck('id', 'position_id'); // key = position_id biar gampang dicocokkan
+                ->get()
+                ->keyBy(function ($detail) {
+                    return $detail->position_id . '_' . $detail->quotation_site_id;
+                });
 
-            $incomingPositionIds = collect($details)->pluck('position_id')->toArray();
+            \Log::info("Existing details", [
+                'count' => $existingDetails->count(),
+                'keys' => $existingDetails->keys()->toArray()
+            ]);
 
-            // Soft delete yang tidak dikirim lagi
-            $toDelete = $existingDetails->keys()->diff($incomingPositionIds);
-            if ($toDelete->isNotEmpty()) {
-                $deletedDetails = QuotationDetail::where('quotation_id', $quotation->id)
-                    ->whereIn('position_id', $toDelete)
-                    ->get();
+            // ============================================================
+            // BUILD INCOMING COMPOSITE KEYS
+            // ============================================================
 
-                foreach ($deletedDetails as $detail) {
-                    $detail->update([
-                        'deleted_at' => $current_date_time,
-                        'deleted_by' => $user
-                    ]);
+            $incomingKeys = collect($details)
+                ->filter(function ($detail) {
+                    return !empty($detail['position_id']) && !empty($detail['quotation_site_id']);
+                })
+                ->map(function ($detail) {
+                    return $detail['position_id'] . '_' . $detail['quotation_site_id'];
+                })
+                ->unique()
+                ->values()
+                ->toArray();
 
-                    QuotationDetailHpp::where('quotation_detail_id', $detail->id)->update([
-                        'deleted_at' => $current_date_time,
-                        'deleted_by' => $user
-                    ]);
-                    QuotationDetailCoss::where('quotation_detail_id', $detail->id)->update([
-                        'deleted_at' => $current_date_time,
-                        'deleted_by' => $user
-                    ]);
-                    QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)->update([
-                        'deleted_at' => $current_date_time,
-                        'deleted_by' => $user
-                    ]);
-                    DB::table('sl_quotation_detail_requirement')
-                        ->where('quotation_detail_id', $detail->id)
-                        ->update([
-                            'deleted_at' => $current_date_time,
-                            'deleted_by' => $user
-                        ]);
-                }
-            }
+            \Log::info("Incoming composite keys", [
+                'count' => count($incomingKeys),
+                'keys' => $incomingKeys
+            ]);
 
-            // === Masuk ke loop data baru ===
-            foreach ($details as $detail) {
-                $this->addDetailHCFromArray($quotation, $detail); // pakai fungsi yang sudah kamu buat
-            }
+            // ============================================================
+            // DELETE OLD DATA NOT IN NEW DATA
+            // ============================================================
 
-            DB::commit();
+            $keysToDelete = $existingDetails->keys()->diff($incomingKeys);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error("Error in syncDetailHCFromArray: " . $e->getMessage());
-            throw new \Exception("Failed to sync HC details: " . $e->getMessage());
-        }
-    }
-
-    public function addDetailHCFromArray(Quotation $quotation, array $detail)
-    {
-        try {
-            DB::beginTransaction();
-
-            $current_date_time = Carbon::now()->toDateTimeString();
-
-            // Get position
-            $position = Position::where('id', $detail['position_id'])->first();
-
-            $quotationSite = QuotationSite::where('quotation_id', $quotation->id)
-                ->where('id', $detail['quotation_site_id'])
-                ->first();
-
-            // Check if data already exists
-            $checkExist = QuotationDetail::where('quotation_id', $quotation->id)
-                ->where('position_id', $detail['position_id'])
-                ->where('quotation_site_id', $detail['quotation_site_id'])
-                ->whereNull('deleted_at')
-                ->first();
-
-            if ($checkExist != null) {
-                // Update existing
-                $checkExist->update([
-                    'jumlah_hc' => $detail['jumlah_hc'], // Gunakan value dari array, bukan increment
-                    'updated_at' => $current_date_time,
-                    'updated_by' => Auth::user()->full_name
+            if ($keysToDelete->isNotEmpty()) {
+                \Log::info("Deleting old details", [
+                    'count' => $keysToDelete->count(),
+                    'keys' => $keysToDelete->toArray()
                 ]);
 
-                // Also update HPP and COSS
-                QuotationDetailHpp::where('quotation_detail_id', $checkExist->id)
-                    ->update([
-                        'jumlah_hc' => $detail['jumlah_hc'],
-                        'updated_at' => $current_date_time,
-                        'updated_by' => Auth::user()->full_name
-                    ]);
-
-                QuotationDetailCoss::where('quotation_detail_id', $checkExist->id)
-                    ->update([
-                        'jumlah_hc' => $detail['jumlah_hc'],
-                        'updated_at' => $current_date_time,
-                        'updated_by' => Auth::user()->full_name
-                    ]);
-
-            } else {
-                // Create new quotation detail
-                $detailBaru = QuotationDetail::create([
-                    'quotation_id' => $quotation->id,
-                    'quotation_site_id' => $detail['quotation_site_id'],
-                    'nama_site' => $detail['nama_site'],
-                    'position_id' => $detail['position_id'],
-                    'jabatan_kebutuhan' => $detail['jabatan_kebutuhan'],
-                    'jumlah_hc' => $detail['jumlah_hc'],
-                    'nominal_upah' => $detail['nominal_upah'] ?? 0,
-                    'created_at' => $current_date_time,
-                    'created_by' => Auth::user()->full_name
-                ]);
-
-                // Create HPP record
-                QuotationDetailHpp::create([
-                    'quotation_id' => $quotation->id,
-                    'quotation_detail_id' => $detailBaru->id,
-                    'leads_id' => $quotation->leads_id,
-                    'position_id' => $detail['position_id'],
-                    'jumlah_hc' => $detail['jumlah_hc'],
-                    'created_at' => $current_date_time,
-                    'created_by' => Auth::user()->full_name
-                ]);
-
-                // Create COSS record
-                QuotationDetailCoss::create([
-                    'quotation_id' => $quotation->id,
-                    'quotation_detail_id' => $detailBaru->id,
-                    'leads_id' => $quotation->leads_id,
-                    'position_id' => $detail['position_id'],
-                    'jumlah_hc' => $detail['jumlah_hc'],
-                    'created_at' => $current_date_time,
-                    'created_by' => Auth::user()->full_name
-                ]);
-
-                // Insert tunjangan berdasarkan position (jika ada di array)
-                if (isset($detail['tunjangans']) && is_array($detail['tunjangans'])) {
-                    foreach ($detail['tunjangans'] as $tunjangan) {
-                        QuotationDetailTunjangan::create([
-                            'quotation_id' => $quotation->id,
-                            'quotation_detail_id' => $detailBaru->id,
-                            'nama_tunjangan' => $tunjangan['nama_tunjangan'] ?? '',
-                            'nominal' => $tunjangan['nominal'] ?? 0,
-                            'created_at' => $current_date_time,
-                            'created_by' => Auth::user()->full_name
-                        ]);
-                    }
-                }
-
-                // Insert requirements berdasarkan position (jika ada di array)
-                if (isset($detail['requirements']) && is_array($detail['requirements'])) {
-                    foreach ($detail['requirements'] as $requirement) {
-                        // Sesuaikan dengan model requirements Anda
-                        DB::table('sl_quotation_detail_requirement')->insert([
-                            'quotation_id' => $quotation->id,
-                            'quotation_detail_id' => $detailBaru->id,
-                            'requirement' => $requirement,
-                            'created_at' => $current_date_time,
-                            'created_by' => Auth::user()->full_name
-                        ]);
+                foreach ($keysToDelete as $compositeKey) {
+                    $detail = $existingDetails->get($compositeKey);
+                    if ($detail) {
+                        $this->softDeleteQuotationDetail($detail, $timestamp, $user);
                     }
                 }
             }
 
-            DB::commit();
-            \Log::info("HC detail added from array", [
+            // ============================================================
+            // CREATE OR UPDATE NEW DATA
+            // ============================================================
+
+            foreach ($details as $detailData) {
+                // Skip invalid data
+                if (empty($detailData['position_id']) || empty($detailData['quotation_site_id'])) {
+                    \Log::warning("Skipping invalid detail data", ['data' => $detailData]);
+                    continue;
+                }
+
+                $this->createOrUpdateQuotationDetail($quotation, $detailData, $timestamp, $user);
+            }
+
+            \Log::info("syncDetailHCFromArray completed", [
                 'quotation_id' => $quotation->id,
-                'position_id' => $detail['position_id'],
-                'site_id' => $detail['quotation_site_id'],
-                'jumlah_hc' => $detail['jumlah_hc']
+                'processed' => count($details),
+                'deleted' => $keysToDelete->count()
             ]);
 
         } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error("Error in addDetailHCFromArray: " . $e->getMessage());
-            throw new \Exception("Failed to add HC detail from array: " . $e->getMessage());
+            \Log::error("Error in syncDetailHCFromArray", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Create or update single quotation detail with composite key checking
+     */
+    private function createOrUpdateQuotationDetail(Quotation $quotation, array $data, string $timestamp, string $user): void
+    {
+        $positionId = $data['position_id'];
+        $siteId = $data['quotation_site_id'];
+
+        // Check if exists (composite key)
+        $existing = QuotationDetail::where('quotation_id', $quotation->id)
+            ->where('position_id', $positionId)
+            ->where('quotation_site_id', $siteId)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($existing) {
+            // UPDATE EXISTING
+            $existing->update([
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                'jabatan_kebutuhan' => $data['jabatan_kebutuhan'] ?? $existing->jabatan_kebutuhan,
+                'nama_site' => $data['nama_site'] ?? $existing->nama_site,
+                'nominal_upah' => $data['nominal_upah'] ?? $existing->nominal_upah,
+                'updated_at' => $timestamp,
+                'updated_by' => $user
+            ]);
+
+            // Update related HPP
+            QuotationDetailHpp::where('quotation_detail_id', $existing->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                    'updated_at' => $timestamp,
+                    'updated_by' => $user
+                ]);
+
+            // Update related COSS
+            QuotationDetailCoss::where('quotation_detail_id', $existing->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                    'updated_at' => $timestamp,
+                    'updated_by' => $user
+                ]);
+
+            \Log::info("Updated quotation detail", [
+                'id' => $existing->id,
+                'position_id' => $positionId,
+                'site_id' => $siteId,
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0
+            ]);
+
+        } else {
+            // CREATE NEW
+            $newDetail = QuotationDetail::create([
+                'quotation_id' => $quotation->id,
+                'quotation_site_id' => $siteId,
+                'nama_site' => $data['nama_site'] ?? null,
+                'position_id' => $positionId,
+                'jabatan_kebutuhan' => $data['jabatan_kebutuhan'] ?? null,
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                'nominal_upah' => $data['nominal_upah'] ?? 0,
+                'created_at' => $timestamp,
+                'created_by' => $user
+            ]);
+
+            // Create HPP
+            QuotationDetailHpp::create([
+                'quotation_id' => $quotation->id,
+                'quotation_detail_id' => $newDetail->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $positionId,
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                'created_at' => $timestamp,
+                'created_by' => $user
+            ]);
+
+            // Create COSS
+            QuotationDetailCoss::create([
+                'quotation_id' => $quotation->id,
+                'quotation_detail_id' => $newDetail->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $positionId,
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0,
+                'created_at' => $timestamp,
+                'created_by' => $user
+            ]);
+
+            // Create Tunjangans if provided
+            if (!empty($data['tunjangans']) && is_array($data['tunjangans'])) {
+                foreach ($data['tunjangans'] as $tunjangan) {
+                    if (!empty($tunjangan['nama_tunjangan'])) {
+                        QuotationDetailTunjangan::create([
+                            'quotation_id' => $quotation->id,
+                            'quotation_detail_id' => $newDetail->id,
+                            'nama_tunjangan' => $tunjangan['nama_tunjangan'],
+                            'nominal' => $tunjangan['nominal'] ?? 0,
+                            'created_at' => $timestamp,
+                            'created_by' => $user
+                        ]);
+                    }
+                }
+            }
+
+            // Create Requirements if provided
+            if (!empty($data['requirements']) && is_array($data['requirements'])) {
+                foreach ($data['requirements'] as $requirement) {
+                    if (!empty(trim($requirement))) {
+                        QuotationDetailRequirement::create([
+                            'quotation_id' => $quotation->id,
+                            'quotation_detail_id' => $newDetail->id,
+                            'requirement' => trim($requirement),
+                            'created_at' => $timestamp,
+                            'created_by' => $user
+                        ]);
+                    }
+                }
+            }
+
+            \Log::info("Created new quotation detail", [
+                'id' => $newDetail->id,
+                'position_id' => $positionId,
+                'site_id' => $siteId,
+                'jumlah_hc' => $data['jumlah_hc'] ?? 0
+            ]);
         }
     }
     /**
@@ -1442,5 +1520,114 @@ class QuotationStepService
             'updated' => $updatedCount,
             'deleted' => $deletedCount
         ]);
+    }
+
+    /**
+     * Soft delete quotation detail and all its relations - USING MODEL ONLY
+     */
+    private function softDeleteQuotationDetail(QuotationDetail $detail, string $timestamp, string $user): void
+    {
+        ;
+
+        try {
+            // Gunakan model untuk soft delete detail utama
+            $detail->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+
+            \Log::info("Main detail soft deleted", [
+                'detail_id' => $detail->id,
+                'deleted_at' => $detail->deleted_at
+            ]);
+
+            // Gunakan model untuk soft delete semua relasi
+            $this->softDeleteRelatedDataWithModel($detail, $timestamp, $user);
+
+        } catch (\Exception $e) {
+            \Log::error("Error soft deleting quotation detail with model", [
+                'detail_id' => $detail->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Soft delete related data menggunakan model
+     */
+    private function softDeleteRelatedDataWithModel(QuotationDetail $detail, string $timestamp, string $user): void
+    {
+        // HPP - menggunakan model
+        QuotationDetailHpp::where('quotation_detail_id', $detail->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+
+        // COSS - menggunakan model  
+        QuotationDetailCoss::where('quotation_detail_id', $detail->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+
+        // Tunjangan - menggunakan model
+        QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+
+        // Wage - menggunakan model
+        QuotationDetailWage::where('quotation_detail_id', $detail->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+
+        // Requirements - menggunakan DB table (karena mungkin bukan model)
+        QuotationDetailRequirement::where('quotation_detail_id', $detail->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $timestamp,
+                'deleted_by' => $user
+            ]);
+    }
+
+    /**
+     * Soft delete ALL quotation details for a quotation - USING MODEL ONLY
+     */
+    private function softDeleteAllQuotationDetails(Quotation $quotation, string $timestamp, string $user): void
+    {
+        \Log::info("Soft deleting ALL quotation details with model", [
+            'quotation_id' => $quotation->id
+        ]);
+
+        try {
+            // Ambil semua details yang belum di-delete menggunakan model
+            $details = QuotationDetail::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->get();
+
+
+            // Soft delete setiap detail menggunakan model
+            foreach ($details as $detail) {
+                $this->softDeleteQuotationDetail($detail, $timestamp, $user);
+            }
+
+
+
+        } catch (\Exception $e) {
+            \Log::error("Error soft deleting all quotation details with model", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
     }
 }

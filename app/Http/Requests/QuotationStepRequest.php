@@ -262,7 +262,6 @@ class QuotationStepRequest extends FormRequest
                 // Validasi khusus: gaji_saat_cuti hanya wajib jika ada Cuti Melahirkan
                 if (
                     $this->ada_cuti === 'Ada' &&
-                    is_array($this->cuti) &&
                     in_array('Cuti Melahirkan', $this->cuti) &&
                     empty($this->gaji_saat_cuti)
                 ) {
