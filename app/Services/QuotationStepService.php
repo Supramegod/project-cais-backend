@@ -470,33 +470,85 @@ class QuotationStepService
     }
     public function updateStep4(Quotation $quotation, Request $request): void
     {
+        DB::beginTransaction();
+        try {
+            \Log::info("Starting updateStep4", [
+                'quotation_id' => $quotation->id,
+                'has_position_data' => $request->has('position_data'),
+                'has_global_data' => $request->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'])
+            ]);
 
-        if ($request->has('position_data') && is_array($request->position_data)) {
-            // UPDATE QUOTATION GLOBAL DATA DARI POSITION PERTAMA
-            if (count($request->position_data) > 0) {
-                $firstPosition = $request->position_data[0];
+            // ============================================================
+            // UPDATE GLOBAL QUOTATION DATA (jika ada di request)
+            // ============================================================
+            $globalData = [];
 
-                $quotation->update([
-                    'is_ppn' => $firstPosition['is_ppn'] ?? null,
-                    'ppn_pph_dipotong' => $firstPosition['ppn_pph_dipotong'] ?? null,
-                    'management_fee_id' => $firstPosition['manajemen_fee'] ?? null,
-                    'persentase' => $firstPosition['persentase'] ?? null,
-                    'updated_by' => Auth::user()->full_name
+            if ($request->has('is_ppn')) {
+                $globalData['is_ppn'] = $request->is_ppn;
+            }
+
+            if ($request->has('ppn_pph_dipotong')) {
+                $globalData['ppn_pph_dipotong'] = $request->ppn_pph_dipotong;
+            }
+
+            if ($request->has('management_fee_id')) {
+                $globalData['management_fee_id'] = $request->management_fee_id;
+            }
+
+            if ($request->has('persentase')) {
+                $globalData['persentase'] = $request->persentase;
+            }
+
+            // Update global data jika ada
+            if (!empty($globalData)) {
+                $globalData['updated_by'] = Auth::user()->full_name;
+                $quotation->update($globalData);
+
+                \Log::info("Updated global quotation data", [
+                    'quotation_id' => $quotation->id,
+                    'global_data' => $globalData
                 ]);
             }
 
-            // Update setiap position (TANPA 4 kolom global)
-            foreach ($request->position_data as $positionData) {
-                $this->updatePositionStep4($quotation, $positionData);
+            // ============================================================
+            // UPDATE POSITION DATA (jika ada)
+            // ============================================================
+            if ($request->has('position_data') && is_array($request->position_data)) {
+                foreach ($request->position_data as $positionData) {
+                    $this->updatePositionStep4($quotation, $positionData);
+                }
+
+                // Synchronize upah for all positions after update
+                $this->updateUpahPerPosition($quotation);
+
+                \Log::info("Updated position data", [
+                    'quotation_id' => $quotation->id,
+                    'position_count' => count($request->position_data)
+                ]);
             }
 
-            // Synchronize upah for all positions after update
-            $this->updateUpahPerPosition($quotation);
-        }
+            // Update quotation timestamp
+            $quotation->update([
+                'updated_by' => Auth::user()->full_name
+            ]);
 
-        $quotation->update([
-            'updated_by' => Auth::user()->full_name
-        ]);
+            DB::commit();
+
+            \Log::info("Step 4 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'global_data_updated' => !empty($globalData),
+                'position_data_updated' => $request->has('position_data')
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep4", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
 
     public function updateStep5(Quotation $quotation, Request $request): void
@@ -1360,7 +1412,7 @@ class QuotationStepService
         // Calculate upah data untuk position ini
         $upahData = $this->calculateUpahForPosition($detail, $positionData);
 
-        // Data untuk wage table - TANPA 4 KOLOM GLOBAL
+        // Data untuk wage table - HANYA DATA POSITION, TANPA DATA GLOBAL
         $wageData = [
             'quotation_id' => $quotation->id,
             'upah' => $positionData['upah'] ?? null,
@@ -1376,8 +1428,7 @@ class QuotationStepService
             'nominal_tunjangan_holiday' => isset($positionData['nominal_tunjangan_holiday']) ? str_replace('.', '', $positionData['nominal_tunjangan_holiday']) : null,
             'jenis_bayar_tunjangan_holiday' => $positionData['jenis_bayar_tunjangan_holiday'] ?? null,
             'updated_by' => Auth::user()->full_name
-            // HAPUS 4 KOLOM GLOBAL:
-            // 'is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'
+            // TIDAK ADA DATA GLOBAL: is_ppn, ppn_pph_dipotong, management_fee_id, persentase
         ];
 
         // Update atau create wage data
