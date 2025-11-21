@@ -28,6 +28,7 @@ class QuotationDetail extends Model
         'nominal_takaful',
         'created_by',
         'updated_by',
+        'deleted_at',
         'deleted_by'
     ];
 

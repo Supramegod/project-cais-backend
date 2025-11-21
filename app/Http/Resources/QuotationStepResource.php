@@ -371,6 +371,8 @@ class QuotationStepResource extends JsonResource
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
                                 'jumlah_hc' => $detail->jumlah_hc,
+                                'nama_site' => $detail->nama_site,
+                                'quotation_site_id' => $detail->quotation_site_id,
 
                                 // ✅ DATA HPP
                                 'hpp' => [
