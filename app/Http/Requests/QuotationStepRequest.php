@@ -54,34 +54,28 @@ class QuotationStepRequest extends FormRequest
                 break;
 
             case 4:
-                // ============================================================
-                // RULES FOR GLOBAL DATA (optional - bisa dikirim terpisah)
-                // ============================================================
-                $rules['is_ppn'] = 'required|in:0,1';
-                $rules['ppn_pph_dipotong'] = 'required|in:Total Invoice,Management Fee';
+                $rules['is_ppn'] = 'sometimes|in:0,1';
+                $rules['ppn_pph_dipotong'] = 'sometimes|in:Total Invoice,Management Fee';
                 $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
                 $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
 
-                // ============================================================
-                // RULES FOR POSITION DATA (optional - bisa dikirim terpisah)
-                // ============================================================
                 $rules['position_data'] = 'sometimes|array';
                 $rules['position_data.*.quotation_detail_id'] = 'required_with:position_data|exists:sl_quotation_detail,id';
                 $rules['position_data.*.upah'] = 'required_with:position_data|string|in:UMP,UMK,Custom';
                 $rules['position_data.*.hitungan_upah'] = 'required_if:position_data.*.upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.custom_upah'] = 'required_if:position_data.*.upah,Custom|string';
+                $rules['position_data.*.nominal_upah'] = 'required_if:position_data.*.upah,Custom|numeric|min:0'; // TAMBAHKAN INI
 
-                // Field untuk wage data - PERBAIKI BAGIAN INI
-                $rules['position_data.*.lembur'] = 'required|in:Flat,Tidak Ada,Normatif';
+                $rules['position_data.*.lembur'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_lembur'] = 'required_if:position_data.*.lembur,Flat|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_lembur'] = 'required_if:position_data.*.lembur,Flat|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:1'; // PERBAIKI: ganti : dengan ,
+                $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:1';
                 $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
-                $rules['position_data.*.kompensasi'] = 'required|in:Diprovisikan,Ditagihkan,Tidak Ada';
-                $rules['position_data.*.thr'] = 'required|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
-                $rules['position_data.*.tunjangan_holiday'] = 'required|in:Flat,Tidak Ada,Normatif';
-                $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0'; // PERBAIKI: ganti lembur dengan tunjangan_holiday
-                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'required|in:Per Bulan,Per Hari,Per Jam';
+
+                $rules['position_data.*.kompensasi'] = 'sometimes|in:Diprovisikan,Ditagihkan,Tidak Ada';
+                $rules['position_data.*.thr'] = 'sometimes|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
+                $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
+                $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
+                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|in:Per Bulan,Per Hari,Per Jam';
 
                 break;
             case 5:

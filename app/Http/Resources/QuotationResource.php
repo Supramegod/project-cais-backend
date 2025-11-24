@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\JabatanPic;
 use App\Models\SalaryRule;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
@@ -284,18 +285,22 @@ class QuotationResource extends JsonResource
 
             'quotation_pics' => $this->whenLoaded('quotationPics', function () {
                 return $this->quotationPics->map(function ($pic) {
+
+                    // Kalau jabatan berupa angka → cari nama jabatan
+                    $jabatanNama = is_numeric($pic->jabatan)
+                        ? optional(JabatanPic::find($pic->jabatan))->nama
+                        : $pic->jabatan; // Kalau sudah nama, langsung pakai
+    
                     return [
                         'id' => $pic->id,
                         'nama' => $pic->nama,
-                        'jabatan_id' => $pic->jabatan_id,
-                        'jabatan' => $pic->jabatan,
+                        'jabatan' => $jabatanNama,
                         'no_telp' => $pic->no_telp,
                         'email' => $pic->email,
                         'is_kuasa' => $pic->is_kuasa,
                     ];
                 });
             }),
-
             'quotation_aplikasis' => $this->whenLoaded('quotationAplikasis', function () {
                 return $this->quotationAplikasis->map(function ($aplikasi) {
                     return [
