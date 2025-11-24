@@ -57,7 +57,7 @@ class QuotationStepRequest extends FormRequest
                 // ============================================================
                 // RULES FOR GLOBAL DATA (optional - bisa dikirim terpisah)
                 // ============================================================
-                $rules['is_ppn'] = 'sometimes|boolean';
+                $rules['is_ppn'] = 'required|in:0,1';
                 $rules['ppn_pph_dipotong'] = 'sometimes|string';
                 $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
                 $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
@@ -191,7 +191,7 @@ class QuotationStepRequest extends FormRequest
             'headCountData.*.nama_site.string' => 'Nama site harus berupa teks',
 
             // Step 4 Messages - GLOBAL DATA
-            'is_ppn.string' => 'Status PPN harus berupa teks',
+            'is_ppn.in' => 'Status PPN harus 0 atau 1',
             'ppn_pph_dipotong.string' => 'PPN PPH dipotong harus berupa teks',
             'management_fee_id.exists' => 'Management fee tidak valid',
             'persentase.numeric' => 'Persentase harus berupa angka',
@@ -317,10 +317,10 @@ class QuotationStepRequest extends FormRequest
 
         // Convert empty strings to null untuk field optional
         $this->merge([
-            'is_ppn' => $this->is_ppn ?: null,
-            'ppn_pph_dipotong' => $this->ppn_pph_dipotong ?: null,
-            'management_fee_id' => $this->management_fee_id ?: null,
-            'persentase' => $this->persentase ?: null,
+            'is_ppn' => $this->is_ppn ?? null,
+            'ppn_pph_dipotong' => $this->ppn_pph_dipotong ?? null,
+            'management_fee_id' => $this->management_fee_id ?? null,
+            'persentase' => $this->persentase ?? null,
         ]);
     }
 }
