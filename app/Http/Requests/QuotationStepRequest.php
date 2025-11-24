@@ -57,7 +57,7 @@ class QuotationStepRequest extends FormRequest
                 // ============================================================
                 // RULES FOR GLOBAL DATA (optional - bisa dikirim terpisah)
                 // ============================================================
-                $rules['is_ppn'] = 'sometimes|string';
+                $rules['is_ppn'] = 'sometimes|boolean';
                 $rules['ppn_pph_dipotong'] = 'sometimes|string';
                 $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
                 $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
@@ -304,6 +304,14 @@ class QuotationStepRequest extends FormRequest
         if ($step == 4 && $this->has('manajemen_fee')) {
             $this->merge([
                 'management_fee_id' => $this->manajemen_fee
+            ]);
+        }
+
+        // Untuk step 5, handle field dengan dash
+        if ($step == 5) {
+            $this->merge([
+                'jenis_perusahaan_id' => $this->input('jenis-perusahaan'),
+                'bidang_perusahaan_id' => $this->input('bidang-perusahaan')
             ]);
         }
 

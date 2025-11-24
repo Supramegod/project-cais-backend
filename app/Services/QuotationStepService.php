@@ -475,7 +475,8 @@ class QuotationStepService
             \Log::info("Starting updateStep4", [
                 'quotation_id' => $quotation->id,
                 'has_position_data' => $request->has('position_data'),
-                'has_global_data' => $request->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'])
+                'has_global_data' => $request->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase']),
+                'global_data_received' => $request->only(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase'])
             ]);
 
             // ============================================================
@@ -483,20 +484,22 @@ class QuotationStepService
             // ============================================================
             $globalData = [];
 
-            if ($request->has('is_ppn')) {
-                $globalData['is_ppn'] = $request->is_ppn;
-            }
+            // Handle semua kemungkinan field global
+            $globalFields = [
+                'is_ppn' => 'is_ppn',
+                'ppn_pph_dipotong' => 'ppn_pph_dipotong',
+                'management_fee_id' => 'management_fee_id',
+                'persentase' => 'persentase'
+            ];
 
-            if ($request->has('ppn_pph_dipotong')) {
-                $globalData['ppn_pph_dipotong'] = $request->ppn_pph_dipotong;
-            }
-
-            if ($request->has('management_fee_id')) {
-                $globalData['management_fee_id'] = $request->management_fee_id;
-            }
-
-            if ($request->has('persentase')) {
-                $globalData['persentase'] = $request->persentase;
+            foreach ($globalFields as $field => $requestField) {
+                if ($request->has($requestField)) {
+                    $globalData[$field] = $request->$requestField;
+                    \Log::info("Global data found", [
+                        'field' => $field,
+                        'value' => $request->$requestField
+                    ]);
+                }
             }
 
             // Update global data jika ada
@@ -508,6 +511,8 @@ class QuotationStepService
                     'quotation_id' => $quotation->id,
                     'global_data' => $globalData
                 ]);
+            } else {
+                \Log::warning("No global data found in request for step 4");
             }
 
             // ============================================================
@@ -545,7 +550,8 @@ class QuotationStepService
             \Log::error("Error in updateStep4", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all() // Log semua data request untuk debugging
             ]);
             throw $e;
         }
