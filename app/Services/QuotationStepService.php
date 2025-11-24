@@ -913,15 +913,21 @@ class QuotationStepService
 
         if (($positionData['upah'] ?? null) == "Custom") {
             $hitunganUpah = $positionData['hitungan_upah'] ?? "Per Bulan";
-            $customUpah = isset($positionData['custom_upah']) ? str_replace('.', '', $positionData['custom_upah']) : 0;
+            $customUpah = $positionData['nominal_upah'] ?? 0; // AMBIL DARI nominal_upah BUKAN custom_upah
 
-            if ($hitunganUpah == "Per Hari") {
-                $customUpah = $customUpah * 21;
-            } else if ($hitunganUpah == "Per Jam") {
-                $customUpah = $customUpah * 21 * 8;
+            // Jika nominal_upah adalah string dengan format, bersihkan
+            if (is_string($customUpah)) {
+                $customUpah = str_replace('.', '', $customUpah);
             }
 
-            $nominalUpah = $customUpah;
+            // Konversi ke nominal bulanan berdasarkan hitungan upah
+            if ($hitunganUpah == "Per Hari") {
+                $nominalUpah = $customUpah * 21; // 21 hari kerja
+            } else if ($hitunganUpah == "Per Jam") {
+                $nominalUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
+            } else {
+                $nominalUpah = $customUpah; // Per Bulan
+            }
         } else {
             $site = QuotationSite::find($detail->quotation_site_id);
             if ($site) {
@@ -1362,15 +1368,43 @@ class QuotationStepService
     private function updateUpahPerPosition(Quotation $quotation): void
     {
         try {
+            \Log::info("=== updateUpahPerPosition START ===", [
+                'quotation_id' => $quotation->id
+            ]);
+
             // Ambil semua quotation details dengan relasi site dan wage
             $quotationDetails = QuotationDetail::with(['quotationSite', 'wage'])
                 ->where('quotation_id', $quotation->id)
                 ->get();
 
             foreach ($quotationDetails as $detail) {
+                \Log::info("Processing detail", [
+                    'detail_id' => $detail->id,
+                    'current_nominal_upah' => $detail->nominal_upah,
+                    'has_wage' => !is_null($detail->wage),
+                    'wage_upah_type' => $detail->wage ? $detail->wage->upah : 'no_wage'
+                ]);
+
+                // JANGAN update nominal_upah jika wage type adalah Custom
+                // Hanya update untuk UMP/UMK
+                if ($detail->wage && $detail->wage->upah === 'Custom') {
+                    \Log::info("Skipping update for Custom upah", [
+                        'detail_id' => $detail->id,
+                        'reason' => 'Custom upah should not be overwritten by site nominal_upah'
+                    ]);
+                    continue;
+                }
+
                 // Jika detail memiliki quotation site, gunakan nominal_upah dari site tersebut
+                // HANYA untuk UMP/UMK
                 if ($detail->quotationSite) {
                     $newNominalUpah = $detail->quotationSite->nominal_upah;
+
+                    \Log::info("Updating UMP/UMK upah from site", [
+                        'detail_id' => $detail->id,
+                        'site_nominal_upah' => $newNominalUpah,
+                        'current_detail_nominal_upah' => $detail->nominal_upah
+                    ]);
 
                     // Update nominal_upah di quotation_detail
                     $detail->update([
@@ -1388,10 +1422,10 @@ class QuotationStepService
                             ]);
                         }
                     }
-
                 }
             }
 
+            \Log::info("=== updateUpahPerPosition END ===");
 
         } catch (\Exception $e) {
             \Log::error("Error updating upah per position", [
@@ -1434,6 +1468,7 @@ class QuotationStepService
                 'upah' => $positionData['upah'] ?? null,
                 'hitungan_upah' => $upahData['hitungan_upah'] ?? null,
                 'lembur' => $positionData['lembur'] ?? null,
+                'nominal_upah' => $positionData['nominal_upah'] ?? null,
                 'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
                 'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
                 'jam_per_bulan_lembur' => $positionData['jam_per_bulan_lembur'] ?? null,
