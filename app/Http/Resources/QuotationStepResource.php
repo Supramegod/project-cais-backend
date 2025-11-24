@@ -350,10 +350,15 @@ class QuotationStepResource extends JsonResource
                             'grand_total_sebelum_pajak' => $calculatedQuotation->grand_total_sebelum_pajak,
                             'ppn' => $calculatedQuotation->ppn,
                             'pph' => $calculatedQuotation->pph,
+                            'dpp' => $calculatedQuotation->dpp,
                             'total_invoice' => $calculatedQuotation->total_invoice,
                             'pembulatan' => $calculatedQuotation->pembulatan,
                             'margin' => $calculatedQuotation->margin,
                             'gpm' => $calculatedQuotation->gpm,
+                            'persen_bunga_bank' => $quotation->persen_bunga_bank,
+                            'persen_bpjs_kesehatan' => $quotation->persen_bpjs_kesehatan,
+                            'persen_bpjs_ketenagakerjaan' => $quotation->persen_bpjs_ketenagakerjaan,
+                            'persen_insentif' => $quotation->persen_incentif,
                         ],
                         'coss' => [
                             'total_sebelum_management_fee_coss' => $calculatedQuotation->total_sebelum_management_fee_coss,
@@ -361,10 +366,15 @@ class QuotationStepResource extends JsonResource
                             'grand_total_sebelum_pajak_coss' => $calculatedQuotation->grand_total_sebelum_pajak_coss,
                             'ppn_coss' => $calculatedQuotation->ppn_coss,
                             'pph_coss' => $calculatedQuotation->pph_coss,
+                            'dpp_coss' => $calculatedQuotation->dpp_coss,
                             'total_invoice_coss' => $calculatedQuotation->total_invoice_coss,
                             'pembulatan_coss' => $calculatedQuotation->pembulatan_coss,
                             'margin_coss' => $calculatedQuotation->margin_coss,
                             'gpm_coss' => $calculatedQuotation->gpm_coss,
+                            'persen_bunga_bank' => $quotation->persen_bunga_bank,
+                            'persen_bpjs_kesehatan' => $quotation->persen_bpjs_kesehatan,
+                            'persen_bpjs_ketenagakerjaan' => $quotation->persen_bpjs_ketenagakerjaan,
+                            'persen_insentif' => $quotation->persen_incentif,
                         ],
                         'quotation_details' => $calculatedQuotation->quotation_detail->map(function ($detail) {
                             return [
@@ -410,7 +420,7 @@ class QuotationStepResource extends JsonResource
                                     'tunjangan_holiday' => $detail->tunjangan_holiday, // Sama dengan HPP
                                     'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
                                     'insentif' => $detail->insentif, // Sama dengan HPP
-                                    'personil_kaporlap' => $detail->personil_kaporlap_coss ?? 0,
+                                    'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
                                     'personil_devices' => $detail->personil_devices_coss ?? 0,
                                     'personil_ohc' => $detail->personil_ohc_coss ?? 0,
                                     'personil_chemical' => $detail->personil_chemical_coss ?? 0,
