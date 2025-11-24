@@ -32,11 +32,7 @@ class QuotationDetailWage extends Model
         'deleted_by',
     ];
 
-    protected $casts = [
-        'nominal_lembur' => 'decimal:2',
-        'nominal_tunjangan_holiday' => 'decimal:2',
-        'jam_per_bulan_lembur' => 'decimal:2',
-    ];
+
 
     /**
      * Relationships

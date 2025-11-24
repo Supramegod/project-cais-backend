@@ -1403,60 +1403,85 @@ class QuotationStepService
     }
     private function updatePositionStep4(Quotation $quotation, array $positionData): void
     {
-        $detail = QuotationDetail::where('id', $positionData['quotation_detail_id'])
-            ->where('quotation_id', $quotation->id)
-            ->first();
+        try {
+            $detail = QuotationDetail::where('id', $positionData['quotation_detail_id'])
+                ->where('quotation_id', $quotation->id)
+                ->first();
 
-        if (!$detail) {
-            \Log::warning("Quotation detail not found", [
-                'quotation_detail_id' => $positionData['quotation_detail_id'],
-                'quotation_id' => $quotation->id
+            if (!$detail) {
+                \Log::warning("Quotation detail not found", [
+                    'quotation_detail_id' => $positionData['quotation_detail_id'],
+                    'quotation_id' => $quotation->id
+                ]);
+                return;
+            }
+
+            // DEBUG: Cek apakah wage sudah ada
+            $existingWage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
+
+            \Log::info("Wage check before update", [
+                'quotation_detail_id' => $detail->id,
+                'wage_exists' => !is_null($existingWage),
+                'wage_id' => $existingWage ? $existingWage->id : 'none'
             ]);
-            return;
+
+            // Calculate upah data untuk position ini
+            $upahData = $this->calculateUpahForPosition($detail, $positionData);
+
+            // Data untuk wage table
+            $wageData = [
+                'quotation_id' => $quotation->id,
+                'upah' => $positionData['upah'] ?? null,
+                'hitungan_upah' => $upahData['hitungan_upah'] ?? null,
+                'lembur' => $positionData['lembur'] ?? null,
+                'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
+                'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
+                'jam_per_bulan_lembur' => $positionData['jam_per_bulan_lembur'] ?? null,
+                'lembur_ditagihkan' => $positionData['lembur_ditagihkan'] ?? null,
+                'kompensasi' => $positionData['kompensasi'] ?? null,
+                'thr' => $positionData['thr'] ?? null,
+                'tunjangan_holiday' => $positionData['tunjangan_holiday'] ?? null,
+                'nominal_tunjangan_holiday' => isset($positionData['nominal_tunjangan_holiday']) ? str_replace('.', '', $positionData['nominal_tunjangan_holiday']) : null,
+                'jenis_bayar_tunjangan_holiday' => $positionData['jenis_bayar_tunjangan_holiday'] ?? null,
+                'updated_by' => Auth::user()->full_name
+            ];
+
+            // APPROACH: Gunakan updateOrCreate dengan kondisi yang tepat
+            $wage = QuotationDetailWage::updateOrCreate(
+                [
+                    'quotation_detail_id' => $detail->id
+                ],
+                array_merge($wageData, [
+                    'created_by' => Auth::user()->full_name
+                ])
+            );
+
+            \Log::info("Wage operation result", [
+                'quotation_detail_id' => $detail->id,
+                'operation' => $wage->wasRecentlyCreated ? 'CREATED' : 'UPDATED',
+                'wage_id' => $wage->id
+            ]);
+
+            // Update nominal_upah di quotation_detail
+            $detail->update([
+                'nominal_upah' => $upahData['nominal_upah'],
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            \Log::info("Successfully updated step 4 wage for position", [
+                'quotation_detail_id' => $detail->id,
+                'position_id' => $detail->position_id,
+                'upah' => $positionData['upah'] ?? 'null'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in updatePositionStep4", [
+                'quotation_detail_id' => $positionData['quotation_detail_id'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        // Calculate upah data untuk position ini
-        $upahData = $this->calculateUpahForPosition($detail, $positionData);
-
-        // Data untuk wage table - HANYA DATA POSITION, TANPA DATA GLOBAL
-        $wageData = [
-            'quotation_id' => $quotation->id,
-            'upah' => $positionData['upah'] ?? null,
-            'hitungan_upah' => $upahData['hitungan_upah'] ?? null,
-            'lembur' => $positionData['lembur'] ?? null,
-            'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
-            'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
-            'jam_per_bulan_lembur' => $positionData['jam_per_bulan_lembur'] ?? null,
-            'lembur_ditagihkan' => $positionData['lembur_ditagihkan'] ?? null,
-            'kompensasi' => $positionData['kompensasi'] ?? null,
-            'thr' => $positionData['thr'] ?? null,
-            'tunjangan_holiday' => $positionData['tunjangan_holiday'] ?? null,
-            'nominal_tunjangan_holiday' => isset($positionData['nominal_tunjangan_holiday']) ? str_replace('.', '', $positionData['nominal_tunjangan_holiday']) : null,
-            'jenis_bayar_tunjangan_holiday' => $positionData['jenis_bayar_tunjangan_holiday'] ?? null,
-            'updated_by' => Auth::user()->full_name
-            // TIDAK ADA DATA GLOBAL: is_ppn, ppn_pph_dipotong, management_fee_id, persentase
-        ];
-
-        // Update atau create wage data
-        if ($detail->wage) {
-            $detail->wage->update($wageData);
-        } else {
-            $wageData['quotation_detail_id'] = $detail->id;
-            $wageData['created_by'] = Auth::user()->full_name;
-            QuotationDetailWage::create($wageData);
-        }
-
-        // Update nominal_upah di quotation_detail
-        $detail->update([
-            'nominal_upah' => $upahData['nominal_upah'],
-            'updated_by' => Auth::user()->full_name
-        ]);
-
-        \Log::info("Updated step 4 wage for position", [
-            'quotation_detail_id' => $detail->id,
-            'position_id' => $detail->position_id,
-            'upah' => $positionData['upah'] ?? 'null'
-        ]);
     }
     /**
      * Helper method to convert various boolean representations to proper boolean
