@@ -377,12 +377,43 @@ class QuotationStepResource extends JsonResource
                             'persen_insentif' => $quotation->persen_incentif,
                         ],
                         'quotation_details' => $calculatedQuotation->quotation_detail->map(function ($detail) {
+                            // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
+                            $wage = $detail->wage ?? null;
+
+                            // Logic untuk display lembur
+                            $lemburDisplay = '';
+                            if ($wage) {
+                                if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
+                                    $lemburDisplay = 'Ditagihkan terpisah';
+                                } elseif ($wage->lembur == 'Flat') {
+                                    $lemburDisplay = 'Rp. ' . number_format($detail->lembur, 2, ',', '.');
+                                } else {
+                                    $lemburDisplay = 'Tidak Ada';
+                                }
+                            }
+
+                            // Logic untuk display tunjangan_holiday
+                            $tunjanganHolidayDisplay = '';
+                            if ($wage) {
+                                if ($wage->tunjangan_holiday == 'Normatif') {
+                                    $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
+                                } elseif ($wage->tunjangan_holiday == 'Flat') {
+                                    $tunjanganHolidayDisplay = 'Rp. ' . number_format($detail->tunjangan_holiday, 2, ',', '.');
+                                } else {
+                                    $tunjanganHolidayDisplay = 'Tidak Ada';
+                                }
+                            }
+
                             return [
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
                                 'jumlah_hc' => $detail->jumlah_hc,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
+
+                                // Tambahan data untuk display
+                                'lembur_display' => $lemburDisplay,
+                                'tunjangan_holiday_display' => $tunjanganHolidayDisplay,
 
                                 // ✅ DATA HPP
                                 'hpp' => [

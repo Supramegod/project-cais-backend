@@ -753,8 +753,13 @@ class QuotationStepService
 
             \Log::info("OHC Sync Result", $syncResult);
 
-            // Update training data
-            $this->updateTrainingData($quotation, $request, Carbon::now());
+            // PERBAIKAN: Handle training data dari quotation_trainings
+            if ($request->has('quotation_trainings') && is_array($request->quotation_trainings)) {
+                $this->updateTrainingDataFromArray($quotation, $request->quotation_trainings, Carbon::now());
+            } else {
+                // Jika tidak ada training data, hapus semua training yang ada
+                $this->clearAllTrainingData($quotation, Carbon::now());
+            }
 
             // Update data kunjungan
             $quotation->update([
@@ -772,7 +777,7 @@ class QuotationStepService
             \Log::info("Step 10 updated successfully", [
                 'quotation_id' => $quotation->id,
                 'ohc_items' => count($barangData),
-                'training' => $request->training
+                'training_count' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
             ]);
 
         } catch (\Exception $e) {
@@ -785,7 +790,6 @@ class QuotationStepService
             throw $e;
         }
     }
-
     public function updateStep11(Quotation $quotation, Request $request): void
     {
         $quotation->update([
@@ -1036,29 +1040,79 @@ class QuotationStepService
         }
     }
 
-    private function updateTrainingData(Quotation $quotation, Request $request, Carbon $currentDateTime): void
+    /**
+     * Update training data from array (new approach for step 10)
+     */
+    private function updateTrainingDataFromArray(Quotation $quotation, array $trainingIds, Carbon $currentDateTime): void
     {
-        if ($request->has('training_id')) {
-            // Hapus training existing
-            QuotationTraining::where('quotation_id', $quotation->id)->update([
-                'deleted_at' => $currentDateTime,
-                'deleted_by' => Auth::user()->full_name
-            ]);
+        $user = Auth::user()->full_name;
 
-            // Insert training baru
-            $arrTrainingId = explode(",", $request->training_id);
-            foreach ($arrTrainingId as $trainingId) {
-                $training = DB::table('m_training')->where('id', $trainingId)->first();
-                if ($training) {
-                    QuotationTraining::create([
-                        'training_id' => $trainingId,
-                        'quotation_id' => $quotation->id,
-                        'nama' => $training->nama,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
+        \Log::info("Updating training data from array", [
+            'quotation_id' => $quotation->id,
+            'training_ids' => $trainingIds,
+            'count' => count($trainingIds)
+        ]);
+
+        // Get existing training IDs untuk quotation ini
+        $existingTrainingIds = QuotationTraining::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->pluck('training_id')
+            ->toArray();
+
+        $trainingIdsToDelete = array_diff($existingTrainingIds, $trainingIds);
+        $trainingIdsToAdd = array_diff($trainingIds, $existingTrainingIds);
+
+        // Delete training yang tidak dipilih lagi
+        if (!empty($trainingIdsToDelete)) {
+            QuotationTraining::where('quotation_id', $quotation->id)
+                ->whereIn('training_id', $trainingIdsToDelete)
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+
+            \Log::info("Deleted training associations", [
+                'quotation_id' => $quotation->id,
+                'deleted_training_ids' => $trainingIdsToDelete
+            ]);
+        }
+
+        // Add training baru
+        foreach ($trainingIdsToAdd as $trainingId) {
+            $training = Training::find($trainingId);
+            if ($training) {
+                QuotationTraining::create([
+                    'training_id' => $trainingId,
+                    'quotation_id' => $quotation->id,
+                    'nama' => $training->nama,
+                    'created_by' => $user
+                ]);
             }
         }
+
+        \Log::info("Added training associations", [
+            'quotation_id' => $quotation->id,
+            'added_training_ids' => $trainingIdsToAdd
+        ]);
+    }
+
+    /**
+     * Clear all training data for quotation
+     */
+    private function clearAllTrainingData(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $user = Auth::user()->full_name;
+
+        QuotationTraining::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->update([
+                'deleted_at' => $currentDateTime,
+                'deleted_by' => $user
+            ]);
+
+        \Log::info("Cleared all training data", [
+            'quotation_id' => $quotation->id
+        ]);
     }
 
     private function generateKerjasama(Quotation $quotation): void
