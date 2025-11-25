@@ -68,7 +68,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['position_data.*.lembur'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_lembur'] = 'required_if:position_data.*.lembur,Flat|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_lembur'] = 'required_if:position_data.*.lembur,Flat|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:1';
+                $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:0 ';
                 $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
 
                 $rules['position_data.*.kompensasi'] = 'sometimes|in:Diprovisikan,Ditagihkan,Tidak Ada';
