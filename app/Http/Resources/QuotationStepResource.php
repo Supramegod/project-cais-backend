@@ -411,10 +411,6 @@ class QuotationStepResource extends JsonResource
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
 
-                                // Tambahan data untuk display
-                                'lembur_display' => $lemburDisplay,
-                                'tunjangan_holiday_display' => $tunjanganHolidayDisplay,
-
                                 // ✅ DATA HPP
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
@@ -423,9 +419,9 @@ class QuotationStepResource extends JsonResource
                                     'bpjs_kesehatan' => $detail->bpjs_kesehatan,
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                                     'kompensasi' => $detail->kompensasi,
-                                    'lembur' => $detail->lembur,
+                                    'lembur' => $lemburDisplay,
                                     'nominal_takaful' => $detail->nominal_takaful,
-                                    'tunjangan_holiday' => $detail->tunjangan_holiday,
+                                    'tunjangan_holiday' => $tunjanganHolidayDisplay,
                                     'bunga_bank' => $detail->bunga_bank,
                                     'insentif' => $detail->insentif,
                                     'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
@@ -446,9 +442,9 @@ class QuotationStepResource extends JsonResource
                                     'bpjs_kesehatan' => $detail->bpjs_kesehatan, // Sama dengan HPP
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya, // Sama dengan HPP
                                     'kompensasi' => $detail->kompensasi, // Sama dengan HPP
-                                    'lembur' => $detail->lembur, // Sama dengan HPP
+                                    'lembur' => $lemburDisplay, // Sama dengan HPP
                                     'nominal_takaful' => $detail->nominal_takaful, // Sama dengan HPP
-                                    'tunjangan_holiday' => $detail->tunjangan_holiday, // Sama dengan HPP
+                                    'tunjangan_holiday' =>  $tunjanganHolidayDisplay, // Sama dengan HPP
                                     'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
                                     'insentif' => $detail->insentif, // Sama dengan HPP
                                     'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
