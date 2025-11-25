@@ -411,6 +411,7 @@ class QuotationStepResource extends JsonResource
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
 
+
                                 // ✅ DATA HPP
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
@@ -444,7 +445,7 @@ class QuotationStepResource extends JsonResource
                                     'kompensasi' => $detail->kompensasi, // Sama dengan HPP
                                     'lembur' => $lemburDisplay, // Sama dengan HPP
                                     'nominal_takaful' => $detail->nominal_takaful, // Sama dengan HPP
-                                    'tunjangan_holiday' =>  $tunjanganHolidayDisplay, // Sama dengan HPP
+                                    'tunjangan_holiday' => $tunjanganHolidayDisplay, // Sama dengan HPP
                                     'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
                                     'insentif' => $detail->insentif, // Sama dengan HPP
                                     'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
@@ -463,11 +464,30 @@ class QuotationStepResource extends JsonResource
             case 12:
                 $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
 
+                // ✅ STRUKTUR BARU: Kerjasama dengan ID tracking
+                $kerjasamas = $quotation->relationLoaded('quotationKerjasamas')
+                    ? $quotation->quotationKerjasamas
+                        ->whereNull('deleted_at')  // Filter yang belum dihapus
+                        ->sortBy('id')              // Sort by ID
+                        ->values()                  // Reset keys
+                        ->map(function ($kerjasama, $index) {
+                            return [
+                                'id' => $kerjasama->id,
+                                'order' => $index + 1,  // Numbering untuk UI
+                                'perjanjian' => $kerjasama->perjanjian,
+                                'is_delete' => $kerjasama->is_delete ?? 1,
+                                'is_editable' => $kerjasama->is_delete == 1,
+                        })->toArray()
+                    : [];
+
                 $finalData = [
-                    'quotation_kerjasamas' => $quotation->relationLoaded('quotationKerjasamas') ?
-                        $quotation->quotationKerjasamas->pluck('perjanjian')->toArray() : [],
+                    'quotation_kerjasamas' => $kerjasamas,
+                    'total_kerjasamas' => count($kerjasamas),
+                    'can_edit' => $quotation->step < 100,  // Check if still editable
                     'final_confirmation' => true,
                 ];
+
+                // Add calculation data if available
                 if ($calculatedQuotation) {
                     $finalData['final_calculation'] = [
                         'total_invoice' => $calculatedQuotation->total_invoice,
@@ -484,6 +504,7 @@ class QuotationStepResource extends JsonResource
                 }
 
                 return $finalData;
+
             default:
                 return [];
         }
@@ -682,9 +703,32 @@ class QuotationStepResource extends JsonResource
 
             case 12:
                 return [
-                    'kerjasama_list' => $quotation->relationLoaded('quotationKerjasamas') ?
-                        $quotation->quotationKerjasamas->toArray() : [],
+                    'kerjasama_list' => $quotation->relationLoaded('quotationKerjasamas')
+                        ? $quotation->quotationKerjasamas
+                            ->whereNull('deleted_at')
+                            ->sortBy('id')
+                            ->values()
+                            ->map(function ($kerjasama) {
+                                return [
+                                    'id' => $kerjasama->id,
+                                    'perjanjian' => $kerjasama->perjanjian,
+                                    'is_delete' => $kerjasama->is_delete ?? 1,
+                                ];
+                            })->toArray()
+                        : [],
                     'jabatan_pic_list' => JabatanPic::whereNull('deleted_at')->get(),
+                    'quotation_pics' => $quotation->relationLoaded('quotationPics')
+                        ? $quotation->quotationPics->map(function ($pic) {
+                            return [
+                                'id' => $pic->id,
+                                'nama_pic' => $pic->nama_pic,
+                                'jabatan_pic_id' => $pic->jabatan_pic_id,
+                                'jabatan_pic' => $pic->jabatan_pic,
+                                'no_telp_pic' => $pic->no_telp_pic,
+                                'email_pic' => $pic->email_pic,
+                            ];
+                        })->toArray()
+                        : [],
                 ];
 
             default:
