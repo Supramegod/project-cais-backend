@@ -124,6 +124,7 @@ class Quotation extends Model
     ];
     protected $dates = ['deleted_at'];
 
+
     // Tambahan: Accessor untuk format tanggal
     public function getTglQuotationAttribute($value)
     {

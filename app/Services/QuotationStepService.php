@@ -283,7 +283,23 @@ class QuotationStepService
                 break;
 
             case 12:
-                $data['additional_data']['calculated_quotation'] = $this->quotationService->calculateQuotation($quotation);
+                // ✅ STRUKTUR BARU: Include ID untuk setiap kerjasama
+                $finalData = [
+                    'quotation_kerjasamas' => $quotation->relationLoaded('quotationKerjasamas')
+                        ? $quotation->quotationKerjasamas->map(function ($kerjasama) {
+                            return [
+                                'id' => $kerjasama->id,
+                                'perjanjian' => $kerjasama->perjanjian,
+                                'is_delete' => $kerjasama->is_delete ?? 1,
+                                'created_at' => $kerjasama->created_at,
+                                'created_by' => $kerjasama->created_by,
+                            ];
+                        })->toArray()
+                        : [],
+                    'final_confirmation' => true,
+                ];
+
+                $data['additional_data']['final_data'] = $finalData;
                 break;
         }
 
