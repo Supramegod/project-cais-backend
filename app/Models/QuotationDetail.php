@@ -11,7 +11,7 @@ class QuotationDetail extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'sl_quotation_detail';
-    
+
     protected $fillable = [
         'quotation_id',
         'quotation_site_id',
@@ -22,7 +22,7 @@ class QuotationDetail extends Model
         'nominal_upah',
         'penjamin_kesehatan',
         'is_bpjs_jkk',
-        'is_bpjs_jkm', 
+        'is_bpjs_jkm',
         'is_bpjs_jht',
         'is_bpjs_jp',
         'nominal_takaful',
@@ -62,5 +62,15 @@ class QuotationDetail extends Model
     public function quotationSite()
     {
         return $this->belongsTo(QuotationSite::class, 'quotation_site_id');
+    }
+    // TAMBAHKAN RELASI INI
+    public function quotationDetailHpps()
+    {
+        return $this->hasMany(QuotationDetailHpp::class, 'quotation_detail_id');
+    }
+
+    public function quotationDetailCosses()
+    {
+        return $this->hasMany(QuotationDetailCoss::class, 'quotation_detail_id');
     }
 }

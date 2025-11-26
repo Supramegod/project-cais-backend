@@ -477,6 +477,7 @@ class QuotationStepResource extends JsonResource
                                 'perjanjian' => $kerjasama->perjanjian,
                                 'is_delete' => $kerjasama->is_delete ?? 1,
                                 'is_editable' => $kerjasama->is_delete == 1,
+                            ];
                         })->toArray()
                     : [];
 

@@ -111,7 +111,7 @@ class QuotationController extends Controller
                 'quotationSites',
                 'company'
             ])
-                ->byUserRole()
+                ->byUsersRole()
                 ->dateRange($request->tgl_dari, $request->tgl_sampai)
                 ->byCompany($request->company)
                 ->byKebutuhan($request->kebutuhan_id)

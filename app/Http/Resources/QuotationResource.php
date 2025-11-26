@@ -16,6 +16,15 @@ class QuotationResource extends JsonResource
     {
         parent::__construct($resource);
 
+        // Pastikan relasi diperlukan untuk calculation sudah diload
+        if ($resource->relationLoaded('quotationDetails')) {
+            $resource->load([
+                'quotationDetails.quotationDetailHpps',
+                'quotationDetails.quotationDetailCosses',
+                'quotationDetails.wage'
+            ]);
+        }
+
         // Hitung quotation menggunakan service
         $quotationService = new QuotationService();
         $this->calculatedQuotation = $quotationService->calculateQuotation($resource);
@@ -160,9 +169,167 @@ class QuotationResource extends JsonResource
                     ];
                 });
             }),
+            // QUOTATION DETAILS - struktur baru sama seperti step 11
+            'quotation_details' => $this->whenLoaded('quotationDetails', function () {
+                return $this->quotationDetails->map(function ($detail) {
+                    $wage = $detail->wage; // Ambil data dari relasi wage
+    
+                    // Jika wage null, buat array kosong atau nilai default
+                    if (!$wage) {
+                        $wageData = [
+                            'upah' => null,
+                            'hitungan_upah' => null,
+                            'lembur' => null,
+                            'nominal_lembur' => null,
+                            'jenis_bayar_lembur' => null,
+                            'jam_per_bulan_lembur' => null,
+                            'lembur_ditagihkan' => null,
+                            'kompensasi' => null,
+                            'thr' => null,
+                            'tunjangan_holiday' => null,
+                            'nominal_tunjangan_holiday' => null,
+                            'jenis_bayar_tunjangan_holiday' => null,
+                        ];
+                    } else {
+                        $wageData = [
+                            'upah' => $wage->upah,
+                            'hitungan_upah' => $wage->hitungan_upah,
+                            'lembur' => $wage->lembur,
+                            'nominal_lembur' => $wage->nominal_lembur,
+                            'jenis_bayar_lembur' => $wage->jenis_bayar_lembur,
+                            'jam_per_bulan_lembur' => $wage->jam_per_bulan_lembur,
+                            'lembur_ditagihkan' => $wage->lembur_ditagihkan,
+                            'kompensasi' => $wage->kompensasi,
+                            'thr' => $wage->thr,
+                            'tunjangan_holiday' => $wage->tunjangan_holiday,
+                            'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday,
+                            'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday,
+                        ];
+                    }
 
+                    // Ambil data HPP dan COSS dari relasi yang sudah diload
+                    $hpp = $detail->relationLoaded('quotationDetailHpps') ? $detail->quotationDetailHpps->first() : null;
+                    $coss = $detail->relationLoaded('quotationDetailCosses') ? $detail->quotationDetailCosses->first() : null;
 
-            // Di dalam method toArray(), tambahkan bagian calculation:
+                    // Logic untuk display lembur
+                    $lemburDisplay = '';
+                    if ($wage) {
+                        if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
+                            $lemburDisplay = 'Ditagihkan terpisah';
+                        } elseif ($wage->lembur == 'Flat') {
+                            $lemburDisplay = 'Rp. ' . number_format($hpp->lembur ?? 0, 2, ',', '.');
+                        } else {
+                            $lemburDisplay = 'Tidak Ada';
+                        }
+                    }
+
+                    // Logic untuk display tunjangan_holiday
+                    $tunjanganHolidayDisplay = '';
+                    if ($wage) {
+                        if ($wage->tunjangan_holiday == 'Normatif') {
+                            $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
+                        } elseif ($wage->tunjangan_holiday == 'Flat') {
+                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($hpp->tunjangan_hari_libur_nasional ?? 0, 2, ',', '.');
+                        } else {
+                            $tunjanganHolidayDisplay = 'Tidak Ada';
+                        }
+                    }
+
+                    return [
+                        'id' => $detail->id,
+                        'quotation_site_id' => $detail->quotation_site_id,
+                        'nama_site' => $detail->nama_site,
+                        'position_id' => $detail->position_id,
+                        'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
+                        'jumlah_hc' => $detail->jumlah_hc,
+                        'nominal_upah' => $detail->nominal_upah,
+                        'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                        'is_bpjs_jkk' => $detail->is_bpjs_jkk,
+                        'is_bpjs_jkm' => $detail->is_bpjs_jkm,
+                        'is_bpjs_jht' => $detail->is_bpjs_jht,
+                        'is_bpjs_jp' => $detail->is_bpjs_jp,
+                        'nominal_takaful' => $detail->nominal_takaful,
+                        'biaya_monitoring_kontrol' => $detail->biaya_monitoring_kontrol,
+
+                        // Data dari wage table (gunakan $wageData)
+                        'upah' => $wageData['upah'],
+                        'hitungan_upah' => $wageData['hitungan_upah'],
+                        'lembur' => $wageData['lembur'],
+                        'nominal_lembur' => $wageData['nominal_lembur'],
+                        'jenis_bayar_lembur' => $wageData['jenis_bayar_lembur'],
+                        'jam_per_bulan_lembur' => $wageData['jam_per_bulan_lembur'],
+                        'lembur_ditagihkan' => $wageData['lembur_ditagihkan'],
+                        'kompensasi' => $wageData['kompensasi'],
+                        'thr' => $wageData['thr'],
+                        'tunjangan_holiday' => $wageData['tunjangan_holiday'],
+                        'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
+                        'jenis_bayar_tunjangan_holiday' => $wageData['jenis_bayar_tunjangan_holiday'],
+
+                        'requirements' => $detail->relationLoaded('quotationDetailRequirements') ? $detail->quotationDetailRequirements->map(function ($requirement) {
+                            return [
+                                'id' => $requirement->id,
+                                'requirement' => $requirement->requirement,
+                            ];
+                        }) : [],
+
+                        'tunjangans' => $detail->relationLoaded('quotationDetailTunjangans') ? $detail->quotationDetailTunjangans->map(function ($tunjangan) {
+                            return [
+                                'id' => $tunjangan->id,
+                                'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                                'nominal' => $tunjangan->nominal,
+                            ];
+                        }) : [],
+
+                        // ✅ DATA HPP dengan struktur sama seperti step 11
+                        'hpp' => $hpp ? [
+                            'nominal_upah' => $detail->nominal_upah,
+                            'total_tunjangan' => $detail->total_tunjangan ?? 0,
+                            'bpjs_ketenagakerjaan' => $hpp->bpjs_jkk + $hpp->bpjs_jkm + $hpp->bpjs_jht + $hpp->bpjs_jp,
+                            'bpjs_kesehatan' => $hpp->bpjs_ks,
+                            'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
+                            'kompensasi' => $hpp->kompensasi,
+                            'lembur' => $lemburDisplay,
+                            'nominal_takaful' => $hpp->takaful,
+                            'tunjangan_holiday' => $tunjanganHolidayDisplay,
+                            'bunga_bank' => $hpp->bunga_bank,
+                            'insentif' => $hpp->insentif,
+                            'personil_kaporlap' => $hpp->provisi_seragam ?? 0,
+                            'personil_devices' => $hpp->provisi_peralatan ?? 0,
+                            'personil_ohc' => $hpp->provisi_ohc ?? 0,
+                            'personil_chemical' => $hpp->provisi_chemical ?? 0,
+                            'total_personil' => ($hpp->provisi_seragam ?? 0) + ($hpp->provisi_peralatan ?? 0) + ($hpp->provisi_ohc ?? 0) + ($hpp->provisi_chemical ?? 0),
+                            'sub_total_personil' => $hpp->total_hpp ?? 0,
+                            'total_base_manpower' => $hpp->total_hpp ?? 0,
+                            'total_exclude_base_manpower' => 0,
+                        ] : null,
+
+                        // ✅ DATA COSS dengan struktur sama seperti step 11
+                        'coss' => $coss ? [
+                            'nominal_upah' => $detail->nominal_upah,
+                            'total_tunjangan' => $detail->total_tunjangan ?? 0,
+                            'bpjs_ketenagakerjaan' => $coss->bpjs_jkk + $coss->bpjs_jkm + $coss->bpjs_jht + $coss->bpjs_jp,
+                            'bpjs_kesehatan' => $coss->bpjs_ks,
+                            'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
+                            'kompensasi' => $coss->kompensasi,
+                            'lembur' => $lemburDisplay,
+                            'nominal_takaful' => $coss->takaful,
+                            'tunjangan_holiday' => $tunjanganHolidayDisplay,
+                            'bunga_bank' => $coss->bunga_bank,
+                            'insentif' => $coss->insentif,
+                            'personil_kaporlap_coss' => $coss->provisi_seragam ?? 0,
+                            'personil_devices_coss' => $coss->provisi_peralatan ?? 0,
+                            'personil_ohc_coss' => $coss->provisi_ohc ?? 0,
+                            'personil_chemical_coss' => $coss->provisi_chemical ?? 0,
+                            'total_personil_coss' => ($coss->provisi_seragam ?? 0) + ($coss->provisi_peralatan ?? 0) + ($coss->provisi_ohc ?? 0) + ($coss->provisi_chemical ?? 0),
+                            'sub_total_personil_coss' => $coss->total_coss ?? 0,
+                            'total_base_manpower' => $coss->total_coss ?? 0,
+                            'total_exclude_base_manpower' => 0,
+                        ] : null,
+                    ];
+                });
+            }),
+
+            // CALCULATION - data summary dari service
             'calculation' => $this->calculatedQuotation ? [
                 'hpp' => [
                     'total_sebelum_management_fee' => $this->calculatedQuotation->total_sebelum_management_fee,
@@ -196,88 +363,6 @@ class QuotationResource extends JsonResource
                     'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan,
                     'persen_insentif' => $this->persen_incentif,
                 ],
-                'quotation_details' => $this->calculatedQuotation->quotation_detail->map(function ($detail) {
-                    // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
-                    $wage = $detail->wage ?? null;
-
-                    // Logic untuk display lembur
-                    $lemburDisplay = '';
-                    if ($wage) {
-                        if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
-                            $lemburDisplay = 'Ditagihkan terpisah';
-                        } elseif ($wage->lembur == 'Flat') {
-                            $lemburDisplay = 'Rp. ' . number_format($detail->lembur, 2, ',', '.');
-                        } else {
-                            $lemburDisplay = 'Tidak Ada';
-                        }
-                    }
-
-                    // Logic untuk display tunjangan_holiday
-                    $tunjanganHolidayDisplay = '';
-                    if ($wage) {
-                        if ($wage->tunjangan_holiday == 'Normatif') {
-                            $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
-                        } elseif ($wage->tunjangan_holiday == 'Flat') {
-                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($detail->tunjangan_holiday, 2, ',', '.');
-                        } else {
-                            $tunjanganHolidayDisplay = 'Tidak Ada';
-                        }
-                    }
-
-                    return [
-                        'id' => $detail->id,
-                        'position_name' => $detail->jabatan_kebutuhan,
-                        'jumlah_hc' => $detail->jumlah_hc,
-                        'nama_site' => $detail->nama_site,
-                        'quotation_site_id' => $detail->quotation_site_id,
-
-                        // ✅ DATA HPP
-                        'hpp' => [
-                            'nominal_upah' => $detail->nominal_upah,
-                            'total_tunjangan' => $detail->total_tunjangan,
-                            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
-                            'bpjs_kesehatan' => $detail->bpjs_kesehatan,
-                            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
-                            'kompensasi' => $detail->kompensasi,
-                            'lembur' => $lemburDisplay,
-                            'nominal_takaful' => $detail->nominal_takaful,
-                            'tunjangan_holiday' => $tunjanganHolidayDisplay,
-                            'bunga_bank' => $detail->bunga_bank,
-                            'insentif' => $detail->insentif,
-                            'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
-                            'personil_devices' => $detail->personil_devices ?? 0,
-                            'personil_ohc' => $detail->personil_ohc ?? 0,
-                            'personil_chemical' => $detail->personil_chemical ?? 0,
-                            'total_personil' => $detail->total_personil,
-                            'sub_total_personil' => $detail->sub_total_personil,
-                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
-                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-                        ],
-
-                        // ✅ DATA COSS
-                        'coss' => [
-                            'nominal_upah' => $detail->nominal_upah, // Sama dengan HPP
-                            'total_tunjangan' => $detail->total_tunjangan, // Sama dengan HPP
-                            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan, // Sama dengan HPP
-                            'bpjs_kesehatan' => $detail->bpjs_kesehatan, // Sama dengan HPP
-                            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya, // Sama dengan HPP
-                            'kompensasi' => $detail->kompensasi, // Sama dengan HPP
-                            'lembur' => $lemburDisplay, // Sama dengan HPP
-                            'nominal_takaful' => $detail->nominal_takaful, // Sama dengan HPP
-                            'tunjangan_holiday' => $tunjanganHolidayDisplay, // Sama dengan HPP
-                            'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
-                            'insentif' => $detail->insentif, // Sama dengan HPP
-                            'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
-                            'personil_devices' => $detail->personil_devices_coss ?? 0,
-                            'personil_ohc' => $detail->personil_ohc_coss ?? 0,
-                            'personil_chemical' => $detail->personil_chemical_coss ?? 0,
-                            'total_personil' => $detail->total_personil_coss ?? 0,
-                            'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
-                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
-                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-                        ]
-                    ];
-                })->toArray()
             ] : null,
 
             'quotation_pics' => $this->whenLoaded('quotationPics', function () {
@@ -381,15 +466,22 @@ class QuotationResource extends JsonResource
                 });
             }),
 
-            'quotation_kerjasamas' => $this->whenLoaded('quotationKerjasamas', function () {
-                return $this->quotationKerjasamas->map(function ($kerjasama) {
-                    return [
-                        'id' => $kerjasama->id,
-                        'perjanjian' => $kerjasama->perjanjian,
-                    ];
-                });
-            }),
-
+            'quotation_kerjasamas' => $this->relationLoaded('quotationKerjasamas')
+                ? $this->quotationKerjasamas
+                    ->whereNull('deleted_at')
+                    ->sortBy('id')
+                    ->values()
+                    ->map(function ($kerjasama, $index) {
+                        return [
+                            'id' => $kerjasama->id,
+                            'order' => $index + 1,
+                            'perjanjian' => $kerjasama->perjanjian,
+                            'is_delete' => $kerjasama->is_delete ?? 1,
+                            'is_editable' => $kerjasama->is_delete == 1,
+                        ];
+                    })->toArray()
+                : [],
+            // ...
             // Calculated fields
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
                 return $this->quotationDetails->sum('jumlah_hc');
