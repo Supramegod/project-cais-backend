@@ -312,54 +312,118 @@ class QuotationController extends Controller
             // Merge tipe_quotation ke request untuk validasi
             $request->merge(['tipe_quotation' => $tipe_quotation]);
 
+            // ✅ VALIDASI QUOTATION REFERENSI DULU
+            if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
+                if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
+                    throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
+                }
+            }
+
             // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
 
             // Handle quotation referensi untuk revisi/rekontrak
             $quotationReferensi = null;
             if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
-                if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
-                    throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
-                }
+                // ✅ LOAD SEMUA RELASI YANG DIBUTUHKAN
+                $quotationReferensi = Quotation::with([
+                    'quotationDetails.quotationDetailHpps',
+                    'quotationDetails.quotationDetailCosses',
+                    'quotationDetails.wage',
+                    'quotationDetails.quotationDetailRequirements',
+                    'quotationDetails.quotationDetailTunjangans',
+                    'leads',
+                    'statusQuotation',
+                    'quotationSites',  // ✅ PENTING: Load sites dulu
+                    'quotationPics',
+                    'quotationAplikasis',
+                    'quotationKaporlaps',
+                    'quotationDevices',
+                    'quotationChemicals',
+                    'quotationOhcs',
+                    'quotationTrainings',
+                    'quotationKerjasamas'
+                ])->findOrFail($request->quotation_referensi_id);
 
-                $quotationReferensi = Quotation::notDeleted()->findOrFail($request->quotation_referensi_id);
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
+
+                // ✅ TAMBAHKAN LOG UNTUK DEBUG
+                \Log::info('Quotation Referensi loaded', [
+                    'id' => $quotationReferensi->id,
+                    'nomor' => $quotationReferensi->nomor,
+                    'sites_count' => $quotationReferensi->quotationSites->count(),
+                    'details_count' => $quotationReferensi->quotationDetails->count(),
+                    'pics_count' => $quotationReferensi->quotationPics->count()
+                ]);
             }
 
             // Generate nomor berdasarkan tipe dari URL parameter
             $quotationData['nomor'] = $this->quotationBusinessService->generateNomorByType(
                 $request->perusahaan_id,
                 $request->entitas,
-                $tipe_quotation, // Gunakan parameter dari URL
+                $tipe_quotation,
                 $quotationReferensi
             );
 
             $quotationData['created_by'] = $user->full_name;
             $quotationData['tipe_quotation'] = $tipe_quotation;
 
+            // ✅ CREATE QUOTATION BARU
             $quotation = Quotation::create($quotationData);
 
-            // Create site data dan PIC
-            $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
-            $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
+            \Log::info('New Quotation created', [
+                'id' => $quotation->id,
+                'nomor' => $quotation->nomor,
+                'tipe' => $tipe_quotation
+            ]);
 
-            // Untuk revisi/rekontrak, copy additional data dari referensi
+            // Untuk revisi/rekontrak, copy data dari referensi
             if ($quotationReferensi) {
-                $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
+                // ✅ PANGGIL DUPLIKASI SERVICE
+                \Log::info('Starting duplication process');
+
+                $this->quotationDuplicationService->duplicateQuotationData(
+                    $quotation,
+                    $quotationReferensi
+                );
+
+                \Log::info('Duplication completed', [
+                    'new_quotation_id' => $quotation->id,
+                    'sites_created' => $quotation->quotationSites()->count(),
+                    'details_created' => $quotation->quotationDetails()->count(),
+                    'pics_created' => $quotation->quotationPics()->count()
+                ]);
+            } else {
+                // Hanya buat site dan PIC awal jika BUKAN revisi/rekontrak
+                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
+                $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
             }
 
             $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
 
             DB::commit();
 
+            // ✅ RELOAD DENGAN RELASI UNTUK RESPONSE
+            $quotation->load([
+                'quotationSites',
+                'quotationPics',
+                'quotationDetails',
+                'statusQuotation'
+            ]);
+
             return response()->json([
                 'success' => true,
-                'data' => new QuotationResource($quotation->load(['quotationSites', 'quotationPics'])),
+                'data' => new QuotationResource($quotation),
                 'message' => 'Quotation ' . $tipe_quotation . ' created successfully'
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Failed to create quotation', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create quotation',
