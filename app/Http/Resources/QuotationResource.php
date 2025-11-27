@@ -17,7 +17,7 @@ class QuotationResource extends JsonResource
         parent::__construct($resource);
 
         // Pastikan relasi diperlukan untuk calculation sudah diload
-        if ($resource->relationLoaded('quotationDetails')) {
+        if (!$resource->relationLoaded('quotationDetails')) {
             $resource->load([
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
@@ -25,9 +25,14 @@ class QuotationResource extends JsonResource
             ]);
         }
 
-        // Hitung quotation menggunakan service
-        $quotationService = new QuotationService();
-        $this->calculatedQuotation = $quotationService->calculateQuotation($resource);
+        // Hitung quotation menggunakan service dengan error handling
+        try {
+            $quotationService = new QuotationService();
+            $this->calculatedQuotation = $quotationService->calculateQuotation($resource);
+        } catch (\Exception $e) {
+            \Log::error("Error calculating quotation in resource: " . $e->getMessage());
+            $this->calculatedQuotation = null;
+        }
     }
     public function toArray($request)
     {
@@ -329,40 +334,121 @@ class QuotationResource extends JsonResource
                 });
             }),
 
-            // CALCULATION - data summary dari service
             'calculation' => $this->calculatedQuotation ? [
                 'hpp' => [
-                    'total_sebelum_management_fee' => $this->calculatedQuotation->total_sebelum_management_fee,
-                    'nominal_management_fee' => $this->calculatedQuotation->nominal_management_fee,
-                    'grand_total_sebelum_pajak' => $this->calculatedQuotation->grand_total_sebelum_pajak,
-                    'ppn' => $this->calculatedQuotation->ppn,
-                    'pph' => $this->calculatedQuotation->pph,
-                    'dpp' => $this->calculatedQuotation->dpp,
-                    'total_invoice' => $this->calculatedQuotation->total_invoice,
-                    'pembulatan' => $this->calculatedQuotation->pembulatan,
-                    'margin' => $this->calculatedQuotation->margin,
-                    'gpm' => $this->calculatedQuotation->gpm,
-                    'persen_bunga_bank' => $this->persen_bunga_bank,
-                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan,
-                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan,
-                    'persen_insentif' => $this->persen_incentif,
+                    'total_sebelum_management_fee' => $this->calculatedQuotation->calculation_summary->total_sebelum_management_fee ?? 0,
+                    'nominal_management_fee' => $this->calculatedQuotation->calculation_summary->nominal_management_fee ?? 0,
+                    'grand_total_sebelum_pajak' => $this->calculatedQuotation->calculation_summary->grand_total_sebelum_pajak ?? 0,
+                    'ppn' => $this->calculatedQuotation->calculation_summary->ppn ?? 0,
+                    'pph' => $this->calculatedQuotation->calculation_summary->pph ?? 0,
+                    'dpp' => $this->calculatedQuotation->calculation_summary->dpp ?? 0,
+                    'total_invoice' => $this->calculatedQuotation->calculation_summary->total_invoice ?? 0,
+                    'pembulatan' => $this->calculatedQuotation->calculation_summary->pembulatan ?? 0,
+                    'margin' => $this->calculatedQuotation->calculation_summary->margin ?? 0,
+                    'gpm' => $this->calculatedQuotation->calculation_summary->gpm ?? 0,
+                    'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
+                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan ?? 0,
+                    'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
                 'coss' => [
-                    'total_sebelum_management_fee_coss' => $this->calculatedQuotation->total_sebelum_management_fee_coss,
-                    'nominal_management_fee_coss' => $this->calculatedQuotation->nominal_management_fee_coss,
-                    'grand_total_sebelum_pajak_coss' => $this->calculatedQuotation->grand_total_sebelum_pajak_coss,
-                    'ppn_coss' => $this->calculatedQuotation->ppn_coss,
-                    'pph_coss' => $this->calculatedQuotation->pph_coss,
-                    'dpp_coss' => $this->calculatedQuotation->dpp_coss,
-                    'total_invoice_coss' => $this->calculatedQuotation->total_invoice_coss,
-                    'pembulatan_coss' => $this->calculatedQuotation->pembulatan_coss,
-                    'margin_coss' => $this->calculatedQuotation->margin_coss,
-                    'gpm_coss' => $this->calculatedQuotation->gpm_coss,
-                    'persen_bunga_bank' => $this->persen_bunga_bank,
-                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan,
-                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan,
-                    'persen_insentif' => $this->persen_incentif,
+                    'total_sebelum_management_fee_coss' => $this->calculatedQuotation->calculation_summary->total_sebelum_management_fee_coss ?? 0,
+                    'nominal_management_fee_coss' => $this->calculatedQuotation->calculation_summary->nominal_management_fee_coss ?? 0,
+                    'grand_total_sebelum_pajak_coss' => $this->calculatedQuotation->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
+                    'ppn_coss' => $this->calculatedQuotation->calculation_summary->ppn_coss ?? 0,
+                    'pph_coss' => $this->calculatedQuotation->calculation_summary->pph_coss ?? 0,
+                    'dpp_coss' => $this->calculatedQuotation->calculation_summary->dpp_coss ?? 0,
+                    'total_invoice_coss' => $this->calculatedQuotation->calculation_summary->total_invoice_coss ?? 0,
+                    'pembulatan_coss' => $this->calculatedQuotation->calculation_summary->pembulatan_coss ?? 0,
+                    'margin_coss' => $this->calculatedQuotation->calculation_summary->margin_coss ?? 0,
+                    'gpm_coss' => $this->calculatedQuotation->calculation_summary->gpm_coss ?? 0,
+                    'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
+                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan ?? 0,
+                    'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
+                'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
+                    // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
+                    $wage = $detail->wage ?? null;
+
+                    // Logic untuk display lembur
+                    $lemburDisplay = '';
+                    if ($wage) {
+                        if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
+                            $lemburDisplay = 'Ditagihkan terpisah';
+                        } elseif ($wage->lembur == 'Flat') {
+                            $lemburDisplay = 'Rp. ' . number_format($detail->lembur, 2, ',', '.');
+                        } else {
+                            $lemburDisplay = 'Tidak Ada';
+                        }
+                    }
+
+                    // Logic untuk display tunjangan_holiday
+                    $tunjanganHolidayDisplay = '';
+                    if ($wage) {
+                        if ($wage->tunjangan_holiday == 'Normatif') {
+                            $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
+                        } elseif ($wage->tunjangan_holiday == 'Flat') {
+                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($detail->tunjangan_holiday, 2, ',', '.');
+                        } else {
+                            $tunjanganHolidayDisplay = 'Tidak Ada';
+                        }
+                    }
+
+                    return [
+                        'id' => $detail->id,
+                        'position_name' => $detail->jabatan_kebutuhan,
+                        'jumlah_hc' => $detail->jumlah_hc,
+                        'nama_site' => $detail->nama_site,
+                        'quotation_site_id' => $detail->quotation_site_id,
+
+                        // ✅ DATA HPP
+                        'hpp' => [
+                            'nominal_upah' => $detail->nominal_upah,
+                            'total_tunjangan' => $detail->total_tunjangan,
+                            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+                            'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                            'kompensasi' => $detail->kompensasi,
+                            'lembur' => $lemburDisplay,
+                            'nominal_takaful' => $detail->nominal_takaful,
+                            'tunjangan_holiday' => $tunjanganHolidayDisplay,
+                            'bunga_bank' => $detail->bunga_bank,
+                            'insentif' => $detail->insentif,
+                            'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
+                            'personil_devices' => $detail->personil_devices ?? 0,
+                            'personil_ohc' => $detail->personil_ohc ?? 0,
+                            'personil_chemical' => $detail->personil_chemical ?? 0,
+                            'total_personil' => $detail->total_personil,
+                            'sub_total_personil' => $detail->sub_total_personil,
+                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
+                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                        ],
+
+                        // ✅ DATA COSS
+                        'coss' => [
+                            'nominal_upah' => $detail->nominal_upah,
+                            'total_tunjangan' => $detail->total_tunjangan,
+                            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+                            'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                            'kompensasi' => $detail->kompensasi,
+                            'lembur' => $lemburDisplay,
+                            'nominal_takaful' => $detail->nominal_takaful,
+                            'tunjangan_holiday' => $tunjanganHolidayDisplay,
+                            'bunga_bank' => $detail->bunga_bank,
+                            'insentif' => $detail->insentif,
+                            'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
+                            'personil_devices_coss' => $detail->personil_devices_coss ?? 0,
+                            'personil_ohc_coss' => $detail->personil_ohc_coss ?? 0,
+                            'personil_chemical_coss' => $detail->personil_chemical_coss ?? 0,
+                            'total_personil' => $detail->total_personil_coss ?? 0,
+                            'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
+                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
+                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                        ]
+                    ];
+                })->toArray()
             ] : null,
 
             'quotation_pics' => $this->whenLoaded('quotationPics', function () {

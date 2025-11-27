@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\DTO\DetailCalculation;
+use App\DTO\QuotationCalculationResult;
 use App\Models\AplikasiPendukung;
 use App\Models\BarangDefaultQty;
 use App\Models\BidangPerusahaan;
@@ -806,17 +808,64 @@ class QuotationStepService
             throw $e;
         }
     }
+
     public function updateStep11(Quotation $quotation, Request $request): void
     {
-        $quotation->update([
-            'penagihan' => $request->penagihan,
-            'updated_by' => Auth::user()->full_name
-        ]);
+        DB::beginTransaction();
+        try {
+            $user = Auth::user()->full_name;
+            $currentDateTime = Carbon::now();
 
-        // Generate perjanjian kerjasama
-        $this->generateKerjasama($quotation);
+            // Update penagihan menggunakan DB facade untuk menghindari masalah attribute model
+            DB::table('sl_quotation')
+                ->where('id', $quotation->id)
+                ->update([
+                    'penagihan' => $request->penagihan,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ]);
+
+            // Generate perjanjian kerjasama
+            $this->generateKerjasama($quotation);
+
+            // =====================================================
+            // SIMPAN HASIL PERHITUNGAN KE DATABASE MENGGUNAKAN DTO
+            // =====================================================
+
+            // Panggil calculateQuotation untuk mendapatkan hasil perhitungan dalam DTO
+            $calculationResult = $this->quotationService->calculateQuotation($quotation);
+
+            // Loop setiap detail calculation untuk menyimpan ke HPP dan COSS
+            foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
+                // Simpan ke QuotationDetailHpp
+                $this->saveHppDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime);
+
+                // Simpan ke QuotationDetailCoss  
+                $this->saveCossDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime);
+            }
+
+            // Update data quotation hanya dengan kolom yang ada - GUNAKAN DB FACADE
+            $this->updateQuotationDataFromCalculation($calculationResult, $user, $currentDateTime);
+
+            DB::commit();
+
+            \Log::info("Step 11 updated successfully with calculation data", [
+                'quotation_id' => $quotation->id,
+                'details_processed' => count($calculationResult->detail_calculations),
+                'hpp_updated' => true,
+                'coss_updated' => true
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep11", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
-
     public function updateStep12(Quotation $quotation, Request $request): void
     {
         DB::beginTransaction();
@@ -1812,6 +1861,191 @@ class QuotationStepService
         } catch (\Exception $e) {
             \Log::error("Error soft deleting all quotation details with model", [
                 'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+
+    /**
+     * Simpan data HPP dari DetailCalculation DTO
+     */
+    private function saveHppDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
+    {
+        try {
+            // Cari existing HPP data
+            $existingHpp = QuotationDetailHpp::where('quotation_detail_id', $detailCalculation->detail_id)->first();
+
+            // Ambil data dari DTO
+            $hppData = $detailCalculation->hpp_data;
+
+            // Tambahkan field tambahan dari calculation summary
+            $hppData = array_merge($hppData, [
+                'management_fee' => $calculationResult->calculation_summary->nominal_management_fee ?? 0,
+                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0, // Ambil dari quotation asli
+                'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak ?? 0,
+                'ppn' => $calculationResult->calculation_summary->ppn ?? 0,
+                'pph' => $calculationResult->calculation_summary->pph ?? 0,
+                'total_invoice' => $calculationResult->calculation_summary->total_invoice ?? 0,
+                'pembulatan' => $calculationResult->calculation_summary->pembulatan ?? 0,
+                'is_pembulatan' => ($calculationResult->calculation_summary->pembulatan != $calculationResult->calculation_summary->total_invoice) ? 1 : 0,
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ]);
+
+            // Jika existing data ada, update. Jika tidak, create baru
+            if ($existingHpp) {
+                // Jangan overwrite value yang sudah ada jika value custom user
+                $preservedFields = [
+                    'gaji_pokok',
+                    'tunjangan_hari_raya',
+                    'kompensasi',
+                    'tunjangan_hari_libur_nasional',
+                    'lembur',
+                    'bunga_bank',
+                    'insentif'
+                ];
+
+                foreach ($preservedFields as $field) {
+                    if ($existingHpp->$field !== null && $existingHpp->$field != 0) {
+                        unset($hppData[$field]);
+                    }
+                }
+
+                $existingHpp->update($hppData);
+
+                \Log::debug("Updated existing HPP data", [
+                    'detail_id' => $detailCalculation->detail_id,
+                    'hpp_id' => $existingHpp->id
+                ]);
+            } else {
+                $hppData['created_by'] = $user;
+                $hppData['created_at'] = $currentDateTime;
+                $newHpp = QuotationDetailHpp::create($hppData);
+
+                \Log::debug("Created new HPP data", [
+                    'detail_id' => $detailCalculation->detail_id,
+                    'hpp_id' => $newHpp->id
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error("Error saving HPP data from calculation for detail {$detailCalculation->detail_id}", [
+                'detail_id' => $detailCalculation->detail_id,
+                'error' => $e->getMessage(),
+                'hpp_data' => $hppData
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Simpan data COSS dari DetailCalculation DTO
+     */
+    private function saveCossDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
+    {
+        try {
+            // Cari existing COSS data
+            $existingCoss = QuotationDetailCoss::where('quotation_detail_id', $detailCalculation->detail_id)->first();
+
+            // Ambil data dari DTO
+            $cossData = $detailCalculation->coss_data;
+
+            // Tambahkan field tambahan dari calculation summary
+            $cossData = array_merge($cossData, [
+                'management_fee' => $calculationResult->calculation_summary->nominal_management_fee_coss ?? 0,
+                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0, // Ambil dari quotation asli
+                'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
+                'ppn' => $calculationResult->calculation_summary->ppn_coss ?? 0,
+                'pph' => $calculationResult->calculation_summary->pph_coss ?? 0,
+                'total_invoice' => $calculationResult->calculation_summary->total_invoice_coss ?? 0,
+                'pembulatan' => $calculationResult->calculation_summary->pembulatan_coss ?? 0,
+                'is_pembulatan' => ($calculationResult->calculation_summary->pembulatan_coss != $calculationResult->calculation_summary->total_invoice_coss) ? 1 : 0,
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ]);
+
+            // Jika existing data ada, update. Jika tidak, create baru
+            if ($existingCoss) {
+                // Jangan overwrite value yang sudah ada jika value custom user
+                $preservedFields = [
+                    'gaji_pokok',
+                    'tunjangan_hari_raya',
+                    'kompensasi',
+                    'tunjangan_hari_libur_nasional',
+                    'lembur',
+                    'bunga_bank',
+                    'insentif'
+                ];
+
+                foreach ($preservedFields as $field) {
+                    if ($existingCoss->$field !== null && $existingCoss->$field != 0) {
+                        unset($cossData[$field]);
+                    }
+                }
+
+                $existingCoss->update($cossData);
+
+                \Log::debug("Updated existing COSS data", [
+                    'detail_id' => $detailCalculation->detail_id,
+                    'coss_id' => $existingCoss->id
+                ]);
+            } else {
+                $cossData['created_by'] = $user;
+                $cossData['created_at'] = $currentDateTime;
+                $newCoss = QuotationDetailCoss::create($cossData);
+
+                \Log::debug("Created new COSS data", [
+                    'detail_id' => $detailCalculation->detail_id,
+                    'coss_id' => $newCoss->id
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error("Error saving COSS data from calculation for detail {$detailCalculation->detail_id}", [
+                'detail_id' => $detailCalculation->detail_id,
+                'error' => $e->getMessage(),
+                'coss_data' => $cossData
+            ]);
+            throw $e;
+        }
+    }
+
+    private function updateQuotationDataFromCalculation(QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
+    {
+        try {
+            $quotation = $calculationResult->quotation;
+
+            // RESET attributes yang tidak ada di tabel
+            $quotation->offsetUnset('quotation_detail');
+            $quotation->offsetUnset('quotation_site');
+            $quotation->offsetUnset('management_fee');
+            $quotation->offsetUnset('jumlah_hc');
+            $quotation->offsetUnset('provisi');
+            $quotation->offsetUnset('persen_bpjs_ketenagakerjaan');
+            $quotation->offsetUnset('persen_bpjs_kesehatan');
+
+            // HANYA update kolom yang ada di tabel
+            $updateData = [
+                'persen_insentif' => $quotation->persen_insentif ?? 0,
+                'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ];
+
+            $affectedRows = DB::table('sl_quotation')
+                ->where('id', $quotation->id)
+                ->update($updateData);
+
+            \Log::info("Quotation data updated from calculation", [
+                'quotation_id' => $quotation->id,
+                'affected_rows' => $affectedRows
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating quotation data from calculation", [
+                'quotation_id' => $quotation->id ?? 'unknown',
                 'error' => $e->getMessage()
             ]);
             throw $e;

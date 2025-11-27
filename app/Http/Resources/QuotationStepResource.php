@@ -342,41 +342,37 @@ class QuotationStepResource extends JsonResource
                                 'is_kuasa' => $pic->is_kuasa,
                             ];
                         })->toArray() : [],
-                    // Data perhitungan dari service
+                    // Data perhitungan dari service - DIPERBAIKI: akses melalui calculation_summary
                     'calculation' => $calculatedQuotation ? [
                         'hpp' => [
-                            'total_sebelum_management_fee' => $calculatedQuotation->total_sebelum_management_fee,
-                            'nominal_management_fee' => $calculatedQuotation->nominal_management_fee,
-                            'grand_total_sebelum_pajak' => $calculatedQuotation->grand_total_sebelum_pajak,
-                            'ppn' => $calculatedQuotation->ppn,
-                            'pph' => $calculatedQuotation->pph,
-                            'dpp' => $calculatedQuotation->dpp,
-                            'total_invoice' => $calculatedQuotation->total_invoice,
-                            'pembulatan' => $calculatedQuotation->pembulatan,
-                            'margin' => $calculatedQuotation->margin,
-                            'gpm' => $calculatedQuotation->gpm,
-                            'persen_bunga_bank' => $quotation->persen_bunga_bank,
-                            'persen_bpjs_kesehatan' => $quotation->persen_bpjs_kesehatan,
-                            'persen_bpjs_ketenagakerjaan' => $quotation->persen_bpjs_ketenagakerjaan,
-                            'persen_insentif' => $quotation->persen_incentif,
+                            'total_sebelum_management_fee' => $calculatedQuotation->calculation_summary->total_sebelum_management_fee ?? 0,
+                            'nominal_management_fee' => $calculatedQuotation->calculation_summary->nominal_management_fee ?? 0,
+                            'grand_total_sebelum_pajak' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak ?? 0,
+                            'ppn' => $calculatedQuotation->calculation_summary->ppn ?? 0,
+                            'pph' => $calculatedQuotation->calculation_summary->pph ?? 0,
+                            'dpp' => $calculatedQuotation->calculation_summary->dpp ?? 0,
+                            'total_invoice' => $calculatedQuotation->calculation_summary->total_invoice ?? 0,
+                            'pembulatan' => $calculatedQuotation->calculation_summary->pembulatan ?? 0,
+                            'margin' => $calculatedQuotation->calculation_summary->margin ?? 0,
+                            'gpm' => $calculatedQuotation->calculation_summary->gpm ?? 0,
+                            'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
+                            'persen_insentif' => $quotation->persen_insentif ?? 0,
                         ],
                         'coss' => [
-                            'total_sebelum_management_fee_coss' => $calculatedQuotation->total_sebelum_management_fee_coss,
-                            'nominal_management_fee_coss' => $calculatedQuotation->nominal_management_fee_coss,
-                            'grand_total_sebelum_pajak_coss' => $calculatedQuotation->grand_total_sebelum_pajak_coss,
-                            'ppn_coss' => $calculatedQuotation->ppn_coss,
-                            'pph_coss' => $calculatedQuotation->pph_coss,
-                            'dpp_coss' => $calculatedQuotation->dpp_coss,
-                            'total_invoice_coss' => $calculatedQuotation->total_invoice_coss,
-                            'pembulatan_coss' => $calculatedQuotation->pembulatan_coss,
-                            'margin_coss' => $calculatedQuotation->margin_coss,
-                            'gpm_coss' => $calculatedQuotation->gpm_coss,
-                            'persen_bunga_bank' => $quotation->persen_bunga_bank,
-                            'persen_bpjs_kesehatan' => $quotation->persen_bpjs_kesehatan,
-                            'persen_bpjs_ketenagakerjaan' => $quotation->persen_bpjs_ketenagakerjaan,
-                            'persen_insentif' => $quotation->persen_incentif,
+                            'total_sebelum_management_fee_coss' => $calculatedQuotation->calculation_summary->total_sebelum_management_fee_coss ?? 0,
+                            'nominal_management_fee_coss' => $calculatedQuotation->calculation_summary->nominal_management_fee_coss ?? 0,
+                            'grand_total_sebelum_pajak_coss' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
+                            'ppn_coss' => $calculatedQuotation->calculation_summary->ppn_coss ?? 0,
+                            'pph_coss' => $calculatedQuotation->calculation_summary->pph_coss ?? 0,
+                            'dpp_coss' => $calculatedQuotation->calculation_summary->dpp_coss ?? 0,
+                            'total_invoice_coss' => $calculatedQuotation->calculation_summary->total_invoice_coss ?? 0,
+                            'pembulatan_coss' => $calculatedQuotation->calculation_summary->pembulatan_coss ?? 0,
+                            'margin_coss' => $calculatedQuotation->calculation_summary->margin_coss ?? 0,
+                            'gpm_coss' => $calculatedQuotation->calculation_summary->gpm_coss ?? 0,
+                            'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
+                            'persen_insentif' => $quotation->persen_insentif ?? 0,
                         ],
-                        'quotation_details' => $calculatedQuotation->quotation_detail->map(function ($detail) {
+                        'quotation_details' => $calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
                             // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
                             $wage = $detail->wage ?? null;
 
@@ -411,7 +407,6 @@ class QuotationStepResource extends JsonResource
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
 
-
                                 // ✅ DATA HPP
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
@@ -437,21 +432,21 @@ class QuotationStepResource extends JsonResource
 
                                 // ✅ DATA COSS
                                 'coss' => [
-                                    'nominal_upah' => $detail->nominal_upah, // Sama dengan HPP
-                                    'total_tunjangan' => $detail->total_tunjangan, // Sama dengan HPP
-                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan, // Sama dengan HPP
-                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan, // Sama dengan HPP
-                                    'tunjangan_hari_raya' => $detail->tunjangan_hari_raya, // Sama dengan HPP
-                                    'kompensasi' => $detail->kompensasi, // Sama dengan HPP
-                                    'lembur' => $lemburDisplay, // Sama dengan HPP
-                                    'nominal_takaful' => $detail->nominal_takaful, // Sama dengan HPP
-                                    'tunjangan_holiday' => $tunjanganHolidayDisplay, // Sama dengan HPP
-                                    'bunga_bank' => $detail->bunga_bank, // Sama dengan HPP
-                                    'insentif' => $detail->insentif, // Sama dengan HPP
+                                    'nominal_upah' => $detail->nominal_upah,
+                                    'total_tunjangan' => $detail->total_tunjangan,
+                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                                    'kompensasi' => $detail->kompensasi,
+                                    'lembur' => $lemburDisplay,
+                                    'nominal_takaful' => $detail->nominal_takaful,
+                                    'tunjangan_holiday' => $tunjanganHolidayDisplay,
+                                    'bunga_bank' => $detail->bunga_bank,
+                                    'insentif' => $detail->insentif,
                                     'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
-                                    'personil_devices' => $detail->personil_devices_coss ?? 0,
-                                    'personil_ohc' => $detail->personil_ohc_coss ?? 0,
-                                    'personil_chemical' => $detail->personil_chemical_coss ?? 0,
+                                    'personil_devices_coss' => $detail->personil_devices_coss ?? 0,
+                                    'personil_ohc_coss' => $detail->personil_ohc_coss ?? 0,
+                                    'personil_chemical_coss' => $detail->personil_chemical_coss ?? 0,
                                     'total_personil' => $detail->total_personil_coss ?? 0,
                                     'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
@@ -467,13 +462,13 @@ class QuotationStepResource extends JsonResource
                 // ✅ STRUKTUR BARU: Kerjasama dengan ID tracking
                 $kerjasamas = $quotation->relationLoaded('quotationKerjasamas')
                     ? $quotation->quotationKerjasamas
-                        ->whereNull('deleted_at')  // Filter yang belum dihapus
-                        ->sortBy('id')              // Sort by ID
-                        ->values()                  // Reset keys
+                        ->whereNull('deleted_at')
+                        ->sortBy('id')
+                        ->values()
                         ->map(function ($kerjasama, $index) {
                             return [
                                 'id' => $kerjasama->id,
-                                'order' => $index + 1,  // Numbering untuk UI
+                                'order' => $index + 1,
                                 'perjanjian' => $kerjasama->perjanjian,
                                 'is_delete' => $kerjasama->is_delete ?? 1,
                                 'is_editable' => $kerjasama->is_delete == 1,
@@ -484,23 +479,23 @@ class QuotationStepResource extends JsonResource
                 $finalData = [
                     'quotation_kerjasamas' => $kerjasamas,
                     'total_kerjasamas' => count($kerjasamas),
-                    'can_edit' => $quotation->step < 100,  // Check if still editable
+                    'can_edit' => $quotation->step < 100,
                     'final_confirmation' => true,
                 ];
 
-                // Add calculation data if available
+                // Add calculation data if available - DIPERBAIKI: akses melalui calculation_summary
                 if ($calculatedQuotation) {
                     $finalData['final_calculation'] = [
-                        'total_invoice' => $calculatedQuotation->total_invoice,
-                        'total_invoice_coss' => $calculatedQuotation->total_invoice_coss,
-                        'pembulatan' => $calculatedQuotation->pembulatan,
-                        'pembulatan_coss' => $calculatedQuotation->pembulatan_coss,
-                        'grand_total_sebelum_pajak' => $calculatedQuotation->grand_total_sebelum_pajak,
-                        'grand_total_sebelum_pajak_coss' => $calculatedQuotation->grand_total_sebelum_pajak_coss,
-                        'margin' => $calculatedQuotation->margin,
-                        'margin_coss' => $calculatedQuotation->margin_coss,
-                        'gpm' => $calculatedQuotation->gpm,
-                        'gpm_coss' => $calculatedQuotation->gpm_coss,
+                        'total_invoice' => $calculatedQuotation->calculation_summary->total_invoice ?? 0,
+                        'total_invoice_coss' => $calculatedQuotation->calculation_summary->total_invoice_coss ?? 0,
+                        'pembulatan' => $calculatedQuotation->calculation_summary->pembulatan ?? 0,
+                        'pembulatan_coss' => $calculatedQuotation->calculation_summary->pembulatan_coss ?? 0,
+                        'grand_total_sebelum_pajak' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak ?? 0,
+                        'grand_total_sebelum_pajak_coss' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
+                        'margin' => $calculatedQuotation->calculation_summary->margin ?? 0,
+                        'margin_coss' => $calculatedQuotation->calculation_summary->margin_coss ?? 0,
+                        'gpm' => $calculatedQuotation->calculation_summary->gpm ?? 0,
+                        'gpm_coss' => $calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                     ];
                 }
 
