@@ -16,6 +16,7 @@ use App\Models\{
     QuotationKaporlap,
     QuotationDevices,
     QuotationDetailWage,
+    SalaryRule,
     User
 };
 use App\DTO\QuotationCalculationResult;
@@ -1029,6 +1030,40 @@ class QuotationService
     {
         $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
 
+        // Get salary rule data
+        $salaryRuleQ = SalaryRule::select('cutoff', 'pengiriman_invoice', 'rilis_payroll')
+            ->whereNull('deleted_at')
+            ->where('id', $quotation->salary_rule_id)
+            ->first();
+
+        // Build salary schedule table
+        $tableSalary = '<table class="table table-bordered" style="width:100%">
+                      <thead>
+                        <tr>
+                          <th class="text-center"><b>No.</b></th>
+                          <th class="text-center"><b>Schedule Plan</b></th>
+                          <th class="text-center"><b>Periode</b></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="text-center">1</td>
+                          <td>Cut Off</td>
+                          <td>' . $salaryRuleQ->cutoff . '</td>
+                        </tr>
+                        <tr>
+                          <td class="text-center">2</td>
+                          <td>Pengiriman <i>Invoice</i></td>
+                          <td>' . $salaryRuleQ->pengiriman_invoice . '</td>
+                        </tr>
+                        <tr>
+                          <td class="text-center">6</td>
+                          <td>Rilis <i>Payroll</i> / Gaji</td>
+                          <td>' . $salaryRuleQ->rilis_payroll . '</td>
+                        </tr>
+                      </tbody>
+                    </table>';
+
         // Build kunjungan operasional text
         $kunjunganOperasional = "";
         if ($quotation->kunjungan_operasional != null) {
@@ -1062,7 +1097,7 @@ class QuotationService
 
         $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
 
-        $perjanjian[] = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b> maksimal 30 hari kalender.";
+        $perjanjian[] = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b> maksimal 30 hari kalender dengan skema sebagai berikut: <br>" . $tableSalary . "<i><br>*Rilis gaji adalah talangan.<br>*Maksimal pembayaran invoice 30 hari kalender setelah invoice</i>";
 
         $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
 

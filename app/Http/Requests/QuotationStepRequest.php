@@ -128,6 +128,10 @@ class QuotationStepRequest extends FormRequest
 
             case 11:
                 $rules['penagihan'] = 'required|string';
+                $rules['tunjangan_data'] = 'sometimes|array';
+                $rules['tunjangan_data.*'] = 'sometimes|array'; // Data per detail_id
+                $rules['tunjangan_data.*.*.nama_tunjangan'] = 'required_with:tunjangan_data.*|string|max:255';
+                $rules['tunjangan_data.*.*.nominal'] = 'required_with:tunjangan_data.*|numeric|min:0';
                 break;
 
             case 12:

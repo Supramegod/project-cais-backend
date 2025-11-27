@@ -220,7 +220,7 @@ class QuotationStepController extends Controller
      * )
      */
     public function updateStep(QuotationStepRequest $request, $id, $step): JsonResponse
-    {
+    { set_time_limit(0);
         DB::beginTransaction();
         try {
             $quotation = Quotation::notDeleted()->findOrFail($id);
