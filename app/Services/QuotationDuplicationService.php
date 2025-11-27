@@ -173,7 +173,7 @@ class QuotationDuplicationService
             'is_aktif' => 1,
             'revisi' => 0,
             'alasan_revisi' => null,
-            'step' => $referensiQuotation->step,
+            'step' => 1,
         ]);
     }
     private function duplicateQuotationDetails(Quotation $newQuotation, Quotation $referensiQuotation): void
