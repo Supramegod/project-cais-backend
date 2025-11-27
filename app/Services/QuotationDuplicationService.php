@@ -16,7 +16,9 @@ class QuotationDuplicationService
         try {
             \Log::info('Starting duplication', [
                 'new_id' => $newQuotation->id,
-                'ref_id' => $referensiQuotation->id
+                'ref_id' => $referensiQuotation->id,
+                'new_jenis_kontrak_before' => $newQuotation->jenis_kontrak, // ← LOG SEBELUM
+                'ref_jenis_kontrak' => $referensiQuotation->jenis_kontrak
             ]);
 
             // ✅ 1. COPY BASIC QUOTATION DATA FIRST
@@ -99,7 +101,7 @@ class QuotationDuplicationService
             'jenis_kontrak' => $referensiQuotation->jenis_kontrak,
             'mulai_kontrak' => $referensiQuotation->mulai_kontrak,
             'kontrak_selesai' => $referensiQuotation->kontrak_selesai,
-            'tgl_penempatan' => $referensiQuotation->tgl_penempatan? Carbon::parse($referensiQuotation->tgl_penempatan)->isoFormat('Y-MM-DD') : null,
+            'tgl_penempatan' => $referensiQuotation->tgl_penempatan ? Carbon::parse($referensiQuotation->tgl_penempatan)->isoFormat('Y-MM-DD') : null,
 
             // Payment & Salary details
             'salary_rule_id' => $referensiQuotation->salary_rule_id,
@@ -174,10 +176,6 @@ class QuotationDuplicationService
             'step' => $referensiQuotation->step,
         ]);
     }
-
-    /**
-     * Duplicate quotation details and related data
-     */
     private function duplicateQuotationDetails(Quotation $newQuotation, Quotation $referensiQuotation): void
     {
         foreach ($referensiQuotation->quotationDetails as $detailReferensi) {
@@ -185,7 +183,8 @@ class QuotationDuplicationService
             $newDetail = $newQuotation->quotationDetails()->create([
                 'quotation_site_id' => $this->getMappedSiteId($newQuotation, $detailReferensi->quotation_site_id),
                 'position_id' => $detailReferensi->position_id,
-                'position' => $detailReferensi->position,
+                'jabatan_kebutuhan' => $detailReferensi->jabatan_kebutuhan,
+                'nama_site' => $detailReferensi->nama_site,
                 'jumlah_hc' => $detailReferensi->jumlah_hc,
                 'nominal_upah' => $detailReferensi->nominal_upah,
                 'penjamin_kesehatan' => $detailReferensi->penjamin_kesehatan,
@@ -198,9 +197,30 @@ class QuotationDuplicationService
                 'created_by' => $newQuotation->created_by
             ]);
 
-            // Copy tunjangan
+            // ✅ PERBAIKI: Copy wage data dengan quotation_id yang benar
+            if ($detailReferensi->relationLoaded('wage') && $detailReferensi->wage) {
+                $newDetail->wage()->create([
+                    'quotation_id' => $newQuotation->id, // ✅ TAMBAHKAN INI
+                    'upah' => $detailReferensi->wage->upah,
+                    'hitungan_upah' => $detailReferensi->wage->hitungan_upah,
+                    'lembur' => $detailReferensi->wage->lembur,
+                    'nominal_lembur' => $detailReferensi->wage->nominal_lembur,
+                    'jenis_bayar_lembur' => $detailReferensi->wage->jenis_bayar_lembur,
+                    'jam_per_bulan_lembur' => $detailReferensi->wage->jam_per_bulan_lembur,
+                    'lembur_ditagihkan' => $detailReferensi->wage->lembur_ditagihkan,
+                    'kompensasi' => $detailReferensi->wage->kompensasi,
+                    'thr' => $detailReferensi->wage->thr,
+                    'tunjangan_holiday' => $detailReferensi->wage->tunjangan_holiday,
+                    'nominal_tunjangan_holiday' => $detailReferensi->wage->nominal_tunjangan_holiday,
+                    'jenis_bayar_tunjangan_holiday' => $detailReferensi->wage->jenis_bayar_tunjangan_holiday,
+                    'created_by' => $newQuotation->created_by
+                ]);
+            }
+
+            // Copy tunjangan (pastikan juga ada quotation_id di sini jika diperlukan)
             foreach ($detailReferensi->quotationDetailTunjangans as $tunjangan) {
                 $newDetail->quotationDetailTunjangans()->create([
+                    'quotation_id' => $newQuotation->id, // ✅ JIKA DIPERLUKAN
                     'nama_tunjangan' => $tunjangan->nama_tunjangan,
                     'nominal' => $tunjangan->nominal,
                     'created_by' => $newQuotation->created_by
@@ -211,6 +231,7 @@ class QuotationDuplicationService
             if ($detailReferensi->quotationDetailHpp) {
                 $hpp = $detailReferensi->quotationDetailHpp;
                 $newDetail->quotationDetailHpp()->create([
+                    'quotation_id' => $newQuotation->id, // ✅ JIKA DIPERLUKAN
                     'gaji_pokok' => $hpp->gaji_pokok,
                     'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
                     'kompensasi' => $hpp->kompensasi,
@@ -228,6 +249,7 @@ class QuotationDuplicationService
                     'provisi_ohc' => $hpp->provisi_ohc,
                     'bunga_bank' => $hpp->bunga_bank,
                     'insentif' => $hpp->insentif,
+                    'total_hpp' => $hpp->total_hpp,
                     'created_by' => $newQuotation->created_by
                 ]);
             }
@@ -236,13 +258,28 @@ class QuotationDuplicationService
             if ($detailReferensi->quotationDetailCoss) {
                 $coss = $detailReferensi->quotationDetailCoss;
                 $newDetail->quotationDetailCoss()->create([
+                    'quotation_id' => $newQuotation->id, // ✅ JIKA DIPERLUKAN
+                    'gaji_pokok' => $coss->gaji_pokok,
+                    'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
+                    'kompensasi' => $coss->kompensasi,
+                    'tunjangan_hari_libur_nasional' => $coss->tunjangan_hari_libur_nasional,
+                    'lembur' => $coss->lembur,
+                    'bpjs_jkk' => $coss->bpjs_jkk,
+                    'bpjs_jkm' => $coss->bpjs_jkm,
+                    'bpjs_jht' => $coss->bpjs_jht,
+                    'bpjs_jp' => $coss->bpjs_jp,
+                    'bpjs_ks' => $coss->bpjs_ks,
+                    'takaful' => $coss->takaful,
                     'provisi_seragam' => $coss->provisi_seragam,
                     'provisi_peralatan' => $coss->provisi_peralatan,
                     'provisi_chemical' => $coss->provisi_chemical,
                     'provisi_ohc' => $coss->provisi_ohc,
+                    'bunga_bank' => $coss->bunga_bank,
+                    'insentif' => $coss->insentif,
                     'management_fee' => $coss->management_fee,
                     'ppn' => $coss->ppn,
                     'pph' => $coss->pph,
+                    'total_coss' => $coss->total_coss,
                     'created_by' => $newQuotation->created_by
                 ]);
             }
@@ -250,6 +287,7 @@ class QuotationDuplicationService
             // Copy requirements
             foreach ($detailReferensi->quotationDetailRequirements as $requirement) {
                 $newDetail->quotationDetailRequirements()->create([
+                    'quotation_id' => $newQuotation->id, // ✅ JIKA DIPERLUKAN
                     'requirement' => $requirement->requirement,
                     'created_by' => $newQuotation->created_by
                 ]);
@@ -297,6 +335,7 @@ class QuotationDuplicationService
         foreach ($referensiQuotation->quotationDevices as $device) {
             $newQuotation->quotationDevices()->create([
                 'barang_id' => $device->barang_id,
+                'quotation_detail_id' => $newDetailId,
                 'nama' => $device->nama,
                 'jenis_barang_id' => $device->jenis_barang_id,
                 'jenis_barang' => $device->jenis_barang,
