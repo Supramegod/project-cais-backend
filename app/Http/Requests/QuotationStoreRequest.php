@@ -104,11 +104,15 @@ class QuotationStoreRequest extends FormRequest
         ];
     }
 
-    /**
-     * Prepare data untuk validasi
-     */
     protected function prepareForValidation()
     {
+        // ✅ Merge tipe_quotation dari route parameter jika ada
+        if ($this->route('tipe_quotation')) {
+            $this->merge([
+                'tipe_quotation' => $this->route('tipe_quotation')
+            ]);
+        }
+
         // Pastikan array untuk multi site selalu ada (meski empty)
         if ($this->jumlah_site == 'Multi Site') {
             $this->merge([
