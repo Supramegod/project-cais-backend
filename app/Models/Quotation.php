@@ -45,6 +45,7 @@ class Quotation extends Model
         // Kolom baru yang ditambahkan
         'quotation_client_id',
         'layanan_id',
+        'jenis_kontrak',
         'layanan',
         'nama_site',
         'company',

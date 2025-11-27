@@ -325,16 +325,16 @@ class QuotationController extends Controller
             // Handle quotation referensi untuk revisi/rekontrak
             $quotationReferensi = null;
             if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
-                // ✅ LOAD SEMUA RELASI YANG DIBUTUHKAN
+                // ✅ PASTIKAN SEMUA RELASI DIMUAT
                 $quotationReferensi = Quotation::with([
                     'quotationDetails.quotationDetailHpps',
                     'quotationDetails.quotationDetailCosses',
-                    'quotationDetails.wage',
+                    'quotationDetails.wage', // ✅ PASTIKAN WAGE DIMUAT
                     'quotationDetails.quotationDetailRequirements',
                     'quotationDetails.quotationDetailTunjangans',
                     'leads',
                     'statusQuotation',
-                    'quotationSites',  // ✅ PENTING: Load sites dulu
+                    'quotationSites',
                     'quotationPics',
                     'quotationAplikasis',
                     'quotationKaporlaps',
@@ -344,6 +344,7 @@ class QuotationController extends Controller
                     'quotationTrainings',
                     'quotationKerjasamas'
                 ])->findOrFail($request->quotation_referensi_id);
+
 
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
 
@@ -378,8 +379,8 @@ class QuotationController extends Controller
             ]);
 
             // Untuk revisi/rekontrak, copy data dari referensi
+            // Untuk revisi/rekontrak, copy data dari referensi
             if ($quotationReferensi) {
-                // ✅ PANGGIL DUPLIKASI SERVICE
                 \Log::info('Starting duplication process');
 
                 $this->quotationDuplicationService->duplicateQuotationData(
@@ -387,11 +388,32 @@ class QuotationController extends Controller
                     $quotationReferensi
                 );
 
-                \Log::info('Duplication completed', [
+                // ✅ VERIFIKASI SETELAH DUPLIKASI
+                $quotation->load([
+                    'quotationSites',
+                    'quotationDetails.wage',
+                    'quotationDetails.quotationDetailHpps',
+                    'quotationDetails.quotationDetailCosses',
+                    'quotationDetails.quotationDetailTunjangans',
+                    'quotationPics',
+                    'quotationAplikasis',
+                    'quotationKaporlaps',
+                    'quotationDevices',
+                    'quotationChemicals',
+                    'quotationOhcs',
+                    'quotationTrainings',
+                    'quotationKerjasamas'
+                ]);
+
+                \Log::info('Duplication Verification', [
                     'new_quotation_id' => $quotation->id,
-                    'sites_created' => $quotation->quotationSites()->count(),
-                    'details_created' => $quotation->quotationDetails()->count(),
-                    'pics_created' => $quotation->quotationPics()->count()
+                    'sites_created' => $quotation->quotationSites->count(),
+                    'details_created' => $quotation->quotationDetails->count(),
+                    'details_with_wage' => $quotation->quotationDetails->where('wage')->count(),
+                    'hpp_count' => $quotation->quotationDetails->flatMap->quotationDetailHpps->count(),
+                    'coss_count' => $quotation->quotationDetails->flatMap->quotationDetailCosses->count(),
+                    'tunjangan_count' => $quotation->quotationDetails->flatMap->quotationDetailTunjangans->count(),
+                    'pics_created' => $quotation->quotationPics->count()
                 ]);
             } else {
                 // Hanya buat site dan PIC awal jika BUKAN revisi/rekontrak
