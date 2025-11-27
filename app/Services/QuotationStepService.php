@@ -808,7 +808,6 @@ class QuotationStepService
             throw $e;
         }
     }
-
     public function updateStep11(Quotation $quotation, Request $request): void
     {
         DB::beginTransaction();
@@ -824,6 +823,13 @@ class QuotationStepService
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);
+
+            // =====================================================
+            // TAMBAHAN: SYNC TUNJANGAN DATA
+            // =====================================================
+            if ($request->has('tunjangan_data') && is_array($request->tunjangan_data)) {
+                $this->syncTunjanganData($quotation, $request->tunjangan_data, $currentDateTime, $user);
+            }
 
             // Generate perjanjian kerjasama
             $this->generateKerjasama($quotation);
@@ -853,7 +859,8 @@ class QuotationStepService
                 'quotation_id' => $quotation->id,
                 'details_processed' => count($calculationResult->detail_calculations),
                 'hpp_updated' => true,
-                'coss_updated' => true
+                'coss_updated' => true,
+                'tunjangan_synced' => $request->has('tunjangan_data')
             ]);
 
         } catch (\Exception $e) {
@@ -1441,22 +1448,6 @@ class QuotationStepService
                 'created_at' => $timestamp,
                 'created_by' => $user
             ]);
-
-            // Create Tunjangans if provided
-            if (!empty($data['tunjangans']) && is_array($data['tunjangans'])) {
-                foreach ($data['tunjangans'] as $tunjangan) {
-                    if (!empty($tunjangan['nama_tunjangan'])) {
-                        QuotationDetailTunjangan::create([
-                            'quotation_id' => $quotation->id,
-                            'quotation_detail_id' => $newDetail->id,
-                            'nama_tunjangan' => $tunjangan['nama_tunjangan'],
-                            'nominal' => $tunjangan['nominal'] ?? 0,
-                            'created_at' => $timestamp,
-                            'created_by' => $user
-                        ]);
-                    }
-                }
-            }
 
             // Create Requirements if provided
             if (!empty($data['requirements']) && is_array($data['requirements'])) {
@@ -2047,6 +2038,122 @@ class QuotationStepService
             \Log::error("Error updating quotation data from calculation", [
                 'quotation_id' => $quotation->id ?? 'unknown',
                 'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+    private function syncTunjanganData(Quotation $quotation, array $tunjanganData, Carbon $currentDateTime, string $user): void
+    {
+        try {
+            \Log::info("Starting tunjangan data sync", [
+                'quotation_id' => $quotation->id,
+                'detail_count' => count($tunjanganData)
+            ]);
+
+            foreach ($tunjanganData as $detailId => $tunjangans) {
+                // Verify detail belongs to this quotation
+                $detail = QuotationDetail::where('id', $detailId)
+                    ->where('quotation_id', $quotation->id)
+                    ->whereNull('deleted_at')
+                    ->first();
+
+                if (!$detail) {
+                    \Log::warning("Quotation detail not found or deleted", [
+                        'detail_id' => $detailId,
+                        'quotation_id' => $quotation->id
+                    ]);
+                    continue;
+                }
+
+                // Get existing tunjangan for this detail
+                $existingTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
+                    ->whereNull('deleted_at')
+                    ->get()
+                    ->keyBy('nama_tunjangan');
+
+                // Track which tunjangan to keep
+                $processedTunjanganNames = [];
+
+                // Process incoming tunjangan data
+                if (is_array($tunjangans) && !empty($tunjangans)) {
+                    foreach ($tunjangans as $tunjanganData) {
+                        $namaTunjangan = trim($tunjanganData['nama_tunjangan'] ?? '');
+                        $nominal = $tunjanganData['nominal'] ?? 0;
+
+                        // Skip empty names
+                        if (empty($namaTunjangan)) {
+                            continue;
+                        }
+
+                        // Convert string nominal to integer if needed
+                        if (is_string($nominal)) {
+                            $nominal = (int) str_replace('.', '', $nominal);
+                        }
+
+                        $processedTunjanganNames[] = $namaTunjangan;
+
+                        // Update or create
+                        if ($existingTunjangan->has($namaTunjangan)) {
+                            // Update existing
+                            $existing = $existingTunjangan->get($namaTunjangan);
+                            $existing->update([
+                                'nominal' => $nominal,
+                                'updated_at' => $currentDateTime,
+                                'updated_by' => $user
+                            ]);
+
+                            \Log::debug("Updated tunjangan", [
+                                'detail_id' => $detailId,
+                                'nama_tunjangan' => $namaTunjangan,
+                                'nominal' => $nominal
+                            ]);
+                        } else {
+                            // Create new
+                            QuotationDetailTunjangan::create([
+                                'quotation_id' => $quotation->id,
+                                'quotation_detail_id' => $detailId,
+                                'nama_tunjangan' => $namaTunjangan,
+                                'nominal' => $nominal,
+                                'created_at' => $currentDateTime,
+                                'created_by' => $user
+                            ]);
+
+                            \Log::debug("Created tunjangan", [
+                                'detail_id' => $detailId,
+                                'nama_tunjangan' => $namaTunjangan,
+                                'nominal' => $nominal
+                            ]);
+                        }
+                    }
+                }
+
+                // Soft delete tunjangan that are no longer in the list
+                $tunjanganToDelete = $existingTunjangan->keys()->diff($processedTunjanganNames);
+                if ($tunjanganToDelete->isNotEmpty()) {
+                    QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
+                        ->whereIn('nama_tunjangan', $tunjanganToDelete->toArray())
+                        ->whereNull('deleted_at')
+                        ->update([
+                            'deleted_at' => $currentDateTime,
+                            'deleted_by' => $user
+                        ]);
+
+                    \Log::debug("Soft deleted tunjangan", [
+                        'detail_id' => $detailId,
+                        'deleted_names' => $tunjanganToDelete->toArray()
+                    ]);
+                }
+            }
+
+            \Log::info("Tunjangan data sync completed", [
+                'quotation_id' => $quotation->id
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error syncing tunjangan data", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }

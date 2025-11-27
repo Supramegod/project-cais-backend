@@ -7,6 +7,7 @@ use App\Models\{
     QuotationDetail,
     QuotationSite,
     ManagementFee,
+    QuotationAplikasi,
     QuotationDetailTunjangan,
     QuotationDetailHpp,
     QuotationDetailCoss,
@@ -1020,58 +1021,60 @@ class QuotationService
         }
     }
 
+
     /**
      * Generate konten perjanjian kerjasama
      */
     public function generateKerjasamaContent(Quotation $quotation)
     {
+        $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
+
+        // Build kunjungan operasional text
+        $kunjunganOperasional = "";
+        if ($quotation->kunjungan_operasional != null) {
+            $kunjunganParts = explode(" ", $quotation->kunjungan_operasional);
+            if (count($kunjunganParts) >= 2) {
+                $kunjunganOperasional = $kunjunganParts[0] . " kali dalam 1 " . $kunjunganParts[1];
+            }
+        }
+
+        // Get aplikasi pendukung
+        $appPendukung = QuotationAplikasi::select('aplikasi_pendukung')
+            ->whereNull('deleted_at')
+            ->where('quotation_id', $quotation->id)
+            ->get();
+
+        $sAppPendukung = "<b>";
+        foreach ($appPendukung as $kduk => $dukung) {
+            if ($kduk != 0) {
+                $sAppPendukung .= ", ";
+            }
+            $sAppPendukung .= $dukung->aplikasi_pendukung;
+        }
+        $sAppPendukung .= "</b>";
+
+        // Build perjanjian array
         $perjanjian = [];
 
-        // 1. Basic information
-        $perjanjian[] = "PERJANJIAN KERJASAMA";
-        $perjanjian[] = "Nomor: " . $quotation->nomor;
-        $perjanjian[] = "Pada hari ini " . Carbon::parse($quotation->tgl_quotation)->translatedFormat('l, d F Y') . " bertempat di " . $quotation->company;
-        $perjanjian[] = "";
+        $perjanjian[] = "Penawaran harga ini berlaku 30 hari sejak tanggal diterbitkan.";
 
-        // 2. Parties involved
-        $perjanjian[] = "PIHAK PERTAMA:";
-        $perjanjian[] = "Nama: " . $quotation->company;
-        $perjanjian[] = "Alamat: [ALAMAT_PERUSAHAAN]";
-        $perjanjian[] = "";
+        $perjanjian[] = "Akan dilakukan <i>survey</i> area untuk kebutuhan " . $kebutuhanPerjanjian . " sebagai tahapan <i>assesment</i> area untuk memastikan efektifitas pekerjaan.";
 
-        $perjanjian[] = "PIHAK KEDUA:";
-        $perjanjian[] = "Nama: " . $quotation->nama_perusahaan;
-        $perjanjian[] = "Alamat: [ALAMAT_CLIENT]";
-        $perjanjian[] = "";
+        $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
 
-        // 3. Service details
-        $perjanjian[] = "BENTUK KERJASAMA:";
-        $perjanjian[] = "Pihak Pertama akan menyediakan jasa " . $quotation->kebutuhan . " kepada Pihak Kedua";
-        $perjanjian[] = "Jumlah personil: " . $quotation->jumlah_hc . " orang";
-        $perjanjian[] = "Lokasi penempatan: " . $this->getSiteLocations($quotation);
-        $perjanjian[] = "";
+        $perjanjian[] = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b> maksimal 30 hari kalender.";
 
-        // 4. Contract period
-        $perjanjian[] = "JANGKA WAKTU PERJANJIAN:";
-        $perjanjian[] = "Perjanjian ini berlaku mulai " . Carbon::parse($quotation->mulai_kontrak)->translatedFormat('d F Y') . " sampai dengan " . Carbon::parse($quotation->kontrak_selesai)->translatedFormat('d F Y');
-        $perjanjian[] = "Durasi: " . $quotation->durasi_kerjasama;
-        $perjanjian[] = "";
+        $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
 
-        // 5. Financial terms
-        $perjanjian[] = "NILAI KONTRAK:";
-        $perjanjian[] = "Total nilai kontrak: Rp " . number_format($quotation->total_invoice, 0, ',', '.');
-        $perjanjian[] = "Management fee: " . $quotation->persentase . "%";
-        $perjanjian[] = "Terms of payment: " . $quotation->top;
-        $perjanjian[] = "";
+        $perjanjian[] = "Tim operasional bersifat <i>on call</i> apabila terjadi <i>case</i> atau insiden yang terjadi yang mengharuskan untuk datang ke lokasi kerja Pihak Pertama.";
 
-        // 6. Additional clauses
-        $perjanjian[] = "KETENTUAN LAIN-LAIN:";
-        $perjanjian[] = "1. Perjanjian ini dapat diperpanjang dengan kesepakatan kedua belah pihak";
-        $perjanjian[] = "2. Segala perubahan terhadap perjanjian ini harus dibuat secara tertulis";
-        $perjanjian[] = "3. Penyelesaian perselisihan akan dilakukan melalui musyawarah";
+        $perjanjian[] = "Pemenuhan kandidat dilakukan dengan 2 tahap <i>screening</i> :<br>a. Tahap ke -1 : dilakukan oleh tim rekrutmen <b>Pihak Kedua</b> untuk memastikan bahwa kandidat sudah sesuai dengan kualifikasi <b>dari Pihak Pertama</b>.<br>b. Tahap ke -2 : dilakukan oleh user <b>Pihak Pertama</b>, dan dijadwalkan setelah adanya <i>report</i> hasil <i>screening</i> dari <b>Pihak Kedua</b>.";
+
+        $perjanjian[] = "<i>Support</i> aplikasi digital :" . $sAppPendukung . ".";
 
         return $perjanjian;
     }
+
 
     // ============================ HELPER METHODS ============================
 
