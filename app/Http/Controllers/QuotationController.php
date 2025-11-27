@@ -111,7 +111,7 @@ class QuotationController extends Controller
                 'quotationSites',
                 'company'
             ])
-                ->byUsersRole()
+                ->byUserRole()
                 ->dateRange($request->tgl_dari, $request->tgl_sampai)
                 ->byCompany($request->company)
                 ->byKebutuhan($request->kebutuhan_id)
@@ -401,41 +401,40 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function show(string $id): JsonResponse
+    // Di QuotationController
+    public function show($id)
     {
         try {
+            // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
+                'quotationDetails.quotationDetailHpps',
+                'quotationDetails.quotationDetailCosses',
+                'quotationDetails.wage',
+                'quotationDetails.quotationDetailRequirements',
+                'quotationDetails.quotationDetailTunjangans',
                 'leads',
                 'statusQuotation',
                 'quotationSites',
-                'quotationDetails.wage', // Pastikan relasi wage dimuat
                 'quotationPics',
                 'quotationAplikasis',
                 'quotationKaporlaps',
                 'quotationDevices',
                 'quotationChemicals',
                 'quotationOhcs',
-                'quotationKerjasamas',
                 'quotationTrainings',
-                'company'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
+                'quotationKerjasamas'
+            ])->findOrFail($id);
 
-            $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
-            
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($calculatedQuotation),
-                'message' => 'Quotation retrieved successfully'
-            ]);
+            // ✅ BENAR: Melewatkan model Quotation ke Resource
+            return new QuotationResource($quotation);
 
         } catch (\Exception $e) {
+            \Log::error("Error in quotation show: " . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Quotation not found',
+                'message' => 'Failed to retrieve quotation',
                 'error' => $e->getMessage()
-            ], 404);
+            ], 500);
         }
     }
     /**
