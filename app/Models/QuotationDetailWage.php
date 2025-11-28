@@ -17,8 +17,6 @@ class QuotationDetailWage extends Model
         'quotation_id',
         'upah',
         'hitungan_upah',
-        'management_fee_id',
-        'persentase',
         'lembur',
         'nominal_lembur',
         'jenis_bayar_lembur',
@@ -29,20 +27,12 @@ class QuotationDetailWage extends Model
         'tunjangan_holiday',
         'nominal_tunjangan_holiday',
         'jenis_bayar_tunjangan_holiday',
-        'is_ppn',
-        'ppn_pph_dipotong',
         'created_by',
         'updated_by',
         'deleted_by',
     ];
 
-    protected $casts = [
-        'nominal_lembur' => 'decimal:2',
-        'nominal_tunjangan_holiday' => 'decimal:2',
-        'persentase' => 'decimal:2',
-        'jam_per_bulan_lembur' => 'decimal:2',
-        // Hapus casting untuk is_ppn karena sekarang string
-    ];
+
 
     /**
      * Relationships
@@ -57,8 +47,5 @@ class QuotationDetailWage extends Model
         return $this->belongsTo(Quotation::class);
     }
 
-    public function managementFee()
-    {
-        return $this->belongsTo(ManagementFee::class, 'management_fee_id');
-    }
+    // HAPUS relasi managementFee karena kolom management_fee_id dihapus
 }

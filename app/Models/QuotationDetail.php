@@ -11,13 +11,34 @@ class QuotationDetail extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'sl_quotation_detail';
-    protected $guarded = [];
+
+    protected $fillable = [
+        'quotation_id',
+        'quotation_site_id',
+        'nama_site',
+        'position_id',
+        'jabatan_kebutuhan',
+        'jumlah_hc',
+        'nominal_upah',
+        'penjamin_kesehatan',
+        'is_bpjs_jkk',
+        'is_bpjs_jkm',
+        'is_bpjs_jht',
+        'is_bpjs_jp',
+        'nominal_takaful',
+        'created_by',
+        'updated_by',
+        'deleted_at',
+        'deleted_by'
+    ];
+
+    protected $dates = ['deleted_at'];
 
     public function quotation()
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
-    // App/Models/QuotationDetail.php
+
     public function quotationDetailRequirements()
     {
         return $this->hasMany(QuotationDetailRequirement::class, 'quotation_detail_id', 'id');
@@ -32,11 +53,24 @@ class QuotationDetail extends Model
     {
         return $this->belongsTo(Position::class, 'position_id', 'id');
     }
-// Di QuotationDetail.php
-public function wage()
-{
-    return $this->hasOne(QuotationDetailWage::class, 'quotation_detail_id');
-}
 
+    public function wage()
+    {
+        return $this->hasOne(QuotationDetailWage::class, 'quotation_detail_id');
+    }
 
+    public function quotationSite()
+    {
+        return $this->belongsTo(QuotationSite::class, 'quotation_site_id');
+    }
+    // TAMBAHKAN RELASI INI
+    public function quotationDetailHpps()
+    {
+        return $this->hasMany(QuotationDetailHpp::class, 'quotation_detail_id');
+    }
+
+    public function quotationDetailCosses()
+    {
+        return $this->hasMany(QuotationDetailCoss::class, 'quotation_detail_id');
+    }
 }

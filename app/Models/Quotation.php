@@ -45,6 +45,7 @@ class Quotation extends Model
         // Kolom baru yang ditambahkan
         'quotation_client_id',
         'layanan_id',
+        'jenis_kontrak',
         'layanan',
         'nama_site',
         'company',
@@ -121,8 +122,11 @@ class Quotation extends Model
         'ot4',
         'ot5',
         'is_sandbox',
+        'quotation_referensi_id',
+        'tipe_quotation'
     ];
     protected $dates = ['deleted_at'];
+
 
     // Tambahan: Accessor untuk format tanggal
     public function getTglQuotationAttribute($value)
@@ -252,6 +256,12 @@ class Quotation extends Model
     public function quotationKerjasamas()
     {
         return $this->hasMany(QuotationKerjasama::class, 'quotation_id');
+    }
+    // File: app/Models/Quotation.php
+
+    public function managementFee()
+    {
+        return $this->belongsTo(ManagementFee::class, 'management_fee_id');
     }
 
     // Relasi ke QuotationTraining
@@ -418,7 +428,7 @@ class Quotation extends Model
     {
         return $this->hasMany(Quotation::class, 'quotation_referensi_id');
     }
-        public function wage()
+    public function wage()
     {
         return $this->hasOne(QuotationDetailWage::class);
     }

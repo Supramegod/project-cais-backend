@@ -7,6 +7,7 @@ use App\Models\{
     QuotationDetail,
     QuotationSite,
     ManagementFee,
+    QuotationAplikasi,
     QuotationDetailTunjangan,
     QuotationDetailHpp,
     QuotationDetailCoss,
@@ -15,24 +16,41 @@ use App\Models\{
     QuotationKaporlap,
     QuotationDevices,
     QuotationDetailWage,
+    SalaryRule,
     User
 };
+use App\DTO\QuotationCalculationResult;
+use App\DTO\CalculationSummary;
+use App\DTO\DetailCalculation;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class QuotationService
 {
     // ============================ MAIN CALCULATION FLOW ============================
-    public function calculateQuotation($quotation)
+
+    /**
+     * Calculate quotation dengan return object terpisah untuk calculated values
+     */
+    public function calculateQuotation($quotation): QuotationCalculationResult
     {
         try {
+            $result = new QuotationCalculationResult($quotation);
+
             $this->initializeQuotation($quotation);
             $this->loadQuotationData($quotation);
 
+            // FIX: Ensure every detail has wage data
+            foreach ($quotation->quotation_detail as $detail) {
+                if (!$detail->wage) {
+                    $this->createDefaultWage($detail);
+                }
+            }
+
             // Cek apakah ada quotation details
             if ($quotation->quotation_detail->isEmpty()) {
-                \Log::warning("No quotation details found for quotation ID: " . $quotation->id);
-                return $quotation;
+                return $result;
             }
 
             $jumlahHc = $quotation->quotation_detail->sum('jumlah_hc');
@@ -40,12 +58,13 @@ class QuotationService
             $quotation->provisi = $this->calculateProvisi($quotation->durasi_kerjasama);
 
             // First pass calculation
-            $this->calculateFirstPass($quotation, $jumlahHc);
+            $this->calculateFirstPass($quotation, $jumlahHc, $result);
 
             // Recalculate with gross-up adjustments
-            $this->recalculateWithGrossUp($quotation, $jumlahHc);
+            $this->recalculateWithGrossUp($quotation, $jumlahHc, $result);
 
-            return $quotation;
+            return $result;
+
         } catch (\Exception $e) {
             \Log::error("Error in calculateQuotation: " . $e->getMessage());
             \Log::error("Stack trace: " . $e->getTraceAsString());
@@ -53,65 +72,110 @@ class QuotationService
         }
     }
 
+    private function createDefaultWage($detail)
+    {
+        try {
+            $wage = QuotationDetailWage::create([
+                'quotation_detail_id' => $detail->id,
+                'quotation_id' => $detail->quotation_id,
+                'upah' => null,
+                'hitungan_upah' => null,
+                'lembur' => 'Tidak Ada',
+                'nominal_lembur' => 0,
+                'jenis_bayar_lembur' => null,
+                'jam_per_bulan_lembur' => 0,
+                'lembur_ditagihkan' => 'Tidak Ditagihkan',
+                'kompensasi' => 'Tidak Ada',
+                'thr' => 'Tidak Ada',
+                'tunjangan_holiday' => 'Tidak Ada',
+                'nominal_tunjangan_holiday' => 0,
+                'jenis_bayar_tunjangan_holiday' => null,
+                'created_by' => Auth::user()->full_name,
+            ]);
+
+            // Reload the relation
+            $detail->load('wage');
+
+            return $wage;
+        } catch (\Exception $e) {
+            \Log::error("Failed to create default wage for detail {$detail->id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
     // ============================ INITIALIZATION ============================
     private function initializeQuotation($quotation)
     {
-        $quotation->persen_bpjs_ketenagakerjaan = 0;
-        $quotation->persen_bpjs_kesehatan = 0;
+        // HAPUS inisialisasi kolom yang tidak ada di tabel
+        // $quotation->persen_bpjs_ketenagakerjaan = 0;
+        // $quotation->persen_bpjs_kesehatan = 0;
     }
 
     private function loadQuotationData($quotation)
     {
-        // Load dengan relasi wage
-        $quotation->quotation_detail = QuotationDetail::with('wage')
+        // Load dengan relasi wage dan tunjangan
+        $quotationDetails = QuotationDetail::with(['wage', 'quotationDetailTunjangans'])
             ->where('quotation_id', $quotation->id)->get();
-        $quotation->quotation_site = QuotationSite::where('quotation_id', $quotation->id)->get();
+
+        $quotationSites = QuotationSite::where('quotation_id', $quotation->id)->get();
 
         // Calculate site details count
-        $quotation->quotation_site->each(function ($site) use ($quotation) {
-            $site->jumlah_detail = $quotation->quotation_detail
+        $quotationSites->each(function ($site) use ($quotationDetails) {
+            $site->jumlah_detail = $quotationDetails
                 ->where('quotation_site_id', $site->id)->count();
         });
 
         // Get management fee
         $managementFee = ManagementFee::find($quotation->management_fee_id);
-        $quotation->management_fee = $managementFee->nama ?? '';
+        $managementFeeName = $managementFee->nama ?? '';
 
-        // Debug info
-        \Log::info("Loaded {$quotation->quotation_detail->count()} quotation details");
+        $quotation->quotation_detail = $quotationDetails;
+        $quotation->quotation_site = $quotationSites;
+        $quotation->management_fee = $managementFeeName;
     }
+
 
     // ============================ CORE CALCULATION METHODS ============================
-    private function calculateFirstPass($quotation, $jumlahHc)
+    private function calculateFirstPass($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
         $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
             ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
 
-        $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc);
-        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi);
-        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi);
+        $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
+        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
+        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
+
+        // HAPUS assignment yang tidak perlu ke model Quotation
+        // $quotation->jumlah_hc = $jumlahHc; // JANGAN lakukan ini
+        // $quotation->provisi = $this->calculateProvisi($quotation->durasi_kerjasama); // JANGAN lakukan ini
     }
-
-    private function recalculateWithGrossUp($quotation, $jumlahHc)
+    private function recalculateWithGrossUp($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
         $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
             ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
 
-        $this->calculateBankInterestAndIncentive($quotation, $jumlahHc);
-        $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc);
+        $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
+        $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
     }
 
     // ============================ DETAIL PROCESSING ============================
-    private function processAllDetails($quotation, $daftarTunjangan, $jumlahHc)
+    private function processAllDetails($quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $quotation->quotation_detail->each(function ($detail) use ($quotation, $daftarTunjangan, $jumlahHc) {
-            $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc);
+        $quotation->quotation_detail->each(function ($detail) use ($quotation, $daftarTunjangan, $jumlahHc, $result) {
+            try {
+                $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc, $result);
+            } catch (\Exception $e) {
+                \Log::error("Failed to process detail {$detail->id}, skipping: " . $e->getMessage());
+                // Skip this detail but continue with others
+            }
         });
     }
 
-    private function processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc)
+    private function processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
     {
         try {
+            $detailCalculation = new DetailCalculation($detail->id);
+
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
             $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
             $site = QuotationSite::find($detail->quotation_site_id);
@@ -122,8 +186,6 @@ class QuotationService
                 $wage = new \stdClass();
                 $wage->upah = null;
                 $wage->hitungan_upah = null;
-                $wage->management_fee_id = null;
-                $wage->persentase = 0;
                 $wage->lembur = "Tidak";
                 $wage->nominal_lembur = 0;
                 $wage->jenis_bayar_lembur = null;
@@ -134,34 +196,30 @@ class QuotationService
                 $wage->tunjangan_holiday = "Tidak";
                 $wage->nominal_tunjangan_holiday = 0;
                 $wage->jenis_bayar_tunjangan_holiday = null;
-                $wage->is_ppn = "Tidak";
-                $wage->ppn_pph_dipotong = "Management Fee";
-                
-                \Log::warning("Created fallback wage for detail ID: " . $detail->id);
             }
 
             $this->initializeDetail($detail, $hpp, $site, $wage);
-            $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage);
+            $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, $detailCalculation);
+
+            // Simpan detail calculation ke result
+            $result->detail_calculations[$detail->id] = $detailCalculation;
+
         } catch (\Exception $e) {
             \Log::error("Error processing detail ID {$detail->id}: " . $e->getMessage());
-            \Log::error("Detail wage status: " . ($detail->wage ? 'exists' : 'null'));
+            \Log::error("Stack trace: " . $e->getTraceAsString());
             throw $e;
         }
     }
 
     private function initializeDetail($detail, $hpp, $site, $wage)
     {
-        $detail->nominal_upah = $hpp->gaji_pokok ?? $site->nominal_upah ?? 0;
+        $detail->nominal_upah = $detail->nominal_upah ?? $hpp->gaji_pokok ?? $site->nominal_upah;
         $detail->umk = $site->umk ?? 0;
         $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
         $detail->insentif = $hpp->insentif ?? 0;
-        
-        // SET VALUES DARI WAGE - PASTIKAN MENGGUNAKAN NULL COALESCING
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
-        $detail->management_fee_id = $wage->management_fee_id ?? null;
-        $detail->persentase = $wage->persentase ?? 0;
         $detail->lembur = $wage->lembur ?? "Tidak";
         $detail->nominal_lembur = $wage->nominal_lembur ?? 0;
         $detail->jenis_bayar_lembur = $wage->jenis_bayar_lembur ?? null;
@@ -172,22 +230,110 @@ class QuotationService
         $detail->tunjangan_holiday = $wage->tunjangan_holiday ?? "Tidak";
         $detail->nominal_tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
         $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
-        $detail->is_ppn = $wage->is_ppn ?? "Tidak";
-        $detail->ppn_pph_dipotong = $wage->ppn_pph_dipotong ?? "Management Fee";
     }
 
-    private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage)
+    private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
-        // Calculate core components
-        $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
-        $this->calculateBpjs($detail, $quotation, $hpp);
-        $this->calculateExtras($detail, $quotation, $hpp, $wage);
+        try {
+            // Calculate core components
+            $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
 
-        // Calculate items
-        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
+            $this->calculateBpjs($detail, $quotation, $hpp);
 
-        // Final totals
-        $this->calculateFinalTotals($detail, $quotation, $totalTunjangan);
+            $this->calculateExtras($detail, $quotation, $hpp, $wage);
+
+            // Calculate items
+            $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
+
+            // Final totals
+            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan);
+
+            // Simpan data ke DTO
+            $this->populateDetailCalculation($detail, $quotation, $detailCalculation);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateDetailComponents for detail {$detail->id}: " . $e->getMessage());
+            \Log::error("Stack trace in calculateDetailComponents: " . $e->getTraceAsString());
+            throw $e;
+        }
+    }
+
+    private function populateDetailCalculation($detail, $quotation, DetailCalculation $detailCalculation): void
+    {
+        // Calculate BPU deduction if applicable
+        $potonganBpu = 0;
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $potonganBpu = 16800;
+        }
+
+        // Data untuk HPP
+        $detailCalculation->hpp_data = [
+            'quotation_detail_id' => $detail->id,
+            'quotation_id' => $quotation->id,
+            'leads_id' => $quotation->leads_id,
+            'position_id' => $detail->position_id,
+            'jumlah_hc' => $detail->jumlah_hc,
+            'gaji_pokok' => $detail->nominal_upah,
+            'total_tunjangan' => $detail->total_tunjangan ?? 0,
+            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya ?? 0,
+            'kompensasi' => $detail->kompensasi ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
+            'lembur' => $detail->lembur ?? 0,
+            'takaful' => $detail->nominal_takaful ?? 0,
+            'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
+            'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
+            'bpjs_jht' => $detail->bpjs_jht ?? 0,
+            'bpjs_jp' => $detail->bpjs_jp ?? 0,
+            'bpjs_ks' => $detail->bpjs_kes ?? 0,
+            'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
+            'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
+            'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
+            'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
+            'persen_bpjs_ks' => $detail->persen_bpjs_kes ?? 0,
+            'provisi_seragam' => $detail->personil_kaporlap ?? 0,
+            'provisi_peralatan' => $detail->personil_devices ?? 0,
+            'provisi_chemical' => $detail->personil_chemical ?? 0,
+            'provisi_ohc' => $detail->personil_ohc ?? 0,
+            'bunga_bank' => $detail->bunga_bank ?? 0,
+            'insentif' => $detail->insentif ?? 0,
+            'potongan_bpu' => $potonganBpu,
+            'total_biaya_per_personil' => $detail->total_personil ?? 0,
+            'total_biaya_all_personil' => $detail->sub_total_personil ?? 0,
+        ];
+
+        // Data untuk COSS
+        $detailCalculation->coss_data = [
+            'quotation_detail_id' => $detail->id,
+            'quotation_id' => $quotation->id,
+            'leads_id' => $quotation->leads_id,
+            'position_id' => $detail->position_id,
+            'jumlah_hc' => $detail->jumlah_hc,
+            'gaji_pokok' => $detail->nominal_upah,
+            'total_tunjangan' => $detail->total_tunjangan ?? 0,
+            'total_base_manpower' => $detail->total_base_manpower ?? 0,
+            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya ?? 0,
+            'kompensasi' => $detail->kompensasi ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
+            'lembur' => $detail->lembur ?? 0,
+            'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
+            'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
+            'bpjs_jht' => $detail->bpjs_jht ?? 0,
+            'bpjs_jp' => $detail->bpjs_jp ?? 0,
+            'bpjs_ks' => $detail->bpjs_kes ?? 0,
+            'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
+            'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
+            'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
+            'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
+            'persen_bpjs_ks' => $detail->persen_bpjs_kes ?? 0,
+            'provisi_seragam' => $detail->personil_kaporlap_coss ?? 0,
+            'provisi_peralatan' => $detail->personil_devices_coss ?? 0,
+            'provisi_chemical' => $detail->personil_chemical_coss ?? 0,
+            'provisi_ohc' => $detail->personil_ohc_coss ?? 0,
+            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+            'bunga_bank' => $detail->bunga_bank ?? 0,
+            'insentif' => $detail->insentif ?? 0,
+            'potongan_bpu' => $potonganBpu,
+        ];
     }
 
     // ============================ COMPONENT CALCULATIONS ============================
@@ -205,54 +351,180 @@ class QuotationService
         $detail->total_tunjangan = $totalTunjangan;
         return $totalTunjangan;
     }
-
     private function calculateBpjs($detail, $quotation, $hpp)
     {
-        $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
+        // DEBUG: Log untuk troubleshooting
+        \Log::info("Calculating BPJS for detail", [
+            'detail_id' => $detail->id,
+            'program_bpjs' => $quotation->program_bpjs,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'nominal_upah' => $detail->nominal_upah,
+            'umk' => $detail->umk,
+            'ump' => $detail->ump,
+            'nominal_takaful' => $detail->nominal_takaful // Tambahkan log untuk nominal_takaful
+        ]);
 
-        $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
-            'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.3],
-            'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.7],
-            'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2],
-            'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4, 'base' => $detail->umk]
-        ];
+        // PERBAIKAN: Terima kedua nilai "BPJS" dan "BPJS Kesehatan"
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            // BPU = potong 16 ribu dari nominal upah, tidak ada BPJS sama sekali
+            $detail->bpjs_jkk = 0;
+            $detail->bpjs_jkm = 0;
+            $detail->bpjs_jht = 0;
+            $detail->bpjs_jp = 0;
+            $detail->bpjs_kes = 0;
 
-        foreach ($bpjsConfig as $config) {
-            if (($hpp->{$config['field']} ?? null) === null) {
-                $base = $config['base'] ?? $upahBpjs;
-                $detail->{$config['percent']} = $detail->{$config['percent']} ?? $config['default'];
-                $detail->{$config['field']} = $base * $detail->{$config['percent']} / 100;
-            } else {
-                $detail->{$config['field']} = $hpp->{$config['field']};
-                $detail->{$config['percent']} = $hpp->{"persen_{$config['field']}"};
-            }
+            $detail->persen_bpjs_jkk = 0;
+            $detail->persen_bpjs_jkm = 0;
+            $detail->persen_bpjs_jht = 0;
+            $detail->persen_bpjs_jp = 0;
+            $detail->persen_bpjs_kes = 0;
+
+            // Potong 16 ribu dari nominal upah
+            $detail->nominal_upah = $detail->nominal_upah - 16800;
+
+            $this->updateQuotationBpjs($detail, $quotation);
+
+            \Log::info("BPU mode - BPJS set to 0", ['detail_id' => $detail->id]);
+            return;
         }
 
-        // Apply BPJS opt-out berdasarkan data dari quotation detail
-        $this->applyBpjsOptOut($detail);
-        $this->updateQuotationBpjs($detail, $quotation);
-    }
+        // PERBAIKAN: Terima kedua nilai "BPJS" dan "BPJS Kesehatan"
+        if ($quotation->program_bpjs === 'BPJS' || $quotation->program_bpjs === 'BPJS Kesehatan') {
+            $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
 
+            // PERBAIKAN: Standardize penjamin kesehatan untuk konsistensi
+            if ($detail->penjamin_kesehatan === 'BPJS Kesehatan') {
+                $detail->penjamin_kesehatan = 'BPJS';
+            }
+            // PERBAIKAN: Sesuaikan dengan peraturan Indonesia 2024
+            $bpjsConfig = [
+                'jkk' => [
+                    'field' => 'bpjs_jkk',
+                    'percent' => 'persen_bpjs_jkk',
+                    'default' => $this->getJkkPercentage($quotation->resiko),
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jkm' => [
+                    'field' => 'bpjs_jkm',
+                    'percent' => 'persen_bpjs_jkm',
+                    'default' => 0.30, // Sesuai peraturan
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jht' => [
+                    'field' => 'bpjs_jht',
+                    'percent' => 'persen_bpjs_jht',
+                    'default' => 3.70, // Perusahaan 3.7%, karyawan 2%
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jp' => [
+                    'field' => 'bpjs_jp',
+                    'percent' => 'persen_bpjs_jp',
+                    'default' => 2.00, // Perusahaan 2%, karyawan 1%
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'kes' => [
+                    'field' => 'bpjs_kes',
+                    'percent' => 'persen_bpjs_kes',
+                    'default' => 4.00, // Perusahaan 4%, karyawan 1% (total 5%)
+                    'keterangan' => 'Ditanggung perusahaan',
+                    'base' => $upahBpjs
+                ]
+            ];
+
+            foreach ($bpjsConfig as $key => $config) {
+                $hppValue = $hpp->{$config['field']} ?? null;
+
+                // PERBAIKAN: Cek apakah nilai dari HPP null atau 0
+                if ($hppValue === null || $hppValue === 0) {
+                    $base = $config['base'] ?? $upahBpjs;
+                    $persentase = $config['default'];
+
+                    // PERBAIKAN: Gunakan persentase dari detail jika ada, otherwise gunakan default
+                    $detail->{$config['percent']} = $detail->{$config['percent']} ?? $persentase;
+
+                    // PERBAIKAN KHUSUS: Untuk BPJS Kesehatan, jika menggunakan asuransi swasta, gunakan nominal_takaful
+                    if ($key === 'kes' && ($detail->penjamin_kesehatan === "Asuransi Swasta" || $detail->penjamin_kesehatan === "Takaful")) {
+                        $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
+                        \Log::info("Using Takaful for BPJS Kesehatan", [
+                            'detail_id' => $detail->id,
+                            'nominal_takaful' => $detail->nominal_takaful,
+                            'penjamin_kesehatan' => $detail->penjamin_kesehatan
+                        ]);
+                    } else {
+                        $detail->{$config['field']} = $base * $detail->{$config['percent']} / 100;
+                    }
+
+                    \Log::info("BPJS calculated", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'base' => $base,
+                        'persentase' => $detail->{$config['percent']},
+                        'nilai' => $detail->{$config['field']},
+                        'keterangan' => $config['keterangan']
+                    ]);
+                } else {
+                    // Gunakan nilai dari HPP
+                    $detail->{$config['field']} = $hppValue;
+                    $detail->{$config['percent']} = $hpp->{"persen_{$config['field']}"} ?? $config['default'];
+
+                    \Log::info("BPJS from HPP", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'nilai' => $detail->{$config['field']},
+                        'persentase' => $detail->{$config['percent']}
+                    ]);
+                }
+            }
+
+            // Apply BPJS opt-out berdasarkan data dari quotation detail
+            $this->applyBpjsOptOut($detail);
+            $this->updateQuotationBpjs($detail, $quotation);
+
+            \Log::info("Final BPJS values", [
+                'detail_id' => $detail->id,
+                'bpjs_jkk' => $detail->bpjs_jkk,
+                'bpjs_jkm' => $detail->bpjs_jkm,
+                'bpjs_jht' => $detail->bpjs_jht,
+                'bpjs_jp' => $detail->bpjs_jp,
+                'bpjs_kes' => $detail->bpjs_kes,
+                'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                'nominal_takaful' => $detail->nominal_takaful
+            ]);
+        } else {
+            \Log::warning("Program BPJS tidak dikenali, tidak menghitung BPJS", [
+                'detail_id' => $detail->id,
+                'program_bpjs' => $quotation->program_bpjs
+            ]);
+        }
+    }
     private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
-        // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $thrValue = $wage->thr ?? "Tidak";
-        $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
-            ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+        try {
+            // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $thrValue = $wage->thr ?? "Tidak";
 
-        $kompensasiValue = $wage->kompensasi ?? "Tidak";
-        $detail->kompensasi = $hpp->kompensasi ??
-            ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+            $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
+                ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
 
-        // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
-        $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
-            ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
-            : 0;
+            $kompensasiValue = $wage->kompensasi ?? "Tidak";
 
-        // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-        $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
+            $detail->kompensasi = $hpp->kompensasi ??
+                ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+
+            // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
+
+            $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
+                ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
+                : 0;
+
+            // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
+            throw $e;
+        }
     }
 
     private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
@@ -288,12 +560,28 @@ class QuotationService
     // ============================ FINAL TOTALS ============================
     private function calculateFinalTotals($detail, $quotation, $totalTunjangan)
     {
+        // Hitung potongan BPU jika ada
+        $potonganBpu = 0;
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $potonganBpu = 16800; // Fixed 16 ribu per karyawan
+            $detail->potongan_bpu = $potonganBpu;
+
+            \Log::info("BPU potongan applied", [
+                'detail_id' => $detail->id,
+                'potongan_bpu' => $potonganBpu
+            ]);
+        }
+
+        // PERBAIKAN: Gunakan bpjs_kesehatan yang sudah disesuaikan (bisa berupa BPJS atau Takaful)
+        $biayaKesehatan = $detail->bpjs_kesehatan;
+
+        // ✅ TUNJANGAN SUDAH DIPERHITUNGKAN: $totalTunjangan digunakan dalam perhitungan
         // HPP Calculations
         $detail->total_personil = $detail->nominal_upah + $totalTunjangan + $detail->tunjangan_hari_raya +
-            $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur + $detail->nominal_takaful +
-            $detail->bpjs_ketenagakerjaan + $detail->bpjs_kesehatan + $detail->personil_kaporlap +
+            $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur +
+            $detail->bpjs_ketenagakerjaan + $biayaKesehatan + $detail->personil_kaporlap +
             $detail->personil_devices + $detail->personil_chemical + $detail->personil_ohc +
-            $detail->bunga_bank + $detail->insentif;
+            $detail->bunga_bank + $detail->insentif - $potonganBpu;
 
         $detail->sub_total_personil = $detail->total_personil * $detail->jumlah_hc;
 
@@ -302,161 +590,195 @@ class QuotationService
 
         $detail->total_exclude_base_manpower = round(
             $detail->tunjangan_hari_raya + $detail->kompensasi + $detail->tunjangan_holiday +
-            $detail->lembur + $detail->nominal_takaful + $detail->bpjs_kesehatan +
-            $detail->bpjs_ketenagakerjaan + $detail->personil_kaporlap_coss +
-            $detail->personil_devices_coss + $detail->personil_chemical_coss,
+            $detail->lembur + $biayaKesehatan + $detail->bpjs_ketenagakerjaan +
+            $detail->personil_kaporlap_coss + $detail->personil_devices_coss + $detail->personil_chemical_coss,
             2
         );
 
-        $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss, 2);
+        $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss - $potonganBpu, 2);
         $detail->sub_total_personil_coss = round($detail->total_personil_coss * $detail->jumlah_hc, 2);
-    }
 
+        \Log::info("Final totals calculated with tunjangan", [
+            'detail_id' => $detail->id,
+            'total_tunjangan' => $totalTunjangan,
+            'biaya_kesehatan' => $biayaKesehatan,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'total_personil' => $detail->total_personil,
+            'potongan_bpu' => $potonganBpu
+        ]);
+    }
     // ============================ GROSS UP RECALCULATION ============================
-    private function calculateBankInterestAndIncentive($quotation, $jumlahHc)
+    private function calculateBankInterestAndIncentive($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
+        $summary = $result->calculation_summary;
+
         $persenBungaBank = $quotation->top != "Non TOP" ? $quotation->persen_bunga_bank : 0;
 
-        $quotation->bunga_bank_total = $persenBungaBank ?
-            $quotation->total_sebelum_management_fee * ($persenBungaBank / 100) / $jumlahHc : 0;
+        $summary->bunga_bank_total = $persenBungaBank ?
+            $summary->total_sebelum_management_fee * ($persenBungaBank / 100) / $jumlahHc : 0;
 
-        $quotation->insentif_total = $quotation->persen_insentif ?
-            $quotation->nominal_management_fee_coss * ($quotation->persen_insentif / 100) / $jumlahHc : 0;
+        $summary->insentif_total = $quotation->persen_insentif ?
+            $summary->nominal_management_fee_coss * ($quotation->persen_insentif / 100) / $jumlahHc : 0;
     }
 
-    private function updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc)
+    private function updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $quotation->quotation_detail->each(function ($detail) use ($quotation) {
+        $summary = $result->calculation_summary;
+
+        $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary) {
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
             if ($hpp && $hpp->bunga_bank === null)
-                $detail->bunga_bank = $quotation->bunga_bank_total;
+                $detail->bunga_bank = $summary->bunga_bank_total;
             if ($hpp && $hpp->insentif === null)
-                $detail->insentif = $quotation->insentif_total;
+                $detail->insentif = $summary->insentif_total;
         });
 
-        $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc);
-        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi);
-        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi);
+        $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
+        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
+        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
     }
 
     // ============================ HPP & COSS CALCULATIONS ============================
-    private function calculateHpp(&$quotation, $jumlahHc, $provisi)
+    private function calculateHpp(&$quotation, $jumlahHc, $provisi, QuotationCalculationResult $result): void
     {
-        $this->calculateFinancials($quotation, 'hpp');
+        $this->calculateFinancials($quotation, 'hpp', $result);
     }
 
-    private function calculateCoss(&$quotation, $jumlahHc, $provisi)
+    private function calculateCoss(&$quotation, $jumlahHc, $provisi, QuotationCalculationResult $result): void
     {
-        $this->calculateFinancials($quotation, 'coss');
+        $this->calculateFinancials($quotation, 'coss', $result);
     }
 
-    private function calculateFinancials(&$quotation, $type)
+    private function calculateFinancials(&$quotation, $type, QuotationCalculationResult $result): void
     {
         $suffix = $type === 'coss' ? '_coss' : '';
         $model = $type === 'coss' ? QuotationDetailCoss::class : QuotationDetailHpp::class;
 
         // Calculate base totals
-        $this->calculateBaseTotals($quotation, $suffix);
+        $this->calculateBaseTotals($quotation, $suffix, $result);
 
         // Calculate management fee
-        $this->calculateManagementFee($quotation, $suffix);
+        $this->calculateManagementFee($quotation, $suffix, $result);
 
         // Calculate taxes
-        $this->calculateTaxes($quotation, $suffix, $model);
+        $this->calculateTaxes($quotation, $suffix, $model, $result);
 
         // Final calculations
-        $this->finalizeCalculations($quotation, $suffix);
+        $this->finalizeCalculations($quotation, $suffix, $result);
     }
 
-    private function calculateBaseTotals(&$quotation, $suffix)
+    private function calculateBaseTotals(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
-        $quotation->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
-        $quotation->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
-        $quotation->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
+        $summary = $result->calculation_summary;
 
-        $quotation->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
-        $quotation->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) =>
-            ($kbd->bpjs_kesehatan + $kbd->nominal_takaful) * $kbd->jumlah_hc
+        $summary->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
+        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
+        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
+
+        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+        $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
+            fn($kbd) => ($kbd->bpjs_kesehatan + $kbd->nominal_takaful) * $kbd->jumlah_hc
         );
-    }
 
-    private function calculateManagementFee(&$quotation, $suffix)
+        // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
+        $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
+            fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
+        );
+
+        $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
+
+        \Log::info("BPU totals calculated", [
+            'quotation_id' => $quotation->id,
+            'total_potongan_bpu' => $summary->total_potongan_bpu,
+            'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
+            'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+        ]);
+    }
+    private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
+        $summary = $result->calculation_summary;
+
+        // GUNAKAN DATA DARI QUOTATION, BUKAN DARI WAGE
         $managementFeeCalculations = [
-            1 => fn() => $quotation->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
-            4 => fn() => $quotation->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
-            5 => fn() => $quotation->{"upah_pokok{$suffix}"} * $quotation->persentase / 100,
-            6 => fn() => ($quotation->{"upah_pokok{$suffix}"} + $quotation->{"total_bpjs{$suffix}"}) * $quotation->persentase / 100,
-            7 => fn() => ($quotation->{"upah_pokok{$suffix}"} + $quotation->{"total_bpjs{$suffix}"} + $quotation->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
-            8 => fn() => ($quotation->{"upah_pokok{$suffix}"} + $quotation->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
+            1 => fn() => $summary->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
+            4 => fn() => $summary->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
+            5 => fn() => $summary->{"upah_pokok{$suffix}"} * $quotation->persentase / 100,
+            6 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"}) * $quotation->persentase / 100,
+            7 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
+            8 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
         ];
 
         $calculation = $managementFeeCalculations[$quotation->management_fee_id] ?? $managementFeeCalculations[1];
-        $quotation->{"nominal_management_fee{$suffix}"} = $calculation();
-        $quotation->{"grand_total_sebelum_pajak{$suffix}"} = $quotation->{"total_sebelum_management_fee{$suffix}"} + $quotation->{"nominal_management_fee{$suffix}"};
+        $summary->{"nominal_management_fee{$suffix}"} = $calculation();
+        $summary->{"grand_total_sebelum_pajak{$suffix}"} = $summary->{"total_sebelum_management_fee{$suffix}"} + $summary->{"nominal_management_fee{$suffix}"};
     }
 
-    private function calculateTaxes(&$quotation, $suffix, $model)
+    private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
     {
-        // Calculate existing taxes
-        $quotation->{"ppn{$suffix}"} = 0;
-        $quotation->{"pph{$suffix}"} = 0;
+        $summary = $result->calculation_summary;
 
-        $quotation->quotation_detail->each(function ($kbd) use (&$quotation, $suffix, $model) {
+        // Calculate existing taxes
+        $summary->{"ppn{$suffix}"} = 0;
+        $summary->{"pph{$suffix}"} = 0;
+
+        $quotation->quotation_detail->each(function ($kbd) use (&$summary, $suffix, $model) {
             $detail = $model::where('quotation_detail_id', $kbd->id)->first();
             if ($detail) {
-                $quotation->{"ppn{$suffix}"} += $detail->ppn ?? 0;
-                $quotation->{"pph{$suffix}"} += $detail->pph ?? 0;
+                $summary->{"ppn{$suffix}"} += $detail->ppn ?? 0;
+                $summary->{"pph{$suffix}"} += $detail->pph ?? 0;
             }
         });
 
         // Calculate taxes if not set
-        if ($quotation->{"ppn{$suffix}"} == 0 || $quotation->{"pph{$suffix}"} == 0) {
-            $this->calculateDefaultTaxes($quotation, $suffix);
+        if ($summary->{"ppn{$suffix}"} == 0 || $summary->{"pph{$suffix}"} == 0) {
+            $this->calculateDefaultTaxes($quotation, $suffix, $result);
         }
     }
 
-    private function calculateDefaultTaxes(&$quotation, $suffix)
+    private function calculateDefaultTaxes(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
-        // GUNAKAN DATA DARI WAGE JIKA ADA
-        $ppnPphDipotong = $quotation->ppn_pph_dipotong;
-        
-        // Jika tidak ada di quotation, coba ambil dari detail pertama yang punya wage
-        if (!$ppnPphDipotong) {
-            $firstDetailWithWage = $quotation->quotation_detail->first(function ($detail) {
-                return $detail->wage && $detail->wage->ppn_pph_dipotong;
-            });
-            $ppnPphDipotong = $firstDetailWithWage ? $firstDetailWithWage->wage->ppn_pph_dipotong : "Management Fee";
+        $summary = $result->calculation_summary;
+
+        $ppnPphDipotong = $quotation->ppn_pph_dipotong ?? "Management Fee";
+        $isPpn = $quotation->is_ppn ?? "Tidak";
+
+        $isPpnBoolean = false;
+        if (is_numeric($isPpn)) {
+            $isPpnBoolean = (int) $isPpn === 1;
+        } else {
+            $isPpnBoolean = $isPpn === "Ya";
         }
 
         $baseAmount = $ppnPphDipotong == "Management Fee"
-            ? $quotation->{"nominal_management_fee{$suffix}"}
-            : $quotation->{"grand_total_sebelum_pajak{$suffix}"};
+            ? $summary->{"nominal_management_fee{$suffix}"}
+            : $summary->{"grand_total_sebelum_pajak{$suffix}"};
 
-        $quotation->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
+        $summary->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
 
-        if ($quotation->{"ppn{$suffix}"} == 0) {
-            $quotation->{"ppn{$suffix}"} = $quotation->{"dpp{$suffix}"} * 12 / 100;
+        if ($summary->{"ppn{$suffix}"} == 0 && $isPpnBoolean) {
+            $summary->{"ppn{$suffix}"} = $summary->{"dpp{$suffix}"} * 12 / 100;
         }
-        if ($quotation->{"pph{$suffix}"} == 0) {
-            $quotation->{"pph{$suffix}"} = $baseAmount * -2 / 100;
+
+        if ($summary->{"pph{$suffix}"} == 0) {
+            $summary->{"pph{$suffix}"} = $baseAmount * -2 / 100;
         }
     }
 
-    private function finalizeCalculations(&$quotation, $suffix)
+    private function finalizeCalculations(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
-        $quotation->{"total_invoice{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} +
-            $quotation->{"ppn{$suffix}"} + $quotation->{"pph{$suffix}"};
-        $quotation->{"pembulatan{$suffix}"} = ceil($quotation->{"total_invoice{$suffix}"} / 1000) * 1000;
+        $summary = $result->calculation_summary;
 
-        $quotation->{"margin{$suffix}"} = $quotation->{"grand_total_sebelum_pajak{$suffix}"} - $quotation->total_sebelum_management_fee;
+        $summary->{"total_invoice{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} +
+            $summary->{"ppn{$suffix}"} + $summary->{"pph{$suffix}"};
+        $summary->{"pembulatan{$suffix}"} = ceil($summary->{"total_invoice{$suffix}"} / 1000) * 1000;
+
+        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->total_sebelum_management_fee;
 
         // FIX: Tambahkan pengecekan untuk menghindari division by zero
-        if ($quotation->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
-            $quotation->{"gpm{$suffix}"} = $quotation->{"margin{$suffix}"} / $quotation->{"grand_total_sebelum_pajak{$suffix}"} * 100;
+        if ($summary->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
+            $summary->{"gpm{$suffix}"} = $summary->{"margin{$suffix}"} / $summary->{"grand_total_sebelum_pajak{$suffix}"} * 100;
         } else {
-            $quotation->{"gpm{$suffix}"} = 0;
+            $summary->{"gpm{$suffix}"} = 0;
         }
     }
 
@@ -495,26 +817,33 @@ class QuotationService
 
     private function calculateLembur($detail, $quotation, $hpp, $wage)
     {
-        if ($hpp->lembur !== null)
+        if ($hpp && $hpp->lembur !== null) {
             return $hpp->lembur;
-            
+        }
+
         $lemburValue = $wage->lembur ?? "Tidak";
-        if ($lemburValue != "Flat")
+
+        if ($lemburValue != "Flat") {
             return 0;
-            
+        }
+
         $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
-        if ($lemburDitagihkan == "Ditagihkan Terpisah")
+
+        if ($lemburDitagihkan == "Ditagihkan Terpisah") {
             return 0;
+        }
 
         $jenisBayar = $wage->jenis_bayar_lembur ?? null;
         $nominalLembur = $wage->nominal_lembur ?? 0;
         $jamPerBulan = $wage->jam_per_bulan_lembur ?? 0;
 
-        return match ($jenisBayar) {
+        $result = match ($jenisBayar) {
             "Per Jam" => $nominalLembur * $jamPerBulan,
             "Per Hari" => $nominalLembur * 25,
             default => $nominalLembur
         };
+
+        return $result;
     }
 
     private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
@@ -541,31 +870,105 @@ class QuotationService
         ];
 
         foreach ($optOuts as $optField => $targetFields) {
-            if ($detail->{$optField} == "0") {
+            // PERBAIKAN: Cek dengan lebih teliti nilai opt-out
+            $isOptOut = false;
+
+            if (isset($detail->{$optField})) {
+                $optValue = $detail->{$optField};
+
+                // Handle berbagai format nilai opt-out
+                if ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false") {
+                    $isOptOut = true;
+                } elseif (is_string($optValue) && strtolower($optValue) === 'tidak') {
+                    $isOptOut = true;
+                }
+            }
+
+            if ($isOptOut) {
                 $detail->{$targetFields[0]} = 0;
                 $detail->{$targetFields[1]} = 0;
+
+                \Log::info("BPJS opt-out applied", [
+                    'detail_id' => $detail->id,
+                    'field' => $optField,
+                    'bpjs_field' => $targetFields[0],
+                    'opt_value' => $detail->{$optField}
+                ]);
             }
         }
     }
 
     private function updateQuotationBpjs($detail, $quotation)
     {
+        // Hitung total BPJS ketenagakerjaan
         $detail->persen_bpjs_ketenagakerjaan = $detail->persen_bpjs_jkk + $detail->persen_bpjs_jkm +
             $detail->persen_bpjs_jht + $detail->persen_bpjs_jp;
         $detail->bpjs_ketenagakerjaan = $detail->bpjs_jkk + $detail->bpjs_jkm + $detail->bpjs_jht + $detail->bpjs_jp;
 
-        if ($detail->persen_bpjs_ketenagakerjaan) {
-            $quotation->persen_bpjs_ketenagakerjaan = $detail->persen_bpjs_ketenagakerjaan;
-        }
-
-        if ($detail->penjamin_kesehatan == "BPJS") {
+        // PERBAIKAN: Tambahkan logika sesuai permintaan
+        if ($detail->penjamin_kesehatan == "BPJS" || $detail->penjamin_kesehatan == "BPJS Kesehatan") {
             $detail->bpjs_kesehatan = $detail->bpjs_kes;
             $detail->persen_bpjs_kesehatan = $detail->persen_bpjs_kes;
-            $quotation->persen_bpjs_kesehatan = $detail->persen_bpjs_kesehatan;
+            // PERBAIKAN: Set persentase BPJS kesehatan di quotation jika diperlukan
+            // $quotation->persen_bpjs_kesehatan = $detail->persen_bpjs_kesehatan;
+
+            \Log::info("Using BPJS for health insurance", [
+                'detail_id' => $detail->id,
+                'bpjs_kes' => $detail->bpjs_kes,
+                'persen_bpjs_kes' => $detail->persen_bpjs_kes
+            ]);
+        } else if ($detail->penjamin_kesehatan == "Asuransi Swasta" || $detail->penjamin_kesehatan == "Takaful") {
+            // PERBAIKAN: Jika menggunakan asuransi swasta/takaful, gunakan nominal_takaful sebagai bpjs_kesehatan
+            $detail->bpjs_kesehatan = $detail->nominal_takaful ?? 0;
+            $detail->persen_bpjs_kesehatan = 0; // Karena menggunakan asuransi swasta, persentase BPJS = 0
+
+            \Log::info("Using Takaful for health insurance", [
+                'detail_id' => $detail->id,
+                'nominal_takaful' => $detail->nominal_takaful,
+                'bpjs_kesehatan' => $detail->bpjs_kesehatan
+            ]);
         } else {
             $detail->bpjs_kesehatan = 0;
             $detail->persen_bpjs_kesehatan = 0;
+            // $quotation->persen_bpjs_kesehatan = 0;
+
+            \Log::info("No health insurance", [
+                'detail_id' => $detail->id,
+                'penjamin_kesehatan' => $detail->penjamin_kesehatan
+            ]);
         }
+
+        \Log::info("Quotation BPJS updated", [
+            'detail_id' => $detail->id,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+            'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+            'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan,
+            'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan,
+            'bpjs_kes' => $detail->bpjs_kes,
+            'persen_bpjs_kes' => $detail->persen_bpjs_kes,
+            'nominal_takaful' => $detail->nominal_takaful
+        ]);
+    }
+    // ============================ BPU CALCULATION ============================
+
+    /**
+     * Calculate BPU (Biaya Penyelenggaraan Umum) - potongan 16.000 per karyawan
+     */
+    private function calculateBpu($detail, $quotation)
+    {
+        $bpuAmount = 0;
+
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $bpuAmount = 16800; // Fixed 16 ribu per karyawan
+            \Log::info("BPU calculated", [
+                'detail_id' => $detail->id,
+                'bpu_amount' => $bpuAmount,
+                'program_bpjs' => $quotation->program_bpjs
+            ]);
+        }
+
+        return $bpuAmount;
     }
     // ============================ OTHER SERVICE METHODS ============================
 
@@ -824,58 +1227,94 @@ class QuotationService
         }
     }
 
+
     /**
      * Generate konten perjanjian kerjasama
      */
     public function generateKerjasamaContent(Quotation $quotation)
     {
+        $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
+
+        // Get salary rule data
+        $salaryRuleQ = SalaryRule::select('cutoff', 'pengiriman_invoice', 'rilis_payroll')
+            ->whereNull('deleted_at')
+            ->where('id', $quotation->salary_rule_id)
+            ->first();
+
+        // Build salary schedule table
+        $tableSalary = '<table class="table table-bordered" style="width:100%">
+                      <thead>
+                        <tr>
+                          <th class="text-center"><b>No.</b></th>
+                          <th class="text-center"><b>Schedule Plan</b></th>
+                          <th class="text-center"><b>Periode</b></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="text-center">1</td>
+                          <td>Cut Off</td>
+                          <td>' . $salaryRuleQ->cutoff . '</td>
+                        </tr>
+                        <tr>
+                          <td class="text-center">2</td>
+                          <td>Pengiriman <i>Invoice</i></td>
+                          <td>' . $salaryRuleQ->pengiriman_invoice . '</td>
+                        </tr>
+                        <tr>
+                          <td class="text-center">6</td>
+                          <td>Rilis <i>Payroll</i> / Gaji</td>
+                          <td>' . $salaryRuleQ->rilis_payroll . '</td>
+                        </tr>
+                      </tbody>
+                    </table>';
+
+        // Build kunjungan operasional text
+        $kunjunganOperasional = "";
+        if ($quotation->kunjungan_operasional != null) {
+            $kunjunganParts = explode(" ", $quotation->kunjungan_operasional);
+            if (count($kunjunganParts) >= 2) {
+                $kunjunganOperasional = $kunjunganParts[0] . " kali dalam 1 " . $kunjunganParts[1];
+            }
+        }
+
+        // Get aplikasi pendukung
+        $appPendukung = QuotationAplikasi::select('aplikasi_pendukung')
+            ->whereNull('deleted_at')
+            ->where('quotation_id', $quotation->id)
+            ->get();
+
+        $sAppPendukung = "<b>";
+        foreach ($appPendukung as $kduk => $dukung) {
+            if ($kduk != 0) {
+                $sAppPendukung .= ", ";
+            }
+            $sAppPendukung .= $dukung->aplikasi_pendukung;
+        }
+        $sAppPendukung .= "</b>";
+
+        // Build perjanjian array
         $perjanjian = [];
 
-        // 1. Basic information
-        $perjanjian[] = "PERJANJIAN KERJASAMA";
-        $perjanjian[] = "Nomor: " . $quotation->nomor;
-        $perjanjian[] = "Pada hari ini " . Carbon::parse($quotation->tgl_quotation)->translatedFormat('l, d F Y') . " bertempat di " . $quotation->company;
-        $perjanjian[] = "";
+        $perjanjian[] = "Penawaran harga ini berlaku 30 hari sejak tanggal diterbitkan.";
 
-        // 2. Parties involved
-        $perjanjian[] = "PIHAK PERTAMA:";
-        $perjanjian[] = "Nama: " . $quotation->company;
-        $perjanjian[] = "Alamat: [ALAMAT_PERUSAHAAN]";
-        $perjanjian[] = "";
+        $perjanjian[] = "Akan dilakukan <i>survey</i> area untuk kebutuhan " . $kebutuhanPerjanjian . " sebagai tahapan <i>assesment</i> area untuk memastikan efektifitas pekerjaan.";
 
-        $perjanjian[] = "PIHAK KEDUA:";
-        $perjanjian[] = "Nama: " . $quotation->nama_perusahaan;
-        $perjanjian[] = "Alamat: [ALAMAT_CLIENT]";
-        $perjanjian[] = "";
+        $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
 
-        // 3. Service details
-        $perjanjian[] = "BENTUK KERJASAMA:";
-        $perjanjian[] = "Pihak Pertama akan menyediakan jasa " . $quotation->kebutuhan . " kepada Pihak Kedua";
-        $perjanjian[] = "Jumlah personil: " . $quotation->jumlah_hc . " orang";
-        $perjanjian[] = "Lokasi penempatan: " . $this->getSiteLocations($quotation);
-        $perjanjian[] = "";
+        $perjanjian[] = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b> maksimal 30 hari kalender dengan skema sebagai berikut: <br>" . $tableSalary . "<i><br>*Rilis gaji adalah talangan.<br>*Maksimal pembayaran invoice 30 hari kalender setelah invoice</i>";
 
-        // 4. Contract period
-        $perjanjian[] = "JANGKA WAKTU PERJANJIAN:";
-        $perjanjian[] = "Perjanjian ini berlaku mulai " . Carbon::parse($quotation->mulai_kontrak)->translatedFormat('d F Y') . " sampai dengan " . Carbon::parse($quotation->kontrak_selesai)->translatedFormat('d F Y');
-        $perjanjian[] = "Durasi: " . $quotation->durasi_kerjasama;
-        $perjanjian[] = "";
+        $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
 
-        // 5. Financial terms
-        $perjanjian[] = "NILAI KONTRAK:";
-        $perjanjian[] = "Total nilai kontrak: Rp " . number_format($quotation->total_invoice, 0, ',', '.');
-        $perjanjian[] = "Management fee: " . $quotation->persentase . "%";
-        $perjanjian[] = "Terms of payment: " . $quotation->top;
-        $perjanjian[] = "";
+        $perjanjian[] = "Tim operasional bersifat <i>on call</i> apabila terjadi <i>case</i> atau insiden yang terjadi yang mengharuskan untuk datang ke lokasi kerja Pihak Pertama.";
 
-        // 6. Additional clauses
-        $perjanjian[] = "KETENTUAN LAIN-LAIN:";
-        $perjanjian[] = "1. Perjanjian ini dapat diperpanjang dengan kesepakatan kedua belah pihak";
-        $perjanjian[] = "2. Segala perubahan terhadap perjanjian ini harus dibuat secara tertulis";
-        $perjanjian[] = "3. Penyelesaian perselisihan akan dilakukan melalui musyawarah";
+        $perjanjian[] = "Pemenuhan kandidat dilakukan dengan 2 tahap <i>screening</i> :<br>a. Tahap ke -1 : dilakukan oleh tim rekrutmen <b>Pihak Kedua</b> untuk memastikan bahwa kandidat sudah sesuai dengan kualifikasi <b>dari Pihak Pertama</b>.<br>b. Tahap ke -2 : dilakukan oleh user <b>Pihak Pertama</b>, dan dijadwalkan setelah adanya <i>report</i> hasil <i>screening</i> dari <b>Pihak Kedua</b>.";
+
+        $perjanjian[] = "<i>Support</i> aplikasi digital :" . $sAppPendukung . ".";
 
         return $perjanjian;
     }
+
 
     // ============================ HELPER METHODS ============================
 
@@ -924,5 +1363,13 @@ class QuotationService
             $locations[] = $site->nama_site . " - " . $site->kota;
         }
         return implode(", ", $locations);
+    }
+
+    /**
+     * Method untuk QuotationStepService agar bisa mendapatkan calculated values
+     */
+    public function getCalculatedValues(Quotation $quotation): QuotationCalculationResult
+    {
+        return $this->calculateQuotation($quotation);
     }
 }

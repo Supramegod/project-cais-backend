@@ -12,7 +12,23 @@ class QuotationSite extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'sl_quotation_site';
-    protected $guarded = [];
+
+    protected $fillable = [
+        'quotation_id',
+        'leads_id',
+        'nama_site',
+        'provinsi_id',
+        'provinsi',
+        'kota_id',
+        'kota',
+        'penempatan',
+        'nominal_upah',
+        'created_by',
+        'updated_by',
+        'deleted_by'
+    ];
+
+    protected $dates = ['deleted_at'];
 
     public function leads()
     {
@@ -28,22 +44,19 @@ class QuotationSite extends Model
     {
         return $this->hasOne(Site::class, 'quotation_site_id');
     }
-    public function getCreatedAtAttribute($value)
-    {
-        return Carbon::parse($value)->format('d-m-Y');
-    }
-    // Di model QuotationSite
+
     public function quotation()
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
 
-    /**
-     * Format updated_at jadi dd-mm-YYYY
-     */
-    public function getUpdatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
 
+    public function getUpdatedAtAttribute($value)
+    {
+        return Carbon::parse($value)->format('d-m-Y');
+    }
 }
