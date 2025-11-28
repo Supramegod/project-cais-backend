@@ -24,7 +24,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
                 break;
             case 2:
-                $rules['mulai_kontrak'] = 'required|date';
+                $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
                 $rules['tgl_penempatan'] = 'required|date';
                 $rules['top'] = 'required|string';
@@ -152,6 +152,7 @@ class QuotationStepRequest extends FormRequest
 
             // Step 2 Messages
             'mulai_kontrak.required' => 'Mulai kontrak harus diisi',
+            'mulai_kontrak.after_or_equal' => 'Tanggal mulai kontrak tidak boleh kurang dari hari ini.',
             'mulai_kontrak.date' => 'Mulai kontrak harus berupa tanggal yang valid',
             'kontrak_selesai.required' => 'Kontrak selesai harus diisi',
             'kontrak_selesai.date' => 'Kontrak selesai harus berupa tanggal yang valid',

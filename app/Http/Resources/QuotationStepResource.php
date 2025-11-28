@@ -325,12 +325,15 @@ class QuotationStepResource extends JsonResource
                 ];
             // Di method getStepSpecificData - case 11:
             case 11:
-                // Gunakan calculated_quotation dari additional_data yang sudah dihitung oleh service
                 $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
 
                 return [
                     'penagihan' => $quotation->penagihan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'persentase' => $quotation->persentase,
+                    'management_fee_nama' => $quotation->managementFee->nama ?? null,
+                    'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
+                    
                     'quotation_pics' => $quotation->relationLoaded('quotationPics') ?
                         $quotation->quotationPics->map(function ($pic) {
                             return [
@@ -344,6 +347,11 @@ class QuotationStepResource extends JsonResource
                         })->toArray() : [],
                     // Data perhitungan dari service - DIPERBAIKI: akses melalui calculation_summary
                     'calculation' => $calculatedQuotation ? [
+                        // ✅ TAMBAHKAN: Data BPU di summary
+                        'bpu' => [
+                            'total_potongan_bpu' => $calculatedQuotation->calculation_summary->total_potongan_bpu ?? 0,
+                            'potongan_bpu_per_orang' => $calculatedQuotation->calculation_summary->potongan_bpu_per_orang ?? 0,
+                        ],
                         'hpp' => [
                             'total_sebelum_management_fee' => $calculatedQuotation->calculation_summary->total_sebelum_management_fee ?? 0,
                             'nominal_management_fee' => $calculatedQuotation->calculation_summary->nominal_management_fee ?? 0,
@@ -376,6 +384,20 @@ class QuotationStepResource extends JsonResource
                             // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
                             $wage = $detail->wage ?? null;
 
+                            // ✅ PERBAIKAN: Ambil potongan_bpu dari detail calculation
+                            $potonganBpu = $detail->potongan_bpu ?? 0;
+
+                            // ✅ TAMBAHKAN: Ambil data tunjangan untuk detail ini
+                            $tunjanganData = [];
+                            if ($detail->relationLoaded('quotationDetailTunjangans')) {
+                                $tunjanganData = $detail->quotationDetailTunjangans->map(function ($tunjangan) {
+                                    return [
+                                        'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                                        'nominal' => $tunjangan->nominal,
+                                    ];
+                                })->toArray();
+                            }
+
                             // Logic untuk display lembur
                             $lemburDisplay = '';
                             if ($wage) {
@@ -406,6 +428,11 @@ class QuotationStepResource extends JsonResource
                                 'jumlah_hc' => $detail->jumlah_hc,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
+                                'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                                // ✅ TAMBAHKAN untuk debug BPU
+        
+                                // ✅ TAMBAHKAN: Data tunjangan rinci
+                                'tunjangan_data' => $tunjanganData,
 
                                 // ✅ DATA HPP
                                 'hpp' => [
@@ -413,6 +440,7 @@ class QuotationStepResource extends JsonResource
                                     'total_tunjangan' => $detail->total_tunjangan,
                                     'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
                                     'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'potongan_bpu' => $potonganBpu,
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                                     'kompensasi' => $detail->kompensasi,
                                     'lembur' => $lemburDisplay,
@@ -436,6 +464,7 @@ class QuotationStepResource extends JsonResource
                                     'total_tunjangan' => $detail->total_tunjangan,
                                     'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
                                     'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'potongan_bpu' => $potonganBpu,
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                                     'kompensasi' => $detail->kompensasi,
                                     'lembur' => $lemburDisplay,

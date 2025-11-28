@@ -113,9 +113,10 @@ class QuotationService
 
     private function loadQuotationData($quotation)
     {
-        // Load dengan relasi wage - TAPI JANGAN ASSIGN KE MODEL
-        $quotationDetails = QuotationDetail::with('wage')
+        // Load dengan relasi wage dan tunjangan
+        $quotationDetails = QuotationDetail::with(['wage', 'quotationDetailTunjangans'])
             ->where('quotation_id', $quotation->id)->get();
+
         $quotationSites = QuotationSite::where('quotation_id', $quotation->id)->get();
 
         // Calculate site details count
@@ -128,8 +129,6 @@ class QuotationService
         $managementFee = ManagementFee::find($quotation->management_fee_id);
         $managementFeeName = $managementFee->nama ?? '';
 
-        // JANGAN assign ke model Quotation, tapi return sebagai array atau simpan di DTO
-        // Sebagai workaround, kita bisa assign tapi harus hati-hati
         $quotation->quotation_detail = $quotationDetails;
         $quotation->quotation_site = $quotationSites;
         $quotation->management_fee = $managementFeeName;
@@ -214,7 +213,7 @@ class QuotationService
 
     private function initializeDetail($detail, $hpp, $site, $wage)
     {
-        $detail->nominal_upah = $hpp->gaji_pokok ?? $site->nominal_upah ?? 0;
+        $detail->nominal_upah = $detail->nominal_upah ?? $hpp->gaji_pokok ?? $site->nominal_upah;
         $detail->umk = $site->umk ?? 0;
         $detail->ump = $site->ump ?? 0;
         $detail->bunga_bank = $hpp->bunga_bank ?? 0;
@@ -261,6 +260,12 @@ class QuotationService
 
     private function populateDetailCalculation($detail, $quotation, DetailCalculation $detailCalculation): void
     {
+        // Calculate BPU deduction if applicable
+        $potonganBpu = 0;
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $potonganBpu = 16800;
+        }
+
         // Data untuk HPP
         $detailCalculation->hpp_data = [
             'quotation_detail_id' => $detail->id,
@@ -291,6 +296,7 @@ class QuotationService
             'provisi_ohc' => $detail->personil_ohc ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
+            'potongan_bpu' => $potonganBpu,
             'total_biaya_per_personil' => $detail->total_personil ?? 0,
             'total_biaya_all_personil' => $detail->sub_total_personil ?? 0,
         ];
@@ -326,6 +332,7 @@ class QuotationService
             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
+            'potongan_bpu' => $potonganBpu,
         ];
     }
 
@@ -344,10 +351,21 @@ class QuotationService
         $detail->total_tunjangan = $totalTunjangan;
         return $totalTunjangan;
     }
-
     private function calculateBpjs($detail, $quotation, $hpp)
     {
-        if ($quotation->program_bpjs === 'BPU') {
+        // DEBUG: Log untuk troubleshooting
+        \Log::info("Calculating BPJS for detail", [
+            'detail_id' => $detail->id,
+            'program_bpjs' => $quotation->program_bpjs,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'nominal_upah' => $detail->nominal_upah,
+            'umk' => $detail->umk,
+            'ump' => $detail->ump,
+            'nominal_takaful' => $detail->nominal_takaful // Tambahkan log untuk nominal_takaful
+        ]);
+
+        // PERBAIKAN: Terima kedua nilai "BPJS" dan "BPJS Kesehatan"
+        if ($detail->penjamin_kesehatan === 'BPU') {
             // BPU = potong 16 ribu dari nominal upah, tidak ada BPJS sama sekali
             $detail->bpjs_jkk = 0;
             $detail->bpjs_jkm = 0;
@@ -362,37 +380,123 @@ class QuotationService
             $detail->persen_bpjs_kes = 0;
 
             // Potong 16 ribu dari nominal upah
-            $detail->nominal_upah = $detail->nominal_upah - 16000;
+            $detail->nominal_upah = $detail->nominal_upah - 16800;
 
             $this->updateQuotationBpjs($detail, $quotation);
+
+            \Log::info("BPU mode - BPJS set to 0", ['detail_id' => $detail->id]);
             return;
         }
-        $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
 
-        $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
-            'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.3],
-            'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.7],
-            'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2],
-            'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4, 'base' => $detail->umk]
-        ];
+        // PERBAIKAN: Terima kedua nilai "BPJS" dan "BPJS Kesehatan"
+        if ($quotation->program_bpjs === 'BPJS' || $quotation->program_bpjs === 'BPJS Kesehatan') {
+            $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
 
-        foreach ($bpjsConfig as $config) {
-            if (($hpp->{$config['field']} ?? null) === null) {
-                $base = $config['base'] ?? $upahBpjs;
-                $detail->{$config['percent']} = $detail->{$config['percent']} ?? $config['default'];
-                $detail->{$config['field']} = $base * $detail->{$config['percent']} / 100;
-            } else {
-                $detail->{$config['field']} = $hpp->{$config['field']};
-                $detail->{$config['percent']} = $hpp->{"persen_{$config['field']}"};
+            // PERBAIKAN: Standardize penjamin kesehatan untuk konsistensi
+            if ($detail->penjamin_kesehatan === 'BPJS Kesehatan') {
+                $detail->penjamin_kesehatan = 'BPJS';
             }
+            // PERBAIKAN: Sesuaikan dengan peraturan Indonesia 2024
+            $bpjsConfig = [
+                'jkk' => [
+                    'field' => 'bpjs_jkk',
+                    'percent' => 'persen_bpjs_jkk',
+                    'default' => $this->getJkkPercentage($quotation->resiko),
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jkm' => [
+                    'field' => 'bpjs_jkm',
+                    'percent' => 'persen_bpjs_jkm',
+                    'default' => 0.30, // Sesuai peraturan
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jht' => [
+                    'field' => 'bpjs_jht',
+                    'percent' => 'persen_bpjs_jht',
+                    'default' => 3.70, // Perusahaan 3.7%, karyawan 2%
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'jp' => [
+                    'field' => 'bpjs_jp',
+                    'percent' => 'persen_bpjs_jp',
+                    'default' => 2.00, // Perusahaan 2%, karyawan 1%
+                    'keterangan' => 'Ditanggung perusahaan'
+                ],
+                'kes' => [
+                    'field' => 'bpjs_kes',
+                    'percent' => 'persen_bpjs_kes',
+                    'default' => 4.00, // Perusahaan 4%, karyawan 1% (total 5%)
+                    'keterangan' => 'Ditanggung perusahaan',
+                    'base' => $upahBpjs
+                ]
+            ];
+
+            foreach ($bpjsConfig as $key => $config) {
+                $hppValue = $hpp->{$config['field']} ?? null;
+
+                // PERBAIKAN: Cek apakah nilai dari HPP null atau 0
+                if ($hppValue === null || $hppValue === 0) {
+                    $base = $config['base'] ?? $upahBpjs;
+                    $persentase = $config['default'];
+
+                    // PERBAIKAN: Gunakan persentase dari detail jika ada, otherwise gunakan default
+                    $detail->{$config['percent']} = $detail->{$config['percent']} ?? $persentase;
+
+                    // PERBAIKAN KHUSUS: Untuk BPJS Kesehatan, jika menggunakan asuransi swasta, gunakan nominal_takaful
+                    if ($key === 'kes' && ($detail->penjamin_kesehatan === "Asuransi Swasta" || $detail->penjamin_kesehatan === "Takaful")) {
+                        $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
+                        \Log::info("Using Takaful for BPJS Kesehatan", [
+                            'detail_id' => $detail->id,
+                            'nominal_takaful' => $detail->nominal_takaful,
+                            'penjamin_kesehatan' => $detail->penjamin_kesehatan
+                        ]);
+                    } else {
+                        $detail->{$config['field']} = $base * $detail->{$config['percent']} / 100;
+                    }
+
+                    \Log::info("BPJS calculated", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'base' => $base,
+                        'persentase' => $detail->{$config['percent']},
+                        'nilai' => $detail->{$config['field']},
+                        'keterangan' => $config['keterangan']
+                    ]);
+                } else {
+                    // Gunakan nilai dari HPP
+                    $detail->{$config['field']} = $hppValue;
+                    $detail->{$config['percent']} = $hpp->{"persen_{$config['field']}"} ?? $config['default'];
+
+                    \Log::info("BPJS from HPP", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'nilai' => $detail->{$config['field']},
+                        'persentase' => $detail->{$config['percent']}
+                    ]);
+                }
+            }
+
+            // Apply BPJS opt-out berdasarkan data dari quotation detail
+            $this->applyBpjsOptOut($detail);
+            $this->updateQuotationBpjs($detail, $quotation);
+
+            \Log::info("Final BPJS values", [
+                'detail_id' => $detail->id,
+                'bpjs_jkk' => $detail->bpjs_jkk,
+                'bpjs_jkm' => $detail->bpjs_jkm,
+                'bpjs_jht' => $detail->bpjs_jht,
+                'bpjs_jp' => $detail->bpjs_jp,
+                'bpjs_kes' => $detail->bpjs_kes,
+                'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                'nominal_takaful' => $detail->nominal_takaful
+            ]);
+        } else {
+            \Log::warning("Program BPJS tidak dikenali, tidak menghitung BPJS", [
+                'detail_id' => $detail->id,
+                'program_bpjs' => $quotation->program_bpjs
+            ]);
         }
-
-        // Apply BPJS opt-out berdasarkan data dari quotation detail
-        $this->applyBpjsOptOut($detail);
-        $this->updateQuotationBpjs($detail, $quotation);
     }
-
     private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
         try {
@@ -458,35 +562,51 @@ class QuotationService
     {
         // Hitung potongan BPU jika ada
         $potonganBpu = 0;
-        if ($quotation->program_bpjs === 'BPU') {
-            $potonganBpu = 16000; // Fixed 16 ribu
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $potonganBpu = 16800; // Fixed 16 ribu per karyawan
             $detail->potongan_bpu = $potonganBpu;
+
+            \Log::info("BPU potongan applied", [
+                'detail_id' => $detail->id,
+                'potongan_bpu' => $potonganBpu
+            ]);
         }
 
+        // PERBAIKAN: Gunakan bpjs_kesehatan yang sudah disesuaikan (bisa berupa BPJS atau Takaful)
+        $biayaKesehatan = $detail->bpjs_kesehatan;
+
+        // ✅ TUNJANGAN SUDAH DIPERHITUNGKAN: $totalTunjangan digunakan dalam perhitungan
         // HPP Calculations
         $detail->total_personil = $detail->nominal_upah + $totalTunjangan + $detail->tunjangan_hari_raya +
-            $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur + $detail->nominal_takaful +
-            $detail->bpjs_ketenagakerjaan + $detail->bpjs_kesehatan + $detail->personil_kaporlap +
+            $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur +
+            $detail->bpjs_ketenagakerjaan + $biayaKesehatan + $detail->personil_kaporlap +
             $detail->personil_devices + $detail->personil_chemical + $detail->personil_ohc +
             $detail->bunga_bank + $detail->insentif - $potonganBpu;
 
         $detail->sub_total_personil = $detail->total_personil * $detail->jumlah_hc;
 
-        // COSS Calculations - sama seperti sebelumnya
+        // COSS Calculations
         $detail->total_base_manpower = round($detail->nominal_upah + $detail->total_tunjangan, 2);
 
         $detail->total_exclude_base_manpower = round(
             $detail->tunjangan_hari_raya + $detail->kompensasi + $detail->tunjangan_holiday +
-            $detail->lembur + $detail->nominal_takaful + $detail->bpjs_kesehatan +
-            $detail->bpjs_ketenagakerjaan + $detail->personil_kaporlap_coss +
-            $detail->personil_devices_coss + $detail->personil_chemical_coss,
+            $detail->lembur + $biayaKesehatan + $detail->bpjs_ketenagakerjaan +
+            $detail->personil_kaporlap_coss + $detail->personil_devices_coss + $detail->personil_chemical_coss,
             2
         );
 
         $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss - $potonganBpu, 2);
         $detail->sub_total_personil_coss = round($detail->total_personil_coss * $detail->jumlah_hc, 2);
-    }
 
+        \Log::info("Final totals calculated with tunjangan", [
+            'detail_id' => $detail->id,
+            'total_tunjangan' => $totalTunjangan,
+            'biaya_kesehatan' => $biayaKesehatan,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'total_personil' => $detail->total_personil,
+            'potongan_bpu' => $potonganBpu
+        ]);
+    }
     // ============================ GROSS UP RECALCULATION ============================
     private function calculateBankInterestAndIncentive($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
@@ -559,8 +679,21 @@ class QuotationService
         $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
             fn($kbd) => ($kbd->bpjs_kesehatan + $kbd->nominal_takaful) * $kbd->jumlah_hc
         );
-    }
 
+        // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
+        $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
+            fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
+        );
+
+        $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
+
+        \Log::info("BPU totals calculated", [
+            'quotation_id' => $quotation->id,
+            'total_potongan_bpu' => $summary->total_potongan_bpu,
+            'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
+            'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+        ]);
+    }
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -737,33 +870,105 @@ class QuotationService
         ];
 
         foreach ($optOuts as $optField => $targetFields) {
-            if ($detail->{$optField} == "0") {
+            // PERBAIKAN: Cek dengan lebih teliti nilai opt-out
+            $isOptOut = false;
+
+            if (isset($detail->{$optField})) {
+                $optValue = $detail->{$optField};
+
+                // Handle berbagai format nilai opt-out
+                if ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false") {
+                    $isOptOut = true;
+                } elseif (is_string($optValue) && strtolower($optValue) === 'tidak') {
+                    $isOptOut = true;
+                }
+            }
+
+            if ($isOptOut) {
                 $detail->{$targetFields[0]} = 0;
                 $detail->{$targetFields[1]} = 0;
+
+                \Log::info("BPJS opt-out applied", [
+                    'detail_id' => $detail->id,
+                    'field' => $optField,
+                    'bpjs_field' => $targetFields[0],
+                    'opt_value' => $detail->{$optField}
+                ]);
             }
         }
     }
 
     private function updateQuotationBpjs($detail, $quotation)
     {
+        // Hitung total BPJS ketenagakerjaan
         $detail->persen_bpjs_ketenagakerjaan = $detail->persen_bpjs_jkk + $detail->persen_bpjs_jkm +
             $detail->persen_bpjs_jht + $detail->persen_bpjs_jp;
         $detail->bpjs_ketenagakerjaan = $detail->bpjs_jkk + $detail->bpjs_jkm + $detail->bpjs_jht + $detail->bpjs_jp;
 
-        // HAPUS assignment ke quotation object untuk kolom yang tidak ada di tabel
-        // if ($detail->persen_bpjs_ketenagakerjaan) {
-        //     $quotation->persen_bpjs_ketenagakerjaan = $detail->persen_bpjs_ketenagakerjaan;
-        // }
-
-        if ($detail->penjamin_kesehatan == "BPJS") {
+        // PERBAIKAN: Tambahkan logika sesuai permintaan
+        if ($detail->penjamin_kesehatan == "BPJS" || $detail->penjamin_kesehatan == "BPJS Kesehatan") {
             $detail->bpjs_kesehatan = $detail->bpjs_kes;
             $detail->persen_bpjs_kesehatan = $detail->persen_bpjs_kes;
-            // HAPUS assignment ke quotation object untuk kolom yang tidak ada di tabel
+            // PERBAIKAN: Set persentase BPJS kesehatan di quotation jika diperlukan
             // $quotation->persen_bpjs_kesehatan = $detail->persen_bpjs_kesehatan;
+
+            \Log::info("Using BPJS for health insurance", [
+                'detail_id' => $detail->id,
+                'bpjs_kes' => $detail->bpjs_kes,
+                'persen_bpjs_kes' => $detail->persen_bpjs_kes
+            ]);
+        } else if ($detail->penjamin_kesehatan == "Asuransi Swasta" || $detail->penjamin_kesehatan == "Takaful") {
+            // PERBAIKAN: Jika menggunakan asuransi swasta/takaful, gunakan nominal_takaful sebagai bpjs_kesehatan
+            $detail->bpjs_kesehatan = $detail->nominal_takaful ?? 0;
+            $detail->persen_bpjs_kesehatan = 0; // Karena menggunakan asuransi swasta, persentase BPJS = 0
+
+            \Log::info("Using Takaful for health insurance", [
+                'detail_id' => $detail->id,
+                'nominal_takaful' => $detail->nominal_takaful,
+                'bpjs_kesehatan' => $detail->bpjs_kesehatan
+            ]);
         } else {
             $detail->bpjs_kesehatan = 0;
             $detail->persen_bpjs_kesehatan = 0;
+            // $quotation->persen_bpjs_kesehatan = 0;
+
+            \Log::info("No health insurance", [
+                'detail_id' => $detail->id,
+                'penjamin_kesehatan' => $detail->penjamin_kesehatan
+            ]);
         }
+
+        \Log::info("Quotation BPJS updated", [
+            'detail_id' => $detail->id,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
+            'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+            'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan,
+            'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan,
+            'bpjs_kes' => $detail->bpjs_kes,
+            'persen_bpjs_kes' => $detail->persen_bpjs_kes,
+            'nominal_takaful' => $detail->nominal_takaful
+        ]);
+    }
+    // ============================ BPU CALCULATION ============================
+
+    /**
+     * Calculate BPU (Biaya Penyelenggaraan Umum) - potongan 16.000 per karyawan
+     */
+    private function calculateBpu($detail, $quotation)
+    {
+        $bpuAmount = 0;
+
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            $bpuAmount = 16800; // Fixed 16 ribu per karyawan
+            \Log::info("BPU calculated", [
+                'detail_id' => $detail->id,
+                'bpu_amount' => $bpuAmount,
+                'program_bpjs' => $quotation->program_bpjs
+            ]);
+        }
+
+        return $bpuAmount;
     }
     // ============================ OTHER SERVICE METHODS ============================
 

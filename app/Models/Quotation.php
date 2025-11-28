@@ -257,6 +257,12 @@ class Quotation extends Model
     {
         return $this->hasMany(QuotationKerjasama::class, 'quotation_id');
     }
+    // File: app/Models/Quotation.php
+
+    public function managementFee()
+    {
+        return $this->belongsTo(ManagementFee::class, 'management_fee_id');
+    }
 
     // Relasi ke QuotationTraining
     public function quotationTrainings()
@@ -422,7 +428,7 @@ class Quotation extends Model
     {
         return $this->hasMany(Quotation::class, 'quotation_referensi_id');
     }
-        public function wage()
+    public function wage()
     {
         return $this->hasOne(QuotationDetailWage::class);
     }

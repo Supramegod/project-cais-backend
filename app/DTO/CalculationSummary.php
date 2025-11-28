@@ -41,4 +41,8 @@ class CalculationSummary
     public $upah_pokok_coss = 0;
     public $total_bpjs_coss = 0;
     public $total_bpjs_kesehatan_coss = 0;
+    
+    // TAMBAHKAN: BPU calculations
+    public $total_potongan_bpu = 0;
+    public $potongan_bpu_per_orang = 0;
 }
