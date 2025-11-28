@@ -270,20 +270,19 @@ class QuotationStepService
             case 11:
                 $data['additional_data']['calculated_quotation'] = $this->quotationService->calculateQuotation($quotation);
 
-                // Menggunakan model method
+                // ✅ PASTIKAN: Data tunjangan diambil dengan relasi
                 $data['additional_data']['daftar_tunjangan'] = QuotationDetailTunjangan::distinctTunjanganByQuotation($quotation->id);
 
-                // Menggunakan model dengan SoftDeletes
-                $data['additional_data']['training_list'] = Training::all();
+                // Load tunjangan untuk setiap detail
+                $quotation->load(['quotationDetails.quotationDetailTunjangans']);
 
+                $data['additional_data']['training_list'] = Training::all();
                 $data['additional_data']['selected_training'] = $quotation->quotationTrainings
                     ->pluck('training_id')
                     ->toArray();
 
-                // Menggunakan model dengan SoftDeletes
                 $data['additional_data']['jabatan_pic_list'] = JabatanPic::all();
                 break;
-
             case 12:
                 // ✅ STRUKTUR BARU: Include ID untuk setiap kerjasama
                 $finalData = [
@@ -574,7 +573,6 @@ class QuotationStepService
             throw $e;
         }
     }
-
     public function updateStep5(Quotation $quotation, Request $request): void
     {
         // Update BPJS data untuk setiap detail (position)
@@ -582,7 +580,7 @@ class QuotationStepService
             $detailId = $detail->id;
             $penjamin = $request->penjamin[$detailId] ?? null;
 
-            // Tentukan nominal_takaful berdasarkan penjamin
+            // PERBAIKAN: Pastikan nilai penjamin kesehatan konsisten
             $nominalTakaful = 0;
             if ($penjamin === 'Asuransi Swasta' || $penjamin === 'Takaful') {
                 $nominalTakaful = $request->nominal_takaful[$detailId] ?? 0;
@@ -590,16 +588,35 @@ class QuotationStepService
                 if (is_string($nominalTakaful)) {
                     $nominalTakaful = (int) str_replace('.', '', $nominalTakaful);
                 }
+
+                \Log::info("Setting Takaful for detail", [
+                    'detail_id' => $detailId,
+                    'penjamin' => $penjamin,
+                    'nominal_takaful' => $nominalTakaful
+                ]);
             }
 
+            // PERBAIKAN: Pastikan nilai "BPJS" dan "BPJS Kesehatan" konsisten
+            if ($penjamin === 'BPJS Kesehatan') {
+                $penjamin = 'BPJS'; // Standardize to "BPJS"
+            }
+
+            // PERBAIKAN: Tambahkan field is_bpjs_kes untuk opt-out BPJS Kesehatan
             $detail->update([
                 'penjamin_kesehatan' => $penjamin,
                 'is_bpjs_jkk' => $this->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0,
                 'is_bpjs_jkm' => $this->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0,
                 'is_bpjs_jht' => $this->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0,
                 'is_bpjs_jp' => $this->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0,
-                'nominal_takaful' => $nominalTakaful, // Tambahkan field ini
+                'is_bpjs_kes' => $this->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0, // Default true
+                'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name
+            ]);
+
+            \Log::info("Updated BPJS data for detail", [
+                'detail_id' => $detailId,
+                'penjamin' => $penjamin,
+                'nominal_takaful' => $nominalTakaful
             ]);
         }
 
@@ -615,6 +632,11 @@ class QuotationStepService
         if ($quotation->leads) {
             $quotation->leads->update($companyData);
         }
+
+        \Log::info("Step 5 completed with BPJS data", [
+            'quotation_id' => $quotation->id,
+            'program_bpjs' => $request->input('program-bpjs')
+        ]);
     }
     public function updateStep6(Quotation $quotation, Request $request): void
     {
@@ -841,6 +863,14 @@ class QuotationStepService
             // Panggil calculateQuotation untuk mendapatkan hasil perhitungan dalam DTO
             $calculationResult = $this->quotationService->calculateQuotation($quotation);
 
+            // TAMBAHKAN: Log BPU information
+            \Log::info("BPU Information", [
+                'quotation_id' => $quotation->id,
+                'program_bpjs' => $quotation->program_bpjs,
+                'total_potongan_bpu' => $calculationResult->calculation_summary->total_potongan_bpu,
+                'potongan_bpu_per_orang' => $calculationResult->calculation_summary->potongan_bpu_per_orang
+            ]);
+
             // Loop setiap detail calculation untuk menyimpan ke HPP dan COSS
             foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
                 // Simpan ke QuotationDetailHpp
@@ -860,7 +890,8 @@ class QuotationStepService
                 'details_processed' => count($calculationResult->detail_calculations),
                 'hpp_updated' => true,
                 'coss_updated' => true,
-                'tunjangan_synced' => $request->has('tunjangan_data')
+                'tunjangan_synced' => $request->has('tunjangan_data'),
+                'bpu_total' => $calculationResult->calculation_summary->total_potongan_bpu
             ]);
 
         } catch (\Exception $e) {
