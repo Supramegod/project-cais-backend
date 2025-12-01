@@ -723,13 +723,13 @@ class QuotationService
         $summary->{"ppn{$suffix}"} = 0;
         $summary->{"pph{$suffix}"} = 0;
 
-        $quotation->quotation_detail->each(function ($kbd) use (&$summary, $suffix, $model) {
-            $detail = $model::where('quotation_detail_id', $kbd->id)->first();
-            if ($detail) {
-                $summary->{"ppn{$suffix}"} += $detail->ppn ?? 0;
-                $summary->{"pph{$suffix}"} += $detail->pph ?? 0;
-            }
-        });
+        // $quotation->quotation_detail->each(function ($kbd) use (&$summary, $suffix, $model) {
+        //     $detail = $model::where('quotation_detail_id', $kbd->id)->first();
+        //     if ($detail) {
+        //         $summary->{"ppn{$suffix}"} += $detail->ppn ?? 0;
+        //         $summary->{"pph{$suffix}"} += $detail->pph ?? 0;
+        //     }
+        // });
 
         // PERBAIKAN: Validasi nilai PPN/PPH tidak wajar
         $grandTotal = $summary->{"grand_total_sebelum_pajak{$suffix}"};

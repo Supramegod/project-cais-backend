@@ -346,6 +346,13 @@ class Quotation extends Model
             return $query;
         }
 
+        // 🌟 PERUBAHAN: TAMBAHKAN ROLE ID 2 (SUPERADMIN) DI SINI
+        if ($user->role_id == 2) {
+            // Superadmin dapat mengakses SEMUA data tanpa filter.
+            return $query;
+        }
+        // -----------------------------------------------------
+
         // Sales division
         if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
             if ($user->role_id == 29) {

@@ -13,7 +13,9 @@ use App\Models\Leads;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
+use App\Models\Pks;
 use App\Models\Province;
+use App\Models\Spk;
 use App\Models\StatusLeads;
 use App\Models\Platform;
 use App\Models\TimSalesDetail;
@@ -726,7 +728,7 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' =>  $validator->errors()->toArray()
+                    'message' => $validator->errors()->toArray()
                 ], 400);
             }
 
@@ -1490,62 +1492,17 @@ class LeadsController extends Controller
     public function availableLeads()
     {
         try {
-            // Pastikan Anda telah mengimpor kelas Leads, DB, dan Auth (jika di luar controller/model)
-            // use App\Models\Leads;
-            // use Illuminate\Support\Facades\DB;
-            // use Illuminate\Support\Facades\Auth;
+            $user = Auth::user();
 
-            $user = auth()->user();
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD']);
-
-            // Role-based filtering
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                // Role 29: Individual Sales (hanya melihat Leads mereka sendiri)
-                if ($user->role_id == 29) {
-                    // Filter Leads berdasarkan TimSalesDetail yang memiliki user_id sama dengan user yang login
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                }
-                // Role 31: Sales Leader (melihat Leads tim mereka)
-                elseif ($user->role_id == 31) {
-                    // 1. Dapatkan TimSalesDetail untuk user leader
-                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
-
-                    if ($timSalesDetail) {
-                        // 2. Dapatkan semua user_id anggota tim (termasuk leader itu sendiri)
-                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-
-                        // 3. Filter Leads yang dimiliki oleh anggota tim tersebut
-                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
-                            $q->whereIn('user_id', $memberSalesUserIds);
-                        });
-                    } else {
-                        // Jika leader tidak terdaftar di m_tim_sales_d, kembalikan Leads kosong
-                        $query->whereRaw('1 = 0');
-                    }
-                }
-            }
-            // RO roles
-            elseif (in_array($user->role_id, [6, 8])) {
-                // Implementasi filter RO, jika ada (saat ini kosong)
-            }
-            // CRM roles
-            elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
+            // Gunakan scope dari model
+            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
+                ->availableForActivity($user);
 
             $data = $query->get();
 
             // Transformasi data
             $data->transform(function ($item) {
-                // Pastikan kolom 'tgl_leads' tersedia di model Leads
                 $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                // Properti ini mungkin perlu diisi dengan data dari relasi 'timSalesD' dan 'branch' jika diperlukan
                 $item->salesEmail = '';
                 $item->branchManagerEmail = '';
                 $item->branchManager = '';
@@ -1558,7 +1515,6 @@ class LeadsController extends Controller
                 'data' => $data
             ]);
         } catch (\Exception $e) {
-            // Penanganan error
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()
@@ -1630,37 +1586,11 @@ class LeadsController extends Controller
     public function availableQuotation()
     {
         try {
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
-                ->whereNull('leads_id');
+            $user = Auth::user();
 
-            // Role-based filtering
-            $user = auth()->user();
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                if ($user->role_id == 29) {
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                } elseif ($user->role_id == 31) {
-                    $tim = DB::table('m_tim_sales_d')->where('user_id', $user->id)->first();
-                    if ($tim) {
-                        $memberSales = DB::table('m_tim_sales_d')
-                            ->where('tim_sales_id', $tim->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-                        $query->whereHas('timSalesD', function ($q) use ($memberSales) {
-                            $q->whereIn('user_id', $memberSales);
-                        });
-                    }
-                }
-            } elseif (in_array($user->role_id, [4, 5, 6, 8])) {
-                if (in_array($user->role_id, [4, 5])) {
-                    $query->where('ro_id', $user->id);
-                }
-            } elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
+            // Gunakan scope dari model
+            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
+                ->availableForQuotation($user);
 
             $data = $query->get();
 
@@ -1681,7 +1611,6 @@ class LeadsController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * @OA\Post(
@@ -2618,7 +2547,288 @@ class LeadsController extends Controller
         }
     }
 
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/spk/{id}",
+     *     summary="Mendapatkan daftar SPK berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua SPK yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data SPK"
+     *     )
+     * )
+     */
+    public function getSpkByLead($id, Request $request)
+    {
+        try {
+            // Validasi leads_id
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+            $spkData = Spk::with('statusSpk')
+                ->byLeadsId($id)
+                ->select('nomor', 'leads_id', 'tgl_spk', 'status_spk_id')
+                ->orderBy('tgl_spk', 'desc')
+                ->get();
+
+            // Di sini kita bisa menggunakan `map` untuk menambahkan accessor dan menghilangkan relasi
+            $spkData = $spkData->map(function ($item) {
+                $data = $item->toArray();
+                // Tambahkan nama status menggunakan accessor yang baru dibuat
+                $data['nama_status'] = $item->nama_status;
+
+                // Hapus objek relasi statusSpk (opsional, jika Anda hanya mau nama status)
+                unset($data['status_spk']);
+
+                return $data;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data SPK berhasil diambil',
+                'data' => $spkData, // <-- Menggunakan data yang sudah di-map
+                'summary' => Spk::getSummaryByLeadsId($id)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/pks/{id}",
+     *     summary="Mendapatkan daftar PKS berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua PKS yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data PKS"
+     *     )
+     * )
+     */
+    public function getPksByLead($id, Request $request)
+    {
+        try {
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+
+            // GUNAKAN MODEL PKS LANGSUNG dengan scope byLeadsId
+            // Logika query ADA DI MODEL PKS, bukan di controller
+            $pksData = Pks::with('leads')
+                ->byLeadsId($id)
+                ->select('nomor', 'leads_id', 'tgl_pks', 'status_pks_id', 'kontrak_akhir') // <-- TAMBAH 'kontrak_akhir'
+                ->orderBy('tgl_pks', 'desc')
+                ->get();
+
+            // 2. Map data dan tambahkan informasi tambahan
+            $pksData = $pksData->map(function ($item) {
+                $data = $item->toArray();
+                $data['nama_status'] = $item->nama_status;
+
+                // Hitung sisa kontrak menggunakan method di class ini
+                $data['sisa_kontrak'] = $this->hitungBerakhirKontrak($item->kontrak_akhir);
+
+                unset($data['leads']);
+
+                return $data;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data PKS berhasil diambil',
+                'data' => $pksData,
+                'summary' => Pks::getSummaryByLeadsId($id) // Summary dari model Pks
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/documents/{id}",
+     *     summary="Mendapatkan semua dokumen (SPK dan PKS) berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua dokumen yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data dokumen"
+     *     )
+     * )
+     */
+    public function getAllDocumentsByLead($id, Request $request)
+    {
+        try {
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            $filters = $request->only(['status', 'jenis', 'date_from', 'date_to', 'search']);
+
+            // Ambil data dari masing-masing model (LOGICA DI MODEL MEREKA)
+            $spkData = Spk::byLeadsId($id, $filters)->get();
+            $pksData = Pks::byLeadsId($id, $filters)->get();
+
+            // Summary dari masing-masing model
+            $spkSummary = Spk::getSummaryByLeadsId($id);
+            $pksSummary = Pks::getSummaryByLeadsId($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data dokumen berhasil diambil',
+                'data' => [
+                    'spk' => $spkData,
+                    'pks' => $pksData,
+                    'total_spk' => $spkData->count(),
+                    'total_pks' => $pksData->count(),
+                    'summary' => [
+                        'spk' => $spkSummary,
+                        'pks' => $pksSummary,
+                        'total_documents' => $spkData->count() + $pksData->count(),
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/active-documents/{id}",
+     *     summary="Mendapatkan dokumen aktif berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil dokumen aktif yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data dokumen aktif"
+     *     )
+     * )
+     */
+    public function getActiveDocumentsByLead($id)
+    {
+        try {
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // Menggunakan scope dari masing-masing model
+            $activeSpk = Spk::where('leads_id', $id)
+                ->active() // Scope dari model Spk
+                ->get();
+
+            $activePks = Pks::where('leads_id', $id)
+                ->active() // Scope dari model Pks
+                ->get();
+
+            $ongoingPks = Pks::where('leads_id', $id)
+                ->ongoing() // Scope dari model Pks
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data dokumen aktif berhasil diambil',
+                'data' => [
+                    'active_spk' => $activeSpk,
+                    'active_pks' => $activePks,
+                    'ongoing_pks' => $ongoingPks
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     //==============================================================================//
+    private function hitungBerakhirKontrak($tanggalBerakhir)
+    {
+        if (is_null($tanggalBerakhir)) {
+            return "-";
+        }
+
+        $tanggalSekarang = Carbon::now();
+        $tanggalBerakhir = Carbon::createFromFormat('Y-m-d', $tanggalBerakhir);
+
+        if ($tanggalSekarang->greaterThanOrEqualTo($tanggalBerakhir)) {
+            return "Kontrak habis";
+        }
+
+        $selisih = $tanggalSekarang->diff($tanggalBerakhir);
+
+        $hasil = [];
+        if ($selisih->y > 0)
+            $hasil[] = "{$selisih->y} tahun";
+        if ($selisih->m > 0)
+            $hasil[] = "{$selisih->m} bulan";
+        if ($selisih->d > 0)
+            $hasil[] = "{$selisih->d} hari";
+
+        return implode(', ', $hasil);
+    }
 
 
     // Tambahkan method helper untuk generate nomor lanjutan
