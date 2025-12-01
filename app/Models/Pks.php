@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,25 +15,92 @@ class Pks extends Model
 
     protected $table = 'sl_pks';
     protected $primaryKey = 'id';
-    
+
     protected $fillable = [
-        'leads_id','quotation_id', 'nomor', 'tgl_pks', 'nama_perusahaan', 'kontrak_awal', 
-        'kontrak_akhir', 'status_pks_id', 'company_id', 'salary_rule_id', 
-        'rule_thr_id', 'branch_id', 'kode_perusahaan', 'alamat_perusahaan',
-        'layanan_id', 'layanan', 'bidang_usaha_id', 'bidang_usaha',
-        'jenis_perusahaan_id', 'jenis_perusahaan', 'provinsi_id', 'provinsi',
-        'kota_id', 'kota', 'pma', 'sales_id', 'crm_id_1', 'crm_id_2', 'crm_id_3',
-        'spv_ro_id', 'ro_id_1', 'ro_id_2', 'ro_id_3', 'loyalty_id', 'loyalty',
-        'kategori_sesuai_hc_id', 'kategori_sesuai_hc', 'link_pks_disetujui',
-        'total_sebelum_pajak', 'dasar_pengenaan_pajak', 'ppn', 'pph', 'total_invoice',
-        'persen_mf', 'nominal_mf', 'persen_bpjs_tk', 'nominal_bpjs_tk',
-        'persen_bpjs_ks', 'nominal_bpjs_ks', 'as_tk', 'as_ks', 'ohc', 'thr_provisi',
-        'thr_ditagihkan', 'penagihan_selisih_thr', 'kaporlap', 'device', 'chemical',
-        'training', 'biaya_training', 'tgl_kirim_invoice', 'jumlah_hari_top',
-        'tipe_hari_top', 'tgl_gaji', 'pic_1', 'jabatan_pic_1', 'email_pic_1',
-        'telp_pic_1', 'pic_2', 'jabatan_pic_2', 'email_pic_2', 'telp_pic_2',
-        'pic_3', 'jabatan_pic_3', 'email_pic_3', 'telp_pic_3', 'is_aktif',
-        'ot1', 'ot2', 'ot3', 'ot4', 'ot5', 'created_by', 'updated_by'
+        'leads_id',
+        'quotation_id',
+        'nomor',
+        'tgl_pks',
+        'nama_perusahaan',
+        'kontrak_awal',
+        'kontrak_akhir',
+        'status_pks_id',
+        'company_id',
+        'salary_rule_id',
+        'rule_thr_id',
+        'branch_id',
+        'kode_perusahaan',
+        'alamat_perusahaan',
+        'layanan_id',
+        'layanan',
+        'bidang_usaha_id',
+        'bidang_usaha',
+        'jenis_perusahaan_id',
+        'jenis_perusahaan',
+        'provinsi_id',
+        'provinsi',
+        'kota_id',
+        'kota',
+        'pma',
+        'sales_id',
+        'crm_id_1',
+        'crm_id_2',
+        'crm_id_3',
+        'spv_ro_id',
+        'ro_id_1',
+        'ro_id_2',
+        'ro_id_3',
+        'loyalty_id',
+        'loyalty',
+        'kategori_sesuai_hc_id',
+        'kategori_sesuai_hc',
+        'link_pks_disetujui',
+        'total_sebelum_pajak',
+        'dasar_pengenaan_pajak',
+        'ppn',
+        'pph',
+        'total_invoice',
+        'persen_mf',
+        'nominal_mf',
+        'persen_bpjs_tk',
+        'nominal_bpjs_tk',
+        'persen_bpjs_ks',
+        'nominal_bpjs_ks',
+        'as_tk',
+        'as_ks',
+        'ohc',
+        'thr_provisi',
+        'thr_ditagihkan',
+        'penagihan_selisih_thr',
+        'kaporlap',
+        'device',
+        'chemical',
+        'training',
+        'biaya_training',
+        'tgl_kirim_invoice',
+        'jumlah_hari_top',
+        'tipe_hari_top',
+        'tgl_gaji',
+        'pic_1',
+        'jabatan_pic_1',
+        'email_pic_1',
+        'telp_pic_1',
+        'pic_2',
+        'jabatan_pic_2',
+        'email_pic_2',
+        'telp_pic_2',
+        'pic_3',
+        'jabatan_pic_3',
+        'email_pic_3',
+        'telp_pic_3',
+        'is_aktif',
+        'ot1',
+        'ot2',
+        'ot3',
+        'ot4',
+        'ot5',
+        'created_by',
+        'updated_by'
     ];
 
     protected $dates = ['tgl_pks', 'kontrak_awal', 'kontrak_akhir', 'deleted_at'];
@@ -62,12 +130,85 @@ class Pks extends Model
     {
         return $this->hasMany(CustomerActivity::class, 'pks_id');
     }
-        public function getCreatedAtAttribute($value)
+    public function quotations(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
+    public function spk(): BelongsTo
+    {
+        return $this->belongsTo(Spk::class, 'spk_id');
+    }
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
+    }
+    /**
+     * SCOPE: Mendapatkan SPK berdasarkan leads_id
+     * Logika filter ada di sini (DI MODEL SPK)
+     */
+    public function scopeByLeadsId(Builder $query, int $leadsId, array $filters = [])
+    {
+        return $query->where('leads_id', $leadsId);
+
+    }
+
+    /**
+     * SCOPE: Hanya SPK aktif
+     */
+    public function scopeActive(Builder $query)
+    {
+        return $query->where('is_aktif', 1);
+    }
+
+    /**
+     * SCOPE: SPK berdasarkan jenis
+     */
+    public function scopeByType(Builder $query, string $type)
+    {
+        return $query->where('jenis_SPK', $type);
+    }
+
+    /**
+     * SCOPE: SPK yang masih berjalan (tgl_mulai <= now <= tgl_selesai)
+     */
+    public function scopeOngoing(Builder $query)
+    {
+        $now = now()->toDateString();
+        return $query->where('kontrak_awal', '<=', $now)
+            ->where('kontrak_akhir', '>=', $now);
+    }
+
+    /**
+     * Method untuk summary SPK berdasarkan leads_id
+     */
+    public static function getSummaryByLeadsId(int $leadsId): array
+    {
+        $total = self::where('leads_id', $leadsId)->count();
+        $active = self::where('leads_id', $leadsId)->active()->count();
+        $ongoing = self::where('leads_id', $leadsId)->ongoing()->count();
+        return [
+            'total' => $total,
+            'active' => $active,
+            'ongoing' => $ongoing,
+            'inactive' => $total - $active,
+        ];
+    }
+    public function getNamaStatusAttribute()
+    {
+        if ($this->relationLoaded('statusPks') && $this->statusPks) {
+            return $this->statusPks->nama;
+        }
+
+        return $this->statusPks?->nama;
+    }
+     public function getTglPksAttribute($value)
+    {
+        $carbonDate = Carbon::parse($value);
+        $carbonDate->setLocale('id');
+        return $carbonDate->isoFormat('D MMMM Y');
     }
 }

@@ -365,6 +365,7 @@ class SpkController extends Controller
             // Buat SPK TANPA quotation_id
             $spk = Spk::create([
                 'leads_id' => $leads->id,
+                'quotation_id'=> $sitesWithSPK->quotation_id,
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,

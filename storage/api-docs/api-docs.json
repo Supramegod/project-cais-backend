@@ -11636,6 +11636,130 @@
                 ]
             }
         },
+        "/api/leads/spk/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar SPK berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua SPK yang terkait dengan leads tertentu",
+                "operationId": "51f8097d633e2e6ffc9c9e51ed55cac1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data SPK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/pks/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar PKS berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua PKS yang terkait dengan leads tertentu",
+                "operationId": "540f22dfa68f95dee91131a5bc55eb9c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data PKS"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/documents/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan semua dokumen (SPK dan PKS) berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua dokumen yang terkait dengan leads tertentu",
+                "operationId": "c0402f9177d3effca9c10f6e91683f58",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data dokumen"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/leads/active-documents/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan dokumen aktif berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil dokumen aktif yang terkait dengan leads tertentu",
+                "operationId": "f910e7207badaca7b59df800b26d41d3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data dokumen aktif"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
