@@ -676,8 +676,10 @@ class QuotationService
         $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
 
         $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+
+        // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
         $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) => ($kbd->bpjs_kesehatan + $kbd->nominal_takaful) * $kbd->jumlah_hc
+            fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
         );
 
         // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
@@ -729,12 +731,33 @@ class QuotationService
             }
         });
 
+        // PERBAIKAN: Validasi nilai PPN/PPH tidak wajar
+        $grandTotal = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        $maxReasonableTax = $grandTotal * 0.5; // Maksimal 50% dari grand total
+
+        if ($summary->{"ppn{$suffix}"} > $maxReasonableTax) {
+            \Log::warning("PPN value too large, resetting to zero", [
+                'current_ppn' => $summary->{"ppn{$suffix}"},
+                'max_reasonable' => $maxReasonableTax,
+                'grand_total' => $grandTotal
+            ]);
+            $summary->{"ppn{$suffix}"} = 0;
+        }
+
+        if ($summary->{"pph{$suffix}"} > $maxReasonableTax) {
+            \Log::warning("PPH value too large, resetting to zero", [
+                'current_pph' => $summary->{"pph{$suffix}"},
+                'max_reasonable' => $maxReasonableTax,
+                'grand_total' => $grandTotal
+            ]);
+            $summary->{"pph{$suffix}"} = 0;
+        }
+
         // Calculate taxes if not set
         if ($summary->{"ppn{$suffix}"} == 0 || $summary->{"pph{$suffix}"} == 0) {
             $this->calculateDefaultTaxes($quotation, $suffix, $result);
         }
     }
-
     private function calculateDefaultTaxes(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -749,21 +772,52 @@ class QuotationService
             $isPpnBoolean = $isPpn === "Ya";
         }
 
-        $baseAmount = $ppnPphDipotong == "Management Fee"
-            ? $summary->{"nominal_management_fee{$suffix}"}
-            : $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        // ✅ PERBAIKAN: Base amount untuk PPN/PPH
+        $baseAmount = 0;
+        if ($ppnPphDipotong == "Management Fee") {
+            // Hanya management fee yang dikenakan pajak
+            $baseAmount = $summary->{"nominal_management_fee{$suffix}"};
+        } else {
+            // "Total Invoice" atau "Lainnya" - gunakan grand total sebelum pajak
+            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        }
 
-        $summary->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
+        $summary->{"dpp{$suffix}"} = $baseAmount;
 
+        // ✅ PERBAIKAN: Hitung PPN (12% di 2024, sebelumnya 11%)
         if ($summary->{"ppn{$suffix}"} == 0 && $isPpnBoolean) {
-            $summary->{"ppn{$suffix}"} = $summary->{"dpp{$suffix}"} * 12 / 100;
+            $summary->{"ppn{$suffix}"} = round($baseAmount * 0.12, 2); // PPN 12%
         }
 
+        // ✅ PERBAIKAN: Hitung PPH (2%) dengan validasi
         if ($summary->{"pph{$suffix}"} == 0) {
-            $summary->{"pph{$suffix}"} = $baseAmount * -2 / 100;
-        }
-    }
+            $calculatedPph = round($baseAmount * -0.02, 2); // PPH 2% (negatif karena potongan)
 
+            // Validasi: PPH tidak boleh lebih besar dari 10% base amount
+            $maxPph = abs($baseAmount * 0.1);
+            if (abs($calculatedPph) > $maxPph) {
+                \Log::warning("PPH calculation seems incorrect", [
+                    'calculated_pph' => $calculatedPph,
+                    'base_amount' => $baseAmount,
+                    'max_reasonable' => $maxPph,
+                    'suffix' => $suffix
+                ]);
+                $calculatedPph = -$maxPph;
+            }
+
+            $summary->{"pph{$suffix}"} = $calculatedPph;
+        }
+
+        \Log::info("Default taxes calculated", [
+            'suffix' => $suffix,
+            'ppn_pph_dipotong' => $ppnPphDipotong,
+            'base_amount' => $baseAmount,
+            'is_ppn' => $isPpnBoolean,
+            'ppn' => $summary->{"ppn{$suffix}"},
+            'pph' => $summary->{"pph{$suffix}"},
+            'dpp' => $summary->{"dpp{$suffix}"}
+        ]);
+    }
     private function finalizeCalculations(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
