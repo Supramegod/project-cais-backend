@@ -289,8 +289,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/generate-null-kode', 'generateNullKode');
         Route::get('/spk/{id}', 'getSpkByLead');
         Route::get('/pks/{id}', 'getPksByLead');
-        Route::get('/documents/{id}', 'getAllDocumentsByLead');
-        Route::get('/active-documents/{id}', 'getActiveDocumentsByLead');
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');

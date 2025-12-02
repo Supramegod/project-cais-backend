@@ -124,7 +124,6 @@ class PksController extends Controller
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
                     'tgl_pks' => $pks->tgl_pks,
-                    'formatted_tgl_pks' => Carbon::parse($pks->tgl_pks)->isoFormat('D MMMM Y'),
                     'kontrak_awal' => $pks->kontrak_awal,
                     'kontrak_akhir' => $pks->kontrak_akhir,
                     'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
@@ -196,7 +195,6 @@ class PksController extends Controller
             }
 
             // Format dates for frontend
-            $pks->formatted_tgl_pks = Carbon::parse($pks->tgl_pks)->isoFormat('D MMMM Y');
             $pks->formatted_kontrak_awal = Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y');
             $pks->formatted_kontrak_akhir = Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y');
             $pks->berakhir_dalam = $this->hitungBerakhirKontrak($pks->kontrak_akhir);
