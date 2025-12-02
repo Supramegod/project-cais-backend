@@ -143,9 +143,34 @@ class LeadsController extends Controller
         try {
             $tim = TimSalesDetail::where('user_id', Auth::id())->first();
 
-            $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD', 'kebutuhan'])
+            // ✅ Select hanya kolom yang diperlukan
+            $query = Leads::select([
+                'id',
+                'nomor',
+                'branch_id',
+                'tgl_leads',
+                'tim_sales_d_id',
+                'nama_perusahaan',
+                'telp_perusahaan',
+                'provinsi',
+                'kota',
+                'no_telp',
+                'email',
+                'status_leads_id',
+                'platform_id',
+                'created_by',
+                'notes',
+                'created_at'
+            ])
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name',
+                    'platform:id,nama',
+                    'timSalesD:id,nama'
+                ])
                 ->where('status_leads_id', '!=', 102);
 
+            // Filter tanggal
             if ($request->filled('tgl_dari')) {
                 $query->where('tgl_leads', '>=', $request->tgl_dari);
             } else {
@@ -158,6 +183,7 @@ class LeadsController extends Controller
                 $query->whereDate('tgl_leads', Carbon::today());
             }
 
+            // Filter lainnya
             if ($request->filled('branch')) {
                 $query->where('branch_id', $request->branch);
             }
@@ -170,22 +196,42 @@ class LeadsController extends Controller
                 $query->where('status_leads_id', $request->status);
             }
 
-            // 🧩 Tambahkan ini sebelum get()
+            // Order by created_at desc
             $query->orderBy('created_at', 'desc');
 
             $data = $query->get();
 
-            $data->transform(function ($item) use ($tim) {
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->can_view = $this->canViewLead($item, $tim);
-                return $item;
+            // ✅ Transform ke format yang dibutuhkan frontend
+            $transformedData = $data->map(function ($item) use ($tim) {
+                return [
+                    'id' => $item->id,
+                    'nomor' => $item->nomor,
+                    'wilayah' => $item->branch->name ?? '-',
+                    'wilayah_id' => $item->branch_id,
+                    'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'sales' => $item->timSalesD->nama ?? '-',
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'telp_perusahaan' => $item->telp_perusahaan,
+                    'provinsi' => $item->provinsi,
+                    'kota' => $item->kota,
+                    'no_telp' => $item->no_telp,
+                    'email' => $item->email,
+                    'status_leads' => $item->statusLeads->nama ?? '-',
+                    'status_leads_id' => $item->status_leads_id,
+                    'sumber_leads' => $item->platform->nama ?? '-',
+                    'sumber_leads_id' => $item->platform_id,
+                    'created_by' => $item->created_by,
+                    'notes' => $item->notes,
+                    'can_view' => $this->canViewLead($item, $tim)
+                ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads berhasil diambil',
-                'data' => $data
+                'data' => $transformedData
             ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -2171,7 +2217,7 @@ class LeadsController extends Controller
     {
         try {
             $user = Auth::user();
-            $allowedRoles = [30, 31, 32, 33, 53, 96];
+            $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
             // Cek apakah user memiliki akses
             if (!in_array($user->role_id, $allowedRoles)) {
@@ -2581,7 +2627,7 @@ class LeadsController extends Controller
             }
             $spkData = Spk::with('statusSpk')
                 ->byLeadsId($id)
-                ->select('nomor', 'leads_id', 'tgl_spk', 'status_spk_id')
+                ->select('id', 'nomor', 'leads_id', 'tgl_spk', 'status_spk_id')
                 ->orderBy('tgl_spk', 'desc')
                 ->get();
 
@@ -2647,7 +2693,7 @@ class LeadsController extends Controller
             // Logika query ADA DI MODEL PKS, bukan di controller
             $pksData = Pks::with('leads')
                 ->byLeadsId($id)
-                ->select('nomor', 'leads_id', 'tgl_pks', 'status_pks_id', 'kontrak_akhir') // <-- TAMBAH 'kontrak_akhir'
+                ->select('id', 'nomor', 'leads_id', 'tgl_pks', 'status_pks_id', 'kontrak_akhir') // <-- TAMBAH 'kontrak_akhir'
                 ->orderBy('tgl_pks', 'desc')
                 ->get();
 
@@ -2678,7 +2724,7 @@ class LeadsController extends Controller
         }
     }
 
-    
+
 
     //==============================================================================//
     private function hitungBerakhirKontrak($tanggalBerakhir)
@@ -2856,7 +2902,7 @@ class LeadsController extends Controller
     {
         $user = Auth::user();
         $assignmentResults = [];
-        $allowedRoles = [30, 31, 32, 33, 53, 96];
+        $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
         if (!in_array($user->role_id, $allowedRoles)) {
             return $assignmentResults;

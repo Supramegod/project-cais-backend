@@ -838,6 +838,7 @@ class QuotationStepService
             $currentDateTime = Carbon::now();
 
             // Update penagihan menggunakan DB facade untuk menghindari masalah attribute model
+            // $this->updateNominalUpahAndInsentif($quotation, $request);
             DB::table('sl_quotation')
                 ->where('id', $quotation->id)
                 ->update([
@@ -2185,6 +2186,92 @@ class QuotationStepService
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+    // Tambahkan method ini di class QuotationStepService
+    private function updateNominalUpahAndInsentif(Quotation $quotation, Request $request): void
+    {
+        try {
+            \Log::info("Updating nominal_upah and insentif from Step 11", [
+                'quotation_id' => $quotation->id,
+                'has_upah_data' => $request->has('upah_data'),
+                'has_insentif_data' => $request->has('insentif_data')
+            ]);
+
+            // Update nominal_upah jika ada perubahan
+            if ($request->has('upah_data') && is_array($request->upah_data)) {
+                foreach ($request->upah_data as $detailId => $upahValue) {
+                    $detail = QuotationDetail::where('id', $detailId)
+                        ->where('quotation_id', $quotation->id)
+                        ->first();
+
+                    if ($detail) {
+                        // Validasi: jika upah custom (berbeda dari UMK/UMK default)
+                        $site = QuotationSite::find($detail->quotation_site_id);
+                        if ($site) {
+                            $umk = Umk::byCity($site->kota_id)->active()->first();
+                            $umkValue = $umk ? $umk->umk : 0;
+
+                            // Cek apakah upah dianggap custom
+                            $isCustomUpah = false;
+                            if (is_numeric($upahValue)) {
+                                $upahNumeric = (float) $upahValue;
+                                if ($upahNumeric < $umkValue || $upahNumeric != $umkValue) {
+                                    $isCustomUpah = true;
+                                    \Log::info("Upah dianggap custom", [
+                                        'detail_id' => $detailId,
+                                        'upah_input' => $upahNumeric,
+                                        'umk_value' => $umkValue
+                                    ]);
+                                }
+                            }
+
+                            // Update detail dengan flag custom jika perlu
+                            $detail->update([
+                                'nominal_upah' => $upahValue,
+                                'is_custom_upah' => $isCustomUpah ? 1 : 0,
+                                'updated_by' => Auth::user()->full_name
+                            ]);
+
+                            // Update wage jika ada
+                            $wage = QuotationDetailWage::where('quotation_detail_id', $detailId)->first();
+                            if ($wage && $isCustomUpah) {
+                                $wage->update([
+                                    'upah' => 'Custom',
+                                    'hitungan_upah' => 'Per Bulan',
+                                    'updated_by' => Auth::user()->full_name
+                                ]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Update insentif jika ada perubahan
+            if ($request->has('insentif_data') && is_array($request->insentif_data)) {
+                foreach ($request->insentif_data as $detailId => $insentifValue) {
+                    // Update HPP
+                    QuotationDetailHpp::where('quotation_detail_id', $detailId)
+                        ->update([
+                            'insentif' => $insentifValue,
+                            'updated_by' => Auth::user()->full_name
+                        ]);
+
+                    // Update COSS
+                    QuotationDetailCoss::where('quotation_detail_id', $detailId)
+                        ->update([
+                            'insentif' => $insentifValue,
+                            'updated_by' => Auth::user()->full_name
+                        ]);
+                }
+            }
+
+        } catch (\Exception $e) {
+            \Log::error("Error updating nominal_upah and insentif", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
             ]);
             throw $e;
         }
