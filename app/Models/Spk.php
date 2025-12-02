@@ -62,7 +62,7 @@ class Spk extends Model
 
     public function spkSites()
     {
-        return $this->hasMany(Spksite::class, 'spk_id');
+        return $this->hasMany(SpkSite::class, 'spk_id');
     }
 
     public function customerActivities()

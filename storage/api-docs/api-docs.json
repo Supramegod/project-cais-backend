@@ -11698,68 +11698,6 @@
                 ]
             }
         },
-        "/api/leads/documents/{id}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan semua dokumen (SPK dan PKS) berdasarkan leads_id",
-                "description": "Endpoint ini digunakan untuk mengambil semua dokumen yang terkait dengan leads tertentu",
-                "operationId": "c0402f9177d3effca9c10f6e91683f58",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "ID lead",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data dokumen"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/active-documents/{id}": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan dokumen aktif berdasarkan leads_id",
-                "description": "Endpoint ini digunakan untuk mengambil dokumen aktif yang terkait dengan leads tertentu",
-                "operationId": "f910e7207badaca7b59df800b26d41d3",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "ID lead",
-                        "required": true,
-                        "schema": {
-                            "type": "integer"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data dokumen aktif"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -16650,8 +16588,8 @@
                 "tags": [
                     "Quotations"
                 ],
-                "summary": "Get all quotations",
-                "description": "Retrieves a list of quotations with optional filtering",
+                "summary": "Get all quotations (Optimized)",
+                "description": "Retrieves a list of quotations with minimal data for list view",
                 "operationId": "82a3ab3a39a78fdb9d74c9068507eb89",
                 "parameters": [
                     {
@@ -16719,7 +16657,61 @@
                                             "example": true
                                         },
                                         "data": {
-                                            "type": "object"
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "QUOT/ION/LEAD-001/012024-00001"
+                                                    },
+                                                    "step": {
+                                                        "type": "integer",
+                                                        "example": 12
+                                                    },
+                                                    "jumlah_site": {
+                                                        "type": "string",
+                                                        "example": "Single Site"
+                                                    },
+                                                    "company": {
+                                                        "type": "string",
+                                                        "example": "PT ION Outsourcing"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "type": "string",
+                                                        "example": "Security Service"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
+                                                    },
+                                                    "tgl_quotation": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-01-01"
+                                                    },
+                                                    "tgl_quotation_formatted": {
+                                                        "type": "string",
+                                                        "example": "1 Januari 2024"
+                                                    },
+                                                    "quotation_sites": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "nama_site": {
+                                                                    "type": "string",
+                                                                    "example": "Head Office Jakarta"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
                                         },
                                         "message": {
                                             "type": "string",

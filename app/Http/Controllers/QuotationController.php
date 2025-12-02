@@ -44,8 +44,8 @@ class QuotationController extends Controller
      * @OA\Get(
      *     path="/api/quotations/list",
      *     tags={"Quotations"},
-     *     summary="Get all quotations",
-     *     description="Retrieves a list of quotations with optional filtering",
+     *     summary="Get all quotations (Optimized)",
+     *     description="Retrieves a list of quotations with minimal data for list view",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tgl_dari",
@@ -87,7 +87,24 @@ class QuotationController extends Controller
      *         description="Quotations retrieved successfully",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="QUOT/ION/LEAD-001/012024-00001"),
+     *                     @OA\Property(property="step", type="integer", example=12),
+     *                     @OA\Property(property="jumlah_site", type="string", example="Single Site"),
+     *                     @OA\Property(property="company", type="string", example="PT ION Outsourcing"),
+     *                     @OA\Property(property="kebutuhan", type="string", example="Security Service"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                     @OA\Property(property="tgl_quotation", type="string", format="date", example="2024-01-01"),
+     *                     @OA\Property(property="tgl_quotation_formatted", type="string", example="1 Januari 2024"),
+     *                     @OA\Property(property="quotation_sites", type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="nama_site", type="string", example="Head Office Jakarta")
+     *                         )
+     *                     )
+     *                 )
+     *             ),
      *             @OA\Property(property="message", type="string", example="Quotations retrieved successfully")
      *         )
      *     ),
@@ -105,12 +122,23 @@ class QuotationController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $quotations = Quotation::with([
-                'leads',
-                'statusQuotation',
-                'quotationSites',
-                'company'
+            $quotations = Quotation::select([
+                'id',
+                'nomor',
+                'step',
+                'jumlah_site',
+                'company_id',
+                'company',
+                'kebutuhan',
+                'nama_perusahaan',
+                'tgl_quotation',
+                'status_quotation_id',
+                'created_at'
             ])
+                ->with([
+                    'quotationSites:id,quotation_id,nama_site',
+                    'statusQuotation:id,nama'// Hanya ambil nama_site dari sites
+                ])
                 ->byUserRole()
                 ->dateRange($request->tgl_dari, $request->tgl_sampai)
                 ->byCompany($request->company)
@@ -120,11 +148,39 @@ class QuotationController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get();
 
+            // Map data ke format yang diinginkan
+            $data = $quotations->map(function ($quotation) {
+                return [
+                    'id' => $quotation->id,
+                    'nomor' => $quotation->nomor,
+                    'step' => $quotation->step,
+                    'jumlah_site' => $quotation->jumlah_site,
+                    'company_id' => $quotation->company_id,
+                    'company' => $quotation->company,
+                    'kebutuhan' => $quotation->kebutuhan,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'tgl_quotation' => $quotation->tgl_quotation,
+                    'tgl_quotation_formatted' => $quotation->tgl_quotation
+                        ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y')
+                        : null,
+                    'status_quotation' => $quotation->statusQuotation ? [
+                        'id' => $quotation->statusQuotation->id,
+                        'nama' => $quotation->statusQuotation->nama
+                    ] : null,
+                    'quotation_sites' => $quotation->quotationSites->map(function ($site) {
+                        return [
+                            'nama_site' => $site->nama_site
+                        ];
+                    })
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => QuotationResource::collection($quotations),
+                'data' => $data,
                 'message' => 'Quotations retrieved successfully'
             ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -133,6 +189,7 @@ class QuotationController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Post(
