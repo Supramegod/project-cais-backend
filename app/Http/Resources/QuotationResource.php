@@ -222,7 +222,11 @@ class QuotationResource extends JsonResource
                         if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
                             $lemburDisplay = 'Ditagihkan terpisah';
                         } elseif ($wage->lembur == 'Flat') {
-                            $lemburDisplay = 'Rp. ' . number_format($hpp->lembur ?? 0, 2, ',', '.');
+                            // Pastikan nilai lembur numerik sebelum diformat
+                            $lemburValue = $hpp->lembur ?? 0;
+                            // Konversi ke float jika string
+                            $lemburValue = is_numeric($lemburValue) ? floatval($lemburValue) : 0;
+                            $lemburDisplay = 'Rp. ' . number_format($lemburValue, 2, ',', '.');
                         } else {
                             $lemburDisplay = 'Tidak Ada';
                         }
@@ -234,7 +238,11 @@ class QuotationResource extends JsonResource
                         if ($wage->tunjangan_holiday == 'Normatif') {
                             $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
                         } elseif ($wage->tunjangan_holiday == 'Flat') {
-                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($hpp->tunjangan_hari_libur_nasional ?? 0, 2, ',', '.');
+                            // Pastikan nilai tunjangan_hari_libur_nasional numerik sebelum diformat
+                            $thlValue = $hpp->tunjangan_hari_libur_nasional ?? 0;
+                            // Konversi ke float jika string
+                            $thlValue = is_numeric($thlValue) ? floatval($thlValue) : 0;
+                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($thlValue, 2, ',', '.');
                         } else {
                             $tunjanganHolidayDisplay = 'Tidak Ada';
                         }
@@ -377,7 +385,11 @@ class QuotationResource extends JsonResource
                         if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
                             $lemburDisplay = 'Ditagihkan terpisah';
                         } elseif ($wage->lembur == 'Flat') {
-                            $lemburDisplay = 'Rp. ' . number_format($detail->lembur, 2, ',', '.');
+                            // Pastikan nilai lembur numerik sebelum diformat
+                            $lemburValue = $hpp->lembur ?? 0;
+                            // Konversi ke float jika string
+                            $lemburValue = is_numeric($lemburValue) ? floatval($lemburValue) : 0;
+                            $lemburDisplay = 'Rp. ' . number_format($lemburValue, 2, ',', '.');
                         } else {
                             $lemburDisplay = 'Tidak Ada';
                         }
@@ -389,7 +401,11 @@ class QuotationResource extends JsonResource
                         if ($wage->tunjangan_holiday == 'Normatif') {
                             $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
                         } elseif ($wage->tunjangan_holiday == 'Flat') {
-                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($detail->tunjangan_holiday, 2, ',', '.');
+                            // Pastikan nilai tunjangan_hari_libur_nasional numerik sebelum diformat
+                            $thlValue = $hpp->tunjangan_hari_libur_nasional ?? 0;
+                            // Konversi ke float jika string
+                            $thlValue = is_numeric($thlValue) ? floatval($thlValue) : 0;
+                            $tunjanganHolidayDisplay = 'Rp. ' . number_format($thlValue, 2, ',', '.');
                         } else {
                             $tunjanganHolidayDisplay = 'Tidak Ada';
                         }

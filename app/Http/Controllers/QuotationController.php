@@ -439,6 +439,7 @@ class QuotationController extends Controller
             // Untuk revisi/rekontrak, copy data dari referensi
             if ($quotationReferensi) {
                 \Log::info('Starting duplication process');
+                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
 
                 $this->quotationDuplicationService->duplicateQuotationData(
                     $quotation,

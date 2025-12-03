@@ -14344,6 +14344,10 @@
                                         },
                                         "data": {
                                             "type": "object"
+                                        },
+                                        "quotation_data": {
+                                            "description": "Quotation details and calculation",
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"

@@ -50,11 +50,11 @@ class QuotationBusinessService
     public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy): void
     {
         if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) {
+            foreach ($request->multisite as $key => $value) { // Nama site
                 $this->createQuotationSite($quotation, $request, $key, true, $createdBy);
             }
         } else {
-            $this->createQuotationSite($quotation, $request, null, false, $createdBy);
+            $this->createQuotationSite($quotation, $request, null, false, $createdBy); // Single site
         }
     }
 
@@ -83,9 +83,9 @@ class QuotationBusinessService
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
-            'provinsi_id' => $province->id,
+            'provinsi_id' => $provinceId,
             'provinsi' => $province->nama,
-            'kota_id' => $city->id,
+            'kota_id' => $cityId,
             'kota' => $city->nama,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
@@ -195,7 +195,7 @@ class QuotationBusinessService
     /**
      * Generate nomor quotation berdasarkan jenis
      */
-    public function generateNomorByType($leadsId, $companyId, $tipeQuotation , $quotationReferensi = null): string
+    public function generateNomorByType($leadsId, $companyId, $tipeQuotation, $quotationReferensi = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
