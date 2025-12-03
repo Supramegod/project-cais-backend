@@ -1218,7 +1218,8 @@ class QuotationController extends Controller
             $query = Leads::with([
                 'statusLeads',
                 'branch'
-            ]);
+            ])
+            ->filterByUserRole();
 
             // Filter berdasarkan tipe quotation
             if ($tipe_quotation === 'baru') {
@@ -1226,32 +1227,6 @@ class QuotationController extends Controller
             } else {
                 $query->whereNotNull('customer_id'); // Leads untuk revisi/rekontrak yang sudah menjadi customer
             }
-
-            // Role-based filtering
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                if ($user->role_id == 29) {
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                } elseif ($user->role_id == 31) {
-                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
-                    if ($timSalesDetail) {
-                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
-                            $q->whereIn('user_id', $memberSalesUserIds);
-                        });
-                    } else {
-                        $query->whereRaw('1 = 0');
-                    }
-                }
-            } elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
-
             // Order by terbaru
             $query->orderBy('created_at', 'desc');
 
