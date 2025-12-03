@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\QuotationResource;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Leads;
 use App\Models\KategoriSesuaiHc;
+use App\Models\Quotation;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\Site;
@@ -167,7 +169,8 @@ class PksController extends Controller
      *         description="Successful operation",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="quotation_data", type="object", description="Quotation details and calculation")
      *         )
      *     ),
      *     @OA\Response(
@@ -184,7 +187,8 @@ class PksController extends Controller
                 'statusPks',
                 'sites',
                 'perjanjian',
-                'activities'
+                'activities',
+                'sites.quotation' // Tambahkan relasi quotation dari site
             ])->find($id);
 
             if (!$pks) {
@@ -199,12 +203,54 @@ class PksController extends Controller
             $pks->formatted_kontrak_akhir = Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y');
             $pks->berakhir_dalam = $this->hitungBerakhirKontrak($pks->kontrak_akhir);
 
-            return response()->json([
+            // GET QUOTATION DATA FROM FIRST SITE
+            $quotationData = null;
+            if ($pks->sites->isNotEmpty()) {
+                $firstSite = $pks->sites->first();
+
+                if ($firstSite && $firstSite->quotation) {
+                    // Load full quotation with all necessary relations
+                    $quotation = Quotation::with([
+                        'quotationDetails.quotationDetailHpps',
+                        'quotationDetails.quotationDetailCosses',
+                        'quotationDetails.wage',
+                        'quotationDetails.quotationDetailRequirements',
+                        'quotationDetails.quotationDetailTunjangans',
+                        'leads',
+                        'statusQuotation',
+                        'quotationSites',
+                        'quotationPics',
+                        'quotationAplikasis',
+                        'quotationKaporlaps',
+                        'quotationDevices',
+                        'quotationChemicals',
+                        'quotationOhcs',
+                        'quotationTrainings',
+                        'quotationKerjasamas'
+                    ])->find($firstSite->quotation_id);
+
+                    if ($quotation) {
+                        // Use QuotationResource to format data
+                        $quotationData = new QuotationResource($quotation);
+                        $quotationData = $quotationData->toArray(request());
+                    }
+                }
+            }
+
+            $response = [
                 'success' => true,
                 'data' => $pks
-            ]);
+            ];
+
+            // Add quotation data if available
+            if ($quotationData) {
+                $response['quotation_data'] = $quotationData;
+            }
+
+            return response()->json($response);
 
         } catch (\Exception $e) {
+            \Log::error('Failed to retrieve PKS details: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS details',
@@ -212,7 +258,6 @@ class PksController extends Controller
             ], 500);
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/pks/add",

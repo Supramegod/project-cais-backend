@@ -1903,10 +1903,89 @@ class QuotationStepService
             // Ambil data dari DTO
             $hppData = $detailCalculation->hpp_data;
 
+            // ============================
+            // PERBAIKAN: Konversi field string ke numerik
+            // ============================
+
+            // Field yang harus numerik
+            $numericFields = [
+                'kompensasi',
+                'tunjangan_hari_raya',
+                'tunjangan_hari_libur_nasional',
+                'lembur',
+                'takaful',
+                'bpjs_jkk',
+                'bpjs_jkm',
+                'bpjs_jht',
+                'bpjs_jp',
+                'bpjs_ks',
+                'provisi_seragam',
+                'provisi_peralatan',
+                'provisi_chemical',
+                'provisi_ohc',
+                'bunga_bank',
+                'insentif',
+                'potongan_bpu',
+                'total_biaya_per_personil',
+                'total_biaya_all_personil'
+            ];
+
+            foreach ($numericFields as $field) {
+                if (isset($hppData[$field])) {
+                    // Jika string yang mengandung "Tidak", "Tidak Ada", "Ya", dll, konversi ke 0
+                    if (is_string($hppData[$field])) {
+                        $stringValue = strtolower(trim($hppData[$field]));
+                        if (in_array($stringValue, ['tidak', 'tidak ada', 'tidak ada', 'false', 'no', 'ya'])) {
+                            $hppData[$field] = 0;
+                        } else {
+                            // Coba konversi string numerik (misal: "1000.50" menjadi 1000.50)
+                            $hppData[$field] = (float) str_replace(['.', ','], ['', '.'], $stringValue);
+                        }
+                    }
+                    // Pastikan selalu float
+                    $hppData[$field] = (float) $hppData[$field];
+                }
+            }
+
+            // ============================
+            // PERBAIKAN: Handle khusus untuk kompensasi
+            // ============================
+            if (isset($hppData['kompensasi'])) {
+                if (is_string($hppData['kompensasi'])) {
+                    $kompensasiString = strtolower(trim($hppData['kompensasi']));
+                    // Jika kompensasi adalah string deskriptif, cari nilai numeriknya dari DTO yang lain
+                    if (in_array($kompensasiString, ['tidak', 'tidak ada', 'false'])) {
+                        $hppData['kompensasi'] = 0;
+                    } elseif ($kompensasiString === 'diprovisikan' || $kompensasiString === 'ditagihkan') {
+                        // Hitung kompensasi sebagai upah/12 jika diprovisikan
+                        $nominalUpah = $hppData['gaji_pokok'] ?? 0;
+                        $hppData['kompensasi'] = round($nominalUpah / 12, 2);
+                    } else {
+                        $hppData['kompensasi'] = 0;
+                    }
+                }
+                $hppData['kompensasi'] = (float) $hppData['kompensasi'];
+            }
+
+            // ============================
+            // PERBAIKAN: Handle khusus untuk lembur
+            // ============================
+            if (isset($hppData['lembur'])) {
+                if (is_string($hppData['lembur'])) {
+                    $lemburString = strtolower(trim($hppData['lembur']));
+                    if (in_array($lemburString, ['tidak', 'tidak ada', 'false'])) {
+                        $hppData['lembur'] = 0;
+                    } else {
+                        $hppData['lembur'] = 0; // Default ke 0 jika tidak bisa dikonversi
+                    }
+                }
+                $hppData['lembur'] = (float) $hppData['lembur'];
+            }
+
             // Tambahkan field tambahan dari calculation summary
             $hppData = array_merge($hppData, [
                 'management_fee' => $calculationResult->calculation_summary->nominal_management_fee ?? 0,
-                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0, // Ambil dari quotation asli
+                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
                 'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak ?? 0,
                 'ppn' => $calculationResult->calculation_summary->ppn ?? 0,
                 'pph' => $calculationResult->calculation_summary->pph ?? 0,
@@ -1940,7 +2019,9 @@ class QuotationStepService
 
                 \Log::debug("Updated existing HPP data", [
                     'detail_id' => $detailCalculation->detail_id,
-                    'hpp_id' => $existingHpp->id
+                    'hpp_id' => $existingHpp->id,
+                    'kompensasi_value' => $hppData['kompensasi'] ?? 'not_set',
+                    'lembur_value' => $hppData['lembur'] ?? 'not_set'
                 ]);
             } else {
                 $hppData['created_by'] = $user;
@@ -1957,6 +2038,7 @@ class QuotationStepService
             \Log::error("Error saving HPP data from calculation for detail {$detailCalculation->detail_id}", [
                 'detail_id' => $detailCalculation->detail_id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'hpp_data' => $hppData
             ]);
             throw $e;
@@ -1975,10 +2057,51 @@ class QuotationStepService
             // Ambil data dari DTO
             $cossData = $detailCalculation->coss_data;
 
+            // ============================
+            // PERBAIKAN: Konversi field string ke numerik
+            // ============================
+
+            // Field yang harus numerik
+            $numericFields = [
+                'kompensasi',
+                'tunjangan_hari_raya',
+                'tunjangan_hari_libur_nasional',
+                'lembur',
+                'bpjs_jkk',
+                'bpjs_jkm',
+                'bpjs_jht',
+                'bpjs_jp',
+                'bpjs_ks',
+                'provisi_seragam',
+                'provisi_peralatan',
+                'provisi_chemical',
+                'provisi_ohc',
+                'bunga_bank',
+                'insentif',
+                'potongan_bpu'
+            ];
+
+            foreach ($numericFields as $field) {
+                if (isset($cossData[$field])) {
+                    // Jika string yang mengandung "Tidak", "Tidak Ada", "Ya", dll, konversi ke 0
+                    if (is_string($cossData[$field])) {
+                        $stringValue = strtolower(trim($cossData[$field]));
+                        if (in_array($stringValue, ['tidak', 'tidak ada', 'tidak ada', 'false', 'no', 'ya'])) {
+                            $cossData[$field] = 0;
+                        } else {
+                            // Coba konversi string numerik
+                            $cossData[$field] = (float) str_replace(['.', ','], ['', '.'], $stringValue);
+                        }
+                    }
+                    // Pastikan selalu float
+                    $cossData[$field] = (float) $cossData[$field];
+                }
+            }
+
             // Tambahkan field tambahan dari calculation summary
             $cossData = array_merge($cossData, [
                 'management_fee' => $calculationResult->calculation_summary->nominal_management_fee_coss ?? 0,
-                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0, // Ambil dari quotation asli
+                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
                 'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
                 'ppn' => $calculationResult->calculation_summary->ppn_coss ?? 0,
                 'pph' => $calculationResult->calculation_summary->pph_coss ?? 0,
@@ -2029,12 +2152,12 @@ class QuotationStepService
             \Log::error("Error saving COSS data from calculation for detail {$detailCalculation->detail_id}", [
                 'detail_id' => $detailCalculation->detail_id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
                 'coss_data' => $cossData
             ]);
             throw $e;
         }
     }
-
     private function updateQuotationDataFromCalculation(QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
     {
         try {
