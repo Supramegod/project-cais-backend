@@ -2386,7 +2386,7 @@ class LeadsController extends Controller
 
             // Cek authorization - hanya user dengan role_id tertentu yang bisa assign sales
             $user = Auth::user();
-            $allowedRoles = [30, 31, 32, 33, 53, 96];
+            $allowedRoles =[30, 31, 32, 33, 53, 96, 2];
 
             if (!in_array($user->role_id, $allowedRoles)) {
                 return response()->json([

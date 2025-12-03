@@ -455,7 +455,6 @@ class SpkController extends Controller
             }
 
             // Format dates
-            $spk->stgl_spk = Carbon::parse($spk->tgl_spk)->isoFormat('D MMMM Y');
             $spk->screated_at = Carbon::parse($spk->created_at)->isoFormat('D MMMM Y');
             $spk->status = $spk->statusSpk->nama ?? 'Unknown';
 
