@@ -133,7 +133,8 @@ class QuotationController extends Controller
                 'nama_perusahaan',
                 'tgl_quotation',
                 'status_quotation_id',
-                'created_at'
+                'created_at',
+                'created_by',
             ])
                 ->with([
                     'quotationSites:id,quotation_id,nama_site',
@@ -160,6 +161,7 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->tgl_quotation,
+                    'createed_by' => $quotation->created_by,
                     'tgl_quotation_formatted' => $quotation->tgl_quotation
                         ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y')
                         : null,
