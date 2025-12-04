@@ -130,6 +130,11 @@ class Pks extends Model
     {
         return $this->hasMany(CustomerActivity::class, 'pks_id');
     }
+    // Tambahkan di bagian relasi (di dalam class Pks)
+    public function ruleThr(): BelongsTo
+    {
+        return $this->belongsTo(RuleThr::class, 'rule_thr_id');
+    }
     public function quotations(): BelongsTo
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
@@ -137,6 +142,35 @@ class Pks extends Model
     public function spk(): BelongsTo
     {
         return $this->belongsTo(Spk::class, 'spk_id');
+    }
+    public function salaryRule(): BelongsTo
+    {
+        return $this->belongsTo(SalaryRule::class, 'salary_rule_id');
+    }
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
+    }
+    public function bidangPerusahaan(): BelongsTo
+    {
+        return $this->belongsTo(BidangPerusahaan::class, 'bidang_usaha_id');
+    }
+    public function provinsi(): BelongsTo
+    {
+        return $this->belongsTo(Province::class, 'provinsi_id');
+    }
+    public function jenisPerusahaan(): BelongsTo
+    {
+        return $this->belongsTo(JenisPerusahaan::class, 'jenis_perusahaan_id');
+    }
+    public function kebutuhan(): BelongsTo
+    {
+        return $this->belongsTo(Kebutuhan::class, 'layanan_id');
+    }
+      // Relasi untuk company_id
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id');
     }
     public function getCreatedAtAttribute($value)
     {
@@ -205,10 +239,11 @@ class Pks extends Model
 
         return $this->statusPks?->nama;
     }
-     public function getTglPksAttribute($value)
+    public function getTglPksAttribute($value)
     {
         $carbonDate = Carbon::parse($value);
         $carbonDate->setLocale('id');
         return $carbonDate->isoFormat('D MMMM Y');
     }
+
 }
