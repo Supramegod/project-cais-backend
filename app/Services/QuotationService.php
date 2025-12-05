@@ -1543,7 +1543,7 @@ class QuotationService
     /**
      * Generate nomor untuk resubmit
      */
-    private function generateResubmitNomor($originalNomor)
+    public function generateResubmitNomor($originalNomor)
     {
         $base = explode('-', $originalNomor)[0];
         $now = Carbon::now();

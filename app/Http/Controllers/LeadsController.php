@@ -315,21 +315,42 @@ class LeadsController extends Controller
             $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
             $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
             $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
+            // Get all activities terkait leads ini (history activity)
+            $activityLeads = CustomerActivity::where('leads_id', $lead->id)
+                ->whereNull('deleted_at')
+                ->orderBy('tgl_activity', 'desc')
+                ->get()
+                ->map(function ($act) {
+                    $baseData = [
+                        'id' => $act->id,
+                        'tipe' => $act->tipe,
+                        'notes' => $act->notes_tipe ?? $act->notes,
+                        'tgl_activity' => $act->tgl_activity
+                    ];
+
+                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
+                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
+                        // Untuk Telepon & Online Meeting
+                        $baseData['start'] = $act->start;
+                        $baseData['end'] = $act->end;
+                        $baseData['durasi'] = $act->durasi;
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                    } elseif (strtolower($act->tipe) === 'visit') {
+                        // Untuk Visit
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                        $baseData['jam_realisasi'] = $act->jam_realisasi;
+                        $baseData['jenis_visit'] = $act->jenis_visit;
+                    }
+
+                    return $baseData;
+                });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Detail lead berhasil diambil',
                 'data' => [
                     'lead' => $lead,
-                    'activities' => CustomerActivity::where('leads_id', $id)
-                        ->latest()
-                        ->limit(5)
-                        ->get()
-                        ->map(function ($a) {
-                            $a->screated_at = Carbon::parse($a->created_at)->isoFormat('D MMMM Y HH:mm');
-                            $a->stgl_activity = Carbon::parse($a->tgl_activity)->isoFormat('D MMMM Y');
-                            return $a;
-                        })
+                    'activities' => $activityLeads
                 ]
             ]);
         } catch (\Exception $e) {
@@ -2386,7 +2407,7 @@ class LeadsController extends Controller
 
             // Cek authorization - hanya user dengan role_id tertentu yang bisa assign sales
             $user = Auth::user();
-            $allowedRoles =[30, 31, 32, 33, 53, 96, 2];
+            $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
             if (!in_array($user->role_id, $allowedRoles)) {
                 return response()->json([

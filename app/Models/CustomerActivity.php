@@ -44,7 +44,8 @@ class CustomerActivity extends Model
         'user_id',
         'created_by',
         'updated_by',
-        'deleted_by'
+        'deleted_by',
+        'deleted_at'
     ];
 
     protected $dates = ['deleted_at'];
