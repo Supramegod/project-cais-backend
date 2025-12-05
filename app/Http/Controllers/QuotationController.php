@@ -749,109 +749,147 @@ class QuotationController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/quotations/{id}/resubmit",
-     *     tags={"Quotations"},
-     *     summary="Resubmit quotation",
-     *     description="Creates a new quotation version from an existing quotation with resubmit reason",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Original quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"alasan"},
-     *             @OA\Property(property="alasan", type="string", example="Perubahan kebutuhan client")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Quotation resubmitted successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotation resubmitted successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validation error"),
-     *             @OA\Property(property="errors", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to resubmit quotation"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function resubmit(Request $request, string $id): JsonResponse
-    {
-        DB::beginTransaction();
-        try {
-            $originalQuotation = Quotation::with([
-                'quotationSites',
-                'quotationDetails',
-                'quotationPics',
-                'quotationAplikasis',
-                'quotationKaporlaps',
-                'quotationDevices',
-                'quotationChemicals',
-                'quotationOhcs',
-                'quotationKerjasamas',
-                'quotationTrainings'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
+ * @OA\Post(
+ *     path="/api/quotations/{id}/resubmit",
+ *     tags={"Quotations"},
+ *     summary="Resubmit quotation",
+ *     description="Creates a new quotation version from an existing quotation with resubmit reason",
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="Original quotation ID",
+ *         required=true,
+ *         @OA\Schema(type="integer", example=1)
+ *     ),
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"alasan"},
+ *             @OA\Property(property="alasan", type="string", example="Perubahan kebutuhan client")
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=201,
+ *         description="Quotation resubmitted successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="data", type="object"),
+ *             @OA\Property(property="message", type="string", example="Quotation resubmitted successfully")
+ *         )
+ *     )
+ * )
+ */
+public function resubmit(Request $request, string $id): JsonResponse
+{
+    DB::beginTransaction();
+    try {
+        $user = Auth::user();
+        
+        // Get original quotation with all relations
+        $originalQuotation = Quotation::with([
+            'quotationDetails.quotationDetailHpps',
+            'quotationDetails.quotationDetailCosses',
+            'quotationDetails.wage',
+            'quotationDetails.quotationDetailRequirements',
+            'quotationDetails.quotationDetailTunjangans',
+            'leads',
+            'statusQuotation',
+            'quotationSites',
+            'quotationPics',
+            'quotationAplikasis',
+            'quotationKaporlaps',
+            'quotationDevices',
+            'quotationChemicals',
+            'quotationOhcs',
+            'quotationTrainings',
+            'quotationKerjasamas'
+        ])
+            ->notDeleted()
+            ->findOrFail($id);
 
-            $validator = Validator::make($request->all(), [
-                'alasan' => 'required|string'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'alasan' => 'required|string'
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $newQuotation = $this->quotationService->resubmitQuotation(
-                $originalQuotation,
-                $request->alasan,
-                Auth::user()
-            );
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($newQuotation),
-                'message' => 'Quotation resubmitted successfully'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to resubmit quotation',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
         }
+
+        // Generate new quotation number for resubmit
+        $newNomor = $this->quotationService->generateResubmitNomor($originalQuotation->nomor);
+
+        // Create new quotation with resubmit data
+        $newQuotation = Quotation::create([
+            'nomor' => $newNomor,
+            'tgl_quotation' => Carbon::now()->toDateString(),
+            'leads_id' => $originalQuotation->leads_id,
+            'nama_perusahaan' => $originalQuotation->nama_perusahaan,
+            'kebutuhan_id' => $originalQuotation->kebutuhan_id,
+            'kebutuhan' => $originalQuotation->kebutuhan,
+            'company_id' => $originalQuotation->company_id,
+            'company' => $originalQuotation->company,
+            'jumlah_site' => $originalQuotation->jumlah_site,
+            'step' => 1,
+            'status_quotation_id' => 1, // Reset to draft
+            'is_aktif' => 1,
+            'alasan_resubmit' => $request->alasan,
+            'quotation_sebelumnya_id' => $originalQuotation->id,
+            'created_by' => $user->full_name
+        ]);
+
+        \Log::info('Resubmit: New quotation created', [
+            'new_id' => $newQuotation->id,
+            'original_id' => $originalQuotation->id,
+            'nomor' => $newNomor
+        ]);
+
+        // Duplicate all data from original quotation
+        $this->quotationDuplicationService->duplicateQuotationData(
+            $newQuotation,
+            $originalQuotation
+        );
+
+        // Deactivate original quotation
+        $originalQuotation->update([
+            'is_aktif' => 0,
+            'updated_by' => $user->full_name
+        ]);
+
+        // Load relations for response
+        $newQuotation->load([
+            'quotationSites',
+            'quotationPics',
+            'quotationDetails',
+            'statusQuotation'
+        ]);
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'data' => new QuotationResource($newQuotation),
+            'message' => 'Quotation resubmitted successfully'
+        ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Failed to resubmit quotation', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to resubmit quotation',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * @OA\Post(

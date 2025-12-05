@@ -162,9 +162,10 @@ class CustomerActivityController extends Controller
 
             // Query dasar dengan eager loading
             $query = CustomerActivity::with([
-                'leads.branch',
-                'leads.kebutuhan',
-                'timSalesDetail'
+                'leads:id,nama_perusahaan,branch_id',
+                'leads.branch:id,name',
+                'leads.kebutuhan:m_kebutuhan.id,m_kebutuhan.nama',
+                'timSalesDetail:id,nama'
             ])->whereNull('deleted_at');
 
             // Filter tanggal - hanya diterapkan jika ada parameter tanggal
@@ -180,8 +181,8 @@ class CustomerActivityController extends Controller
             }
 
             if ($request->filled('kebutuhan')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('kebutuhan_id', $request->kebutuhan);
+                $query->whereHas('leads.kebutuhan', function ($q) use ($request) {
+                    $q->where('m_kebutuhan.id', $request->kebutuhan);
                 });
             }
 
@@ -193,7 +194,7 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            // Filter berdasarkan role user - FIXED: Menambahkan logika yang benar
+            // Filter berdasarkan role user
             $user = Auth::user();
             if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
                 // Logic filter untuk divisi sales - menampilkan hanya aktivitas user tersebut
@@ -205,11 +206,28 @@ class CustomerActivityController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get();
 
+            // Map data untuk menampilkan hanya field yang diperlukan
+            $mappedActivities = $activities->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'nomor' => $activity->nomor,
+                    'tgl_activity' => $activity->tgl_activity,
+                    'tipe' => $activity->tipe,
+                    'notes' => $activity->notes,
+                    'status_leads_id' => $activity->status_leads_id,
+                    'created_at' => $activity->created_at,
+                    'nama_perusahaan' => $activity->leads?->nama_perusahaan,
+                    'kebutuhan' => $activity->leads?->kebutuhan->first()?->nama,
+                    'branch' => $activity->leads?->branch?->name,
+                    'sales' => $activity->timSalesDetail?->nama,
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => $activities,
+                'data' => $mappedActivities,
                 'meta' => [
-                    'total' => $activities->count(),
+                    'total' => $mappedActivities->count(),
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
                     'filters_applied' => [
@@ -320,8 +338,12 @@ class CustomerActivityController extends Controller
     public function view($id): JsonResponse
     {
         try {
-            $activity = CustomerActivity::with(['leads', 'files', 'statusLeads'])
-                ->whereNull('deleted_at')
+            $activity = CustomerActivity::with([
+                'leads.branch',
+                'leads.kebutuhan',
+                'leads.timSales',
+                'leads.timSalesD'
+            ])->whereNull('deleted_at')
                 ->find($id);
 
             if (!$activity) {
@@ -331,19 +353,65 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
+            // Map data sesuai form "1. Informasi Leads" di gambar
+            $informasiLeads = [
+                'leads_customer' => $activity->leads?->nama_perusahaan,
+                'tanggal_activity' => $activity->tgl_activity,
+                'wilayah' => $activity->leads?->branch?->name,
+                'kebutuhan' => $activity->leads?->kebutuhan->first()?->nama,
+                'tim_sales' => $activity->leads?->timSales?->nama,
+                'sales' => $activity->leads?->timSalesD?->nama,
+                'crm' => $activity->crm,
+                'ro' => $activity->ro,
+                'notes' => $activity->notes
+            ];
+
+            // Get all activities terkait leads ini (history activity)
+            $activityLeads = CustomerActivity::where('leads_id', $activity->leads_id)
+                ->whereNull('deleted_at')
+                ->orderBy('tgl_activity', 'desc')
+                ->get()
+                ->map(function ($act) {
+                    $baseData = [
+                        'id' => $act->id,
+                        'tipe' => $act->tipe,
+                        'notes' => $act->notes_tipe ?? $act->notes,
+                        'tgl_activity' => $act->tgl_activity
+                    ];
+
+                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
+                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
+                        // Untuk Telepon & Online Meeting
+                        $baseData['start'] = $act->start;
+                        $baseData['end'] = $act->end;
+                        $baseData['durasi'] = $act->durasi;
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                    } elseif (strtolower($act->tipe) === 'visit') {
+                        // Untuk Visit
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                        $baseData['jam_realisasi'] = $act->jam_realisasi;
+                        $baseData['jenis_visit'] = $act->jenis_visit;
+                    }
+
+                    return $baseData;
+                });
+
             return response()->json([
                 'success' => true,
-                'data' => $activity
+                'data' => [
+                    'informasi_leads' => $informasiLeads,
+                    'activity_leads' => $activityLeads
+                ]
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error in CustomerActivityController@view: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/customer-activities/add",

@@ -228,13 +228,39 @@ class QuotationBusinessService
     public function generateActivityNomor($leadsId): string
     {
         $now = Carbon::now();
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-        $count = CustomerActivity::where('leads_id', $leadsId)
-            ->whereYear('created_at', $now->year)
-            ->whereMonth('created_at', $now->month)
-            ->count();
+        $leads = Leads::find($leadsId);
 
-        return "ACT/" . $leadsId . "/" . $month . $now->year . "/" . sprintf("%04d", $count + 1);
+        $prefix = "CAT/";
+        if ($leads) {
+            switch ($leads->kebutuhan_id) {
+                case 2:
+                    $prefix .= "LS/";
+                    break;
+                case 1:
+                    $prefix .= "SG/";
+                    break;
+                case 3:
+                    $prefix .= "CS/";
+                    break;
+                case 4:
+                    $prefix .= "LL/";
+                    break;
+                default:
+                    $prefix .= "NN/";
+                    break;
+            }
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
     /**
      * Validate multi site data consistency
