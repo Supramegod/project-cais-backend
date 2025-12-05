@@ -1333,10 +1333,15 @@ class PksController extends Controller
             ->distinct()
             ->get();
     }
-
     private function getAvailableSitesData($leadsId)
     {
-        return SpkSite::with(['spk'])
+        // Ambil data PKS dengan relasi yang diperlukan
+        $pks = Pks::with(['leads', 'sites', 'company', 'ruleThr', 'salaryRule'])
+            ->where('leads_id', $leadsId)
+            ->first();
+
+        // Ambil data sites yang tersedia
+        $sites = SpkSite::with(['spk'])
             ->where('leads_id', $leadsId)
             ->whereNull('deleted_at')
             ->whereDoesntHave('site')
@@ -1351,15 +1356,37 @@ class PksController extends Controller
                     ->limit(1);
             }, 'asc')
             ->get()
-            ->map(function ($site) {
+            ->map(function ($site) use ($pks) {
                 return [
-                    'nomor' => $site->spk->nomor ?? null,
                     'id' => $site->id,
+                    'nomor' => $site->spk->nomor ?? null,
                     'nama_site' => $site->nama_site,
                     'provinsi' => $site->provinsi,
                     'kota' => $site->kota,
                     'penempatan' => $site->penempatan,
+                    // Data tambahan dari PKS
+                    'company' => $pks && $pks->company ? [
+                        'id' => $pks->company->id,
+                        'name' => $pks->company->name,
+                        'code' => $pks->company->code
+                    ] : null,
+                    'rule_thr' => $pks && $pks->ruleThr ? [
+                        'id' => $pks->ruleThr->id,
+                        'nama' => $pks->ruleThr->nama,
+                        'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice,
+                        'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
+                        'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr
+                    ] : null,
+                    'salary_rule' => $pks && $pks->salaryRule ? [
+                        'id' => $pks->salaryRule->id,
+                        'nama' => $pks->salaryRule->nama_salary_rule,
+                        'cutoff' => $pks->salaryRule->cutoff,
+                        'pembayaran_invoice' => $pks->salaryRule->pembayaran_invoice,
+                        'rilis_payroll' => $pks->salaryRule->rilis_payroll
+                    ] : null
                 ];
             });
+
+        return $sites;
     }
 }

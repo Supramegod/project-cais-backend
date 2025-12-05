@@ -260,7 +260,9 @@ class SpkController extends Controller
     public function availableLeads(Request $request)
     {
         try {
-            $data = Leads::whereHas('quotations.quotationSites', function ($query) {
+            $user = Auth::user();
+
+            $query = Leads::whereHas('quotations.quotationSites', function ($query) {
                 $query->whereNull('deleted_at')
                     ->whereDoesntHave('spkSite', function ($q) {
                         $q->whereNull('deleted_at');
@@ -269,11 +271,17 @@ class SpkController extends Controller
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
                         ->where('is_aktif', 1);
-                })
-                ->whereHas('timSalesD', function ($query) {
-                    $query->where('user_id', Auth::user()->id);
-                })
-                ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+                });
+
+            // Role 2 (Superadmin) bisa lihat semua data
+            // Role lainnya hanya bisa lihat data tim sales mereka
+            if ($user->role_id != 2) {
+                $query->whereHas('timSalesD', function ($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                });
+            }
+
+            $data = $query->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
                 ->distinct()
                 ->get();
 
@@ -365,7 +373,7 @@ class SpkController extends Controller
             // Buat SPK TANPA quotation_id
             $spk = Spk::create([
                 'leads_id' => $leads->id,
-                'quotation_id'=> $sitesWithSPK->quotation_id,
+                'quotation_id' => $sitesWithSPK->quotation_id,
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,
