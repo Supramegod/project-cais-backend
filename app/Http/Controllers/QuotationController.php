@@ -44,8 +44,8 @@ class QuotationController extends Controller
      * @OA\Get(
      *     path="/api/quotations/list",
      *     tags={"Quotations"},
-     *     summary="Get all quotations",
-     *     description="Retrieves a list of quotations with optional filtering",
+     *     summary="Get all quotations (Optimized)",
+     *     description="Retrieves a list of quotations with minimal data for list view",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tgl_dari",
@@ -87,7 +87,24 @@ class QuotationController extends Controller
      *         description="Quotations retrieved successfully",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="QUOT/ION/LEAD-001/012024-00001"),
+     *                     @OA\Property(property="step", type="integer", example=12),
+     *                     @OA\Property(property="jumlah_site", type="string", example="Single Site"),
+     *                     @OA\Property(property="company", type="string", example="PT ION Outsourcing"),
+     *                     @OA\Property(property="kebutuhan", type="string", example="Security Service"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                     @OA\Property(property="tgl_quotation", type="string", format="date", example="2024-01-01"),
+     *                     @OA\Property(property="tgl_quotation_formatted", type="string", example="1 Januari 2024"),
+     *                     @OA\Property(property="quotation_sites", type="array",
+     *                         @OA\Items(
+     *                             @OA\Property(property="nama_site", type="string", example="Head Office Jakarta")
+     *                         )
+     *                     )
+     *                 )
+     *             ),
      *             @OA\Property(property="message", type="string", example="Quotations retrieved successfully")
      *         )
      *     ),
@@ -105,12 +122,24 @@ class QuotationController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $quotations = Quotation::with([
-                'leads',
-                'statusQuotation',
-                'quotationSites',
-                'company'
+            $quotations = Quotation::select([
+                'id',
+                'nomor',
+                'step',
+                'jumlah_site',
+                'company_id',
+                'company',
+                'kebutuhan',
+                'nama_perusahaan',
+                'tgl_quotation',
+                'status_quotation_id',
+                'created_at',
+                'created_by',
             ])
+                ->with([
+                    'quotationSites:id,quotation_id,nama_site',
+                    'statusQuotation:id,nama'// Hanya ambil nama_site dari sites
+                ])
                 ->byUserRole()
                 ->dateRange($request->tgl_dari, $request->tgl_sampai)
                 ->byCompany($request->company)
@@ -120,11 +149,40 @@ class QuotationController extends Controller
                 ->orderBy('created_at', 'desc')
                 ->get();
 
+            // Map data ke format yang diinginkan
+            $data = $quotations->map(function ($quotation) {
+                return [
+                    'id' => $quotation->id,
+                    'nomor' => $quotation->nomor,
+                    'step' => $quotation->step,
+                    'jumlah_site' => $quotation->jumlah_site,
+                    'company_id' => $quotation->company_id,
+                    'company' => $quotation->company,
+                    'kebutuhan' => $quotation->kebutuhan,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'tgl_quotation' => $quotation->tgl_quotation,
+                    'createed_by' => $quotation->created_by,
+                    'tgl_quotation_formatted' => $quotation->tgl_quotation
+                        ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y')
+                        : null,
+                    'status_quotation' => $quotation->statusQuotation ? [
+                        'id' => $quotation->statusQuotation->id,
+                        'nama' => $quotation->statusQuotation->nama
+                    ] : null,
+                    'quotation_sites' => $quotation->quotationSites->map(function ($site) {
+                        return [
+                            'nama_site' => $site->nama_site
+                        ];
+                    })
+                ];
+            });
+
             return response()->json([
                 'success' => true,
-                'data' => QuotationResource::collection($quotations),
+                'data' => $data,
                 'message' => 'Quotations retrieved successfully'
             ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -133,6 +191,7 @@ class QuotationController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * @OA\Post(
@@ -382,6 +441,7 @@ class QuotationController extends Controller
             // Untuk revisi/rekontrak, copy data dari referensi
             if ($quotationReferensi) {
                 \Log::info('Starting duplication process');
+                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
 
                 $this->quotationDuplicationService->duplicateQuotationData(
                     $quotation,
@@ -689,109 +749,147 @@ class QuotationController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/quotations/{id}/resubmit",
-     *     tags={"Quotations"},
-     *     summary="Resubmit quotation",
-     *     description="Creates a new quotation version from an existing quotation with resubmit reason",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Original quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"alasan"},
-     *             @OA\Property(property="alasan", type="string", example="Perubahan kebutuhan client")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Quotation resubmitted successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotation resubmitted successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validation error"),
-     *             @OA\Property(property="errors", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to resubmit quotation"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function resubmit(Request $request, string $id): JsonResponse
-    {
-        DB::beginTransaction();
-        try {
-            $originalQuotation = Quotation::with([
-                'quotationSites',
-                'quotationDetails',
-                'quotationPics',
-                'quotationAplikasis',
-                'quotationKaporlaps',
-                'quotationDevices',
-                'quotationChemicals',
-                'quotationOhcs',
-                'quotationKerjasamas',
-                'quotationTrainings'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
+ * @OA\Post(
+ *     path="/api/quotations/{id}/resubmit",
+ *     tags={"Quotations"},
+ *     summary="Resubmit quotation",
+ *     description="Creates a new quotation version from an existing quotation with resubmit reason",
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(
+ *         name="id",
+ *         in="path",
+ *         description="Original quotation ID",
+ *         required=true,
+ *         @OA\Schema(type="integer", example=1)
+ *     ),
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             required={"alasan"},
+ *             @OA\Property(property="alasan", type="string", example="Perubahan kebutuhan client")
+ *         )
+ *     ),
+ *     @OA\Response(
+ *         response=201,
+ *         description="Quotation resubmitted successfully",
+ *         @OA\JsonContent(
+ *             @OA\Property(property="success", type="boolean", example=true),
+ *             @OA\Property(property="data", type="object"),
+ *             @OA\Property(property="message", type="string", example="Quotation resubmitted successfully")
+ *         )
+ *     )
+ * )
+ */
+public function resubmit(Request $request, string $id): JsonResponse
+{
+    DB::beginTransaction();
+    try {
+        $user = Auth::user();
+        
+        // Get original quotation with all relations
+        $originalQuotation = Quotation::with([
+            'quotationDetails.quotationDetailHpps',
+            'quotationDetails.quotationDetailCosses',
+            'quotationDetails.wage',
+            'quotationDetails.quotationDetailRequirements',
+            'quotationDetails.quotationDetailTunjangans',
+            'leads',
+            'statusQuotation',
+            'quotationSites',
+            'quotationPics',
+            'quotationAplikasis',
+            'quotationKaporlaps',
+            'quotationDevices',
+            'quotationChemicals',
+            'quotationOhcs',
+            'quotationTrainings',
+            'quotationKerjasamas'
+        ])
+            ->notDeleted()
+            ->findOrFail($id);
 
-            $validator = Validator::make($request->all(), [
-                'alasan' => 'required|string'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'alasan' => 'required|string'
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $newQuotation = $this->quotationService->resubmitQuotation(
-                $originalQuotation,
-                $request->alasan,
-                Auth::user()
-            );
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($newQuotation),
-                'message' => 'Quotation resubmitted successfully'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to resubmit quotation',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
         }
+
+        // Generate new quotation number for resubmit
+        $newNomor = $this->quotationService->generateResubmitNomor($originalQuotation->nomor);
+
+        // Create new quotation with resubmit data
+        $newQuotation = Quotation::create([
+            'nomor' => $newNomor,
+            'tgl_quotation' => Carbon::now()->toDateString(),
+            'leads_id' => $originalQuotation->leads_id,
+            'nama_perusahaan' => $originalQuotation->nama_perusahaan,
+            'kebutuhan_id' => $originalQuotation->kebutuhan_id,
+            'kebutuhan' => $originalQuotation->kebutuhan,
+            'company_id' => $originalQuotation->company_id,
+            'company' => $originalQuotation->company,
+            'jumlah_site' => $originalQuotation->jumlah_site,
+            'step' => 1,
+            'status_quotation_id' => 1, // Reset to draft
+            'is_aktif' => 1,
+            'alasan_resubmit' => $request->alasan,
+            'quotation_sebelumnya_id' => $originalQuotation->id,
+            'created_by' => $user->full_name
+        ]);
+
+        \Log::info('Resubmit: New quotation created', [
+            'new_id' => $newQuotation->id,
+            'original_id' => $originalQuotation->id,
+            'nomor' => $newNomor
+        ]);
+
+        // Duplicate all data from original quotation
+        $this->quotationDuplicationService->duplicateQuotationData(
+            $newQuotation,
+            $originalQuotation
+        );
+
+        // Deactivate original quotation
+        $originalQuotation->update([
+            'is_aktif' => 0,
+            'updated_by' => $user->full_name
+        ]);
+
+        // Load relations for response
+        $newQuotation->load([
+            'quotationSites',
+            'quotationPics',
+            'quotationDetails',
+            'statusQuotation'
+        ]);
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'data' => new QuotationResource($newQuotation),
+            'message' => 'Quotation resubmitted successfully'
+        ], 201);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Failed to resubmit quotation', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to resubmit quotation',
+            'error' => $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * @OA\Post(
@@ -1160,7 +1258,8 @@ class QuotationController extends Controller
             $query = Leads::with([
                 'statusLeads',
                 'branch'
-            ]);
+            ])
+            ->filterByUserRole();
 
             // Filter berdasarkan tipe quotation
             if ($tipe_quotation === 'baru') {
@@ -1168,32 +1267,6 @@ class QuotationController extends Controller
             } else {
                 $query->whereNotNull('customer_id'); // Leads untuk revisi/rekontrak yang sudah menjadi customer
             }
-
-            // Role-based filtering
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                if ($user->role_id == 29) {
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                } elseif ($user->role_id == 31) {
-                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
-                    if ($timSalesDetail) {
-                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
-                            $q->whereIn('user_id', $memberSalesUserIds);
-                        });
-                    } else {
-                        $query->whereRaw('1 = 0');
-                    }
-                }
-            } elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
-
             // Order by terbaru
             $query->orderBy('created_at', 'desc');
 

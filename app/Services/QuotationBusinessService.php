@@ -50,11 +50,11 @@ class QuotationBusinessService
     public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy): void
     {
         if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) {
+            foreach ($request->multisite as $key => $value) { // Nama site
                 $this->createQuotationSite($quotation, $request, $key, true, $createdBy);
             }
         } else {
-            $this->createQuotationSite($quotation, $request, null, false, $createdBy);
+            $this->createQuotationSite($quotation, $request, null, false, $createdBy); // Single site
         }
     }
 
@@ -83,9 +83,9 @@ class QuotationBusinessService
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
-            'provinsi_id' => $province->id,
+            'provinsi_id' => $provinceId,
             'provinsi' => $province->nama,
-            'kota_id' => $city->id,
+            'kota_id' => $cityId,
             'kota' => $city->nama,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
@@ -195,7 +195,7 @@ class QuotationBusinessService
     /**
      * Generate nomor quotation berdasarkan jenis
      */
-    public function generateNomorByType($leadsId, $companyId, $tipeQuotation , $quotationReferensi = null): string
+    public function generateNomorByType($leadsId, $companyId, $tipeQuotation, $quotationReferensi = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
@@ -228,13 +228,39 @@ class QuotationBusinessService
     public function generateActivityNomor($leadsId): string
     {
         $now = Carbon::now();
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-        $count = CustomerActivity::where('leads_id', $leadsId)
-            ->whereYear('created_at', $now->year)
-            ->whereMonth('created_at', $now->month)
-            ->count();
+        $leads = Leads::find($leadsId);
 
-        return "ACT/" . $leadsId . "/" . $month . $now->year . "/" . sprintf("%04d", $count + 1);
+        $prefix = "CAT/";
+        if ($leads) {
+            switch ($leads->kebutuhan_id) {
+                case 2:
+                    $prefix .= "LS/";
+                    break;
+                case 1:
+                    $prefix .= "SG/";
+                    break;
+                case 3:
+                    $prefix .= "CS/";
+                    break;
+                case 4:
+                    $prefix .= "LL/";
+                    break;
+                default:
+                    $prefix .= "NN/";
+                    break;
+            }
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
     /**
      * Validate multi site data consistency

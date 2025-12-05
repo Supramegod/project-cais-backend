@@ -257,7 +257,6 @@ class QuotationService
             throw $e;
         }
     }
-
     private function populateDetailCalculation($detail, $quotation, DetailCalculation $detailCalculation): void
     {
         // Calculate BPU deduction if applicable
@@ -265,6 +264,21 @@ class QuotationService
         if ($detail->penjamin_kesehatan === 'BPU') {
             $potonganBpu = 16800;
         }
+
+        // PERBAIKAN CRITICAL: Gunakan nilai dari $detail yang sudah dihitung di calculateExtras
+        // JANGAN ambil dari HPP karena HPP mungkin masih 0
+        $tunjanganHariRaya = $detail->tunjangan_hari_raya ?? 0;
+        $kompensasi = $detail->kompensasi ?? 0;
+        $tunjanganHoliday = $detail->tunjangan_holiday ?? 0;
+
+        // DEBUG: Bandingkan nilai dari detail vs HPP
+        $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+        \Log::info("THR Value Comparison", [
+            'detail_id' => $detail->id,
+            'from_detail' => $tunjanganHariRaya,
+            'from_hpp' => $hpp ? $hpp->tunjangan_hari_raya : 'no_hpp',
+            'from_wage_thr' => $detail->thr ?? 'no_thr'
+        ]);
 
         // Data untuk HPP
         $detailCalculation->hpp_data = [
@@ -275,9 +289,9 @@ class QuotationService
             'jumlah_hc' => $detail->jumlah_hc,
             'gaji_pokok' => $detail->nominal_upah,
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
-            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya ?? 0,
-            'kompensasi' => $detail->kompensasi ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
+            'tunjangan_hari_raya' => $tunjanganHariRaya, // ← GUNAKAN NILAI INI
+            'kompensasi' => $kompensasi, // ← GUNAKAN NILAI INI
+            'tunjangan_hari_libur_nasional' => $tunjanganHoliday, // ← GUNAKAN NILAI INI
             'lembur' => $detail->lembur ?? 0,
             'takaful' => $detail->nominal_takaful ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
@@ -311,9 +325,9 @@ class QuotationService
             'gaji_pokok' => $detail->nominal_upah,
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
             'total_base_manpower' => $detail->total_base_manpower ?? 0,
-            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya ?? 0,
-            'kompensasi' => $detail->kompensasi ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
+            'tunjangan_hari_raya' => $tunjanganHariRaya, // ← GUNAKAN NILAI INI
+            'kompensasi' => $kompensasi, // ← GUNAKAN NILAI INI
+            'tunjangan_hari_libur_nasional' => $tunjanganHoliday, // ← GUNAKAN NILAI INI
             'lembur' => $detail->lembur ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
             'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
@@ -334,6 +348,13 @@ class QuotationService
             'insentif' => $detail->insentif ?? 0,
             'potongan_bpu' => $potonganBpu,
         ];
+
+        \Log::info("Populated THR values to DTO", [
+            'detail_id' => $detail->id,
+            'thr_value' => $tunjanganHariRaya,
+            'kompensasi_value' => $kompensasi,
+            'tunjangan_holiday_value' => $tunjanganHoliday
+        ]);
     }
 
     // ============================ COMPONENT CALCULATIONS ============================
@@ -344,7 +365,7 @@ class QuotationService
             $dtTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)
                 ->where('nama_tunjangan', $tunjangan->nama)->first();
 
-            $value = $dtTunjangan->nominal ?? 0;
+            $value = (float) ($dtTunjangan->nominal ?? 0);
             $detail->{$tunjangan->nama} = $value;
             $totalTunjangan += $value;
         }
@@ -497,36 +518,105 @@ class QuotationService
             ]);
         }
     }
+    // PERBAIKAN 1: Pastikan nilai THR dihitung dengan benar
     private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
         try {
+            // DEBUG DETIL: Log semua properti wage
+            \Log::info("=== DEBUG CALCULATE EXTRAS ===", [
+                'detail_id' => $detail->id,
+                'wage_exists' => !empty($wage),
+                'wage_id' => $wage ? ($wage->id ?? 'no_id') : 'no_wage',
+                'wage_data' => $wage ? [
+                    'thr' => $wage->thr ?? 'null',
+                    'kompensasi' => $wage->kompensasi ?? 'null',
+                    'tunjangan_holiday' => $wage->tunjangan_holiday ?? 'null',
+                    'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? 0
+                ] : 'no_wage_data'
+            ]);
+
             // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
             $thrValue = $wage->thr ?? "Tidak";
-
-            $detail->tunjangan_hari_raya = $hpp->tunjangan_hari_raya ??
-                ($thrValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
-
             $kompensasiValue = $wage->kompensasi ?? "Tidak";
 
-            $detail->kompensasi = $hpp->kompensasi ??
-                ($kompensasiValue == "Diprovisikan" ? $detail->nominal_upah / 12 : 0);
+            // DEBUG: Tampilkan nilai sebenarnya
+            \Log::info("THR Raw Values", [
+                'detail_id' => $detail->id,
+                'thr_raw' => $thrValue,
+                'kompensasi_raw' => $kompensasiValue,
+                'thr_type' => gettype($thrValue),
+                'kompensasi_type' => gettype($kompensasiValue)
+            ]);
 
-            // Tunjangan Holiday - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            // PERBAIKAN CRITICAL: Normalisasi string comparison
+            $thrIsDiprovisikan = (is_string($thrValue) && strtolower(trim($thrValue)) === 'diprovisikan');
+            $kompensasiIsDiprovisikan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'diprovisikan');
+            $kompensasiIsDitagihkan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'ditagihkan');
+
+            \Log::info("THR Check Results", [
+                'detail_id' => $detail->id,
+                'thr_is_diprovisikan' => $thrIsDiprovisikan,
+                'kompensasi_is_diprovisikan' => $kompensasiIsDiprovisikan,
+                'kompensasi_is_ditagihkan' => $kompensasiIsDitagihkan
+            ]);
+
+            // PERBAIKAN CRITICAL: Jika HPP nilai 0, hitung ulang dari wage
+            // THR: Gunakan nilai dari HPP hanya jika > 0, jika 0 hitung dari wage
+            if ($hpp && $hpp->tunjangan_hari_raya > 0) {
+                $detail->tunjangan_hari_raya = (float) $hpp->tunjangan_hari_raya;
+                \Log::info("Using THR from HPP (non-zero)", [
+                    'detail_id' => $detail->id,
+                    'value' => $hpp->tunjangan_hari_raya
+                ]);
+            } else if ($thrIsDiprovisikan) {
+                $detail->tunjangan_hari_raya = round((float) $detail->nominal_upah / 12, 2);
+                \Log::info("Calculated THR from nominal_upah", [
+                    'detail_id' => $detail->id,
+                    'nominal_upah' => $detail->nominal_upah,
+                    'thr_calculated' => $detail->tunjangan_hari_raya,
+                    'reason' => 'HPP value is 0 and wage thr is Diprovisikan'
+                ]);
+            } else {
+                $detail->tunjangan_hari_raya = 0;
+                \Log::info("THR set to 0", [
+                    'detail_id' => $detail->id,
+                    'reason' => 'thr is not Diprovisikan'
+                ]);
+            }
+
+            // Tunjangan Holiday - dengan logging
             $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
+            \Log::info("Tunjangan Holiday Check", [
+                'detail_id' => $detail->id,
+                'raw_value' => $tunjanganHolidayValue,
+                'is_flat' => (is_string($tunjanganHolidayValue) && strtolower(trim($tunjanganHolidayValue)) === 'flat')
+            ]);
 
-            $detail->tunjangan_holiday = $tunjanganHolidayValue == "Flat"
-                ? ($hpp->tunjangan_hari_libur_nasional ?? ($wage->nominal_tunjangan_holiday ?? 0))
-                : 0;
+            $isTunjanganHolidayFlat = (is_string($tunjanganHolidayValue) && strtolower(trim($tunjanganHolidayValue)) === 'flat');
 
-            // Lembur - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
-            $detail->lembur = $this->calculateLembur($detail, $quotation, $hpp, $wage);
+            // PERBAIKAN CRITICAL: Jika HPP nilai 0, hitung ulang dari wage
+            if ($hpp && $hpp->tunjangan_hari_libur_nasional > 0) {
+                $detail->tunjangan_holiday = $hpp->tunjangan_hari_libur_nasional;
+            } else if ($isTunjanganHolidayFlat) {
+                $detail->tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
+            } else {
+                $detail->tunjangan_holiday = 0;
+            }
+
+            // Log hasil akhir
+            \Log::info("Extras Calculation Result", [
+                'detail_id' => $detail->id,
+                'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
+                'kompensasi' => $detail->kompensasi,
+                'tunjangan_holiday' => $detail->tunjangan_holiday,
+                'lembur' => $detail->lembur
+            ]);
 
         } catch (\Exception $e) {
             \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
             throw $e;
         }
     }
-
     private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
     {
         $items = [
@@ -572,39 +662,95 @@ class QuotationService
             ]);
         }
 
-        // PERBAIKAN: Gunakan bpjs_kesehatan yang sudah disesuaikan (bisa berupa BPJS atau Takaful)
-        $biayaKesehatan = $detail->bpjs_kesehatan;
+        // PERBAIKAN CRITICAL: Pastikan THR dan komponen lainnya digunakan
+        // DAN PASTIKAN SEMUA VARIABEL DIKONVERSI KE FLOAT/INTEGER
+        $tunjanganHariRaya = (float) ($detail->tunjangan_hari_raya ?? 0);
+        $kompensasi = (float) ($detail->kompensasi ?? 0);
+        $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
+        $nominalUpah = (float) ($detail->nominal_upah ?? 0);
+        $totalTunjangan = (float) $totalTunjangan;
+        $lembur = (float) ($detail->lembur ?? 0);
+        $bpjsKetenagakerjaan = (float) ($detail->bpjs_ketenagakerjaan ?? 0);
+        $biayaKesehatan = (float) ($detail->bpjs_kesehatan ?? 0);
+        $personilKaporlap = (float) ($detail->personil_kaporlap ?? 0);
+        $personilDevices = (float) ($detail->personil_devices ?? 0);
+        $personilChemical = (float) ($detail->personil_chemical ?? 0);
+        $personilOhc = (float) ($detail->personil_ohc ?? 0);
+        $bungaBank = (float) ($detail->bunga_bank ?? 0);
+        $insentif = (float) ($detail->insentif ?? 0);
+        $jumlahHc = (int) ($detail->jumlah_hc ?? 0);
 
-        // ✅ TUNJANGAN SUDAH DIPERHITUNGKAN: $totalTunjangan digunakan dalam perhitungan
-        // HPP Calculations
-        $detail->total_personil = $detail->nominal_upah + $totalTunjangan + $detail->tunjangan_hari_raya +
-            $detail->kompensasi + $detail->tunjangan_holiday + $detail->lembur +
-            $detail->bpjs_ketenagakerjaan + $biayaKesehatan + $detail->personil_kaporlap +
-            $detail->personil_devices + $detail->personil_chemical + $detail->personil_ohc +
-            $detail->bunga_bank + $detail->insentif - $potonganBpu;
+        // Debug tipe data
+        \Log::info("Data Types Check", [
+            'detail_id' => $detail->id,
+            'nominal_upah_type' => gettype($detail->nominal_upah ?? 0),
+            'tunjangan_hari_raya_type' => gettype($detail->tunjangan_hari_raya ?? 0),
+            'kompensasi_type' => gettype($detail->kompensasi ?? 0),
+            'total_tunjangan_type' => gettype($totalTunjangan)
+        ]);
 
-        $detail->sub_total_personil = $detail->total_personil * $detail->jumlah_hc;
+        // Log komponen perhitungan dengan nilai sudah dikonversi
+        \Log::info("Final Totals Components (Converted)", [
+            'detail_id' => $detail->id,
+            'tunjangan_hari_raya' => $tunjanganHariRaya,
+            'kompensasi' => $kompensasi,
+            'tunjangan_holiday' => $tunjanganHoliday,
+            'total_tunjangan' => $totalTunjangan,
+            'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
+            'biaya_kesehatan' => $biayaKesehatan
+        ]);
+
+        // PERBAIKAN: Pastikan semua komponen dijumlahkan dengan aman
+        $detail->total_personil = $nominalUpah
+            + $totalTunjangan
+            + $tunjanganHariRaya
+            + $kompensasi
+            + $tunjanganHoliday
+            + $lembur
+            + $bpjsKetenagakerjaan
+            + $biayaKesehatan
+            + $personilKaporlap
+            + $personilDevices
+            + $personilChemical
+            + $personilOhc
+            + $bungaBank
+            + $insentif
+            - $potonganBpu;
+
+        $detail->sub_total_personil = $detail->total_personil * $jumlahHc;
 
         // COSS Calculations
-        $detail->total_base_manpower = round($detail->nominal_upah + $detail->total_tunjangan, 2);
+        $detail->total_base_manpower = round($nominalUpah + $totalTunjangan, 2);
 
         $detail->total_exclude_base_manpower = round(
-            $detail->tunjangan_hari_raya + $detail->kompensasi + $detail->tunjangan_holiday +
-            $detail->lembur + $biayaKesehatan + $detail->bpjs_ketenagakerjaan +
-            $detail->personil_kaporlap_coss + $detail->personil_devices_coss + $detail->personil_chemical_coss,
+            $tunjanganHariRaya
+            + $kompensasi
+            + $tunjanganHoliday
+            + $lembur
+            + $biayaKesehatan
+            + $bpjsKetenagakerjaan
+            + ($detail->personil_kaporlap_coss ?? 0)
+            + ($detail->personil_devices_coss ?? 0)
+            + ($detail->personil_chemical_coss ?? 0),
             2
         );
 
-        $detail->total_personil_coss = round($detail->total_base_manpower + $detail->total_exclude_base_manpower + $detail->personil_ohc_coss - $potonganBpu, 2);
-        $detail->sub_total_personil_coss = round($detail->total_personil_coss * $detail->jumlah_hc, 2);
+        $detail->total_personil_coss = round(
+            $detail->total_base_manpower
+            + $detail->total_exclude_base_manpower
+            + ($detail->personil_ohc_coss ?? 0)
+            - $potonganBpu,
+            2
+        );
 
-        \Log::info("Final totals calculated with tunjangan", [
+        $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHc, 2);
+
+        \Log::info("Final totals calculated", [
             'detail_id' => $detail->id,
-            'total_tunjangan' => $totalTunjangan,
-            'biaya_kesehatan' => $biayaKesehatan,
-            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
             'total_personil' => $detail->total_personil,
-            'potongan_bpu' => $potonganBpu
+            'sub_total_personil' => $detail->sub_total_personil,
+            'total_personil_coss' => $detail->total_personil_coss,
+            'sub_total_personil_coss' => $detail->sub_total_personil_coss
         ]);
     }
     // ============================ GROSS UP RECALCULATION ============================
@@ -676,8 +822,10 @@ class QuotationService
         $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
 
         $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+
+        // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
         $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) => ($kbd->bpjs_kesehatan + $kbd->nominal_takaful) * $kbd->jumlah_hc
+            fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
         );
 
         // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
@@ -721,20 +869,41 @@ class QuotationService
         $summary->{"ppn{$suffix}"} = 0;
         $summary->{"pph{$suffix}"} = 0;
 
-        $quotation->quotation_detail->each(function ($kbd) use (&$summary, $suffix, $model) {
-            $detail = $model::where('quotation_detail_id', $kbd->id)->first();
-            if ($detail) {
-                $summary->{"ppn{$suffix}"} += $detail->ppn ?? 0;
-                $summary->{"pph{$suffix}"} += $detail->pph ?? 0;
-            }
-        });
+        // $quotation->quotation_detail->each(function ($kbd) use (&$summary, $suffix, $model) {
+        //     $detail = $model::where('quotation_detail_id', $kbd->id)->first();
+        //     if ($detail) {
+        //         $summary->{"ppn{$suffix}"} += $detail->ppn ?? 0;
+        //         $summary->{"pph{$suffix}"} += $detail->pph ?? 0;
+        //     }
+        // });
+
+        // PERBAIKAN: Validasi nilai PPN/PPH tidak wajar
+        $grandTotal = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        $maxReasonableTax = $grandTotal * 0.5; // Maksimal 50% dari grand total
+
+        if ($summary->{"ppn{$suffix}"} > $maxReasonableTax) {
+            \Log::warning("PPN value too large, resetting to zero", [
+                'current_ppn' => $summary->{"ppn{$suffix}"},
+                'max_reasonable' => $maxReasonableTax,
+                'grand_total' => $grandTotal
+            ]);
+            $summary->{"ppn{$suffix}"} = 0;
+        }
+
+        if ($summary->{"pph{$suffix}"} > $maxReasonableTax) {
+            \Log::warning("PPH value too large, resetting to zero", [
+                'current_pph' => $summary->{"pph{$suffix}"},
+                'max_reasonable' => $maxReasonableTax,
+                'grand_total' => $grandTotal
+            ]);
+            $summary->{"pph{$suffix}"} = 0;
+        }
 
         // Calculate taxes if not set
         if ($summary->{"ppn{$suffix}"} == 0 || $summary->{"pph{$suffix}"} == 0) {
             $this->calculateDefaultTaxes($quotation, $suffix, $result);
         }
     }
-
     private function calculateDefaultTaxes(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -749,21 +918,56 @@ class QuotationService
             $isPpnBoolean = $isPpn === "Ya";
         }
 
-        $baseAmount = $ppnPphDipotong == "Management Fee"
-            ? $summary->{"nominal_management_fee{$suffix}"}
-            : $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        // ✅ PERBAIKAN: Base amount untuk PPN/PPH dengan faktor 11/12
+        $baseAmount = 0;
+        if ($ppnPphDipotong == "Management Fee") {
+            // Hanya management fee yang dikenakan pajak, dengan faktor 11/12
+            $managementFee = $summary->{"nominal_management_fee{$suffix}"};
+            $baseAmount = $managementFee * (11 / 12); // Faktor 11/12
+        } else {
+            // "Total Invoice" atau "Lainnya" - gunakan grand total sebelum pajak
+            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+        }
 
-        $summary->{"dpp{$suffix}"} = 11 / 12 * $baseAmount;
+        $summary->{"dpp{$suffix}"} = $baseAmount;
 
+        // ✅ PERBAIKAN: Hitung PPN (12% dari baseAmount setelah faktor 11/12)
         if ($summary->{"ppn{$suffix}"} == 0 && $isPpnBoolean) {
-            $summary->{"ppn{$suffix}"} = $summary->{"dpp{$suffix}"} * 12 / 100;
+            $summary->{"ppn{$suffix}"} = round($baseAmount * 0.12, 2); // PPN 12%
         }
 
+        // ✅ PERBAIKAN: Hitung PPH (2% dari baseAmount setelah faktor 11/12) dengan validasi
         if ($summary->{"pph{$suffix}"} == 0) {
-            $summary->{"pph{$suffix}"} = $baseAmount * -2 / 100;
-        }
-    }
+            $calculatedPph = round($baseAmount * -0.02, 2); // PPH 2% (negatif karena potongan)
 
+            // Validasi: PPH tidak boleh lebih besar dari 10% base amount
+            $maxPph = abs($baseAmount * 0.1);
+            if (abs($calculatedPph) > $maxPph) {
+                \Log::warning("PPH calculation seems incorrect", [
+                    'calculated_pph' => $calculatedPph,
+                    'base_amount' => $baseAmount,
+                    'max_reasonable' => $maxPph,
+                    'suffix' => $suffix
+                ]);
+                $calculatedPph = -$maxPph;
+            }
+
+            $summary->{"pph{$suffix}"} = $calculatedPph;
+        }
+
+        \Log::info("Default taxes calculated with 11/12 factor", [
+            'suffix' => $suffix,
+            'ppn_pph_dipotong' => $ppnPphDipotong,
+            'management_fee' => $summary->{"nominal_management_fee{$suffix}"} ?? 0,
+            'base_amount_after_11_12' => $baseAmount,
+            'is_ppn' => $isPpnBoolean,
+            'ppn' => $summary->{"ppn{$suffix}"},
+            'pph' => $summary->{"pph{$suffix}"},
+            'dpp' => $summary->{"dpp{$suffix}"},
+            'ppn_formula' => 'base_amount * 0.12',
+            'pph_formula' => 'base_amount * -0.02'
+        ]);
+    }
     private function finalizeCalculations(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -1339,7 +1543,7 @@ class QuotationService
     /**
      * Generate nomor untuk resubmit
      */
-    private function generateResubmitNomor($originalNomor)
+    public function generateResubmitNomor($originalNomor)
     {
         $base = explode('-', $originalNomor)[0];
         $now = Carbon::now();

@@ -287,6 +287,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/export', 'exportExcel');
         Route::get('/template-import', 'templateImport');
         Route::post('/generate-null-kode', 'generateNullKode');
+        Route::get('/spk/{id}', 'getSpkByLead');
+        Route::get('/pks/{id}', 'getPksByLead');
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');

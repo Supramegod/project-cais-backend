@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -54,6 +55,10 @@ class Spk extends Model
     {
         return $this->belongsTo(StatusSpk::class, 'status_spk_id');
     }
+    public function pks()
+    {
+        return $this->hasMany(pks::class, 'spk_id');
+    }
 
     public function spkSites()
     {
@@ -77,6 +82,55 @@ class Spk extends Model
 
     public function getTglSpkAttribute($value)
     {
-        return Carbon::parse($value)->format('d-m-Y');
+        $carbonDate = Carbon::parse($value);
+        $carbonDate->setLocale('id');
+        return $carbonDate->isoFormat('D MMMM Y');
+    }
+    /**
+     * SCOPE: Mendapatkan SPK berdasarkan leads_id
+     * Logika filter ada di sini (DI MODEL SPK)
+     */
+    public function scopeByLeadsId(Builder $query, int $leadsId, array $filters = [])
+    {
+        return $query->where('leads_id', $leadsId);
+
+    }
+
+    /**
+     * SCOPE: Hanya SPK aktif
+     */
+    public function scopeActive(Builder $query)
+    {
+        return $query->where('status_spk_id', 2);
+    }
+
+    /**
+     * SCOPE: SPK berdasarkan jenis
+     */
+    public function scopeByType(Builder $query, string $type)
+    {
+        return $query->where('jenis_SPK', $type);
+    }
+
+    /**
+     * Method untuk summary SPK berdasarkan leads_id
+     */
+    public static function getSummaryByLeadsId(int $leadsId): array
+    {
+        $total = self::where('leads_id', $leadsId)->count();
+        $active = self::where('leads_id', $leadsId)->active()->count();
+        return [
+            'total' => $total,
+            'active' => $active,
+            'inactive' => $total - $active,
+        ];
+    }
+    public function getNamaStatusAttribute()
+    {
+        if ($this->relationLoaded('statusSpk') && $this->statusSpk) {
+            return $this->statusSpk->nama;
+        }
+
+        return $this->statusSpk?->nama;
     }
 }

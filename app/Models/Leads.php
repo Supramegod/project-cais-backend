@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Auth;
 
 class Leads extends Model
 {
@@ -129,6 +130,13 @@ class Leads extends Model
     {
         return $this->hasMany(Pks::class, 'leads_id');
     }
+        /**
+     * Relasi ke SPK (Surat Perintah Kerja)
+     */
+    public function spk()
+    {
+        return $this->hasMany(Spk::class, 'leads_id', 'id');
+    }
 
     // Relasi balik ke detail grup
     public function groupDetails()
@@ -168,6 +176,87 @@ class Leads extends Model
     {
         // Pastikan locale Carbon diatur ke 'id' di config/app.php
         return Carbon::parse($value)->isoFormat('D MMMM Y');
+    }
+    /**
+     * Scope untuk filter leads berdasarkan role user
+     */
+    public function scopeFilterByUserRole($query, $user = null)
+    {
+        $user = $user ?: Auth::user();
+
+        if (!$user) {
+            return $query;
+        }
+
+        // 🌟 Superadmin dapat mengakses SEMUA data tanpa filter
+        if ($user->role_id == 2) {
+            return $query;
+        }
+
+        // Sales division
+        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+            if ($user->role_id == 29) {
+                // Sales - hanya melihat leads mereka sendiri
+                $query->whereHas('timSalesD', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
+            } elseif ($user->role_id == 31) {
+                // Sales Leader - melihat leads seluruh anggota tim
+                $tim = TimSalesDetail::where('user_id', $user->id)->first();
+                if ($tim) {
+                    $memberSales = TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
+                        ->pluck('user_id')
+                        ->toArray();
+                    $query->whereHas('timSalesD', function ($q) use ($memberSales) {
+                        $q->whereIn('user_id', $memberSales);
+                    });
+                }
+            }
+            // Untuk role 30, 32, 33 (Sales lainnya) - tidak ada filter khusus
+        }
+        // RO division
+        elseif (in_array($user->role_id, [4, 5, 6, 8])) {
+            // RO - filter berdasarkan ro_id (jika kolom ada)
+            if (in_array($user->role_id, [4, 5])) {
+                $query->where('ro_id', $user->id);
+            }
+            // Role 6,8 - tanpa filter (lihat semua)
+        }
+        // CRM division
+        elseif (in_array($user->role_id, [54, 55, 56])) {
+            // CRM - filter berdasarkan crm_id (jika kolom ada)
+            if ($user->role_id == 54) {
+                $query->where('crm_id', $user->id);
+            }
+            // Role 55,56 - tanpa filter (lihat semua)
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope untuk leads yang tersedia untuk aktivitas
+     */
+    public function scopeAvailableForActivity($query, $user = null)
+    {
+        $user = $user ?: Auth::user();
+
+        // Panggil scope filter role
+        return $this->scopeFilterByUserRole($query, $user);
+    }
+
+    /**
+     * Scope untuk leads yang tersedia untuk quotation
+     */
+    public function scopeAvailableForQuotation($query, $user = null)
+    {
+        $user = $user ?: Auth::user();
+
+        // Hanya leads parent (bukan child)
+        $query->whereNull('leads_id');
+
+        // Panggil scope filter role
+        return $this->scopeFilterByUserRole($query, $user);
     }
 
 }

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\QuotationResource;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Leads;
 use App\Models\KategoriSesuaiHc;
+use App\Models\Quotation;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\Site;
@@ -124,7 +126,6 @@ class PksController extends Controller
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
                     'tgl_pks' => $pks->tgl_pks,
-                    'formatted_tgl_pks' => Carbon::parse($pks->tgl_pks)->isoFormat('D MMMM Y'),
                     'kontrak_awal' => $pks->kontrak_awal,
                     'kontrak_akhir' => $pks->kontrak_akhir,
                     'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
@@ -168,7 +169,8 @@ class PksController extends Controller
      *         description="Successful operation",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="quotation_data", type="object", description="Quotation details and calculation")
      *         )
      *     ),
      *     @OA\Response(
@@ -185,7 +187,8 @@ class PksController extends Controller
                 'statusPks',
                 'sites',
                 'perjanjian',
-                'activities'
+                'activities',
+                'sites.quotation' // Tambahkan relasi quotation dari site
             ])->find($id);
 
             if (!$pks) {
@@ -196,17 +199,58 @@ class PksController extends Controller
             }
 
             // Format dates for frontend
-            $pks->formatted_tgl_pks = Carbon::parse($pks->tgl_pks)->isoFormat('D MMMM Y');
             $pks->formatted_kontrak_awal = Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y');
             $pks->formatted_kontrak_akhir = Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y');
             $pks->berakhir_dalam = $this->hitungBerakhirKontrak($pks->kontrak_akhir);
 
-            return response()->json([
+            // GET QUOTATION DATA FROM FIRST SITE
+            $quotationData = null;
+            if ($pks->sites->isNotEmpty()) {
+                $firstSite = $pks->sites->first();
+
+                if ($firstSite && $firstSite->quotation) {
+                    // Load full quotation with all necessary relations
+                    $quotation = Quotation::with([
+                        'quotationDetails.quotationDetailHpps',
+                        'quotationDetails.quotationDetailCosses',
+                        'quotationDetails.wage',
+                        'quotationDetails.quotationDetailRequirements',
+                        'quotationDetails.quotationDetailTunjangans',
+                        'leads',
+                        'statusQuotation',
+                        'quotationSites',
+                        'quotationPics',
+                        'quotationAplikasis',
+                        'quotationKaporlaps',
+                        'quotationDevices',
+                        'quotationChemicals',
+                        'quotationOhcs',
+                        'quotationTrainings',
+                        'quotationKerjasamas'
+                    ])->find($firstSite->quotation_id);
+
+                    if ($quotation) {
+                        // Use QuotationResource to format data
+                        $quotationData = new QuotationResource($quotation);
+                        $quotationData = $quotationData->toArray(request());
+                    }
+                }
+            }
+
+            $response = [
                 'success' => true,
                 'data' => $pks
-            ]);
+            ];
+
+            // Add quotation data if available
+            if ($quotationData) {
+                $response['quotation_data'] = $quotationData;
+            }
+
+            return response()->json($response);
 
         } catch (\Exception $e) {
+            \Log::error('Failed to retrieve PKS details: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS details',
@@ -214,7 +258,6 @@ class PksController extends Controller
             ], 500);
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/pks/add",
@@ -1290,10 +1333,15 @@ class PksController extends Controller
             ->distinct()
             ->get();
     }
-
     private function getAvailableSitesData($leadsId)
     {
-        return SpkSite::with(['spk'])
+        // Ambil data PKS dengan relasi yang diperlukan
+        $pks = Pks::with(['leads', 'sites', 'company', 'ruleThr', 'salaryRule'])
+            ->where('leads_id', $leadsId)
+            ->first();
+
+        // Ambil data sites yang tersedia
+        $sites = SpkSite::with(['spk'])
             ->where('leads_id', $leadsId)
             ->whereNull('deleted_at')
             ->whereDoesntHave('site')
@@ -1308,15 +1356,37 @@ class PksController extends Controller
                     ->limit(1);
             }, 'asc')
             ->get()
-            ->map(function ($site) {
+            ->map(function ($site) use ($pks) {
                 return [
-                    'nomor' => $site->spk->nomor ?? null,
                     'id' => $site->id,
+                    'nomor' => $site->spk->nomor ?? null,
                     'nama_site' => $site->nama_site,
                     'provinsi' => $site->provinsi,
                     'kota' => $site->kota,
                     'penempatan' => $site->penempatan,
+                    // Data tambahan dari PKS
+                    'company' => $pks && $pks->company ? [
+                        'id' => $pks->company->id,
+                        'name' => $pks->company->name,
+                        'code' => $pks->company->code
+                    ] : null,
+                    'rule_thr' => $pks && $pks->ruleThr ? [
+                        'id' => $pks->ruleThr->id,
+                        'nama' => $pks->ruleThr->nama,
+                        'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice,
+                        'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
+                        'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr
+                    ] : null,
+                    'salary_rule' => $pks && $pks->salaryRule ? [
+                        'id' => $pks->salaryRule->id,
+                        'nama' => $pks->salaryRule->nama_salary_rule,
+                        'cutoff' => $pks->salaryRule->cutoff,
+                        'pembayaran_invoice' => $pks->salaryRule->pembayaran_invoice,
+                        'rilis_payroll' => $pks->salaryRule->rilis_payroll
+                    ] : null
                 ];
             });
+
+        return $sites;
     }
 }
