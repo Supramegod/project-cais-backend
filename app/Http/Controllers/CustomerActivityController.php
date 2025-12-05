@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ use App\Models\CustomerActivity;
 use App\Models\CustomerActivityFile;
 use App\Models\Leads;
 use App\Models\Pks;
+use Illuminate\Support\Str;
 
 /**
  * @OA\Tag(
@@ -422,31 +424,41 @@ class CustomerActivityController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         description="Data aktivitas customer baru",
-     *         @OA\JsonContent(
-     *             required={"leads_id", "tgl_activity", "tipe"},
-     *             @OA\Property(property="leads_id", type="integer", example=1, description="ID leads yang terkait"),
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01", description="Tanggal aktivitas"),
-     *             @OA\Property(property="tipe", type="string", example="Telepon", description="Tipe aktivitas: Telepon, Email, Meeting, Visit"),
-     *             @OA\Property(property="notes", type="string", example="Catatan aktivitas", description="Catatan atau keterangan aktivitas"),
-     *             @OA\Property(property="tim_sales_id", type="integer", example=1, description="ID tim sales"),
-     *             @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID detail tim sales"),
-     *             @OA\Property(property="status_leads_id", type="integer", example=1, description="ID status leads yang akan diupdate"),
-     *             @OA\Property(property="start", type="string", example="09:00", description="Jam mulai aktivitas"),
-     *             @OA\Property(property="end", type="string", example="10:00", description="Jam selesai aktivitas"),
-     *             @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
-     *             @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-01", description="Tanggal realisasi"),
-     *             @OA\Property(property="jam_realisasi", type="string", example="09:30", description="Jam realisasi"),
-     *             @OA\Property(property="jenis_visit_id", type="integer", example=1, description="ID jenis visit (jika tipe = Visit)"),
-     *             @OA\Property(property="notulen", type="string", example="Notulen meeting", description="Notulen atau hasil meeting"),
-     *             @OA\Property(property="email", type="string", format="email", example="email@example.com", description="Email customer"),
-     *             @OA\Property(
-     *                 property="files",
-     *                 type="array",
-     *                 description="Array file yang akan diupload",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
-     *                     @OA\Property(property="file_content", type="string", example="base64EncodedFileContent", description="File content dalam format base64")
+     *         @OA\MediaType(
+     *             mediaType="application/json",
+     *             @OA\Schema(
+     *                 required={"leads_id", "tgl_activity", "tipe"},
+     *                 type="object",
+     *                 @OA\Property(property="leads_id", type="integer", example=1, description="ID leads yang terkait"),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01", description="Tanggal aktivitas"),
+     *                 @OA\Property(property="tipe", type="string", example="Telepon", description="Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting"),
+     *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas", description="Catatan atau keterangan aktivitas"),
+     *                 @OA\Property(property="notes_tipe", type="string", example="Catatan spesifik tipe", description="Catatan berdasarkan tipe aktivitas"),
+     *                 @OA\Property(property="tim_sales_id", type="integer", example=1, description="ID tim sales"),
+     *                 @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID detail tim sales"),
+     *                 @OA\Property(property="status_leads_id", type="integer", example=1, description="ID status leads yang akan diupdate"),
+     *                 @OA\Property(property="start", type="string", example="09:00", description="Jam mulai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="end", type="string", example="10:00", description="Jam selesai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
+     *                 @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-01", description="Tanggal realisasi"),
+     *                 @OA\Property(property="jam_realisasi", type="string", example="09:30", description="Jam realisasi (format: HH:mm)"),
+     *                 @OA\Property(property="jenis_visit_id", type="integer", example=1, description="ID jenis visit (jika tipe = Visit)"),
+     *                 @OA\Property(property="jenis_visit", type="string", example="Survey", description="Jenis visit"),
+     *                 @OA\Property(property="notulen", type="string", example="Notulen meeting", description="Notulen atau hasil meeting"),
+     *                 @OA\Property(property="email", type="string", format="email", example="email@example.com", description="Email customer"),
+     *                 @OA\Property(property="penerima", type="string", example="John Doe", description="Penerima email/telepon"),
+     *                 @OA\Property(property="link_bukti_foto", type="string", example="https://example.com/foto.jpg", description="Link bukti foto"),
+     *                 @OA\Property(
+     *                     property="files",
+     *                     type="array",
+     *                     description="Array file yang akan diupload",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         required={"nama_file", "file_content"},
+     *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
+     *                         @OA\Property(property="file_content", type="string", example="base64EncodedFileContent", description="File content dalam format base64"),
+     *                         @OA\Property(property="extension", type="string", example="pdf", description="Ekstensi file (pdf, jpg, png, dll)")
+     *                     )
      *                 )
      *             )
      *         )
@@ -466,7 +478,25 @@ class CustomerActivityController extends Controller
      *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
      *                 @OA\Property(property="tipe", type="string", example="Telepon"),
      *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas"),
-     *                 @OA\Property(property="created_at", type="string", format="date-time")
+     *                 @OA\Property(property="status_leads_id", type="integer", example=2),
+     *                 @OA\Property(property="created_at", type="string", format="date-time", example="2024-07-01T10:30:00.000000Z"),
+     *                 @OA\Property(property="created_by", type="string", example="John Doe"),
+     *                 @OA\Property(
+     *                     property="leads",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Perusahaan")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="files",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
+     *                         @OA\Property(property="url_file", type="string", example="http://example.com/uploads/customer-activity/file.pdf")
+     *                     )
+     *                 )
      *             )
      *         )
      *     ),
@@ -475,21 +505,7 @@ class CustomerActivityController extends Controller
      *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 @OA\Property(
-     *                     property="leads_id",
-     *                     type="array",
-     *                     @OA\Items(type="string", example="The leads id field is required.")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="tgl_activity",
-     *                     type="array",
-     *                     @OA\Items(type="string", example="The tgl activity field is required.")
-     *                 )
-     *             )
+     *             @OA\Property(property="message", type="object", description="Object error dari validator")
      *         )
      *     ),
      *     @OA\Response(
@@ -514,47 +530,40 @@ class CustomerActivityController extends Controller
         try {
             DB::beginTransaction();
 
-            $validator = Validator::make($request->all(), [
-                'leads_id' => 'required|exists:sl_leads,id',
-                'tgl_activity' => 'required|date',
-                'tipe' => 'required|string',
-                'tgl_realisasi' => 'nullable|date',
-                'files' => 'nullable|array',
-                'files.*.nama_file' => 'required_with:files|string',
-                'files.*.file_content' => 'required_with:files|string' // base64 encoded file
-            ]);
+            // Validate request menggunakan rules untuk ADD
+            $validator = Validator::make(
+                $request->all(),
+                $this->getValidationRules(false), // isUpdate = false
+                $this->getValidationMessages()
+            );
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
-            $nomor = $this->generateNomor($request->leads_id);
+            // Check if leads exists and not deleted
+            // Mengganti Leads::whereNull('deleted_at')->find($request->leads_id);
+            // karena sudah divalidasi dengan 'exists:sl_leads,id'
+            $leads = Leads::find($request->leads_id);
+            // Perlu menambahkan check deleted_at jika 'exists' tidak mengeceknya
+            if (!$leads || $leads->deleted_at) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Leads tidak ditemukan atau sudah dihapus.'
+                ], 404);
+            }
+
+
+            $nomor = $this->generateNomor($request->leads_id); // Asumsi method ini ada
             $current_date_time = Carbon::now();
 
-            $activityData = $request->only([
-                'leads_id',
-                'tgl_activity',
-                'tipe',
-                'notes',
-                'tim_sales_id',
-                'tim_sales_d_id',
-                'status_leads_id',
-                'start',
-                'end',
-                'durasi',
-                'tgl_realisasi',
-                'jam_realisasi',
-                'jenis_visit_id',
-                'notulen',
-                'email'
-            ]);
-
+            // Prepare activity data using allowed fields
+            $activityData = $request->only($this->getAllowedFields());
             $activityData['nomor'] = $nomor;
-            $activityData['branch_id'] = Leads::find($request->leads_id)->branch_id;
+            $activityData['branch_id'] = $leads->branch_id;
             $activityData['user_id'] = Auth::id();
             $activityData['created_by'] = Auth::user()->full_name;
             $activityData['created_at'] = $current_date_time;
@@ -562,19 +571,25 @@ class CustomerActivityController extends Controller
             $activity = CustomerActivity::create($activityData);
 
             // Handle file uploads
-            if ($request->has('files')) {
+            if ($request->has('files') && is_array($request->files)) {
                 foreach ($request->files as $fileData) {
-                    $this->saveActivityFile($activity->id, $fileData);
+                    $this->saveActivityFile($activity->id, $fileData); // Asumsi method ini ada
                 }
             }
 
             // Update status leads jika ada
             if ($request->status_leads_id) {
-                Leads::where('id', $request->leads_id)
-                    ->update(['status_leads_id' => $request->status_leads_id]);
+                $leads->update([
+                    'status_leads_id' => $request->status_leads_id,
+                    'updated_by' => Auth::user()->full_name,
+                    'updated_at' => $current_date_time
+                ]);
             }
 
             DB::commit();
+
+            // Return with complete data
+            $activity->load(['leads', 'files', 'statusLeads']); // Asumsi relasi ini ada
 
             return response()->json([
                 'success' => true,
@@ -584,9 +599,10 @@ class CustomerActivityController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error in CustomerActivityController@add: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -595,7 +611,7 @@ class CustomerActivityController extends Controller
      * @OA\Put(
      *     path="/api/customer-activities/update/{id}",
      *     summary="Update customer activity",
-     *     description="Mengupdate aktivitas customer berdasarkan ID",
+     *     description="Mengupdate aktivitas customer berdasarkan ID. Field leads_id tidak dapat diupdate.",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -608,21 +624,29 @@ class CustomerActivityController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         description="Data yang akan diupdate",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
-     *             @OA\Property(property="tipe", type="string", example="Email"),
-     *             @OA\Property(property="notes", type="string", example="Catatan aktivitas updated"),
-     *             @OA\Property(property="tim_sales_id", type="integer", example=2),
-     *             @OA\Property(property="tim_sales_d_id", type="integer", example=2),
-     *             @OA\Property(property="status_leads_id", type="integer", example=3),
-     *             @OA\Property(property="start", type="string", example="10:00"),
-     *             @OA\Property(property="end", type="string", example="11:00"),
-     *             @OA\Property(property="durasi", type="integer", example=60),
-     *             @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-02"),
-     *             @OA\Property(property="jam_realisasi", type="string", example="10:30"),
-     *             @OA\Property(property="jenis_visit_id", type="integer", example=2),
-     *             @OA\Property(property="notulen", type="string", example="Updated notulen"),
-     *             @OA\Property(property="email", type="string", format="email", example="newemail@example.com")
+     *         @OA\MediaType(
+     *             mediaType="application/json",
+     *             @OA\Schema(
+     *                 type="object",
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-02", description="Tanggal aktivitas"),
+     *                 @OA\Property(property="tipe", type="string", example="Email", description="Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting"),
+     *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas updated", description="Catatan atau keterangan aktivitas"),
+     *                 @OA\Property(property="notes_tipe", type="string", example="Catatan spesifik tipe updated", description="Catatan berdasarkan tipe aktivitas"),
+     *                 @OA\Property(property="tim_sales_id", type="integer", example=2, description="ID tim sales"),
+     *                 @OA\Property(property="tim_sales_d_id", type="integer", example=2, description="ID detail tim sales"),
+     *                 @OA\Property(property="status_leads_id", type="integer", example=3, description="ID status leads yang akan diupdate"),
+     *                 @OA\Property(property="start", type="string", example="10:00", description="Jam mulai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="end", type="string", example="11:00", description="Jam selesai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
+     *                 @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-02", description="Tanggal realisasi"),
+     *                 @OA\Property(property="jam_realisasi", type="string", example="10:30", description="Jam realisasi (format: HH:mm)"),
+     *                 @OA\Property(property="jenis_visit_id", type="integer", example=2, description="ID jenis visit (jika tipe = Visit)"),
+     *                 @OA\Property(property="jenis_visit", type="string", example="Presentasi", description="Jenis visit"),
+     *                 @OA\Property(property="notulen", type="string", example="Updated notulen", description="Notulen atau hasil meeting"),
+     *                 @OA\Property(property="email", type="string", format="email", example="newemail@example.com", description="Email customer"),
+     *                 @OA\Property(property="penerima", type="string", example="Jane Doe", description="Penerima email/telepon"),
+     *                 @OA\Property(property="link_bukti_foto", type="string", example="https://example.com/new-foto.jpg", description="Link bukti foto")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -636,11 +660,19 @@ class CustomerActivityController extends Controller
      *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-092024-00001"),
-     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-02"),
      *                 @OA\Property(property="tipe", type="string", example="Email"),
      *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas updated"),
-     *                 @OA\Property(property="updated_at", type="string", format="date-time"),
-     *                 @OA\Property(property="updated_by", type="string", example="John Doe")
+     *                 @OA\Property(property="status_leads_id", type="integer", example=3),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-07-02T15:45:00.000000Z"),
+     *                 @OA\Property(property="updated_by", type="string", example="Jane Doe"),
+     *                 @OA\Property(
+     *                     property="leads",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Perusahaan"),
+     *                     @OA\Property(property="status_leads_id", type="integer", example=3)
+     *                 )
      *             )
      *         )
      *     ),
@@ -654,11 +686,10 @@ class CustomerActivityController extends Controller
      *     ),
      *     @OA\Response(
      *         response=422,
-     *         description="Validation Error",
+     *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(property="errors", type="object")
+     *             @OA\Property(property="message", type="object", description="Object error dari validator")
      *         )
      *     ),
      *     @OA\Response(
@@ -691,43 +722,47 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
-            $validator = Validator::make($request->all(), [
-                'tgl_activity' => 'sometimes|required|date',
-                'tipe' => 'sometimes|required|string',
-                'tgl_realisasi' => 'nullable|date'
-            ]);
+            // Validate request menggunakan rules untuk UPDATE
+            $validator = Validator::make(
+                $request->all(),
+                $this->getValidationRules(true), // isUpdate = true
+                $this->getValidationMessages()
+            );
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
-            $updateData = $request->only([
-                'tgl_activity',
-                'tipe',
-                'notes',
-                'tim_sales_id',
-                'tim_sales_d_id',
-                'status_leads_id',
-                'start',
-                'end',
-                'durasi',
-                'tgl_realisasi',
-                'jam_realisasi',
-                'jenis_visit_id',
-                'notulen',
-                'email'
-            ]);
+            // Get allowed fields (exclude leads_id untuk update)
+            $allowedUpdateFields = array_diff($this->getAllowedFields(), ['leads_id']);
+            $updateData = $request->only($allowedUpdateFields);
 
-            $updateData['updated_by'] = Auth::user()->full_name;
-            $updateData['updated_at'] = Carbon::now();
+            // Only update if there's actual data
+            if (!empty($updateData)) {
+                $current_time = Carbon::now();
+                $updateData['updated_by'] = Auth::user()->full_name;
+                $updateData['updated_at'] = $current_time;
 
-            $activity->update($updateData);
+                $activity->update($updateData);
+
+                // Update status leads jika ada dan berubah
+                if ($request->has('status_leads_id') && $request->status_leads_id != $activity->leads->status_leads_id) {
+                    $activity->leads->update([
+                        'status_leads_id' => $request->status_leads_id,
+                        'updated_by' => Auth::user()->full_name,
+                        'updated_at' => $current_time
+                    ]);
+                }
+            }
 
             DB::commit();
+
+            // Reload relationships
+            $activity->refresh();
+            $activity->load(['leads', 'files', 'statusLeads']);
 
             return response()->json([
                 'success' => true,
@@ -737,9 +772,10 @@ class CustomerActivityController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error in CustomerActivityController@update: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -970,70 +1006,6 @@ class CustomerActivityController extends Controller
         }
     }
 
-    /**
-     * Generate nomor customer activity
-     */
-    private function generateNomor($leadsId): string
-    {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-
-        $prefix = "CAT/";
-        if ($leads) {
-            switch ($leads->kebutuhan_id) {
-                case 2:
-                    $prefix .= "LS/";
-                    break;
-                case 1:
-                    $prefix .= "SG/";
-                    break;
-                case 3:
-                    $prefix .= "CS/";
-                    break;
-                case 4:
-                    $prefix .= "LL/";
-                    break;
-                default:
-                    $prefix .= "NN/";
-                    break;
-            }
-            $prefix .= $leads->nomor . "-";
-        } else {
-            $prefix .= "NN/NNNNN-";
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $year = $now->year;
-
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
-        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-
-        return $prefix . $month . $year . "-" . $sequence;
-    }
-
-    /**
-     * Save activity file
-     */
-    private function saveActivityFile($activityId, $fileData): void
-    {
-        // Handle base64 file upload
-        if (isset($fileData['file_content'])) {
-            $fileContent = base64_decode($fileData['file_content']);
-            $fileName = $fileData['nama_file'] . '_' . time() . '.pdf'; // Adjust extension as needed
-
-            Storage::disk('bukti-activity')->put($fileName, $fileContent);
-
-            $fileUrl = env('APP_URL') . '/public/uploads/customer-activity/' . $fileName;
-
-            CustomerActivityFile::create([
-                'customer_activity_id' => $activityId,
-                'nama_file' => $fileData['nama_file'],
-                'url_file' => $fileUrl,
-                'created_by' => Auth::user()->full_name,
-                'created_at' => Carbon::now()
-            ]);
-        }
-    }
 
 
     /**
@@ -1837,6 +1809,220 @@ class CustomerActivityController extends Controller
                 'success' => false,
                 'message' => 'Terjadi kesalahan server.'
             ], 500);
+        }
+    }
+    //=====halper functions=====//
+    /**
+     * Menggabungkan dan mengelola validation rules untuk Add (Create) dan Update.
+     *
+     * @param bool $isUpdate True jika rules untuk update, false untuk add (create).
+     * @return array
+     */
+    private function getValidationRules(bool $isUpdate = false): array
+    {
+        // Default rules
+        $rules = [
+            'tgl_activity' => 'required|date',
+            'tipe' => 'required|string|in:Telepon,Email,Meeting,Visit,Online Meeting',
+            'notes' => 'nullable|string',
+            'notes_tipe' => 'nullable|string',
+            'tim_sales_id' => 'nullable|exists:m_tim_sales,id',
+            'tim_sales_d_id' => 'nullable|exists:m_tim_sales_d,id',
+            'status_leads_id' => 'nullable|exists:m_status_leads,id',
+            'start' => 'nullable|date_format:H:i',
+            'end' => 'nullable|date_format:H:i|after:start',
+            'durasi' => 'nullable|integer|min:0',
+            'tgl_realisasi' => 'nullable|date',
+            'jam_realisasi' => 'nullable|date_format:H:i',
+            'jenis_visit_id' => 'nullable|integer',
+            'jenis_visit' => 'nullable|string',
+            'notulen' => 'nullable|string',
+            'email' => 'nullable|email',
+            'penerima' => 'nullable|string',
+            'link_bukti_foto' => 'nullable|url',
+        ];
+
+        if (!$isUpdate) {
+            // Rules khusus untuk ADD (Create)
+            $rules['leads_id'] = 'required|exists:sl_leads,id';
+            $rules['tgl_realisasi'] .= '|after_or_equal:tgl_activity'; // Tambahkan rule ini hanya untuk ADD
+            $rules['files'] = 'nullable|array';
+            $rules['files.*.nama_file'] = 'required_with:files|string|max:255';
+            $rules['files.*.file_content'] = 'required_with:files|string';
+        } else {
+            // Rules khusus untuk UPDATE
+            // Ubah rule 'required' di tgl_activity dan tipe menjadi 'sometimes|required'
+            $rules['tgl_activity'] = 'sometimes|' . $rules['tgl_activity'];
+            $rules['tipe'] = 'sometimes|' . $rules['tipe'];
+            // Hapus rule files untuk update jika tidak diperlukan
+            unset($rules['files'], $rules['files.*.nama_file'], $rules['files.*.file_content']);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Custom validation messages.
+     *
+     * @return array
+     */
+    private function getValidationMessages(): array
+    {
+        return [
+            // Required messages
+            'leads_id.required' => 'Leads wajib dipilih.',
+            'leads_id.exists' => 'Leads yang dipilih tidak valid.',
+            'tgl_activity.required' => 'Tanggal activity wajib diisi.',
+            'tgl_activity.date' => 'Format tanggal activity tidak valid.',
+            'tipe.required' => 'Tipe activity wajib dipilih.',
+            'tipe.in' => 'Tipe activity harus salah satu dari: Telepon, Email, Meeting, Visit, atau Online Meeting.',
+
+            // Tim Sales validation
+            'tim_sales_id.exists' => 'Tim Sales yang dipilih tidak valid.',
+            'tim_sales_d_id.exists' => 'Sales yang dipilih tidak valid.',
+
+            // Status leads validation
+            'status_leads_id.exists' => 'Status leads yang dipilih tidak valid.',
+
+            // Time validation
+            'start.date_format' => 'Format jam mulai harus HH:MM (contoh: 09:00).',
+            'end.date_format' => 'Format jam selesai harus HH:MM (contoh: 10:00).',
+            'end.after' => 'Jam selesai harus lebih besar dari jam mulai.',
+            'jam_realisasi.date_format' => 'Format jam realisasi harus HH:MM (contoh: 09:00).',
+
+            // Duration validation
+            'durasi.integer' => 'Durasi harus berupa angka.',
+            'durasi.min' => 'Durasi tidak boleh kurang dari 0.',
+
+            // Date validation
+            'tgl_realisasi.date' => 'Format tanggal realisasi tidak valid.',
+            'tgl_realisasi.after_or_equal' => 'Tanggal realisasi tidak boleh sebelum tanggal activity.',
+
+            // Email validation
+            'email.email' => 'Format email tidak valid.',
+
+            // URL validation
+            'link_bukti_foto.url' => 'Format link bukti foto tidak valid.',
+
+            // File validation
+            'files.array' => 'Format files harus berupa array.',
+            'files.*.nama_file.required_with' => 'Nama file wajib diisi.',
+            'files.*.nama_file.max' => 'Nama file maksimal 255 karakter.',
+            'files.*.file_content.required_with' => 'Konten file wajib diisi.',
+        ];
+    }
+
+    /**
+     * Fields yang diizinkan untuk create/update.
+     *
+     * @return array
+     */
+    private function getAllowedFields(): array
+    {
+        return [
+            'leads_id',
+            'tgl_activity',
+            'tipe',
+            'notes',
+            'notes_tipe',
+            'tim_sales_id',
+            'tim_sales_d_id',
+            'status_leads_id',
+            'start',
+            'end',
+            'durasi',
+            'tgl_realisasi',
+            'jam_realisasi',
+            'jenis_visit_id',
+            'jenis_visit',
+            'notulen',
+            'email',
+            'penerima',
+            'link_bukti_foto'
+        ];
+    }
+
+    /**
+     * Generate nomor customer activity
+     */
+    private function generateNomor($leadsId): string
+    {
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        $prefix = "CAT/";
+        if ($leads) {
+            switch ($leads->kebutuhan_id) {
+                case 2:
+                    $prefix .= "LS/";
+                    break;
+                case 1:
+                    $prefix .= "SG/";
+                    break;
+                case 3:
+                    $prefix .= "CS/";
+                    break;
+                case 4:
+                    $prefix .= "LL/";
+                    break;
+                default:
+                    $prefix .= "NN/";
+                    break;
+            }
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
+    }
+
+    /**
+     * Save activity file
+     */
+    private function saveActivityFile($activityId, $fileData): void
+    {
+        try {
+            if (isset($fileData['file_content']) && isset($fileData['nama_file'])) {
+                // Decode base64
+                $fileContent = base64_decode($fileData['file_content']);
+
+                // Validate decoded content
+                if ($fileContent === false) {
+                    throw new \Exception('Gagal decode file content. Pastikan file dalam format base64.');
+                }
+
+                // Generate unique filename
+                $extension = $fileData['extension'] ?? 'pdf'; // Asumsi extension bisa dikirim
+                $fileName = Str::slug($fileData['nama_file']) . '_' . time() . '_' . uniqid() . '.' . $extension;
+
+                // Use Storage facade properly
+                // Pastikan 'bukti-activity' adalah disk yang dikonfigurasi di config/filesystems.php
+                Storage::disk('bukti-activity')->put($fileName, $fileContent);
+
+                // Build URL properly
+                // Sesuaikan dengan konfigurasi URL untuk disk 'bukti-activity' Anda
+                // Contoh: Storage::disk('bukti-activity')->url($fileName);
+                $fileUrl = url('public/uploads/customer-activity/' . $fileName);
+
+                CustomerActivityFile::create([
+                    'customer_activity_id' => $activityId,
+                    'nama_file' => $fileData['nama_file'],
+                    'url_file' => $fileUrl,
+                    'created_by' => Auth::user()->full_name,
+                    'created_at' => Carbon::now()
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error saving activity file: ' . $e->getMessage());
+            // Lemparkan exception untuk memicu DB::rollBack() di metode pemanggil (add)
+            throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
     }
 }

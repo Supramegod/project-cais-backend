@@ -3929,7 +3929,7 @@
                                         "example": "2024-07-01"
                                     },
                                     "tipe": {
-                                        "description": "Tipe aktivitas: Telepon, Email, Meeting, Visit",
+                                        "description": "Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting",
                                         "type": "string",
                                         "example": "Telepon"
                                     },
@@ -3937,6 +3937,11 @@
                                         "description": "Catatan atau keterangan aktivitas",
                                         "type": "string",
                                         "example": "Catatan aktivitas"
+                                    },
+                                    "notes_tipe": {
+                                        "description": "Catatan berdasarkan tipe aktivitas",
+                                        "type": "string",
+                                        "example": "Catatan spesifik tipe"
                                     },
                                     "tim_sales_id": {
                                         "description": "ID tim sales",
@@ -3954,12 +3959,12 @@
                                         "example": 1
                                     },
                                     "start": {
-                                        "description": "Jam mulai aktivitas",
+                                        "description": "Jam mulai aktivitas (format: HH:mm)",
                                         "type": "string",
                                         "example": "09:00"
                                     },
                                     "end": {
-                                        "description": "Jam selesai aktivitas",
+                                        "description": "Jam selesai aktivitas (format: HH:mm)",
                                         "type": "string",
                                         "example": "10:00"
                                     },
@@ -3975,7 +3980,7 @@
                                         "example": "2024-07-01"
                                     },
                                     "jam_realisasi": {
-                                        "description": "Jam realisasi",
+                                        "description": "Jam realisasi (format: HH:mm)",
                                         "type": "string",
                                         "example": "09:30"
                                     },
@@ -3983,6 +3988,11 @@
                                         "description": "ID jenis visit (jika tipe = Visit)",
                                         "type": "integer",
                                         "example": 1
+                                    },
+                                    "jenis_visit": {
+                                        "description": "Jenis visit",
+                                        "type": "string",
+                                        "example": "Survey"
                                     },
                                     "notulen": {
                                         "description": "Notulen atau hasil meeting",
@@ -3995,10 +4005,24 @@
                                         "format": "email",
                                         "example": "email@example.com"
                                     },
+                                    "penerima": {
+                                        "description": "Penerima email/telepon",
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "link_bukti_foto": {
+                                        "description": "Link bukti foto",
+                                        "type": "string",
+                                        "example": "https://example.com/foto.jpg"
+                                    },
                                     "files": {
                                         "description": "Array file yang akan diupload",
                                         "type": "array",
                                         "items": {
+                                            "required": [
+                                                "nama_file",
+                                                "file_content"
+                                            ],
                                             "properties": {
                                                 "nama_file": {
                                                     "type": "string",
@@ -4008,6 +4032,11 @@
                                                     "description": "File content dalam format base64",
                                                     "type": "string",
                                                     "example": "base64EncodedFileContent"
+                                                },
+                                                "extension": {
+                                                    "description": "Ekstensi file (pdf, jpg, png, dll)",
+                                                    "type": "string",
+                                                    "example": "pdf"
                                                 }
                                             },
                                             "type": "object"
@@ -4061,9 +4090,51 @@
                                                     "type": "string",
                                                     "example": "Catatan aktivitas"
                                                 },
+                                                "status_leads_id": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
                                                 "created_at": {
                                                     "type": "string",
-                                                    "format": "date-time"
+                                                    "format": "date-time",
+                                                    "example": "2024-07-01T10:30:00.000000Z"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "leads": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "files": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_file": {
+                                                                "type": "string",
+                                                                "example": "Notulen Meeting"
+                                                            },
+                                                            "url_file": {
+                                                                "type": "string",
+                                                                "example": "http://example.com/uploads/customer-activity/file.pdf"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
                                                 }
                                             },
                                             "type": "object"
@@ -4085,26 +4156,7 @@
                                             "example": false
                                         },
                                         "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "leads_id": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The leads id field is required."
-                                                    }
-                                                },
-                                                "tgl_activity": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The tgl activity field is required."
-                                                    }
-                                                }
-                                            },
+                                            "description": "Object error dari validator",
                                             "type": "object"
                                         }
                                     },
@@ -4163,7 +4215,7 @@
                     "Customer Activity"
                 ],
                 "summary": "Update customer activity",
-                "description": "Mengupdate aktivitas customer berdasarkan ID",
+                "description": "Mengupdate aktivitas customer berdasarkan ID. Field leads_id tidak dapat diupdate.",
                 "operationId": "7eefe24d6e2b3feab0d5ebde120502fb",
                 "parameters": [
                     {
@@ -4185,63 +4237,97 @@
                             "schema": {
                                 "properties": {
                                     "tgl_activity": {
+                                        "description": "Tanggal aktivitas",
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2024-07-01"
+                                        "example": "2024-07-02"
                                     },
                                     "tipe": {
+                                        "description": "Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting",
                                         "type": "string",
                                         "example": "Email"
                                     },
                                     "notes": {
+                                        "description": "Catatan atau keterangan aktivitas",
                                         "type": "string",
                                         "example": "Catatan aktivitas updated"
                                     },
+                                    "notes_tipe": {
+                                        "description": "Catatan berdasarkan tipe aktivitas",
+                                        "type": "string",
+                                        "example": "Catatan spesifik tipe updated"
+                                    },
                                     "tim_sales_id": {
+                                        "description": "ID tim sales",
                                         "type": "integer",
                                         "example": 2
                                     },
                                     "tim_sales_d_id": {
+                                        "description": "ID detail tim sales",
                                         "type": "integer",
                                         "example": 2
                                     },
                                     "status_leads_id": {
+                                        "description": "ID status leads yang akan diupdate",
                                         "type": "integer",
                                         "example": 3
                                     },
                                     "start": {
+                                        "description": "Jam mulai aktivitas (format: HH:mm)",
                                         "type": "string",
                                         "example": "10:00"
                                     },
                                     "end": {
+                                        "description": "Jam selesai aktivitas (format: HH:mm)",
                                         "type": "string",
                                         "example": "11:00"
                                     },
                                     "durasi": {
+                                        "description": "Durasi aktivitas dalam menit",
                                         "type": "integer",
                                         "example": 60
                                     },
                                     "tgl_realisasi": {
+                                        "description": "Tanggal realisasi",
                                         "type": "string",
                                         "format": "date",
                                         "example": "2024-07-02"
                                     },
                                     "jam_realisasi": {
+                                        "description": "Jam realisasi (format: HH:mm)",
                                         "type": "string",
                                         "example": "10:30"
                                     },
                                     "jenis_visit_id": {
+                                        "description": "ID jenis visit (jika tipe = Visit)",
                                         "type": "integer",
                                         "example": 2
                                     },
+                                    "jenis_visit": {
+                                        "description": "Jenis visit",
+                                        "type": "string",
+                                        "example": "Presentasi"
+                                    },
                                     "notulen": {
+                                        "description": "Notulen atau hasil meeting",
                                         "type": "string",
                                         "example": "Updated notulen"
                                     },
                                     "email": {
+                                        "description": "Email customer",
                                         "type": "string",
                                         "format": "email",
                                         "example": "newemail@example.com"
+                                    },
+                                    "penerima": {
+                                        "description": "Penerima email/telepon",
+                                        "type": "string",
+                                        "example": "Jane Doe"
+                                    },
+                                    "link_bukti_foto": {
+                                        "description": "Link bukti foto",
+                                        "type": "string",
+                                        "example": "https://example.com/new-foto.jpg"
                                     }
                                 },
                                 "type": "object"
@@ -4277,7 +4363,7 @@
                                                 "tgl_activity": {
                                                     "type": "string",
                                                     "format": "date",
-                                                    "example": "2024-07-01"
+                                                    "example": "2024-07-02"
                                                 },
                                                 "tipe": {
                                                     "type": "string",
@@ -4287,13 +4373,35 @@
                                                     "type": "string",
                                                     "example": "Catatan aktivitas updated"
                                                 },
+                                                "status_leads_id": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
                                                 "updated_at": {
                                                     "type": "string",
-                                                    "format": "date-time"
+                                                    "format": "date-time",
+                                                    "example": "2024-07-02T15:45:00.000000Z"
                                                 },
                                                 "updated_by": {
                                                     "type": "string",
-                                                    "example": "John Doe"
+                                                    "example": "Jane Doe"
+                                                },
+                                                "leads": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        },
+                                                        "status_leads_id": {
+                                                            "type": "integer",
+                                                            "example": 3
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
@@ -4325,7 +4433,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation Error",
+                        "description": "Validation Error - Data tidak valid",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4335,10 +4443,7 @@
                                             "example": false
                                         },
                                         "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
+                                            "description": "Object error dari validator",
                                             "type": "object"
                                         }
                                     },
