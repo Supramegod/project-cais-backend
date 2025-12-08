@@ -392,6 +392,10 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/kecamatan/{kotaId}', 'getKecamatan');
         Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
         Route::get('/negara/{benuaId}', 'getNegara');
+        Route::get('/loyalty', 'loyaltylist');
+        Route::get('/kategori-sesuai-hc', 'kategorusesuaihc');
+        Route::get('/rule-thr', 'rulethr');
+        Route::get('/salary-rule', 'salaryrule');
 
     });
 

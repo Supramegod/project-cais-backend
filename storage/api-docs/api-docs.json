@@ -14182,6 +14182,394 @@
                 ]
             }
         },
+        "/api/options/loyalty": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar loyalty",
+                "description": "Endpoint ini digunakan untuk mengambil data loyalty. Berguna untuk dropdown form input options.",
+                "operationId": "e0dc3be2f0bb381eebda72d4abea84b5",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data loyalty",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data loyalty list berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Standard Loyalty"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Standard loyalty program"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/kategori-sesuai-hc": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar kategori sesuai HC",
+                "description": "Endpoint ini digunakan untuk mengambil data kategori sesuai headcount. Berguna untuk dropdown form input options.",
+                "operationId": "893d3b524a002e3dcdd453e668780354",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data kategori sesuai HC",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data kategori sesuai HC berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Kategori A"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Kategori sesuai HC A"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/rule-thr": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar rule THR",
+                "description": "Endpoint ini digunakan untuk mengambil data rule THR (Tunjangan Hari Raya). Berguna untuk dropdown form input options.",
+                "operationId": "6e3bc570b88019d9c9f95f7d558a2694",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data rule THR",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data rule THR berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Rule THR A"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Rule untuk THR tipe A"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/salary-rule": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar salary rule",
+                "description": "Endpoint ini digunakan untuk mengambil data salary rule. Berguna untuk dropdown form input options.",
+                "operationId": "e8a3b7af0dbbec51abc2a4d575000d52",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data salary rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data salary rule berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Salary Rule A"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Aturan gaji untuk tipe A"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks/list": {
             "get": {
                 "tags": [
@@ -14813,7 +15201,7 @@
                 "tags": [
                     "PKS"
                 ],
-                "summary": "Activate PKS sites",
+                "summary": "Activate PKS sites with full synchronization",
                 "operationId": "98e7b1406d594a51c274b36917c385be",
                 "parameters": [
                     {
@@ -16688,7 +17076,7 @@
                                                         "type": "string",
                                                         "example": "1 Januari 2024"
                                                     },
-                                                    "quotation_sites": {
+                                                    "sl_quotation_site": {
                                                         "type": "array",
                                                         "items": {
                                                             "properties": {
@@ -16938,7 +17326,7 @@
                                                     "type": "integer",
                                                     "example": 1
                                                 },
-                                                "quotation_sites": {
+                                                "sl_quotation_site": {
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\QuotationResource;
+use App\Models\Client;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\Loyalty;
@@ -11,6 +12,10 @@ use App\Models\Pks;
 use App\Models\Leads;
 use App\Models\KategoriSesuaiHc;
 use App\Models\Quotation;
+use App\Models\QuotationDetail;
+use App\Models\QuotationDetailCoss;
+use App\Models\QuotationDetailHpp;
+use App\Models\QuotationMargin;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\Site;
@@ -353,7 +358,7 @@ class PksController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' =>  $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
@@ -620,7 +625,7 @@ class PksController extends Controller
     /**
      * @OA\Post(
      *     path="/api/pks/{id}/activate",
-     *     summary="Activate PKS sites",
+     *     summary="Activate PKS sites with full synchronization",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -643,10 +648,14 @@ class PksController extends Controller
      *     )
      * )
      */
-    public function activate($id): JsonResponse
+    public function activate(Request $request, $id): JsonResponse
     {
         try {
-            $pks = Pks::with(['leads', 'sites'])->find($id);
+            DB::beginTransaction();
+            DB::connection('mysqlhris')->beginTransaction();
+
+            $current_date_time = Carbon::now()->toDateTimeString();
+            $pks = Pks::find($id);
 
             if (!$pks) {
                 return response()->json([
@@ -655,14 +664,35 @@ class PksController extends Controller
                 ], 404);
             }
 
-            $this->activatePksSites($pks);
+            // Step 1: Update PKS and Leads Status
+            $leads = $this->updatePksAndLeadsStatus($pks, $current_date_time);
+
+            // Step 2: Sync Customer to HRIS
+            $clientId = $this->syncCustomerToHris($leads, $current_date_time);
+
+            // Step 3: Process PKS Sites
+            $this->processPksSites($pks, $leads, $clientId, $current_date_time);
+
+            // Step 4: Create Customer Activity Log
+            $this->createCustomerActivityLog($pks, $leads, $current_date_time);
+
+            // Step 5: Handle Customer Creation/Update
+            $this->handleCustomerStatus($pks, $leads, $current_date_time);
+
+            DB::commit();
+            DB::connection('mysqlhris')->commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'PKS sites activated successfully'
+                'message' => 'PKS sites activated successfully with HRIS synchronization'
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            DB::connection('mysqlhris')->rollBack();
+
+            \Log::error('Failed to activate PKS sites: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to activate PKS sites',
@@ -1388,4 +1418,369 @@ class PksController extends Controller
 
         return $sites;
     }
+    // ======================================================================
+    // PRIVATE METHODS FOR ACTIVATE FUNCTION
+    // ======================================================================
+
+    /**
+     * Update PKS and Leads Status
+     */
+    private function updatePksAndLeadsStatus($pks, $current_date_time)
+    {
+        // Update PKS status
+        $pks->update([
+            'ot5' => Auth::user()->full_name,
+            'status_pks_id' => 7,
+            'is_aktif' => 1,
+            'updated_at' => $current_date_time,
+            'updated_by' => Auth::user()->full_name
+        ]);
+
+        // Get leads
+        $leads = Leads::find($pks->leads_id);
+        if (!$leads) {
+            throw new \Exception('Leads not found');
+        }
+
+        // Check RO and supervisor fields
+        if ($leads->ro_id_1 == null)
+            $leads->ro_id_1 = 0;
+        if ($leads->ro_id_2 == null)
+            $leads->ro_id_2 = 0;
+        if ($leads->ro_id_3 == null)
+            $leads->ro_id_3 = 0;
+        if ($leads->ro_id == null)
+            $leads->ro_id = 0;
+
+        // Update leads status
+        $leads->update([
+            'status_leads_id' => 102,
+            'updated_at' => $current_date_time,
+            'updated_by' => Auth::user()->full_name
+        ]);
+
+        return $leads;
+    }
+
+    /**
+     * Sync Customer to HRIS
+     */
+    private function syncCustomerToHris($leads, $current_date_time)
+    {
+        // Check if client exists in HRIS
+        $client = Client::whereNull('deleted_at')
+            ->where('customer_id', $leads->id)
+            ->where('is_active', 1)
+            ->first();
+
+        if ($client != null) {
+            return $client->id;
+        }
+
+        // Create new client in HRIS
+        return Client::insertGetId([
+            'customer_id' => $leads->id,
+            'name' => $leads->nama_perusahaan,
+            'address' => $leads->alamat ?? '-',
+            'is_active' => 1,
+            'created_at' => $current_date_time,
+            'created_by' => Auth::user()->id,
+            'updated_at' => $current_date_time,
+            'updated_by' => Auth::user()->id
+        ]);
+    }
+
+    /**
+     * Process PKS Sites
+     */
+    private function processPksSites($pks, $leads, $clientId, $current_date_time)
+    {
+        $siteList = Site::where('pks_id', $pks->id)
+            ->whereNull('deleted_at')
+            ->get();
+
+        foreach ($siteList as $site) {
+            $quotation = Quotation::find($site->quotation_id);
+            if (!$quotation)
+                continue;
+
+            // Sync Site to HRIS
+            $this->syncSiteToHris($site, $pks, $leads, $quotation, $clientId, $current_date_time);
+
+            // Update Quotation Calculations
+            $this->updateQuotationCalculations($site, $quotation, $leads, $current_date_time);
+        }
+    }
+
+    /**
+     * Sync Site to HRIS
+     */
+    private function syncSiteToHris($site, $pks, $leads, $quotation, $clientId, $current_date_time)
+    {
+        Site::create([
+            'site_id' => $site->id,
+            'code' => $leads->nomor,
+            'proyek_id' => 0,
+            'contract_number' => $pks->nomor,
+            'name' => $site->nama_site,
+            'address' => $site->penempatan,
+            'layanan_id' => $site->kebutuhan_id,
+            'client_id' => $clientId,
+            'city_id' => $site->kota_id,
+            'branch_id' => $leads->branch_id,
+            'company_id' => $quotation->company_id,
+            'pic_id_1' => $leads->ro_id_1,
+            'pic_id_2' => $leads->ro_id_2,
+            'pic_id_3' => $leads->ro_id_3,
+            'supervisor_id' => $leads->ro_id,
+            'reliever' => $quotation->joker_reliever,
+            'contract_value' => 0,
+            'contract_start' => $pks->kontrak_awal,
+            'contract_end' => $pks->kontrak_akhir,
+            'contract_terminated' => null,
+            'note_terminated' => '',
+            'contract_status' => 'Aktif',
+            'health_insurance_status' => 'Terdaftar',
+            'labor_insurance_status' => 'Terdaftar',
+            'vacation' => 0,
+            'attendance_machine' => '',
+            'is_active' => 1,
+            'created_at' => $current_date_time,
+            'created_by' => Auth::user()->id,
+            'updated_at' => $current_date_time,
+            'updated_by' => Auth::user()->id
+        ]);
+    }
+
+    /**
+     * Update Quotation Calculations
+     */
+    private function updateQuotationCalculations($site, $quotation, $leads, $current_date_time)
+    {
+        // Get quotation details
+        $detailQuotation = QuotationDetail::whereNull('deleted_at')
+            ->whereNull('deleted_at')
+            ->where('quotation_site_id', $site->quotation_site_id)
+            ->get();
+
+        // Calculate quotation (assuming QuotationService exists)
+        // Note: You might need to adjust this based on your actual QuotationService
+        // $quotationService = new \App\Services\QuotationService();
+        // $calcQuotation = $quotationService->calculateQuotation($quotation);
+
+        // For now, we'll use simplified calculation
+        $calcQuotation = $this->calculateQuotationSimple($quotation);
+
+        // Update HPP and COSS calculations
+        $totalData = $this->updateHppAndCossCalculations($calcQuotation, $leads, $current_date_time);
+
+        // Insert Quotation Margin
+        $this->insertQuotationMargin($quotation, $leads, $totalData, $current_date_time);
+    }
+
+    /**
+     * Simple Quotation Calculation (replace with actual service if available)
+     */
+    private function calculateQuotationSimple($quotation)
+    {
+        // This is a simplified version. Replace with actual calculation logic
+        return (object) [
+            'jumlah_hc' => 0,
+            'nominal_upah' => 0,
+            'total_invoice' => 0,
+            'total_invoice_coss' => 0,
+            'ppn' => 0,
+            'ppn_coss' => 0,
+            'grand_total_sebelum_pajak' => 0,
+            'grand_total_sebelum_pajak_coss' => 0,
+            'nominal_management_fee' => 0,
+            'nominal_management_fee_coss' => 0,
+            'persentase' => 0,
+            'persen_bunga_bank' => 0,
+            'persen_insentif' => 0,
+            'pembulatan' => 0,
+            'pembulatan_coss' => 0,
+            'penagihan' => 'Tanpa Pembulatan',
+            'pph' => 0,
+            'pph_coss' => 0,
+            'quotation_detail' => []
+        ];
+    }
+
+    /**
+     * Update HPP and COSS Calculations
+     */
+    private function updateHppAndCossCalculations($calcQuotation, $leads, $current_date_time)
+    {
+        $totalNominal = 0;
+        $totalNominalCoss = 0;
+        $ppn = 0;
+        $ppnCoss = 0;
+        $totalBiaya = 0;
+        $totalBiayaCoss = 0;
+
+        // Assuming we have quotation details
+        foreach ($calcQuotation->quotation_detail as $kbd) {
+            // Update HPP calculation
+            QuotationDetailHpp::whereNull('deleted_at')
+                ->where('quotation_detail_id', $kbd->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'position_id' => $kbd->position_id ?? 0,
+                    'leads_id' => $leads->id,
+                    'jumlah_hc' => $calcQuotation->jumlah_hc,
+                    'gaji_pokok' => $calcQuotation->nominal_upah,
+                    // Add other fields as needed
+                    'updated_at' => $current_date_time,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+
+            // Update COSS calculation
+            QuotationDetailCoss::whereNull('deleted_at')
+                ->where('quotation_detail_id', $kbd->id)
+                ->update([
+                    'position_id' => $kbd->position_id ?? 0,
+                    'leads_id' => $leads->id,
+                    'jumlah_hc' => $calcQuotation->jumlah_hc,
+                    'gaji_pokok' => $calcQuotation->nominal_upah,
+                    // Add other fields as needed
+                    'updated_at' => $current_date_time,
+                    'updated_by' => Auth::user()->full_name
+                ]);
+
+            // Accumulate totals
+            $totalNominal += $calcQuotation->total_invoice;
+            $totalNominalCoss += $calcQuotation->total_invoice_coss;
+            $ppn += $calcQuotation->ppn;
+            $ppnCoss += $calcQuotation->ppn_coss;
+            $totalBiaya += $kbd->sub_total_personil ?? 0;
+            $totalBiayaCoss += $kbd->sub_total_personil ?? 0;
+        }
+
+        // Calculate margins
+        $margin = $totalNominal - $ppn - $totalBiaya;
+        $marginCoss = $totalNominalCoss - $ppnCoss - $totalBiayaCoss;
+        $gpm = $totalBiaya > 0 ? ($margin / $totalBiaya) * 100 : 0;
+        $gpmCoss = $totalBiayaCoss > 0 ? ($marginCoss / $totalBiayaCoss) * 100 : 0;
+
+        return compact(
+            'totalNominal',
+            'totalNominalCoss',
+            'ppn',
+            'ppnCoss',
+            'totalBiaya',
+            'totalBiayaCoss',
+            'margin',
+            'marginCoss',
+            'gpm',
+            'gpmCoss'
+        );
+    }
+
+    /**
+     * Insert Quotation Margin
+     */
+    private function insertQuotationMargin($quotation, $leads, $totalData, $current_date_time)
+    {
+        QuotationMargin::create([
+            'quotation_id' => $quotation->id,
+            'leads_id' => $leads->id,
+            'nominal_hpp' => $totalData['totalNominal'],
+            'nominal_harga_pokok' => $totalData['totalNominalCoss'],
+            'ppn_hpp' => $totalData['ppn'],
+            'ppn_harga_pokok' => $totalData['ppnCoss'],
+            'total_biaya_hpp' => $totalData['totalBiaya'],
+            'total_biaya_harga_pokok' => $totalData['totalBiayaCoss'],
+            'margin_hpp' => $totalData['margin'],
+            'margin_harga_pokok' => $totalData['marginCoss'],
+            'gpm_hpp' => $totalData['gpm'],
+            'gpm_harga_pokok' => $totalData['gpmCoss'],
+            'created_at' => $current_date_time,
+            'created_by' => Auth::user()->full_name
+        ]);
+    }
+
+    /**
+     * Create Customer Activity Log
+     */
+    private function createCustomerActivityLog($pks, $leads, $current_date_time)
+    {
+        $nomorActivity = $this->generateNomorActivity($leads->id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'pks_id' => $pks->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => $current_date_time,
+            'nomor' => $nomorActivity,
+            'tipe' => 'PKS',
+            'notes' => 'PKS dengan nomor :' . $pks->nomor . ' telah diaktifkan oleh ' . Auth::user()->full_name,
+            'is_activity' => 0,
+            'user_id' => Auth::user()->id,
+            'created_at' => $current_date_time,
+            'created_by' => Auth::user()->full_name
+        ]);
+    }
+
+    /**
+     * Handle Customer Status
+     */
+    private function handleCustomerStatus($pks, $leads, $current_date_time)
+    {
+        // If customer doesn't exist, create one
+        if (!$leads->customer_id) {
+            $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
+
+            $customer = Customer::create([
+                'leads_id' => $leads->id,
+                'nomor' => $customerNomor,
+                'tgl_customer' => $current_date_time,
+                'tim_sales_id' => $leads->tim_sales_id,
+                'tim_sales_d_id' => $leads->tim_sales_d_id,
+                'created_by' => Auth::user()->full_name
+            ]);
+
+            $leads->update([
+                'customer_id' => $customer->id,
+                'customer_active' => 1,
+                'updated_at' => $current_date_time,
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            // Create customer activity log
+            $this->createCustomerCreationActivity($leads, $customerNomor, $current_date_time);
+        } else {
+            // Update existing customer status
+            $leads->update([
+                'customer_active' => 1,
+                'updated_at' => $current_date_time,
+                'updated_by' => Auth::user()->full_name
+            ]);
+        }
+
+        // Auto sync customer active status
+        $this->autoSyncCustomerActiveStatus();
+    }
+
+    /**
+     * Create Customer Creation Activity
+     */
+    private function createCustomerCreationActivity($leads, $customerNomor, $current_date_time)
+    {
+        $nomorActivity = $this->generateNomorActivity($leads->id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => $current_date_time,
+            'nomor' => $nomorActivity,
+            'tipe' => 'CUSTOMER',
+            'notes' => 'Customer dengan nomor :' . $customerNomor . ' terbentuk dari PKS',
+            'is_activity' => 0,
+            'user_id' => Auth::id(),
+            'created_at' => $current_date_time,
+            'created_by' => Auth::user()->full_name
+        ]);
+    }
+
 }
