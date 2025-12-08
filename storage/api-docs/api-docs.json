@@ -18106,6 +18106,80 @@
                 ]
             }
         },
+        "/api/quotations/hc-high-cost": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get sites with HC >= 12 and cost per HC >= 6.5 million",
+                "operationId": "8f176146c7285344fcd36912c9f5f311",
+                "responses": {
+                    "200": {
+                        "description": "List of sites meeting criteria",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "site_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site Jakarta Pusat"
+                                                    },
+                                                    "jumlah_hc": {
+                                                        "type": "integer",
+                                                        "example": 15
+                                                    },
+                                                    "wilayah": {
+                                                        "type": "string",
+                                                        "example": "Jakarta"
+                                                    },
+                                                    "biaya_per_hc": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 6800000
+                                                    },
+                                                    "total_biaya_site": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 102000000
+                                                    },
+                                                    "quotation_id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "nomor_quotation": {
+                                                        "type": "string",
+                                                        "example": "Q001/2024"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/quotations-step/{id}/step/{step}": {
             "get": {
                 "tags": [

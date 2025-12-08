@@ -330,7 +330,16 @@ class SpkController extends Controller
      */
     public function add(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        // Ekstrak hanya ID dari array of objects jika diperlukan
+        $siteIds = $request->site_ids;
+
+        // Jika site_ids adalah array of objects, ekstrak id-nya
+        if (is_array($siteIds) && count($siteIds) > 0 && is_array($siteIds[0])) {
+            $siteIds = array_column($siteIds, 'id');
+        }
+
+        // Validasi dengan data yang sudah diolah
+        $validator = Validator::make(array_merge($request->all(), ['site_ids' => $siteIds]), [
             'leads_id' => 'required|exists:sl_leads,id',
             'tanggal_spk' => 'required|date',
             'site_ids' => 'required|array|min:1',
@@ -350,8 +359,8 @@ class SpkController extends Controller
                 throw new \Exception("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
             }
 
-            // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih dan belum memiliki SPK
-            $invalidSites = QuotationSite::whereIn('id', $request->site_ids)
+            // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih
+            $invalidSites = QuotationSite::whereIn('id', $siteIds)
                 ->where('leads_id', '!=', $request->leads_id)
                 ->exists();
 
@@ -360,7 +369,7 @@ class SpkController extends Controller
             }
 
             // Validasi: pastikan site belum memiliki SPK
-            $sitesWithSPK = QuotationSite::whereIn('id', $request->site_ids)
+            $sitesWithSPK = QuotationSite::whereIn('id', $siteIds)
                 ->whereHas('spkSite')
                 ->exists();
 
@@ -368,12 +377,16 @@ class SpkController extends Controller
                 throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
             }
 
+            // Ambil quotation_id dari site pertama (jika diperlukan)
+            $firstSite = QuotationSite::find($siteIds[0]);
+            $quotationId = $firstSite ? $firstSite->quotation_id : null;
+
             $spkNomor = $this->generateNomorNew($leads->id);
 
-            // Buat SPK TANPA quotation_id
+            // Buat SPK
             $spk = Spk::create([
                 'leads_id' => $leads->id,
-                'quotation_id' => $sitesWithSPK->quotation_id,
+                'quotation_id' => $quotationId,
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,
@@ -384,7 +397,7 @@ class SpkController extends Controller
                 'created_by' => Auth::user()->full_name ?? 'System'
             ]);
 
-            $this->createSpkSites($spk, $request->site_ids);
+            $this->createSpkSites($spk, $siteIds);
             $this->createCustomerActivity($leads, $spk, $spkNomor);
 
             DB::commit();
@@ -1257,7 +1270,6 @@ class SpkController extends Controller
                 'provinsi' => $quotationSite->provinsi,
                 'kota_id' => $quotationSite->kota_id,
                 'kota' => $quotationSite->kota,
-                ~
                 'ump' => $quotationSite->ump,
                 'umk' => $quotationSite->umk,
                 'nominal_upah' => $quotationSite->nominal_upah,
@@ -1620,8 +1632,7 @@ class SpkController extends Controller
     {
         return response()->json([
             'success' => false,
-            'message' => 'Validation error',
-            'errors' => $errors
+            'message' => $errors
         ], $status);
     }
 
