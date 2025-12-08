@@ -238,6 +238,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
         Route::get('/leads/{leadsId}/track', 'trackActivity');
+        Route::get('/available', 'availableLeads');
     });
 
     // Company Group Routes - UPDATED
@@ -280,7 +281,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/child/{id}', 'childLeads');
         Route::post('/child/{id}', 'saveChildLeads');
         Route::get('/belum-aktif', 'leadsBelumAktif');
-        Route::get('/available', 'availableLeads');
         Route::get('/available-quotation', 'availableQuotation');
         Route::post('/activate/{id}', 'activateLead');
         Route::post('/import', 'import');

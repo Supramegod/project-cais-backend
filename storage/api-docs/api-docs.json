@@ -5528,37 +5528,17 @@
                 ]
             }
         },
-        "/api/customer-activities/paginated": {
+        "/api/customer-activities/available": {
             "get": {
                 "tags": [
                     "Customer Activity"
                 ],
-                "summary": "Get paginated customer activities",
-                "description": "Mengambil daftar customer activities dengan pagination untuk feed",
-                "operationId": "e94cd37c0cff6881eb63c2efde93ced6",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Halaman",
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Jumlah data per halaman",
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    }
-                ],
+                "summary": "Mendapatkan daftar leads yang tersedia untuk aktivitas",
+                "description": "Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:\n     *                 - Sales (29): hanya melihat leads mereka sendiri\n     *                 - Team Leader (31): melihat leads seluruh anggota tim\n     *                 - RO (6,8): melihat semua leads\n     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
+                "operationId": "dd5b48918f1841856ef42836498d2504",
                 "responses": {
                     "200": {
-                        "description": "Success",
+                        "description": "Berhasil mengambil data leads tersedia",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5566,6 +5546,10 @@
                                         "success": {
                                             "type": "boolean",
                                             "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data leads tersedia berhasil diambil"
                                         },
                                         "data": {
                                             "type": "array",
@@ -5577,60 +5561,100 @@
                                                     },
                                                     "nomor": {
                                                         "type": "string",
-                                                        "example": "CAT/LS/LS001-092024-00001"
+                                                        "example": "AAAAA"
                                                     },
-                                                    "tgl_activity": {
+                                                    "nama_perusahaan": {
                                                         "type": "string",
-                                                        "format": "date",
-                                                        "example": "2024-09-23"
+                                                        "example": "PT ABC Indonesia"
                                                     },
-                                                    "tipe": {
+                                                    "tgl": {
                                                         "type": "string",
-                                                        "example": "Telepon"
+                                                        "example": "1 Januari 2025"
                                                     },
-                                                    "keterangan": {
+                                                    "salesEmail": {
                                                         "type": "string",
-                                                        "example": "Follow up customer"
+                                                        "example": ""
                                                     },
-                                                    "created_at": {
+                                                    "branchManagerEmail": {
                                                         "type": "string",
-                                                        "format": "date-time"
+                                                        "example": ""
                                                     },
-                                                    "nama": {
+                                                    "branchManager": {
                                                         "type": "string",
-                                                        "example": "PT. Contoh Perusahaan"
-                                                    },
-                                                    "sales": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "kebutuhan": {
-                                                        "type": "string",
-                                                        "example": "Laboratory Service"
+                                                        "example": ""
                                                     },
                                                     "status_leads": {
-                                                        "type": "string",
-                                                        "example": "Follow Up"
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "nama": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "branch": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "nama": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "nama": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
                                                     }
                                                 },
                                                 "type": "object"
                                             }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
                                         },
-                                        "current_page": {
-                                            "type": "integer",
-                                            "example": 1
-                                        },
-                                        "per_page": {
-                                            "type": "integer",
-                                            "example": 10
-                                        },
-                                        "total": {
-                                            "type": "integer",
-                                            "example": 50
-                                        },
-                                        "last_page": {
-                                            "type": "integer",
-                                            "example": 5
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Error message"
                                         }
                                     },
                                     "type": "object"
@@ -10476,148 +10500,6 @@
                                                         "type": "object"
                                                     },
                                                     "platform": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "nama": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/available": {
-            "get": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Mendapatkan daftar leads yang tersedia untuk aktivitas",
-                "description": "Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:\n     *                 - Sales (29): hanya melihat leads mereka sendiri\n     *                 - Team Leader (31): melihat leads seluruh anggota tim\n     *                 - RO (6,8): melihat semua leads\n     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
-                "operationId": "ad28f4ecf46a633e2db3f73dacbfe4da",
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data leads tersedia",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data leads tersedia berhasil diambil"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nomor": {
-                                                        "type": "string",
-                                                        "example": "AAAAA"
-                                                    },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT ABC Indonesia"
-                                                    },
-                                                    "tgl": {
-                                                        "type": "string",
-                                                        "example": "1 Januari 2025"
-                                                    },
-                                                    "salesEmail": {
-                                                        "type": "string",
-                                                        "example": ""
-                                                    },
-                                                    "branchManagerEmail": {
-                                                        "type": "string",
-                                                        "example": ""
-                                                    },
-                                                    "branchManager": {
-                                                        "type": "string",
-                                                        "example": ""
-                                                    },
-                                                    "status_leads": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "nama": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "branch": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "nama": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "kebutuhan": {
                                                         "properties": {
                                                             "id": {
                                                                 "type": "integer"
@@ -25313,7 +25195,7 @@
         },
         {
             "name": "Customer Activity",
-            "description": "Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
+            "description": "Endpoints untuk manajemen aktivitas customer"
         },
         {
             "name": "Customer",

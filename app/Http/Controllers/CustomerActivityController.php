@@ -22,7 +22,7 @@ use Illuminate\Support\Str;
 /**
  * @OA\Tag(
  *     name="Customer Activity",
- *     description="Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
+ *     description="Endpoints untuk manajemen aktivitas customer"
  * )
  */
 class CustomerActivityController extends Controller
@@ -1696,121 +1696,108 @@ class CustomerActivityController extends Controller
         }
     }
 
+    
     /**
      * @OA\Get(
-     *     path="/api/customer-activities/paginated",
-     *     summary="Get paginated customer activities",
-     *     description="Mengambil daftar customer activities dengan pagination untuk feed",
+     *     path="/api/customer-activities/available",
+     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas",
+     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:
+     *                 - Sales (29): hanya melihat leads mereka sendiri
+     *                 - Team Leader (31): melihat leads seluruh anggota tim
+     *                 - RO (6,8): melihat semua leads
+     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Halaman",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Jumlah data per halaman",
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Success",
+     *         description="Berhasil mengambil data leads tersedia",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
      *             @OA\Property(
-     *                 property="data", 
+     *                 property="data",
      *                 type="array",
      *                 @OA\Items(
-     *                     type="object",
      *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-092024-00001"),
-     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2024-09-23"),
-     *                     @OA\Property(property="tipe", type="string", example="Telepon"),
-     *                     @OA\Property(property="keterangan", type="string", example="Follow up customer"),
-     *                     @OA\Property(property="created_at", type="string", format="date-time"),
-     *                     @OA\Property(property="nama", type="string", example="PT. Contoh Perusahaan"),
-     *                     @OA\Property(property="sales", type="string", example="John Doe"),
-     *                     @OA\Property(property="kebutuhan", type="string", example="Laboratory Service"),
-     *                     @OA\Property(property="status_leads", type="string", example="Follow Up")
+     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="salesEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManagerEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManager", type="string", example=""),
+     *                     @OA\Property(
+     *                         property="status_leads",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="branch",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="kebutuhan",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     )
      *                 )
-     *             ),
-     *             @OA\Property(property="current_page", type="integer", example=1),
-     *             @OA\Property(property="per_page", type="integer", example=10),
-     *             @OA\Property(property="total", type="integer", example=50),
-     *             @OA\Property(property="last_page", type="integer", example=5)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
      *         )
      *     )
      * )
      */
-    public function getPaginatedActivities(Request $request): JsonResponse
+    public function availableLeads()
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $page = $request->get('page', 1);
+            $user = Auth::user();
 
-            $db2 = DB::connection('mysqlhris')->getDatabaseName();
+            // Gunakan scope dari model
+            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
+                ->availableForActivity($user);
 
-            $query = DB::table('sl_customer_activity')
-                ->join('sl_leads', 'sl_leads.id', 'sl_customer_activity.leads_id')
-                ->leftJoin('m_tim_sales_d', 'sl_leads.tim_sales_d_id', '=', 'm_tim_sales_d.id')
-                ->leftJoin('m_kebutuhan', 'sl_leads.kebutuhan_id', '=', 'm_kebutuhan.id')
-                ->leftJoin('m_status_leads', 'sl_customer_activity.status_leads_id', '=', 'm_status_leads.id')
-                ->select([
-                    'sl_customer_activity.id',
-                    'sl_customer_activity.nomor',
-                    'sl_customer_activity.tgl_activity',
-                    'sl_customer_activity.tipe',
-                    'sl_customer_activity.notes as keterangan',
-                    'sl_customer_activity.created_at',
-                    'sl_leads.nama_perusahaan as nama',
-                    'm_tim_sales_d.nama as sales',
-                    'm_kebutuhan.nama as kebutuhan',
-                    'm_status_leads.nama as status_leads'
-                ])
-                ->whereNull('sl_customer_activity.deleted_at')
-                ->orderBy('sl_customer_activity.tgl_activity', 'desc');
+            $data = $query->get();
 
-            // Apply filters if provided
-            if ($request->tgl_dari && $request->tgl_sampai) {
-                $query->whereBetween('sl_customer_activity.tgl_activity', [$request->tgl_dari, $request->tgl_sampai]);
-            }
-
-            if ($request->branch) {
-                $query->where('sl_leads.branch_id', $request->branch);
-            }
-
-            if ($request->kebutuhan) {
-                $query->where('m_kebutuhan.id', $request->kebutuhan);
-            }
-
-            if ($request->tipe) {
-                $query->where('sl_customer_activity.tipe', $request->tipe);
-            }
-
-            $total = $query->count();
-            $results = $query->offset(($page - 1) * $perPage)
-                ->limit($perPage)
-                ->get();
+            // Transformasi data
+            $data->transform(function ($item) {
+                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
+                $item->salesEmail = '';
+                $item->branchManagerEmail = '';
+                $item->branchManager = '';
+                return $item;
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $results,
-                'current_page' => (int) $page,
-                'per_page' => (int) $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage)
+                'message' => 'Data leads tersedia berhasil diambil',
+                'data' => $data
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
     }
+
+   
     //=====halper functions=====//
     /**
      * Menggabungkan dan mengelola validation rules untuk Add (Create) dan Update.
