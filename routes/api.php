@@ -364,6 +364,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/{id}/status', 'getStatus');
         Route::get('/available-leads/{tipe_quotation}', 'availableLeads');
         Route::get('/reference/{leads_id}', 'getReferenceQuotations');
+        Route::get('/hc-high-cost', 'getSitesWithHighHcAndCost');
     });
 
     // Quotation Step Management
