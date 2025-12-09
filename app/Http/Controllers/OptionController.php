@@ -18,6 +18,7 @@ use App\Models\SalaryRule;
 use App\Models\StatusLeads;
 use App\Models\Statusoptions;
 use App\Models\StatusQuotation;
+use App\Models\StatusSpk;
 use App\Models\User;
 use App\Models\Village;
 use Illuminate\Http\Request;
@@ -1354,6 +1355,55 @@ class OptionController extends Controller
                 'success' => true,
                 'message' => 'Data salary rule berhasil diambil',
                 'data' => $salaryrule
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/spk/status-spk",
+     *     summary="Mendapatkan daftar semua status SPK",
+     *     description="Endpoint untuk mengambil data master status SPK yang tersedia dalam sistem.",
+     *     tags={"SPK"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sukses mengambil data status SPK",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data status SPK berhasil diambil"),
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nama", type="string", example="Draft"),
+     *                 @OA\Property(property="keterangan", type="string", example="SPK masih dalam tahap draft"),
+     *                 @OA\Property(property="created_at", type="string", format="date-time", example="2024-01-15 10:30:00"),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-01-15 10:30:00")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Database connection failed")
+     *         )
+     *     )
+     * )
+     */
+    public function statusspk()
+    {
+        try {
+            $statusspk = StatusSpk::get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data status SPK berhasil diambil',
+                'data' => $statusspk
             ]);
         } catch (Exception $e) {
             return response()->json([

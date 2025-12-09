@@ -14570,6 +14570,93 @@
                 ]
             }
         },
+        "/api/spk/status-spk": {
+            "get": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Mendapatkan daftar semua status SPK",
+                "description": "Endpoint untuk mengambil data master status SPK yang tersedia dalam sistem.",
+                "operationId": "fe64d51c321bf54b6c1babe5dbe64881",
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data status SPK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data status SPK berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Draft"
+                                                    },
+                                                    "keterangan": {
+                                                        "type": "string",
+                                                        "example": "SPK masih dalam tahap draft"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15 10:30:00"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15 10:30:00"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Database connection failed"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks/list": {
             "get": {
                 "tags": [
@@ -20768,6 +20855,117 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Error fetching available leads"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/add": {
+            "post": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Membuat SPK baru",
+                "description": "Endpoint untuk membuat SPK baru berdasarkan leads dan site yang dipilih.",
+                "operationId": "7ca37fa6dd173f08807c88edbb5470a2",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "leads_id",
+                                    "tanggal_spk",
+                                    "site_ids"
+                                ],
+                                "properties": {
+                                    "leads_id": {
+                                        "description": "ID Leads",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tanggal_spk": {
+                                        "description": "Tanggal SPK",
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-15"
+                                    },
+                                    "site_ids": {
+                                        "description": "Array ID Quotation Site",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "SPK berhasil dibuat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK created successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "SPK/LEAD001-012024-00001"
+                                                },
+                                                "tgl_spk": {
+                                                    "type": "string",
+                                                    "example": "2024-01-15"
+                                                },
+                                                "status_spk_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "spk_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "leads": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
