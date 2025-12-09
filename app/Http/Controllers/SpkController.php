@@ -293,7 +293,7 @@ class SpkController extends Controller
         }
     }
 
-    /**up
+    /**
      * @OA\Post(
      *     path="/api/spk/add",
      *     summary="Membuat SPK baru",
@@ -356,7 +356,7 @@ class SpkController extends Controller
             $leads = Leads::whereNull('deleted_at')->find($request->leads_id);
 
             if (!$leads) {
-                throw new \Exception("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
+                return $this->errorResponse("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
             }
 
             // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih
@@ -365,7 +365,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($invalidSites) {
-                throw new \Exception("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+                return $this->errorResponse("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
             }
 
             // Validasi: pastikan site belum memiliki SPK
@@ -374,7 +374,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($sitesWithSPK) {
-                throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
+                return $this->errorResponse("Beberapa site yang dipilih sudah memiliki SPK.");
             }
 
             // Ambil quotation_id dari site pertama (jika diperlukan)
@@ -1318,7 +1318,7 @@ class SpkController extends Controller
         // Tambahkan pengecekan null untuk leads
         $leads = Leads::whereNull('deleted_at')->find($leadsId);
         if (!$leads) {
-            throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan");
+            return $this->errorResponse("Leads dengan ID {$leadsId} tidak ditemukan");
         }
 
         $baseNumber = "SPK/" . $leads->nomor . "-";
@@ -1627,15 +1627,25 @@ class SpkController extends Controller
 
         return response()->json($response, $status);
     }
-
+    /**
+     * Unified validation error response
+     * Digunakan untuk semua jenis error (validation, not found, server error, dll)
+     * 
+     * @param mixed $errors - Bisa berupa string, array, atau MessageBag dari validator
+     * @param int $status - HTTP status code
+     */
     private function validationError($errors, int $status = 400)
     {
+        // Jika errors adalah MessageBag dari validator, convert ke array
+        if (is_object($errors) && method_exists($errors, 'toArray')) {
+            $errors = $errors->toArray();
+        }
+
         return response()->json([
             'success' => false,
             'message' => $errors
         ], $status);
     }
-
     private function notFoundResponse(string $message = 'Resource not found')
     {
         return response()->json([
