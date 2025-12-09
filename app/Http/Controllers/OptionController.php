@@ -17,6 +17,7 @@ use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\StatusLeads;
 use App\Models\Statusoptions;
+use App\Models\StatusPks;
 use App\Models\StatusQuotation;
 use App\Models\StatusSpk;
 use App\Models\User;
@@ -1365,10 +1366,10 @@ class OptionController extends Controller
     }
     /**
      * @OA\Get(
-     *     path="/api/spk/status-spk",
+     *     path="/api/options/status-spk",
      *     summary="Mendapatkan daftar semua status SPK",
      *     description="Endpoint untuk mengambil data master status SPK yang tersedia dalam sistem.",
-     *     tags={"SPK"},
+     *     tags={"Option"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
@@ -1403,6 +1404,55 @@ class OptionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data status SPK berhasil diambil',
+                'data' => $statusspk
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/options/status-pks",
+     *     summary="Mendapatkan daftar semua status PKS",
+     *     description="Endpoint untuk mengambil data master status PKS (Perjanjian Kerja Sama) yang tersedia dalam sistem.",
+     *     tags={"Option"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sukses mengambil data status PKS",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data status Pks berhasil diambil"),
+     *             @OA\Property(property="data", type="array", @OA\Items(
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nama", type="string", example="Draft"),
+     *                 @OA\Property(property="keterangan", type="string", example="PKS masih dalam tahap draft"),
+     *                 @OA\Property(property="created_at", type="string", format="date-time", example="2024-01-15 10:30:00"),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-01-15 10:30:00")
+     *             ))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Database connection failed")
+     *         )
+     *     )
+     * )
+     */
+    public function statuspks()
+    {
+        try {
+            $statusspk = StatusPks::get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data status Pks berhasil diambil',
                 'data' => $statusspk
             ]);
         } catch (Exception $e) {

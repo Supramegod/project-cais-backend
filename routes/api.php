@@ -396,6 +396,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/kategori-sesuai-hc', 'kategorusesuaihc');
         Route::get('/rule-thr', 'rulethr');
         Route::get('/salary-rule', 'salaryrule');
+        Route::get('/status-pks', 'statuspks');
+        Route::get('/status-spk', 'statusspk');
 
     });
 
