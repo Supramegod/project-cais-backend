@@ -74,8 +74,8 @@ class QuotationStepRequest extends FormRequest
                 $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:0 ';
                 $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
 
-                $rules['position_data.*.kompensasi'] = 'sometimes|in:Diprovisikan,Ditagihkan,Tidak Ada';
-                $rules['position_data.*.thr'] = 'sometimes|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
+                $rules['position_data.*.kompensasi'] = 'required|in:Diprovisikan,Ditagihkan,Tidak Ada';
+                $rules['position_data.*.thr'] = 'required|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
                 $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|in:Per Bulan,Per Hari,Per Jam';
@@ -207,6 +207,9 @@ class QuotationStepRequest extends FormRequest
             'position_data.*.nominal_upah.required_if' => 'Nominal upah custom harus diisi ketika memilih upah custom',
             'position_data.*.nominal_upah.numeric' => 'Nominal upah harus berupa angka',
             'position_data.*.nominal_upah.min' => 'Nominal upah tidak boleh kurang dari 0',
+            'position_data.*.thr.required' => 'tunjangan hari raya  harus diisi',
+            'position_data.*.kompensasi.required' => 'kompensasi harus diisi',
+            
 
             // Step 5 Messages
             'jenis-perusahaan.required' => 'Jenis perusahaan harus dipilih',
