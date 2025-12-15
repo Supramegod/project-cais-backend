@@ -81,6 +81,21 @@ class User extends Authenticatable
     {
         return $this->hasMany(CustomerActivity::class, 'user_id');
     }
+    // app/Models/User.php (tambahkan method)
+    public function emailConfig()
+    {
+        return $this->hasOne(UserEmailConfig::class, 'user_id', 'id');
+    }
+
+    public function getActiveEmailConfig()
+    {
+        return $this->emailConfig()
+            ->where('is_active', true)
+            ->whereNotNull('email_host')
+            ->whereNotNull('email_username')
+            ->whereNotNull('email_password')
+            ->first();
+    }
     // Method untuk membuat token pair dengan Sanctum
     public function createTokenPair($name = 'auth_token', array $abilities = ['*'])
     {

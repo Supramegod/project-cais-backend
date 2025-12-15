@@ -31,6 +31,7 @@ use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -234,6 +235,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
+        Route::post('/send-email', 'sendEmail');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
@@ -399,6 +401,12 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/status-pks', 'statuspks');
         Route::get('/status-spk', 'statusspk');
 
+    });
+    // User Email Config
+    Route::prefix('user')->controller(UserEmailConfigController::class)->group(function () {
+        Route::get('/list', 'getConfig');
+        Route::post('/add', 'saveConfig');
+        Route::post('/test', 'testConnection');
     });
 
 });

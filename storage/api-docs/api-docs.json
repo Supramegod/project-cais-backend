@@ -4875,8 +4875,8 @@
                 "tags": [
                     "Customer Activity"
                 ],
-                "summary": "Send email notification",
-                "description": "Mengirim email notifikasi terkait customer activity",
+                "summary": "Send email notification with dynamic SMTP configuration",
+                "description": "Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. \n     *                 Jika user memiliki konfigurasi email, akan digunakan. \n     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
                 "operationId": "075717d714fe38302a4787bfe54e4b40",
                 "requestBody": {
                     "required": true,
@@ -4886,16 +4886,24 @@
                                 "required": [
                                     "subject",
                                     "body",
-                                    "recipients"
+                                    "recipients",
+                                    "leads_id"
                                 ],
                                 "properties": {
                                     "subject": {
+                                        "description": "Subject email",
                                         "type": "string",
                                         "example": "Update Customer Activity"
                                     },
                                     "body": {
+                                        "description": "Isi email (mendukung line breaks)",
                                         "type": "string",
-                                        "example": "Customer activity telah diupdate"
+                                        "example": "Customer activity telah diupdate. Berikut detailnya:\\n\\nNama Perusahaan: PT ABC\\nTanggal: 2024-12-09\\nTipe: Meeting\\nCatatan: Follow up penawaran produk"
+                                    },
+                                    "leads_id": {
+                                        "description": "ID leads untuk membuat activity baru",
+                                        "type": "integer",
+                                        "example": 1
                                     },
                                     "recipients": {
                                         "description": "Array email penerima",
@@ -4905,6 +4913,43 @@
                                             "format": "email",
                                             "example": "customer@example.com"
                                         }
+                                    },
+                                    "cc": {
+                                        "description": "Optional: CC recipients",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "email"
+                                        }
+                                    },
+                                    "bcc": {
+                                        "description": "Optional: BCC recipients",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "email"
+                                        }
+                                    },
+                                    "attachments": {
+                                        "description": "Optional: File attachments",
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string",
+                                                    "example": "document.pdf"
+                                                },
+                                                "content": {
+                                                    "description": "Base64 encoded file content",
+                                                    "type": "string"
+                                                },
+                                                "mime": {
+                                                    "type": "string",
+                                                    "example": "application/pdf"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     }
                                 },
                                 "type": "object"
@@ -4913,8 +4958,8 @@
                     }
                 },
                 "responses": {
-                    "200": {
-                        "description": "Email berhasil dikirim",
+                    "201": {
+                        "description": "Email berhasil dikirim dan activity baru dibuat",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4925,7 +4970,119 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Email berhasil dikirim"
+                                            "example": "Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "mailer_used": {
+                                                    "type": "string",
+                                                    "example": "user_123_smtp"
+                                                },
+                                                "sender": {
+                                                    "type": "string",
+                                                    "example": "John Doe <john@example.com>"
+                                                },
+                                                "recipients_count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "activity": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 123
+                                                        },
+                                                        "nomor": {
+                                                            "type": "string",
+                                                            "example": "CAT/LS/LS001-122024-00001"
+                                                        },
+                                                        "tipe": {
+                                                            "type": "string",
+                                                            "example": "Email"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "config_source": {
+                                                    "description": "user_custom, user_default, or system_default",
+                                                    "type": "string",
+                                                    "example": "user_custom"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "207": {
+                        "description": "Multi-Status - Beberapa email berhasil, beberapa gagal",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Email berhasil dikirim ke 2 dari 3 penerima dan activity baru telah dibuat"
+                                        },
+                                        "partial_success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "failed_recipients": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validasi gagal"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Gagal mengirim email: SMTP connection failed"
                                         }
                                     },
                                     "type": "object"
@@ -14570,14 +14727,14 @@
                 ]
             }
         },
-        "/api/spk/status-spk": {
+        "/api/options/status-spk": {
             "get": {
                 "tags": [
-                    "SPK"
+                    "Option"
                 ],
                 "summary": "Mendapatkan daftar semua status SPK",
                 "description": "Endpoint untuk mengambil data master status SPK yang tersedia dalam sistem.",
-                "operationId": "fe64d51c321bf54b6c1babe5dbe64881",
+                "operationId": "de30dcd072389a3dccbbbabda9d7e120",
                 "responses": {
                     "200": {
                         "description": "Sukses mengambil data status SPK",
@@ -14608,6 +14765,93 @@
                                                     "keterangan": {
                                                         "type": "string",
                                                         "example": "SPK masih dalam tahap draft"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15 10:30:00"
+                                                    },
+                                                    "updated_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15 10:30:00"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: Database connection failed"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/status-pks": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar semua status PKS",
+                "description": "Endpoint untuk mengambil data master status PKS (Perjanjian Kerja Sama) yang tersedia dalam sistem.",
+                "operationId": "044af9b101716afe9b3394bf58388ba9",
+                "responses": {
+                    "200": {
+                        "description": "Sukses mengambil data status PKS",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data status Pks berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Draft"
+                                                    },
+                                                    "keterangan": {
+                                                        "type": "string",
+                                                        "example": "PKS masih dalam tahap draft"
                                                     },
                                                     "created_at": {
                                                         "type": "string",
@@ -25829,6 +26073,198 @@
                     }
                 ]
             }
+        },
+        "/api/user/list": {
+            "get": {
+                "tags": [
+                    "User Email Config"
+                ],
+                "summary": "Get user email configuration",
+                "operationId": "511f3abe168b56e49089e68b6688c58e",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer"
+                                                },
+                                                "user_id": {
+                                                    "type": "integer"
+                                                },
+                                                "email_host": {
+                                                    "type": "string"
+                                                },
+                                                "email_port": {
+                                                    "type": "integer"
+                                                },
+                                                "email_username": {
+                                                    "type": "string"
+                                                },
+                                                "email_encryption": {
+                                                    "type": "string"
+                                                },
+                                                "email_from_address": {
+                                                    "type": "string"
+                                                },
+                                                "email_from_name": {
+                                                    "type": "string"
+                                                },
+                                                "is_active": {
+                                                    "type": "boolean"
+                                                },
+                                                "created_at": {
+                                                    "type": "string"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/user/add": {
+            "post": {
+                "tags": [
+                    "User Email Config"
+                ],
+                "summary": "Save or update user email configuration",
+                "operationId": "a969133770c25a0b1f38248e834976ce",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email_host",
+                                    "email_port",
+                                    "email_username",
+                                    "email_password"
+                                ],
+                                "properties": {
+                                    "email_host": {
+                                        "type": "string",
+                                        "example": "smtp.gmail.com"
+                                    },
+                                    "email_port": {
+                                        "type": "integer",
+                                        "example": 587
+                                    },
+                                    "email_username": {
+                                        "type": "string",
+                                        "example": "user@gmail.com"
+                                    },
+                                    "email_password": {
+                                        "type": "string",
+                                        "example": "yourpassword"
+                                    },
+                                    "email_encryption": {
+                                        "type": "string",
+                                        "example": "tls"
+                                    },
+                                    "email_from_address": {
+                                        "type": "string",
+                                        "example": "user@gmail.com"
+                                    },
+                                    "email_from_name": {
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Email configuration saved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/user/test": {
+            "post": {
+                "tags": [
+                    "User Email Config"
+                ],
+                "summary": "Test SMTP connection",
+                "operationId": "64cad225f722849a930ccfa761b29c32",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SMTP connection successful"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -25944,6 +26380,10 @@
         {
             "name": "UMP",
             "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
+        },
+        {
+            "name": "User Email Config",
+            "description": "User Email Config"
         }
     ]
 }
