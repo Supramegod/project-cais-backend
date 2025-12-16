@@ -13,7 +13,7 @@ class CalculationSummary
     public $dpp = 0;
     public $total_invoice = 0;
     public $pembulatan = 0;
-    
+
     // COSS calculations
     public $total_sebelum_management_fee_coss = 0;
     public $nominal_management_fee_coss = 0;
@@ -23,10 +23,8 @@ class CalculationSummary
     public $dpp_coss = 0;
     public $total_invoice_coss = 0;
     public $pembulatan_coss = 0;
-    
+
     // Other calculations
-    public $persen_bpjs_ketenagakerjaan = 0;
-    public $persen_bpjs_kesehatan = 0;
     public $margin = 0;
     public $gpm = 0;
     public $margin_coss = 0;
@@ -41,8 +39,25 @@ class CalculationSummary
     public $upah_pokok_coss = 0;
     public $total_bpjs_coss = 0;
     public $total_bpjs_kesehatan_coss = 0;
-    
+
     // TAMBAHKAN: BPU calculations
     public $total_potongan_bpu = 0;
     public $potongan_bpu_per_orang = 0;
+    // Persentase BPJS untuk HPP
+    public $persen_bpjs_jkk = 0;
+    public $persen_bpjs_jkm = 0;
+    public $persen_bpjs_jht = 0;
+    public $persen_bpjs_jp = 0;
+    public $persen_bpjs_kes = 0;
+    public $persen_bpjs_ketenagakerjaan = 0;
+    public $persen_bpjs_kesehatan = 0;
+
+    // Persentase BPJS untuk COSS (tambahkan suffix _coss)
+    public $persen_bpjs_jkk_coss = 0;
+    public $persen_bpjs_jkm_coss = 0;
+    public $persen_bpjs_jht_coss = 0;
+    public $persen_bpjs_jp_coss = 0;
+    public $persen_bpjs_kes_coss = 0;
+    public $persen_bpjs_ketenagakerjaan_coss = 0;
+    public $persen_bpjs_kesehatan_coss = 0;
 }

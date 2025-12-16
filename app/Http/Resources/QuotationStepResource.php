@@ -326,6 +326,39 @@ class QuotationStepResource extends JsonResource
             // Di method getStepSpecificData - case 11:
             case 11:
                 $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
+                $persenBpjsTotalHpp = 0;
+                $persenBpjsTotalCoss = 0;
+                $persenBpjsBreakdownHpp = [];
+                $persenBpjsBreakdownCoss = [];
+
+                if ($calculatedQuotation && isset($calculatedQuotation->calculation_summary)) {
+                    $summary = $calculatedQuotation->calculation_summary;
+
+                    // Untuk HPP
+                    $persenBpjsTotalHpp = $summary->persen_bpjs_ketenagakerjaan ?? 0;
+                    $persenBpjsBreakdownHpp = [
+                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk ?? 0,
+                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm ?? 0,
+                        'persen_bpjs_jht' => $summary->persen_bpjs_jht ?? 0,
+                        'persen_bpjs_jp' => $summary->persen_bpjs_jp ?? 0,
+                    ];
+
+                    // Untuk COSS
+                    $persenBpjsTotalCoss = $summary->persen_bpjs_ketenagakerjaan_coss ?? 0;
+                    $persenBpjsBreakdownCoss = [
+                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk_coss ?? 0,
+                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm_coss ?? 0,
+                        'persen_bpjs_jht' => $summary->persen_bpjs_jht_coss ?? 0,
+                        'persen_bpjs_jp' => $summary->persen_bpjs_jp_coss ?? 0,
+                    ];
+
+                    \Log::info("BPJS percentages in resource", [
+                        'hpp_total' => $persenBpjsTotalHpp,
+                        'coss_total' => $persenBpjsTotalCoss,
+                        'hpp_breakdown' => $persenBpjsBreakdownHpp,
+                        'coss_breakdown' => $persenBpjsBreakdownCoss
+                    ]);
+                }
 
                 return [
                     'penagihan' => $quotation->penagihan,
@@ -333,7 +366,7 @@ class QuotationStepResource extends JsonResource
                     'persentase' => $quotation->persentase,
                     'management_fee_nama' => $quotation->managementFee->nama ?? null,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                    
+                    'note_harga_jual' => $quotation->note_harga_jual,
                     'quotation_pics' => $quotation->relationLoaded('quotationPics') ?
                         $quotation->quotationPics->map(function ($pic) {
                             return [
@@ -347,7 +380,6 @@ class QuotationStepResource extends JsonResource
                         })->toArray() : [],
                     // Data perhitungan dari service - DIPERBAIKI: akses melalui calculation_summary
                     'calculation' => $calculatedQuotation ? [
-                        // ✅ TAMBAHKAN: Data BPU di summary
                         'bpu' => [
                             'total_potongan_bpu' => $calculatedQuotation->calculation_summary->total_potongan_bpu ?? 0,
                             'potongan_bpu_per_orang' => $calculatedQuotation->calculation_summary->potongan_bpu_per_orang ?? 0,
@@ -365,7 +397,11 @@ class QuotationStepResource extends JsonResource
                             'gpm' => $calculatedQuotation->calculation_summary->gpm ?? 0,
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
+                            'persen_bpjs_total' => $persenBpjsTotalHpp,
+                            'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
+                            'persen_bpjs_breakdown' => $persenBpjsBreakdownHpp,
                         ],
+
                         'coss' => [
                             'total_sebelum_management_fee_coss' => $calculatedQuotation->calculation_summary->total_sebelum_management_fee_coss ?? 0,
                             'nominal_management_fee_coss' => $calculatedQuotation->calculation_summary->nominal_management_fee_coss ?? 0,
@@ -379,15 +415,30 @@ class QuotationStepResource extends JsonResource
                             'gpm_coss' => $calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
+                            'persen_bpjs_total' => $persenBpjsTotalCoss,
+                            'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan_coss ?? 0,
+                            'persen_bpjs_breakdown' => $persenBpjsBreakdownCoss,
                         ],
                         'quotation_details' => $calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
-                            // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
                             $wage = $detail->wage ?? null;
-
-                            // ✅ PERBAIKAN: Ambil potongan_bpu dari detail calculation
                             $potonganBpu = $detail->potongan_bpu ?? 0;
 
-                            // ✅ TAMBAHKAN: Ambil data tunjangan untuk detail ini
+                        
+                            $bpjsJkk = $detail->bpjs_jkk ?? 0;
+                            $bpjsJkm = $detail->bpjs_jkm ?? 0;
+                            $bpjsJht = $detail->bpjs_jht ?? 0;
+                            $bpjsJp = $detail->bpjs_jp ?? 0;
+                            $bpjsKes = $detail->bpjs_kes ?? 0;
+                            $bpjsKetenagakerjaan = $bpjsJkk + $bpjsJkm + $bpjsJht + $bpjsJp;
+
+                            $bpjsKesehatan = 0;
+                            if ($detail->penjamin_kesehatan === 'BPJS' || $detail->penjamin_kesehatan === 'BPJS Kesehatan') {
+                                $bpjsKesehatan = $bpjsKes;
+                            } else if ($detail->penjamin_kesehatan === 'Asuransi Swasta' || $detail->penjamin_kesehatan === 'Takaful') {
+                                $bpjsKesehatan = $detail->nominal_takaful ?? 0;
+                            } else if ($detail->penjamin_kesehatan === 'BPU') {
+                                $bpjsKesehatan = 0; // BPU tidak ada BPJS
+                            }
                             $tunjanganData = [];
                             if ($detail->relationLoaded('quotationDetailTunjangans')) {
                                 $tunjanganData = $detail->quotationDetailTunjangans->map(function ($tunjangan) {
@@ -397,8 +448,6 @@ class QuotationStepResource extends JsonResource
                                     ];
                                 })->toArray();
                             }
-
-                            // Logic untuk display lembur
                             $lemburDisplay = '';
                             if ($wage) {
                                 if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
@@ -409,8 +458,6 @@ class QuotationStepResource extends JsonResource
                                     $lemburDisplay = 'Tidak Ada';
                                 }
                             }
-
-                            // Logic untuk display tunjangan_holiday
                             $tunjanganHolidayDisplay = '';
                             if ($wage) {
                                 if ($wage->tunjangan_holiday == 'Normatif') {
@@ -429,22 +476,28 @@ class QuotationStepResource extends JsonResource
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
-                                // ✅ TAMBAHKAN untuk debug BPU
-        
-                                // ✅ TAMBAHKAN: Data tunjangan rinci
                                 'tunjangan_data' => $tunjanganData,
-
-                                // ✅ DATA HPP
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
-                                    'total_tunjangan' => $detail->total_tunjangan,
-                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
-                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'total_tunjangan' => $detail->total_tunjangan,        
+                                    'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
+                                    'bpjs_kesehatan' => $bpjsKesehatan,
+                                    'bpjs_jkk' => $bpjsJkk,
+                                    'bpjs_jkm' => $bpjsJkm,
+                                    'bpjs_jht' => $bpjsJht,
+                                    'bpjs_jp' => $bpjsJp,
+                                    'bpjs_kes' => $bpjsKes,
+                                    'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
+                                    'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
+                                    'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
+                                    'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
+                                    'persen_bpjs_kes' => $detail->persen_bpjs_kes ?? 0,
+                                    'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
+                                    'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
                                     'potongan_bpu' => $potonganBpu,
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                                     'kompensasi' => $detail->kompensasi,
                                     'lembur' => $lemburDisplay,
-                                    'nominal_takaful' => $detail->nominal_takaful,
                                     'tunjangan_holiday' => $tunjanganHolidayDisplay,
                                     'bunga_bank' => $detail->bunga_bank,
                                     'insentif' => $detail->insentif,
@@ -457,18 +510,27 @@ class QuotationStepResource extends JsonResource
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
                                     'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
                                 ],
-
-                                // ✅ DATA COSS
                                 'coss' => [
                                     'nominal_upah' => $detail->nominal_upah,
                                     'total_tunjangan' => $detail->total_tunjangan,
-                                    'bpjs_ketenagakerjaan' => $detail->bpjs_ketenagakerjaan,
-                                    'bpjs_kesehatan' => $detail->bpjs_kesehatan,
+                                    'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
+                                    'bpjs_kesehatan' => $bpjsKesehatan,
+                                    'bpjs_jkk' => $bpjsJkk,
+                                    'bpjs_jkm' => $bpjsJkm,
+                                    'bpjs_jht' => $bpjsJht,
+                                    'bpjs_jp' => $bpjsJp,
+                                    'bpjs_kes' => $bpjsKes,
+                                    'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
+                                    'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
+                                    'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
+                                    'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
+                                    'persen_bpjs_kes' => $detail->persen_bpjs_kes ?? 0,
+                                    'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
+                                    'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
                                     'potongan_bpu' => $potonganBpu,
                                     'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                                     'kompensasi' => $detail->kompensasi,
                                     'lembur' => $lemburDisplay,
-                                    'nominal_takaful' => $detail->nominal_takaful,
                                     'tunjangan_holiday' => $tunjanganHolidayDisplay,
                                     'bunga_bank' => $detail->bunga_bank,
                                     'insentif' => $detail->insentif,
