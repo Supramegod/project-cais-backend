@@ -275,6 +275,17 @@ class Quotation extends Model
     {
         return $this->belongsTo(TimSalesDetail::class, 'tim_sales_d_id');
     }
+    // Di file Quotation.php, tambahkan method relasi ini:
+
+    public function salaryRule()
+    {
+        return $this->belongsTo(SalaryRule::class, 'salary_rule_id');
+    }
+
+    public function ruleThr()
+    {
+        return $this->belongsTo(RuleThr::class, 'rule_thr_id');
+    }
 
     // ACCESSOR/METHOD BARU YANG DIPERLUKAN:
 

@@ -471,7 +471,7 @@ class PksController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' =>  $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
@@ -1355,20 +1355,22 @@ class PksController extends Controller
     }
     private function getAvailableSitesData($leadsId)
     {
-        // Ambil data PKS dengan relasi yang diperlukan
-        $pks = Pks::with(['leads', 'sites', 'company', 'ruleThr', 'salaryRule'])
-            ->where('leads_id', $leadsId)
-            ->first();
-
-        // Ambil data sites yang tersedia
-        $sites = SpkSite::with(['spk'])
+        // Ambil data sites yang tersedia dengan relasi yang diperlukan
+        $sites = SpkSite::with([
+            'spk',
+            'quotation' => function ($query) {
+                $query->with(['company', 'salaryRule', 'ruleThr']);
+            },
+            'quotation.quotationSites',
+            'leads'
+        ])
             ->where('leads_id', $leadsId)
             ->whereNull('deleted_at')
             ->whereDoesntHave('site')
             ->whereHas('spk', function ($query) {
                 $query->whereNull('deleted_at');
             })
-            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'spk_id')
+            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'spk_id', 'quotation_id')
             ->orderBy(function ($query) {
                 $query->select('nomor')
                     ->from('sl_spk')
@@ -1376,7 +1378,11 @@ class PksController extends Controller
                     ->limit(1);
             }, 'asc')
             ->get()
-            ->map(function ($site) use ($pks) {
+            ->map(function ($site) {
+                $quotation = $site->quotation;
+                $quotationCompany = $quotation ? $quotation->company()->first() : null;
+
+
                 return [
                     'id' => $site->id,
                     'nomor' => $site->spk->nomor ?? null,
@@ -1384,26 +1390,40 @@ class PksController extends Controller
                     'provinsi' => $site->provinsi,
                     'kota' => $site->kota,
                     'penempatan' => $site->penempatan,
-                    // Data tambahan dari PKS
-                    'company' => $pks && $pks->company ? [
-                        'id' => $pks->company->id,
-                        'name' => $pks->company->name,
-                        'code' => $pks->company->code
+
+                    // Data dari Quotation
+                    'mulai_kontrak' => $quotation?->mulai_kontrak,
+                    'kontrak_selesai' => $quotation?->kontrak_selesai,
+                    'durasi_kerjasama' => $quotation?->durasi_kerjasama,
+
+                    // Data company dari quotation
+                    'company' => $quotationCompany ? [
+                        'id' => $quotationCompany->id,
+                        'name' => $quotationCompany->name ?? null,
+                        'code' => $quotationCompany->code ?? null,
                     ] : null,
-                    'rule_thr' => $pks && $pks->ruleThr ? [
-                        'id' => $pks->ruleThr->id,
-                        'nama' => $pks->ruleThr->nama,
-                        'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice,
-                        'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
-                        'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr
+
+                    // Data salary rule dari quotation
+                    'salary_rule' => $quotation && $quotation->salaryRule ? [
+                        'id' => $quotation->salaryRule->id ?? null,
+                        'nama' => $quotation->salaryRule->nama_salary_rule ?? null,
+                        'cutoff' => $quotation->salaryRule->cutoff ?? null,
+                        'pembayaran_invoice' => $quotation->salaryRule->pembayaran_invoice ?? null,
+                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll ?? null
                     ] : null,
-                    'salary_rule' => $pks && $pks->salaryRule ? [
-                        'id' => $pks->salaryRule->id,
-                        'nama' => $pks->salaryRule->nama_salary_rule,
-                        'cutoff' => $pks->salaryRule->cutoff,
-                        'pembayaran_invoice' => $pks->salaryRule->pembayaran_invoice,
-                        'rilis_payroll' => $pks->salaryRule->rilis_payroll
-                    ] : null
+
+                    // Data rule THR dari quotation
+                    'rule_thr' => $quotation && $quotation->ruleThr ? [
+                        'id' => $quotation->ruleThr->id ?? null,
+                        'nama' => $quotation->ruleThr->nama ?? null,
+                        'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice ?? null,
+                        'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice ?? null,
+                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr ?? null
+                    ] : null,
+
+                    // Data tambahan dari quotation yang mungkin berguna
+                    'quotation_id' => $quotation?->id,
+                    'nomor_quotation' => $quotation?->nomor,
                 ];
             });
 
