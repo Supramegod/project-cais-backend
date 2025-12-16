@@ -48,12 +48,12 @@ class QuotationStepRequest extends FormRequest
                 $rules['jam_kerja'] = 'sometimes|string';
                 break;
             case 3:
-                $rules['headCountData'] = 'sometimes|array';
-                $rules['headCountData.*.quotation_site_id'] = 'sometimes|required|integer';
-                $rules['headCountData.*.position_id'] = 'sometimes|required|integer';
-                $rules['headCountData.*.jumlah_hc'] = 'sometimes|required|integer|min:1';
-                $rules['headCountData.*.jabatan_kebutuhan'] = 'sometimes|required|string';
-                $rules['headCountData.*.nama_site'] = 'sometimes|required|string';
+                $rules['headCountData'] = 'required|array';
+                $rules['headCountData.*.quotation_site_id'] = 'required|required|integer';
+                $rules['headCountData.*.position_id'] = 'required|required|integer';
+                $rules['headCountData.*.jumlah_hc'] = 'required|required|integer|min:1';
+                $rules['headCountData.*.jabatan_kebutuhan'] = 'required|required|string';
+                $rules['headCountData.*.nama_site'] = 'required|required|string';
                 break;
 
             case 4:

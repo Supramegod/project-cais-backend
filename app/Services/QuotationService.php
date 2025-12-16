@@ -814,34 +814,106 @@ class QuotationService
     }
 
     private function calculateBaseTotals(&$quotation, $suffix, QuotationCalculationResult $result): void
-    {
-        $summary = $result->calculation_summary;
+{
+    $summary = $result->calculation_summary;
 
-        $summary->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
-        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
-        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
+    $summary->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
+    $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
+    $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
 
-        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+    $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
 
-        // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
-        $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
-        );
+    // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
+    $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
+        fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
+    );
 
-        // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
-        $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
-            fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
-        );
+    // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
+    $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
+        fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
+    );
 
-        $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
+    $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
 
-        \Log::info("BPU totals calculated", [
+    // ✅ TAMBAHKAN: Hitung persentase BPJS untuk HPP dan COSS
+    $totalHc = $quotation->quotation_detail->sum('jumlah_hc');
+    
+    if ($totalHc > 0) {
+        $totalPersenBpjsKetenagakerjaan = 0;
+        $totalPersenBpjsKesehatan = 0;
+        $totalPersenBpjsJkk = 0;
+        $totalPersenBpjsJkm = 0;
+        $totalPersenBpjsJht = 0;
+        $totalPersenBpjsJp = 0;
+        $totalPersenBpjsKes = 0;
+        
+        foreach ($quotation->quotation_detail as $detail) {
+            $persenBpjsKetenagakerjaanDetail = $detail->persen_bpjs_ketenagakerjaan ?? 0;
+            $persenBpjsKesehatanDetail = $detail->persen_bpjs_kesehatan ?? 0;
+            $persenBpjsJkkDetail = $detail->persen_bpjs_jkk ?? 0;
+            $persenBpjsJkmDetail = $detail->persen_bpjs_jkm ?? 0;
+            $persenBpjsJhtDetail = $detail->persen_bpjs_jht ?? 0;
+            $persenBpjsJpDetail = $detail->persen_bpjs_jp ?? 0;
+            $persenBpjsKesDetail = $detail->persen_bpjs_kes ?? 0;
+            $jumlahHcDetail = $detail->jumlah_hc;
+            
+            $totalPersenBpjsKetenagakerjaan += $persenBpjsKetenagakerjaanDetail * $jumlahHcDetail;
+            $totalPersenBpjsKesehatan += $persenBpjsKesehatanDetail * $jumlahHcDetail;
+            $totalPersenBpjsJkk += $persenBpjsJkkDetail * $jumlahHcDetail;
+            $totalPersenBpjsJkm += $persenBpjsJkmDetail * $jumlahHcDetail;
+            $totalPersenBpjsJht += $persenBpjsJhtDetail * $jumlahHcDetail;
+            $totalPersenBpjsJp += $persenBpjsJpDetail * $jumlahHcDetail;
+            $totalPersenBpjsKes += $persenBpjsKesDetail * $jumlahHcDetail;
+        }
+        
+        // Set untuk HPP (suffix kosong) dan COSS (suffix '_coss')
+        if ($suffix === '') {
+            // Untuk HPP
+            $summary->persen_bpjs_ketenagakerjaan = $totalPersenBpjsKetenagakerjaan / $totalHc;
+            $summary->persen_bpjs_kesehatan = $totalPersenBpjsKesehatan / $totalHc;
+            $summary->persen_bpjs_jkk = $totalPersenBpjsJkk / $totalHc;
+            $summary->persen_bpjs_jkm = $totalPersenBpjsJkm / $totalHc;
+            $summary->persen_bpjs_jht = $totalPersenBpjsJht / $totalHc;
+            $summary->persen_bpjs_jp = $totalPersenBpjsJp / $totalHc;
+            $summary->persen_bpjs_kes = $totalPersenBpjsKes / $totalHc;
+        } else if ($suffix === '_coss') {
+            // Untuk COSS (gunakan nilai yang sama karena perhitungannya sama)
+            $summary->persen_bpjs_ketenagakerjaan_coss = $totalPersenBpjsKetenagakerjaan / $totalHc;
+            $summary->persen_bpjs_kesehatan_coss = $totalPersenBpjsKesehatan / $totalHc;
+            $summary->persen_bpjs_jkk_coss = $totalPersenBpjsJkk / $totalHc;
+            $summary->persen_bpjs_jkm_coss = $totalPersenBpjsJkm / $totalHc;
+            $summary->persen_bpjs_jht_coss = $totalPersenBpjsJht / $totalHc;
+            $summary->persen_bpjs_jp_coss = $totalPersenBpjsJp / $totalHc;
+            $summary->persen_bpjs_kes_coss = $totalPersenBpjsKes / $totalHc;
+        }
+        
+        \Log::info("BPJS percentages calculated for {$suffix}", [
             'quotation_id' => $quotation->id,
-            'total_potongan_bpu' => $summary->total_potongan_bpu,
-            'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
-            'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+            'suffix' => $suffix,
+            'persen_bpjs_ketenagakerjaan' => $suffix === '' ? 
+                $summary->persen_bpjs_ketenagakerjaan : $summary->persen_bpjs_ketenagakerjaan_coss,
+            'persen_bpjs_kesehatan' => $suffix === '' ? 
+                $summary->persen_bpjs_kesehatan : $summary->persen_bpjs_kesehatan_coss,
+            'persen_bpjs_jkk' => $suffix === '' ? 
+                $summary->persen_bpjs_jkk : $summary->persen_bpjs_jkk_coss,
+            'persen_bpjs_jkm' => $suffix === '' ? 
+                $summary->persen_bpjs_jkm : $summary->persen_bpjs_jkm_coss,
+            'persen_bpjs_jht' => $suffix === '' ? 
+                $summary->persen_bpjs_jht : $summary->persen_bpjs_jht_coss,
+            'persen_bpjs_jp' => $suffix === '' ? 
+                $summary->persen_bpjs_jp : $summary->persen_bpjs_jp_coss,
+            'persen_bpjs_kes' => $suffix === '' ? 
+                $summary->persen_bpjs_kes : $summary->persen_bpjs_kes_coss,
         ]);
     }
+
+    \Log::info("BPU totals calculated", [
+        'quotation_id' => $quotation->id,
+        'total_potongan_bpu' => $summary->total_potongan_bpu,
+        'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
+        'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+    ]);
+}
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;

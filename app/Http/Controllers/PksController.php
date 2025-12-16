@@ -7,6 +7,7 @@ use App\Http\Resources\QuotationResource;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\HrisSite;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Leads;
@@ -1558,7 +1559,7 @@ class PksController extends Controller
      */
     private function syncSiteToHris($site, $pks, $leads, $quotation, $clientId, $current_date_time)
     {
-        Site::create([
+        HrisSite::create([
             'site_id' => $site->id,
             'code' => $leads->nomor,
             'proyek_id' => 0,
