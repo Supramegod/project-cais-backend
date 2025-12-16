@@ -866,7 +866,7 @@ class LeadsController extends Controller
                 'nomor' => $nomorActivity,
                 'notes' => 'Leads Diupdate' .
                     (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
-                'tipe' => 'Leads Update',
+                'tipe' => 'Leads',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
