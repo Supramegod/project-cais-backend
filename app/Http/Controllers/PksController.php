@@ -23,6 +23,7 @@ use App\Models\PksPerjanjian;
 use App\Models\CustomerActivity;
 use App\Models\Kebutuhan;
 use App\Models\SpkSite;
+use App\Services\PksPerjanjianTemplateService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -897,8 +898,37 @@ class PksController extends Controller
 
         // Create Initial Activity
         $this->createInitialActivity($pks, $leads, $pksNomor);
+        $this->createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor);
+
 
         return $pks;
+    }
+
+    /**
+     * Create PKS Perjanjian using service
+     */
+    private function createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor)
+    {
+        try {
+            // Inisialisasi service
+            $templateService = new PksPerjanjianTemplateService(
+                $leads,
+                $company,
+                $kebutuhan,
+                $ruleThr,
+                $salaryRule,
+                $pksNomor
+            );
+
+            // Insert agreement sections
+            $templateService->insertAgreementSections($pks->id, Auth::user()->full_name);
+
+            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to create PKS Perjanjian: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     private function createSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads)
