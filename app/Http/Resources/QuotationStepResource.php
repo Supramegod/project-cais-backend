@@ -351,13 +351,6 @@ class QuotationStepResource extends JsonResource
                         'persen_bpjs_jht' => $summary->persen_bpjs_jht_coss ?? 0,
                         'persen_bpjs_jp' => $summary->persen_bpjs_jp_coss ?? 0,
                     ];
-
-                    \Log::info("BPJS percentages in resource", [
-                        'hpp_total' => $persenBpjsTotalHpp,
-                        'coss_total' => $persenBpjsTotalCoss,
-                        'hpp_breakdown' => $persenBpjsBreakdownHpp,
-                        'coss_breakdown' => $persenBpjsBreakdownCoss
-                    ]);
                 }
 
                 return [
@@ -397,9 +390,8 @@ class QuotationStepResource extends JsonResource
                             'gpm' => $calculatedQuotation->calculation_summary->gpm ?? 0,
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
-                            'persen_bpjs_total' => $persenBpjsTotalHpp,
+                            // 'persen_bpjs_total' => $persenBpjsTotalHpp,
                             'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
-                            'persen_bpjs_breakdown' => $persenBpjsBreakdownHpp,
                         ],
 
                         'coss' => [
@@ -415,9 +407,8 @@ class QuotationStepResource extends JsonResource
                             'gpm_coss' => $calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
-                            'persen_bpjs_total' => $persenBpjsTotalCoss,
+                            // 'persen_bpjs_total' => $persenBpjsTotalCoss,
                             'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan_coss ?? 0,
-                            'persen_bpjs_breakdown' => $persenBpjsBreakdownCoss,
                         ],
                         'quotation_details' => $calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
                             $wage = $detail->wage ?? null;
