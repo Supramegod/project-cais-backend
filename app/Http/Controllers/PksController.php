@@ -311,6 +311,7 @@ class PksController extends Controller
         return [
             'quotation_id' => $quotation->id,
             'nomor_quotation' => $quotation->nomor,
+            'jenis_kontrak' => $quotation->jenis_kontrak,
             'penagihan' => $quotation->penagihan,
             'nama_perusahaan' => $quotation->nama_perusahaan,
             'persentase' => $quotation->persentase,
