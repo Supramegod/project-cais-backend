@@ -123,7 +123,7 @@ class AuthController extends Controller
 
 
             // 3. 🔥 HAPUS SEMUA TOKEN LAMA USER INI
-            $this->revokeAllUserTokens($user);
+            // $this->revokeAllUserTokens($user);
 
             // 4. Buat token pair baru
             $tokenPair = $user->createTokenPair('auth_token');
