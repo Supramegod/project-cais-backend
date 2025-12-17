@@ -351,13 +351,6 @@ class QuotationStepResource extends JsonResource
                         'persen_bpjs_jht' => $summary->persen_bpjs_jht_coss ?? 0,
                         'persen_bpjs_jp' => $summary->persen_bpjs_jp_coss ?? 0,
                     ];
-
-                    \Log::info("BPJS percentages in resource", [
-                        'hpp_total' => $persenBpjsTotalHpp,
-                        'coss_total' => $persenBpjsTotalCoss,
-                        'hpp_breakdown' => $persenBpjsBreakdownHpp,
-                        'coss_breakdown' => $persenBpjsBreakdownCoss
-                    ]);
                 }
 
                 return [

@@ -355,8 +355,8 @@ class QuotationResource extends JsonResource
                     'margin' => $this->calculatedQuotation->calculation_summary->margin ?? 0,
                     'gpm' => $this->calculatedQuotation->calculation_summary->gpm ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
-                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan ?? 0,
+                    'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
+                    'persen_bpjs_ketenagakerjaan_total' => $this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan ?? 0,
                     'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
                 'coss' => [
@@ -371,10 +371,11 @@ class QuotationResource extends JsonResource
                     'margin_coss' => $this->calculatedQuotation->calculation_summary->margin_coss ?? 0,
                     'gpm_coss' => $this->calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
-                    'persen_bpjs_kesehatan' => $this->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => $this->persen_bpjs_ketenagakerjaan ?? 0,
+                    'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
+                    'persen_bpjs_ketenagakerjaan_total' => $this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0,
                     'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
+           
                 'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
                     // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
                     $wage = $detail->wage ?? null;

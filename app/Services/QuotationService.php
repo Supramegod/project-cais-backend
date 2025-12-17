@@ -886,25 +886,6 @@ class QuotationService
             $summary->persen_bpjs_jp_coss = $totalPersenBpjsJp / $totalHc;
             $summary->persen_bpjs_kes_coss = $totalPersenBpjsKes / $totalHc;
         }
-        
-        \Log::info("BPJS percentages calculated for {$suffix}", [
-            'quotation_id' => $quotation->id,
-            'suffix' => $suffix,
-            'persen_bpjs_ketenagakerjaan' => $suffix === '' ? 
-                $summary->persen_bpjs_ketenagakerjaan : $summary->persen_bpjs_ketenagakerjaan_coss,
-            'persen_bpjs_kesehatan' => $suffix === '' ? 
-                $summary->persen_bpjs_kesehatan : $summary->persen_bpjs_kesehatan_coss,
-            'persen_bpjs_jkk' => $suffix === '' ? 
-                $summary->persen_bpjs_jkk : $summary->persen_bpjs_jkk_coss,
-            'persen_bpjs_jkm' => $suffix === '' ? 
-                $summary->persen_bpjs_jkm : $summary->persen_bpjs_jkm_coss,
-            'persen_bpjs_jht' => $suffix === '' ? 
-                $summary->persen_bpjs_jht : $summary->persen_bpjs_jht_coss,
-            'persen_bpjs_jp' => $suffix === '' ? 
-                $summary->persen_bpjs_jp : $summary->persen_bpjs_jp_coss,
-            'persen_bpjs_kes' => $suffix === '' ? 
-                $summary->persen_bpjs_kes : $summary->persen_bpjs_kes_coss,
-        ]);
     }
 
     \Log::info("BPU totals calculated", [
