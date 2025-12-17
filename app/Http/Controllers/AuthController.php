@@ -123,7 +123,7 @@ class AuthController extends Controller
 
 
             // 3. 🔥 HAPUS SEMUA TOKEN LAMA USER INI
-            // $this->revokeAllUserTokens($user);
+            $this->revokeAllUserTokens($user);
 
             // 4. Buat token pair baru
             $tokenPair = $user->createTokenPair('auth_token');
@@ -276,7 +276,6 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-
             // Cek apakah user terautentikasi
             if (!$user) {
                 return response()->json([
@@ -284,7 +283,6 @@ class AuthController extends Controller
                     'message' => 'Unauthenticated'
                 ], 401);
             }
-
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -298,14 +296,12 @@ class AuthController extends Controller
                     ]
                 ]
             ], 200);
-
         } catch (Exception $e) {
             Log::error('User endpoint error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => Auth::id() ?? 'unknown'
             ]);
-
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan pada server'
@@ -455,29 +451,54 @@ class AuthController extends Controller
     private function revokeAllUserTokens(User $user)
     {
         try {
-            // 1. Dapatkan semua access token user ini
-            $accessTokenIds = $user->tokens()->pluck('id')->toArray();
+            $now = now();
 
-            // 2. Hapus semua refresh token yang terkait dengan access token user ini
-            if (!empty($accessTokenIds)) {
-                RefreshTokens::whereIn('access_token_id', $accessTokenIds)->delete();
+            $expiredTokenIds = $user->tokens()
+                ->where('expires_at', '<', $now)
+                ->pluck('id')
+                ->toArray();
+
+            if (!empty($expiredTokenIds)) {
+                RefreshTokens::whereIn('access_token_id', $expiredTokenIds)->delete();
+                $user->tokens()->whereIn('id', $expiredTokenIds)->delete();
             }
 
-            // 3. Hapus semua access token user ini
-            $user->tokens()->delete();
-
-            Log::info('All user tokens revoked', [
+            Log::info('Expired user tokens revoked', [
                 'user_id' => $user->id,
-                'access_tokens_deleted' => count($accessTokenIds),
-                'timestamp' => now()
+                'expired_count' => count($expiredTokenIds),
+                'timestamp' => $now
             ]);
 
         } catch (Exception $e) {
-            Log::error('Error revoking user tokens', [
+            Log::error('Error revoking expired user tokens', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage()
             ]);
             throw $e;
         }
     }
+//     private function revokeAllUserTokens(User $user)
+// {
+//     try {
+//         $accessTokenIds = $user->tokens()->pluck('id')->toArray();
+
+//         if (!empty($accessTokenIds)) {
+//             RefreshTokens::whereIn('access_token_id', $accessTokenIds)->delete();
+//             $user->tokens()->delete();
+//         }
+
+//         Log::info('All user tokens revoked', [
+//             'user_id' => $user->id,
+//             'count' => count($accessTokenIds),
+//             'timestamp' => now()
+//         ]);
+
+//     } catch (Exception $e) {
+//         Log::error('Error revoking all user tokens', [
+//             'user_id' => $user->id,
+//             'error' => $e->getMessage()
+//         ]);
+//         throw $e;
+//     }
+// }
 }

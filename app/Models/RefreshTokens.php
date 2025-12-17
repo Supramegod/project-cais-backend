@@ -11,6 +11,7 @@ class RefreshTokens extends Model
     use HasFactory;
 
     protected $table = 'refresh_tokens';
+    protected $connection = 'mysql';
 
     protected $fillable = [
         'access_token_id',
