@@ -848,7 +848,7 @@ class QuotationService
         $totalPersenBpjsKes = 0;
         
         foreach ($quotation->quotation_detail as $detail) {
-            $persenBpjsKetenagakerjaanDetail = $detail->persen_bpjs_ketenagakerjaan ?? 0;
+          
             $persenBpjsKesehatanDetail = $detail->persen_bpjs_kesehatan ?? 0;
             $persenBpjsJkkDetail = $detail->persen_bpjs_jkk ?? 0;
             $persenBpjsJkmDetail = $detail->persen_bpjs_jkm ?? 0;
@@ -856,35 +856,29 @@ class QuotationService
             $persenBpjsJpDetail = $detail->persen_bpjs_jp ?? 0;
             $persenBpjsKesDetail = $detail->persen_bpjs_kes ?? 0;
             $jumlahHcDetail = $detail->jumlah_hc;
+            $persenBpjsKetenagakerjaanDetail = $detail->persen_bpjs_ketenagakerjaan ?? 0;
             
-            $totalPersenBpjsKetenagakerjaan += $persenBpjsKetenagakerjaanDetail * $jumlahHcDetail;
-            $totalPersenBpjsKesehatan += $persenBpjsKesehatanDetail * $jumlahHcDetail;
-            $totalPersenBpjsJkk += $persenBpjsJkkDetail * $jumlahHcDetail;
-            $totalPersenBpjsJkm += $persenBpjsJkmDetail * $jumlahHcDetail;
-            $totalPersenBpjsJht += $persenBpjsJhtDetail * $jumlahHcDetail;
-            $totalPersenBpjsJp += $persenBpjsJpDetail * $jumlahHcDetail;
-            $totalPersenBpjsKes += $persenBpjsKesDetail * $jumlahHcDetail;
         }
         
         // Set untuk HPP (suffix kosong) dan COSS (suffix '_coss')
         if ($suffix === '') {
             // Untuk HPP
-            $summary->persen_bpjs_ketenagakerjaan = $totalPersenBpjsKetenagakerjaan / $totalHc;
-            $summary->persen_bpjs_kesehatan = $totalPersenBpjsKesehatan / $totalHc;
-            $summary->persen_bpjs_jkk = $totalPersenBpjsJkk / $totalHc;
-            $summary->persen_bpjs_jkm = $totalPersenBpjsJkm / $totalHc;
-            $summary->persen_bpjs_jht = $totalPersenBpjsJht / $totalHc;
-            $summary->persen_bpjs_jp = $totalPersenBpjsJp / $totalHc;
-            $summary->persen_bpjs_kes = $totalPersenBpjsKes / $totalHc;
+            $summary->persen_bpjs_ketenagakerjaan = $persenBpjsKetenagakerjaanDetail;
+            $summary->persen_bpjs_kesehatan = $persenBpjsKesehatanDetail;
+            $summary->persen_bpjs_jkk = $persenBpjsJkkDetail;
+            $summary->persen_bpjs_jkm = $persenBpjsJkmDetail;
+            $summary->persen_bpjs_jht = $persenBpjsJhtDetail;
+            $summary->persen_bpjs_jp = $persenBpjsJpDetail;
+            $summary->persen_bpjs_kes = $persenBpjsKesDetail;
         } else if ($suffix === '_coss') {
             // Untuk COSS (gunakan nilai yang sama karena perhitungannya sama)
-            $summary->persen_bpjs_ketenagakerjaan_coss = $totalPersenBpjsKetenagakerjaan / $totalHc;
-            $summary->persen_bpjs_kesehatan_coss = $totalPersenBpjsKesehatan / $totalHc;
-            $summary->persen_bpjs_jkk_coss = $totalPersenBpjsJkk / $totalHc;
-            $summary->persen_bpjs_jkm_coss = $totalPersenBpjsJkm / $totalHc;
-            $summary->persen_bpjs_jht_coss = $totalPersenBpjsJht / $totalHc;
-            $summary->persen_bpjs_jp_coss = $totalPersenBpjsJp / $totalHc;
-            $summary->persen_bpjs_kes_coss = $totalPersenBpjsKes / $totalHc;
+            $summary->persen_bpjs_ketenagakerjaan_coss = $persenBpjsKetenagakerjaanDetail;
+            $summary->persen_bpjs_kesehatan_coss = $persenBpjsKesehatanDetail;
+            $summary->persen_bpjs_jkk_coss = $persenBpjsJkkDetail;
+            $summary->persen_bpjs_jkm_coss = $persenBpjsJkmDetail;
+            $summary->persen_bpjs_jht_coss = $persenBpjsJhtDetail;
+            $summary->persen_bpjs_jp_coss = $persenBpjsJpDetail;
+            $summary->persen_bpjs_kes_coss = $persenBpjsKesDetail;
         }
     }
 
