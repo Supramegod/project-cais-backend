@@ -42,6 +42,7 @@ class Quotation extends Model
         'ot1',
         'ot2',
         'ot3',
+        'pengiriman_invoice',
         // Kolom baru yang ditambahkan
         'quotation_client_id',
         'layanan_id',
