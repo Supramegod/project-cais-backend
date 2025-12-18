@@ -5,9 +5,9 @@ namespace App\Http\Requests;
 use App\Models\QuotationDetail;
 use App\Models\QuotationSite;
 use App\Models\Umk;
-use Illuminate\Foundation\Http\FormRequest;
 
-class QuotationStepRequest extends FormRequest
+
+class QuotationStepRequest extends BaseRequest
 {
     public function authorize(): bool
     {

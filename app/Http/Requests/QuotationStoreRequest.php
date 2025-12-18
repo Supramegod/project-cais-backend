@@ -2,9 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 
-class QuotationStoreRequest extends FormRequest
+class QuotationStoreRequest extends BaseRequest
 {
     public function authorize(): bool
     {
