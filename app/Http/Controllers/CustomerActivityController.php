@@ -152,14 +152,12 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-      public function list(Request $request): JsonResponse
+    public function list(Request $request): JsonResponse
     {
         try {
-            // Set default tanggal jika tidak ada parameter
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi tanggal hanya jika kedua parameter ada
             if ($request->tgl_dari && $request->tgl_sampai) {
                 if (Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
                     return response()->json([
@@ -169,7 +167,6 @@ class CustomerActivityController extends Controller
                 }
             }
 
-            // Query dasar dengan eager loading
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
@@ -177,12 +174,10 @@ class CustomerActivityController extends Controller
                 'timSalesDetail:id,nama'
             ])->whereNull('deleted_at');
 
-            // Filter tanggal - hanya diterapkan jika ada parameter tanggal
             if ($request->tgl_dari || $request->tgl_sampai) {
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
-            // Apply filters - hanya jika parameter ada dan tidak null/empty
             if ($request->filled('branch')) {
                 $query->whereHas('leads', function ($q) use ($request) {
                     $q->where('branch_id', $request->branch);
@@ -203,20 +198,16 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            // Filter berdasarkan role user
             $user = Auth::user();
             if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                // Logic filter untuk divisi sales - menampilkan hanya aktivitas user tersebut
                 $query->where('user_id', $user->id);
             }
 
-            // Order dan get data
             $activities = $query->orderBy('tgl_activity', 'desc')
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            // Map data untuk menampilkan hanya field yang diperlukan
-            $mappedActivities = $activities->map(function ($activity) {
+            $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
                 return [
                     'id' => $activity->id,
                     'nomor' => $activity->nomor,

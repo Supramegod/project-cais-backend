@@ -426,6 +426,8 @@ class PksController extends Controller
                         'position_name' => $detail->jabatan_kebutuhan,
                         'jumlah_hc' => $detail->jumlah_hc,
                         'nama_site' => $detail->nama_site,
+                        'kebutuhan' => $detail->kebutuhan,
+                        'kota_site' => $detail->quotationSite->kota,
                         'quotation_site_id' => $detail->quotation_site_id,
                         'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                         'tunjangan_data' => $tunjanganData,

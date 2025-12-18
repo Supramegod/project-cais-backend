@@ -30,10 +30,10 @@ class QuotationStepRequest extends FormRequest
                 $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
                 $rules['tgl_penempatan'] = 'required|date';
-                $rules['top'] = 'required|string';
+                $rules['top'] = 'required|in:Non Top ,Kurang Dari 7 Hari ,Lebih Dari 7 Hari';
                 $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
-                $rules['jumlah_hari_invoice'] = 'sometimes|integer|min:1';
-                $rules['tipe_hari_invoice'] = 'sometimes|string|in:Kerja,Kalender';
+                $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari |integer|min:1';
+                $rules['tipe_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|string|in:Kerja,Kalender';
                 $rules['evaluasi_kontrak'] = 'sometimes|string';
                 $rules['durasi_kerjasama'] = 'sometimes|string';
                 $rules['durasi_karyawan'] = 'sometimes|string';
@@ -41,7 +41,7 @@ class QuotationStepRequest extends FormRequest
                 $rules['ada_cuti'] = 'required|string|in:Ada,Tidak Ada';
                 $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
                 $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Cuti Roster,Tidak Ada';
-                $rules['gaji_saat_cuti'] = 'required_if:ada_cuti,Ada|string|in:No Work No Pay,Prorate';
+                // $rules['gaji_saat_cuti'] = 'required_if:ada_cuti,Ada|string|in:No Work No Pay,Prorate';
                 $rules['prorate'] = 'required_if:gaji_saat_cuti,Prorate|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
                 $rules['hari_kerja'] = 'sometimes|string';
@@ -61,25 +61,24 @@ class QuotationStepRequest extends FormRequest
                 $rules['ppn_pph_dipotong'] = 'sometimes|in:Total Invoice,Management Fee';
                 $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
                 $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
+                $rules['position_data'] = 'required|array|min:1';
 
-                $rules['position_data'] = 'sometimes|array';
-                $rules['position_data.*.quotation_detail_id'] = 'required_with:position_data|exists:sl_quotation_detail,id';
-                $rules['position_data.*.upah'] = 'required_with:position_data|string|in:UMP,UMK,Custom';
+                $rules['position_data.*.quotation_detail_id'] = 'required|exists:sl_quotation_detail,id';
+                $rules['position_data.*.upah'] = 'required|string|in:UMP,UMK,Custom';
                 $rules['position_data.*.hitungan_upah'] = 'required_if:position_data.*.upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.nominal_upah'] = 'required_if:position_data.*.upah,Custom|numeric|min:0'; // TAMBAHKAN INI
+                $rules['position_data.*.nominal_upah'] = 'required_if:position_data.*.upah,Custom|numeric|min:0';
 
                 $rules['position_data.*.lembur'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_lembur'] = 'required_if:position_data.*.lembur,Flat|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_lembur'] = 'required_if:position_data.*.lembur,Flat|in:Per Bulan,Per Hari,Per Jam';
                 $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:0 ';
                 $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
-
                 $rules['position_data.*.kompensasi'] = 'required|in:Diprovisikan,Ditagihkan,Tidak Ada';
                 $rules['position_data.*.thr'] = 'required|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
+
                 $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
                 $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|in:Per Bulan,Per Hari,Per Jam';
-
                 break;
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
@@ -209,7 +208,7 @@ class QuotationStepRequest extends FormRequest
             'position_data.*.nominal_upah.min' => 'Nominal upah tidak boleh kurang dari 0',
             'position_data.*.thr.required' => 'tunjangan hari raya  harus diisi',
             'position_data.*.kompensasi.required' => 'kompensasi harus diisi',
-            
+
 
             // Step 5 Messages
             'jenis-perusahaan.required' => 'Jenis perusahaan harus dipilih',
