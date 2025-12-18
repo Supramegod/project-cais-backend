@@ -30,9 +30,9 @@ class QuotationStepRequest extends FormRequest
                 $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
                 $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
                 $rules['tgl_penempatan'] = 'required|date';
-                $rules['top'] = 'required|in:Non Top ,Kurang Dari 7 Hari ,Lebih Dari 7 Hari';
+                $rules['top'] = 'required|in:Non TOP,Kurang Dari 7 Hari,Lebih Dari 7 Hari';
                 $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
-                $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari |integer|min:1';
+                $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|integer|min:1';
                 $rules['tipe_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|string|in:Kerja,Kalender';
                 $rules['evaluasi_kontrak'] = 'sometimes|string';
                 $rules['durasi_kerjasama'] = 'sometimes|string';
@@ -78,11 +78,12 @@ class QuotationStepRequest extends FormRequest
 
                 $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
-                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'sometimes|in:Per Bulan,Per Hari,Per Jam';
+                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|in:Per Bulan,Per Hari,Per Jam';
                 break;
             case 5:
                 $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
                 $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
+                
                 $rules['resiko'] = 'required|string';
                 $rules['program-bpjs'] = 'required|string';
                 $rules['penjamin'] = 'sometimes|array';
