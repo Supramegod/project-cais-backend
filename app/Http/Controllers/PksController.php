@@ -1607,9 +1607,14 @@ class PksController extends Controller
 
     private function getAvailableLeadsData()
     {
+        $user = Auth::user();
+
         return Leads::with(['timSalesD.user'])
-            ->whereHas('timSalesD', function ($query) {
-                $query->where('user_id', Auth::id());
+            // Jika role_id BUKAN 2 (Bukan Superadmin), maka filter berdasarkan user_id login
+            ->when($user->role_id != 2, function ($query) use ($user) {
+                $query->whereHas('timSalesD', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                });
             })
             ->whereHas('spkSites', function ($query) {
                 $query->whereNull('sl_spk_site.deleted_at')

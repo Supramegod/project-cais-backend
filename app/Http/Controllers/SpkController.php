@@ -467,21 +467,116 @@ class SpkController extends Controller
             $spk = Spk::with([
                 'leads',
                 'statusSpk',
-                'spkSites.quotation',
-                'spkSites.quotationSite'
+                'spkSites.quotation',  // Relasi ke quotation dari spkSite
+                'spkSites.quotation.quotationPics.jabatan', // Relasi ke PIC dengan jabatan
+                'spkSites.quotation.company', // Relasi ke company untuk alamat
+                'spkSites.quotation.quotationDetails', // Relasi ke details untuk HC
+                'spkSites' // Relasi ke site
             ])->find($id);
 
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
+            // DEBUG: Cek apakah company dimuat dengan benar
+            if ($spk->spkSites->isNotEmpty()) {
+                $firstSite = $spk->spkSites->first();
+                if ($firstSite->quotation) {
+                    // Cek ini di browser/Postman
+                    \Log::info('Quotation ID: ' . $firstSite->quotation->id);
+                    \Log::info('Company ID: ' . ($firstSite->quotation->company_id ?? 'null'));
+                    \Log::info('Company loaded: ' . ($firstSite->quotation->relationLoaded('company') ? 'yes' : 'no'));
+                    // \Log::info('Company object: ', $firstSite->quotation->company ? $firstSite->quotation->company->toArray() : ['null']);
+                }
+            }
 
-            // Format dates
-            $spk->screated_at = Carbon::parse($spk->created_at)->isoFormat('D MMMM Y');
-            $spk->status = $spk->statusSpk->nama ?? 'Unknown';
+            // 1. Informasi SPK
+            $spkInfo = [
+                'nomor_spk' => $spk->nomor,
+                'tanggal_spk' => $spk->tgl_spk,
+            ];
 
-            return $this->successResponse('SPK details retrieved successfully', $spk);
+            // 2. Informasi Leads
+            $leadsInfo = [
+                'id' => $spk->leads->id ?? null,
+                'nama_perusahaan' => $spk->leads->nama_perusahaan ?? null,
+                'nama_pic' => $spk->leads->pic ?? null,
+                'telepon_pic' => $spk->leads->no_telp ?? null,
+                'email_pic' => $spk->leads->email ?? null,
+                'alamat_perusahaan' => $spk->leads->alamat?? null
+            ];
+
+            // 3. Informasi Quotation (ARRAY karena bisa lebih dari satu)
+            $quotationsInfo = [];
+
+            // Kelompokkan quotation berdasarkan ID untuk menghindari duplikat
+            $uniqueQuotations = collect();
+
+            foreach ($spk->spkSites as $spkSite) {
+                if ($spkSite->quotation && !$uniqueQuotations->contains('id', $spkSite->quotation->id)) {
+                    $uniqueQuotations->push($spkSite->quotation);
+                }
+            }
+
+            foreach ($uniqueQuotations as $quotation) {
+                // Cari PIC utama (is_kuasa = 1)
+                // fallback: ambil Company via relation() jika properti ->company bukan model
+                $companyModel = null;
+                if ($quotation->relationLoaded('company') && $quotation->company instanceof Company) {
+                    $companyModel = $quotation->company;
+                } elseif (!empty($quotation->company_id)) {
+                    $companyModel = Company::find($quotation->company_id);
+                }
+
+                // $picKuasa = $quotation->quotationPics->where('is_kuasa', 1)->first();
+                // $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
+                // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
+
+                $quotationsInfo[] = [
+                    'id' => $quotation->id,
+                    'nomor_quotation' => $quotation->nomor ?? null,
+                    'kebutuhan' => $quotation->kebutuhan ?? null,
+                    'jenis_kontrak' => $quotation->jenis_kontrak ?? null,
+                    // 'nama_pic' => $picKuasa->nama ?? null,
+                    'company_address' => $companyModel ? ($companyModel->address ?? null) : null,
+                    // 'posisi_jabatan' => $posisiJabatan,
+                    // 'jumlah_hc' => $totalHc,
+                    'tanggal_quotation' => $quotation->tgl_quotation ?? null,
+                    'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
+                        return [
+                            'id' => $detail->id,
+                            'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
+                            'jumlah_hc' => $detail->jumlah_hc
+                        ];
+                    })
+                ];
+            }
+
+            // 4. Informasi Site (array karena bisa banyak site)
+            $sitesInfo = $spk->spkSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'quotation_id' => $site->quotation_id
+                ];
+            });
+
+            // Struktur respons akhir
+            $responseData = [
+                'spk' => $spkInfo,
+                'leads' => $leadsInfo,
+                'quotations' => $quotationsInfo,
+                'sites' => $sitesInfo
+            ];
+
+            return $this->successResponse('SPK details retrieved successfully', $responseData);
 
         } catch (\Exception $e) {
+            // Untuk debugging, tambahkan ini:
+            \Log::error('SPK View Error: ' . $e->getMessage());
+            \Log::error('SPK View Stack Trace: ' . $e->getTraceAsString());
+
             return $this->errorResponse('Error fetching SPK details', $e->getMessage());
         }
     }
