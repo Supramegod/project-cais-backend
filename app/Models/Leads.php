@@ -152,6 +152,11 @@ class Leads extends Model
     {
         return $this->hasOne(Customer::class, 'leads_id');
     }
+    public function jabatanPic()
+    {
+        return $this->belongsTo(JabatanPic::class, 'jabatan');
+    }
+
 
     // Update scope AvailableCustomers
     public function scopeAvailableCustomers($query)
