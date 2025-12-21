@@ -16,7 +16,7 @@ class JabatanPic extends Model
     // Sesuaikan field di bawah ini dengan struktur kolom tabel Anda
     // Biasanya hanya nama jabatan dan status aktif/kode yang diisi
     protected $fillable = [
-        'nama_jabatan',
+        'nama',
         'kode',
         'is_active',
         'created_by',
@@ -36,5 +36,9 @@ class JabatanPic extends Model
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
+    }
+    public function leads()
+    {
+        return $this->hasMany(Leads::class, 'jabatan', 'id');
     }
 }

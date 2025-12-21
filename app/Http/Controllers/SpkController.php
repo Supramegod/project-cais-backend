@@ -466,6 +466,7 @@ class SpkController extends Controller
         try {
             $spk = Spk::with([
                 'leads',
+                'leads.jabatanPic',
                 'statusSpk',
                 'spkSites.quotation',  // Relasi ke quotation dari spkSite
                 'spkSites.quotation.quotationPics.jabatan', // Relasi ke PIC dengan jabatan
@@ -494,7 +495,6 @@ class SpkController extends Controller
                 'nomor_spk' => $spk->nomor,
                 'tanggal_spk' => $spk->tgl_spk,
             ];
-
             // 2. Informasi Leads
             $leadsInfo = [
                 'id' => $spk->leads->id ?? null,
@@ -502,7 +502,8 @@ class SpkController extends Controller
                 'nama_pic' => $spk->leads->pic ?? null,
                 'telepon_pic' => $spk->leads->no_telp ?? null,
                 'email_pic' => $spk->leads->email ?? null,
-                'alamat_perusahaan' => $spk->leads->alamat?? null
+                'alamat_perusahaan' => $spk->leads->alamat?? null,
+                'jabatan_nama' => $spk->leads->jabatanPic?->nama ?? null,
             ];
 
             // 3. Informasi Quotation (ARRAY karena bisa lebih dari satu)
@@ -536,11 +537,11 @@ class SpkController extends Controller
                     'nomor_quotation' => $quotation->nomor ?? null,
                     'kebutuhan' => $quotation->kebutuhan ?? null,
                     'jenis_kontrak' => $quotation->jenis_kontrak ?? null,
-                    // 'nama_pic' => $picKuasa->nama ?? null,
+                    'tanggal_penempatan' => $quotation->tgl_penempatan ?? null,
+                    'company_name' => $companyModel ? ($companyModel->name ?? null) : null,
                     'company_address' => $companyModel ? ($companyModel->address ?? null) : null,
-                    // 'posisi_jabatan' => $posisiJabatan,
-                    // 'jumlah_hc' => $totalHc,
                     'tanggal_quotation' => $quotation->tgl_quotation ?? null,
+                    'npwp'=>$quotation->npwp ?? null,
                     'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
                         return [
                             'id' => $detail->id,
