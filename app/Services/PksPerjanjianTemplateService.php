@@ -189,6 +189,7 @@ tab-stops:117.0pt 144.0pt"><b><span lang="EN-US" style="font-family:&quot;Arial&
 <b>PIHAK KEDUA </b>selanjutnya secara bersama-sama akan disebut sebagai <b>PARA
 PIHAK</b></span><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">.<o:p></o:p></span></p>
 
+
 <p class="MsoNormal" style="margin-bottom:6.0pt;text-align:justify;text-justify:
 inter-ideograph;tab-stops:117.0pt"><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;
 mso-bidi-font-weight:bold">Sebelumnya<b> PIHAK PERTAMA </b>dan<b> PIHAK KEDUA </b>menerangkan
