@@ -414,7 +414,7 @@ class QuotationStepResource extends JsonResource
                             $wage = $detail->wage ?? null;
                             $potonganBpu = $detail->potongan_bpu ?? 0;
 
-                        
+
                             $bpjsJkk = $detail->bpjs_jkk ?? 0;
                             $bpjsJkm = $detail->bpjs_jkm ?? 0;
                             $bpjsJht = $detail->bpjs_jht ?? 0;
@@ -444,17 +444,20 @@ class QuotationStepResource extends JsonResource
                                 if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
                                     $lemburDisplay = 'Ditagihkan terpisah';
                                 } elseif ($wage->lembur == 'Flat') {
-                                    $lemburDisplay = 'Rp. ' . number_format($detail->lembur, 2, ',', '.');
+                                    // Tambahkan (float) di sini
+                                    $lemburDisplay = 'Rp. ' . number_format((float) ($detail->lembur ?? 0), 2, ',', '.');
                                 } else {
                                     $lemburDisplay = 'Tidak Ada';
                                 }
                             }
+
                             $tunjanganHolidayDisplay = '';
                             if ($wage) {
                                 if ($wage->tunjangan_holiday == 'Normatif') {
                                     $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
                                 } elseif ($wage->tunjangan_holiday == 'Flat') {
-                                    $tunjanganHolidayDisplay = 'Rp. ' . number_format($detail->tunjangan_holiday, 2, ',', '.');
+                                    // Tambahkan (float) di sini
+                                    $tunjanganHolidayDisplay = 'Rp. ' . number_format((float) ($detail->tunjangan_holiday ?? 0), 2, ',', '.');
                                 } else {
                                     $tunjanganHolidayDisplay = 'Tidak Ada';
                                 }
@@ -470,7 +473,7 @@ class QuotationStepResource extends JsonResource
                                 'tunjangan_data' => $tunjanganData,
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
-                                    'total_tunjangan' => $detail->total_tunjangan,        
+                                    'total_tunjangan' => $detail->total_tunjangan,
                                     'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
                                     'bpjs_kesehatan' => $bpjsKesehatan,
                                     'bpjs_jkk' => $bpjsJkk,
