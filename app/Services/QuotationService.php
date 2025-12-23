@@ -218,8 +218,15 @@ class QuotationService
         $detail->nominal_upah = $detail->nominal_upah ?? $hpp->gaji_pokok ?? $site->nominal_upah;
         $detail->umk = $site->umk ?? 0;
         $detail->ump = $site->ump ?? 0;
-        $detail->bunga_bank = $hpp->bunga_bank ?? 0;
-        $detail->insentif = $hpp->insentif ?? 0;
+
+        // Jangan set bunga_bank dan insentif jika sudah ada (misalnya dari gross-up)
+        if (!isset($detail->bunga_bank)) {
+            $detail->bunga_bank = $hpp->bunga_bank ?? 0;
+        }
+        if (!isset($detail->insentif)) {
+            $detail->insentif = $hpp->insentif ?? 0;
+        }
+
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
         $detail->lembur = $wage->lembur ?? "Tidak";
@@ -233,7 +240,6 @@ class QuotationService
         $detail->nominal_tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
         $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
     }
-
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
         try {
@@ -767,23 +773,36 @@ class QuotationService
 
         $summary->insentif_total = $quotation->persen_insentif ?
             $summary->nominal_management_fee_coss * ($quotation->persen_insentif / 100) / $jumlahHc : 0;
+        \Log::info('Bunga Bank Calculation', [
+            'top' => $quotation->top,
+            'persen_bunga_bank' => $quotation->persen_bunga_bank,
+            'bunga_dihitung' => ($quotation->top != "Non TOP") ? 'YA' : 'TIDAK',
+            'bunga_bank_total' => $summary->bunga_bank_total
+        ]);
     }
 
     private function updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
 
+        \Log::info('Setting bunga_bank to details', [
+            'bunga_bank_total' => $summary->bunga_bank_total,
+            'insentif_total' => $summary->insentif_total,
+            'detail_count' => $quotation->quotation_detail->count()
+        ]);
+
         $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary) {
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            if ($hpp && $hpp->bunga_bank === null)
-                $detail->bunga_bank = $summary->bunga_bank_total;
-            if ($hpp && $hpp->insentif === null)
-                $detail->insentif = $summary->insentif_total;
+            $detail->bunga_bank = $summary->bunga_bank_total;
+            $detail->insentif = $summary->insentif_total;
+
+            \Log::info('Detail bunga_bank set', [
+                'detail_id' => $detail->id,
+                'bunga_bank_set' => $detail->bunga_bank,
+                'insentif_set' => $detail->insentif
+            ]);
         });
 
-        $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
-        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
-        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
+        // ... rest of the method
     }
 
     // ============================ HPP & COSS CALCULATIONS ============================
