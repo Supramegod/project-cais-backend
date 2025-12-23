@@ -440,29 +440,46 @@ class AuthController extends Controller
             ], 500);
         }
     }
+
     /**
-     * 🔥 HELPER: Hapus semua token user (access + refresh)
+     * 🔥 HELPER: Hapus token yang sudah expired (access token & refresh token)
+     * Refresh token yang belum expired TIDAK akan dihapus
      */
     private function revokeAllUserTokens(User $user, $excludeTokenId = null)
     {
         try {
             $now = now();
 
-            $query = $user->tokens()->where('expires_at', '<', $now);
-            
-            if ($excludeTokenId) {
-                $query->where('id', '!=', $excludeTokenId);
-            }
-            
-            $expiredTokenIds = $query->pluck('id')->toArray();
+            // 1️⃣ Hapus ACCESS TOKEN yang sudah expired
+            $queryAccessToken = $user->tokens()->where('expires_at', '<', $now);
 
-            if (!empty($expiredTokenIds)) {
-                $user->tokens()->whereIn('id', $expiredTokenIds)->delete();
+            if ($excludeTokenId) {
+                $queryAccessToken->where('id', '!=', $excludeTokenId);
+            }
+
+            $expiredAccessTokenIds = $queryAccessToken->pluck('id')->toArray();
+
+            if (!empty($expiredAccessTokenIds)) {
+                $user->tokens()->whereIn('id', $expiredAccessTokenIds)->delete();
+            }
+
+            // 2️⃣ Hapus REFRESH TOKEN yang sudah expired (pakai tokenable_id langsung)
+            $expiredRefreshCount = RefreshTokens::where('tokenable_type', User::class)
+                ->where('tokenable_id', $user->id)
+                ->where('expires_at', '<', $now)
+                ->count();
+
+            if ($expiredRefreshCount > 0) {
+                RefreshTokens::where('tokenable_type', User::class)
+                    ->where('tokenable_id', $user->id)
+                    ->where('expires_at', '<', $now)
+                    ->delete();
             }
 
             Log::info('Expired user tokens revoked', [
                 'user_id' => $user->id,
-                'expired_count' => count($expiredTokenIds),
+                'expired_access_tokens_count' => count($expiredAccessTokenIds),
+                'expired_refresh_tokens_count' => $expiredRefreshCount,
                 'timestamp' => $now
             ]);
 
