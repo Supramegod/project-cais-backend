@@ -63,6 +63,7 @@ class QuotationResource extends JsonResource
             'kontrak_selesai_formatted' => $this->kontrak_selesai ? Carbon::parse($this->kontrak_selesai)->isoFormat('D MMMM Y') : null,
             'tgl_penempatan' => $this->tgl_penempatan,
             'tgl_penempatan_formatted' => $this->tgl_penempatan ? Carbon::parse($this->tgl_penempatan)->isoFormat('D MMMM Y') : null,
+            
 
             // Payment details
             'top' => $this->top,
@@ -418,6 +419,7 @@ class QuotationResource extends JsonResource
                         'jumlah_hc' => $detail->jumlah_hc,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
+                        'kota'=> $detail->quotationSite->kota ?? null,
 
                         // ✅ DATA HPP
                         'hpp' => [

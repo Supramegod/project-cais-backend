@@ -376,7 +376,8 @@ class QuotationStepService
             $cutiData = $this->prepareCutiData($request);
 
             // Ambil persentase bunga bank dari TOP
-            $top = Top::find($request->top);
+            $top = Top::where('nama', $request->jumlah_hari_invoice)->first();
+
             $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
 
             $updateData = array_merge([
@@ -2427,5 +2428,5 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             throw $e;
         }
     }
-    
+
 }

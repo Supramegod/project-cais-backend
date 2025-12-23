@@ -86,7 +86,7 @@ class QuotationBusinessService
             'provinsi_id' => $provinceId,
             'provinsi' => $province->nama,
             'kota_id' => $cityId,
-            'kota' => $city->nama,
+            'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,

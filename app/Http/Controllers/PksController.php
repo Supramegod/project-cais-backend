@@ -240,8 +240,10 @@ class PksController extends Controller
                 'leads',
                 'statusPks',
                 'sites',
+                'spk.spkSites',
                 'perjanjian',
-                'activities'
+                'activities',
+                'ruleThr',
             ])->find($id);
 
             if (!$pks) {
@@ -253,20 +255,15 @@ class PksController extends Controller
             $pks->formatted_kontrak_akhir = Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y');
             $pks->berakhir_dalam = $this->hitungBerakhirKontrak($pks->kontrak_akhir);
 
-            // MAPPED DATA - TAMBAHKAN DI SINI
+            // MAPPED DATA - LEADS
             $leads_mapped = null;
             if ($pks->leads) {
                 $leads = $pks->leads;
 
-                // Ambil data kebutuhan dari leads (jika ada relasi)
+                // Ambil data kebutuhan dari leads
                 $kebutuhan_leads = null;
-                if ($leads->relationLoaded('kebutuhan') && $leads->kebutuhan->isNotEmpty()) {
-                    // Ambil nama kebutuhan pertama atau gabungkan jika ada banyak
-                    $kebutuhan_names = $leads->kebutuhan->pluck('nama')->toArray();
-                    $kebutuhan_leads = implode(', ', $kebutuhan_names);
-                } else {
-                    // Fallback ke bidang_perusahaan jika tidak ada data kebutuhan
-                    $kebutuhan_leads = $leads->kebutuhan->first()->nama ?? null ;
+                if ($leads->relationLoaded('kebutuhan') && $leads->kebutuhan) {
+                    $kebutuhan_leads = $leads->kebutuhan->nama;
                 }
 
                 $leads_mapped = [
@@ -274,18 +271,20 @@ class PksController extends Controller
                     'nama_perusahaan' => $leads->nama_perusahaan ?? null,
                     'nomor_leads' => $leads->nomor ?? null,
                     'kebutuhan_leads' => $kebutuhan_leads,
-                    'kota' => $leads->kota ?? null,
+                    'negara' => $leads->negara ?? null,
                     'bidang_perusahaan' => $leads->bidang_perusahaan ?? null,
-                    'pma_pmdn' => $leads->pma ?? null, // Asumsi kolom pma berisi "PMA" atau "PMDN"
+                    'pma_pmdn' => $leads->pma ?? null,
                     'provinsi' => $leads->provinsi ?? null,
                     'kecamatan' => $leads->kecamatan ?? null,
                     'kelurahan' => $leads->kelurahan ?? null,
                     'alamat' => $leads->alamat ?? null,
                     'pic' => $leads->pic ?? null,
                     'jabatan' => $leads->jabatan ?? null
+                    
                 ];
             }
 
+            // MAPPED DATA - PKS
             $pks_mapped = [
                 'id' => $pks->id,
                 'nomor' => $pks->nomor ?? null,
@@ -306,9 +305,17 @@ class PksController extends Controller
                         'raw_text' => $perjanjian->raw_text,
                         'created_by' => $perjanjian->created_by
                     ];
-                })->toArray()   
+                })->toArray(),
+                'rule_thr' => $pks->ruleThr ? [
+                    'id' => $pks->ruleThr->id,
+                    'nama' => $pks->ruleThr->nama,
+                    'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr,
+                    'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
+                    'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice
+                ] : null
             ];
 
+            // QUOTATION DATA
             $quotationDataArray = [];
             $spkarray = [];
 
@@ -354,21 +361,50 @@ class PksController extends Controller
                 }
             }
 
+            // SITES INFO - PERBAIKAN DI SINI
+            $sitesInfo = [];
+
+            // Cek apakah relasi spk ada dan tidak null
+            if ($pks->spk && $pks->spk->spkSites) {
+                $sitesInfo = $pks->spk->spkSites->map(function ($site) {
+                    return [
+                        'id' => $site->id,
+                        'nama_site' => $site->nama_site,
+                        'kota' => $site->kota,
+                        'penempatan' => $site->penempatan,
+                        'quotation_id' => $site->quotation_id
+                    ];
+                })->toArray();
+            } else {
+                // Alternatif: Ambil sites info dari relasi sites yang sudah ada
+                $sitesInfo = $pks->sites->map(function ($site) {
+                    return [
+                        'id' => $site->id,
+                        'nama_site' => $site->nama_site,
+                        'kota' => $site->kota,
+                        'penempatan' => $site->penempatan,
+                        'quotation_id' => $site->quotation_id
+                    ];
+                })->toArray();
+            }
+
             $response = [
                 'success' => true,
                 'data' => [
                     'pks_mapped' => $pks_mapped,
                     'leads_mapped' => $leads_mapped,
-                    // 'pks_details' => $pks // Data lengkap PKS
                 ],
                 'quotation_data' => $quotationDataArray,
-                'spk_data' => $spkarray
+                'spk_data' => $spkarray,
+                'sites_info' => $sitesInfo
             ];
 
             return response()->json($response);
 
         } catch (\Exception $e) {
             \Log::error('Failed to retrieve PKS details: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS details',
