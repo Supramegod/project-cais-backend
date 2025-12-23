@@ -898,7 +898,7 @@ class QuotationController extends Controller
      *     path="/api/quotations/{id}/submit-approval",
      *     tags={"Quotations"},
      *     summary="Submit quotation for approval",
-     *     description="Submits quotation for approval at different levels (OT1, OT2, OT3)",
+     *     description="Submits quotation for approval at different levels based on user role (role_id 96, 97, 40)",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",
@@ -910,8 +910,7 @@ class QuotationController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"approval_type","is_approved"},
-     *             @OA\Property(property="approval_type", type="string", enum={"ot1", "ot2", "ot3"}, example="ot1"),
+     *             required={"is_approved"},
      *             @OA\Property(property="is_approved", type="boolean", example=true),
      *             @OA\Property(property="notes", type="string", example="Approval notes")
      *         )
@@ -921,25 +920,7 @@ class QuotationController extends Controller
      *         description="Quotation submitted for approval successfully",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Quotation submitted for approval successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validation error"),
-     *             @OA\Property(property="errors", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to submit quotation for approval"),
-     *             @OA\Property(property="error", type="string", example="Error details")
+     *             @OA\Property(property="message", type="string", example="Quotation approved successfully")
      *         )
      *     )
      * )
@@ -950,7 +931,6 @@ class QuotationController extends Controller
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
             $validator = Validator::make($request->all(), [
-                'approval_type' => 'required|in:ot1,ot2,ot3',
                 'is_approved' => 'required|boolean',
                 'notes' => 'nullable|string'
             ]);
@@ -958,8 +938,7 @@ class QuotationController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
@@ -967,7 +946,7 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Quotation submitted for approval successfully'
+                'message' => $request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully'
             ]);
 
         } catch (\Exception $e) {
@@ -978,7 +957,6 @@ class QuotationController extends Controller
             ], 500);
         }
     }
-
     /**
      * @OA\Get(
      *     path="/api/quotations/{id}/calculate",

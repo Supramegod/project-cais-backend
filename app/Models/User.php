@@ -139,4 +139,46 @@ class User extends Authenticatable
         return $query->where('username', $username)
             ->where('password', $hashedPassword);
     }
+    /**
+     * Get the user's notifications.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(LogNotification::class, 'user_id');
+    }
+
+    /**
+     * Get the user's unread notifications.
+     */
+    public function unreadNotifications()
+    {
+        return $this->notifications()->unread(true);
+    }
+
+    /**
+     * Get the user's read notifications.
+     */
+    public function readNotifications()
+    {
+        return $this->notifications()->unread(false);
+    }
+
+    /**
+     * Get notifications count.
+     *
+     * @param  bool  $unread
+     * @return int
+     */
+    public function notificationsCount($unread = null)
+    {
+        $query = $this->notifications();
+
+        if ($unread === true) {
+            $query->unread(true);
+        } elseif ($unread === false) {
+            $query->unread(false);
+        }
+
+        return $query->count();
+    }
 }

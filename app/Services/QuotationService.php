@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\{
+    LogApproval,
+    LogNotification,
     Quotation,
     QuotationDetail,
     QuotationSite,
@@ -1420,63 +1422,186 @@ class QuotationService
     }
 
     /**
-     * Submit quotation untuk approval
+     * Submit quotation untuk approval dengan logika role-based yang diperbaiki
      */
     public function submitForApproval(Quotation $quotation, array $data, User $user)
     {
         DB::beginTransaction();
         try {
-            $approvalType = $data['approval_type'];
-            $isApproved = $data['is_approved'];
+            $currentDateTime = Carbon::now()->toDateTimeString();
+
+            // Validasi data
+            $approve = $data['is_approved'] ?? false;
             $notes = $data['notes'] ?? null;
 
-            $updateData = [
-                'updated_by' => $user->full_name
-            ];
-
-            switch ($approvalType) {
-                case 'ot1':
-                    $updateData['status_ot1'] = $isApproved ? 'approved' : 'rejected';
-                    $updateData['tgl_approval_ot1'] = $isApproved ? Carbon::now() : null;
-                    $updateData['notes_ot1'] = $notes;
-                    break;
-
-                case 'ot2':
-                    $updateData['status_ot2'] = $isApproved ? 'approved' : 'rejected';
-                    $updateData['tgl_approval_ot2'] = $isApproved ? Carbon::now() : null;
-                    $updateData['notes_ot2'] = $notes;
-                    break;
-
-                case 'ot3':
-                    $updateData['status_ot3'] = $isApproved ? 'approved' : 'rejected';
-                    $updateData['tgl_approval_ot3'] = $isApproved ? Carbon::now() : null;
-                    $updateData['notes_ot3'] = $notes;
-
-                    // Jika OT3 approved, update status quotation
-                    if ($isApproved) {
-                        $updateData['status_quotation_id'] = 4; // Status approved
-                    }
-                    break;
+            // Pastikan approve adalah boolean
+            if (is_string($approve)) {
+                $approve = filter_var($approve, FILTER_VALIDATE_BOOLEAN);
             }
 
+            $tingkat = 0;
+            $isApproved = (bool) $approve;
+
+            // Role-based approval logic
+            if (in_array($user->role_id, [96])) {
+                // ====== LEVEL 1 APPROVAL (OT1) ======
+                $tingkat = 1;
+                $updateData = [
+                    'updated_at' => $currentDateTime,
+                    'updated_by' => $user->full_name
+                ];
+
+                if ($isApproved) {
+                    // ✅ DISETUJUI - Update OT1
+                    $updateData['ot1'] = $user->full_name;
+
+                    // Cek apakah perlu approval level 2
+                    $needsLevel2 = !(
+                        $quotation->top == "Kurang Dari 7 Hari" ||
+                        $quotation->top == "Non TOP" ||
+                        ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada")
+                    );
+
+                    if ($needsLevel2) {
+                        // Butuh approval level 2
+                        $updateData['status_quotation_id'] = 2; // Pending Level 2 Approval
+                        $updateData['is_aktif'] = 0;
+
+                        \Log::info("Level 1 approved, waiting for Level 2", [
+                            'quotation_id' => $quotation->id,
+                            'nomor' => $quotation->nomor
+                        ]);
+                    } else {
+                        // Langsung approved (tidak butuh level 2)
+                        $updateData['status_quotation_id'] = 3; // Approved
+                        $updateData['is_aktif'] = 1;
+
+                        \Log::info("Level 1 approved, auto-approved (no Level 2 needed)", [
+                            'quotation_id' => $quotation->id,
+                            'nomor' => $quotation->nomor
+                        ]);
+                    }
+                } else {
+                    // ❌ DITOLAK
+                    $updateData['status_quotation_id'] = 8; // Rejected
+                    $updateData['is_aktif'] = 0;
+
+                    \Log::info("Level 1 rejected", [
+                        'quotation_id' => $quotation->id,
+                        'nomor' => $quotation->nomor,
+                        'reason' => $notes
+                    ]);
+                }
+
+            } elseif (in_array($user->role_id, [97, 40])) {
+                // ====== LEVEL 2 APPROVAL (OT2) ======
+                $tingkat = 2;
+                $updateData = [
+                    'updated_at' => $currentDateTime,
+                    'updated_by' => $user->full_name
+                ];
+
+                // Validasi: pastikan OT1 sudah approve
+                if (empty($quotation->ot1)) {
+                    throw new \Exception('Quotation belum disetujui di Level 1');
+                }
+
+                if ($isApproved) {
+                    // ✅ DISETUJUI
+                    $updateData['ot2'] = $user->full_name;
+                    $updateData['status_quotation_id'] = 3; // Approved
+                    $updateData['is_aktif'] = 1;
+
+                    \Log::info("Level 2 approved, quotation fully approved", [
+                        'quotation_id' => $quotation->id,
+                        'nomor' => $quotation->nomor
+                    ]);
+                } else {
+                    // ❌ DITOLAK
+                    $updateData['status_quotation_id'] = 8; // Rejected
+                    $updateData['is_aktif'] = 0;
+
+                    \Log::info("Level 2 rejected", [
+                        'quotation_id' => $quotation->id,
+                        'nomor' => $quotation->nomor,
+                        'reason' => $notes
+                    ]);
+                }
+
+            } else {
+                throw new \Exception('User tidak memiliki akses untuk approval. Role ID: ' . $user->role_id);
+            }
+
+            // Update quotation
             $quotation->update($updateData);
 
-            // Jika rejected di level manapun, update status menjadi rejected
-            if (!$isApproved) {
-                $quotation->update([
-                    'status_quotation_id' => 5, // Status rejected
-                    'updated_by' => $user->full_name
+            \Log::info("Quotation updated", [
+                'quotation_id' => $quotation->id,
+                'status_quotation_id' => $updateData['status_quotation_id'],
+                'is_aktif' => $updateData['is_aktif'],
+                'ot1' => $updateData['ot1'] ?? null,
+                'ot2' => $updateData['ot2'] ?? null
+            ]);
+
+            // Log approval ke tabel log_approval
+            LogApproval::create([
+                'tabel' => 'sl_quotation', // ✅ Sesuaikan dengan nama tabel
+                'doc_id' => $quotation->id,
+                'tingkat' => $tingkat,
+                'is_approve' => $isApproved,
+                'note' => $notes,
+                'user_id' => $user->id,
+                'approval_date' => $currentDateTime,
+                'created_at' => $currentDateTime,
+                'created_by' => $user->full_name
+            ]);
+
+            \Log::info("Log approval created", [
+                'quotation_id' => $quotation->id,
+                'tingkat' => $tingkat,
+                'is_approve' => $isApproved
+            ]);
+
+            // Send notification ke sales yang membuat quotation
+            if ($quotation->leads && $quotation->leads->timSalesDetail) {
+                $timSalesDetail = $quotation->leads->timSalesDetail;
+
+                LogNotification::createQuotationApprovalNotification(
+                    $timSalesDetail->user_id,
+                    $quotation->id,
+                    $quotation->nomor,
+                    $user->full_name,
+                    $isApproved,
+                    $notes
+                );
+
+                \Log::info("Notification sent", [
+                    'quotation_id' => $quotation->id,
+                    'user_id' => $timSalesDetail->user_id
                 ]);
             }
 
             DB::commit();
+
+            // Reload quotation dengan status terbaru
+            $quotation->refresh();
+            $quotation->load('statusQuotation');
+
             return $quotation;
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error("Error in submitForApproval", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'quotation_id' => $quotation->id ?? null,
+                'user_id' => $user->id ?? null
+            ]);
             throw $e;
         }
     }
+    // ============================ HELPER METHODS (tambahan jika diperlukan) ============================
+
 
 
     /**
