@@ -15052,8 +15052,18 @@
                                             "type": "object"
                                         },
                                         "quotation_data": {
-                                            "description": "Quotation details and calculation",
-                                            "type": "object"
+                                            "description": "Array of Quotation details and calculations",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "spk_data": {
+                                            "description": "Array of SPK data",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
                                         }
                                     },
                                     "type": "object"
@@ -18153,7 +18163,7 @@
                     "Quotations"
                 ],
                 "summary": "Submit quotation for approval",
-                "description": "Submits quotation for approval at different levels (OT1, OT2, OT3)",
+                "description": "Submits quotation for approval at different levels based on user role (role_id 96, 97, 40)",
                 "operationId": "021f68ceb6a992b138d5fa3cbfb2e899",
                 "parameters": [
                     {
@@ -18173,19 +18183,9 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "approval_type",
                                     "is_approved"
                                 ],
                                 "properties": {
-                                    "approval_type": {
-                                        "type": "string",
-                                        "enum": [
-                                            "ot1",
-                                            "ot2",
-                                            "ot3"
-                                        ],
-                                        "example": "ot1"
-                                    },
                                     "is_approved": {
                                         "type": "boolean",
                                         "example": true
@@ -18213,54 +18213,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Quotation submitted for approval successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation error"
-                                        },
-                                        "errors": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to submit quotation for approval"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
+                                            "example": "Quotation approved successfully"
                                         }
                                     },
                                     "type": "object"

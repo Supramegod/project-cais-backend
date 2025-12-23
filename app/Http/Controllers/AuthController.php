@@ -457,7 +457,6 @@ class AuthController extends Controller
             $expiredTokenIds = $query->pluck('id')->toArray();
 
             if (!empty($expiredTokenIds)) {
-                RefreshTokens::whereIn('access_token_id', $expiredTokenIds)->delete();
                 $user->tokens()->whereIn('id', $expiredTokenIds)->delete();
             }
 
