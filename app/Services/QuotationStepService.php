@@ -1272,36 +1272,55 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
     private function calculateFinalStatus(Quotation $quotation): array
     {
-        $isAktif = 1;
-        $statusQuotation = 3;
+        // 1. Cek BPJS (Jika ada salah satu item bernilai 0/false)
+        $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
+            $query->where('is_bpjs_jkk', 0)
+                ->orWhere('is_bpjs_jkm', 0)
+                ->orWhere('is_bpjs_jht', 0)
+                ->orWhere('is_bpjs_jp', 0);
+        })->exists();
 
-        // Business logic untuk menentukan status final
-        if ($quotation->top == "Lebih Dari 7 Hari") {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
+        // 2. Cek Kompensasi & THR (Jika salah satu saja "Tidak Ada")
+        $hasNoCompensation = $quotation->quotationDetails()->whereHas('wage', function ($query) {
+            $query->where(function ($q) {
+                $q->where('kompensasi', 'Tidak Ada')
+                    ->orWhere('thr', 'Tidak Ada');
+            });
+        })->exists();
 
-        if ($quotation->persentase < 7) {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
+        // 3. Cek Upah Custom < 85% UMK
+        $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
+            $wage = $detail->wage;
+            $site = $detail->quotationSite;
 
-        if ($quotation->company_id == 17) { // PT ION
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
+            if (!$wage || !$site || $wage->upah !== 'Custom')
+                return false;
 
-        if ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada") {
-            $isAktif = 0;
-            $statusQuotation = 2;
-        }
+            $umkData = Umk::byCity($site->kota_id)->active()->first();
+            if (!$umkData)
+                return false;
+
+            $nominalUpah = (float) $wage->nominal_upah;
+            $batasMinimal = (float) $umkData->umk * 0.85;
+
+            return $nominalUpah < $batasMinimal;
+        });
+
+        // 4. Evaluasi Akhir
+        $needsApprovalLevel2 = (
+            $hasMissingBpjs ||
+            $hasNoCompensation ||
+            $isUnderMinimumWage ||
+            $quotation->top == "Lebih Dari 7 Hari" ||
+            $quotation->persentase < 7 ||
+            $quotation->company_id == 17
+        );
 
         return [
-            'is_aktif' => $isAktif,
-            'status_quotation_id' => $statusQuotation
+            'is_aktif' => $needsApprovalLevel2 ? 0 : 1,
+            'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
         ];
     }
-
     private function insertRequirements(Quotation $quotation): void
     {
         $currentDateTime = Carbon::now();

@@ -25,6 +25,7 @@ class QuotationDetail extends Model
         'is_bpjs_jkm',
         'is_bpjs_jht',
         'is_bpjs_jp',
+        'is_bpjs_kes',
         'nominal_takaful',
         'created_by',
         'updated_by',

@@ -1475,10 +1475,9 @@ class QuotationService
                     $updateData['ot1'] = $user->full_name;
 
                     // Cek apakah perlu approval level 2
-                    $needsLevel2 = !(
-                        $quotation->top == "Kurang Dari 7 Hari" ||
-                        $quotation->top == "Non TOP" ||
-                        ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada")
+                    $needsLevel2 = (
+                        $quotation->top == "Lebih Dari 7 Hari" 
+                        // ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada")
                     );
 
                     if ($needsLevel2) {
@@ -1512,7 +1511,7 @@ class QuotationService
                     ]);
                 }
 
-            } elseif (in_array($user->role_id, [97, 40])) {
+            } elseif (in_array($user->role_id, [97])) {
                 // ====== LEVEL 2 APPROVAL (OT2) ======
                 $tingkat = 2;
                 $updateData = [
