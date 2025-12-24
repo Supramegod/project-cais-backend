@@ -280,7 +280,7 @@ class PksController extends Controller
                     'alamat' => $leads->alamat ?? null,
                     'pic' => $leads->pic ?? null,
                     'jabatan' => $leads->jabatan ?? null
-                    
+
                 ];
             }
 
@@ -1222,6 +1222,156 @@ class PksController extends Controller
             ], 500);
         }
     }
+    /**
+     * @OA\Post(
+     *     path="/api/pks/{id}/submit-checklist",
+     *     tags={"PKS"},
+     *     summary="Submit quotation checklist",
+     *     description="Submits checklist data for quotation including NPWP, invoice, and other administrative details",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="Quotation ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Checklist data",
+     *         @OA\JsonContent(
+     *             required={"npwp", "alamat_npwp", "pic_invoice", "telp_pic_invoice", "email_pic_invoice", "materai", "joker_reliever", "syarat_invoice", "alamat_penagihan_invoice", "status_serikat"},
+     *             @OA\Property(property="npwp", type="string", description="NPWP number", example="123456789012345"),
+     *             @OA\Property(property="alamat_npwp", type="string", description="NPWP address", example="Jl. Sudirman No. 123, Jakarta"),
+     *             @OA\Property(property="pic_invoice", type="string", description="PIC for invoice", example="John Doe"),
+     *             @OA\Property(property="telp_pic_invoice", type="string", description="Phone number of PIC", example="081234567890"),
+     *             @OA\Property(property="email_pic_invoice", type="string", format="email", description="Email of PIC", example="john@example.com"),
+     *             @OA\Property(property="materai", type="string", description="Stamp duty amount", example="10000"),
+     *             @OA\Property(property="joker_reliever", type="string", description="Joker/Reliever availability", example="Tersedia"),
+     *             @OA\Property(property="syarat_invoice", type="string", description="Invoice terms", example="Net 30 days"),
+     *             @OA\Property(property="alamat_penagihan_invoice", type="string", description="Invoice billing address", example="Jl. Thamrin No. 456, Jakarta"),
+     *             @OA\Property(property="catatan_site", type="string", description="Site notes", example="Catatan penting untuk site"),
+     *             @OA\Property(property="status_serikat", type="string", description="Union status", example="Tidak Ada"),
+     *             @OA\Property(property="pks_id", type="integer", description="PKS ID if exists", example=1),
+     *             @OA\Property(property="ro", type="integer", description="RO user ID", example=10),
+     *             @OA\Property(property="crm", type="integer", description="CRM user ID", example=11),
+     *             @OA\Property(property="ada_serikat", type="string", description="Union existence", example="Tidak Ada")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Checklist submitted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Checklist submitted successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="npwp", type="string", example="123456789012345"),
+     *                 @OA\Property(property="pic_invoice", type="string", example="John Doe")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Quotation not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Quotation not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to submit checklist"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+public function submitChecklist(Request $request, string $id): JsonResponse
+{
+    DB::beginTransaction();
+    try {
+        $user = Auth::user();
+        $current_date_time = Carbon::now()->toDateTimeString();
+
+        // Validasi input
+        $validator = Validator::make($request->all(), [
+            'npwp' => 'required|string|max:50',
+            'alamat_npwp' => 'required|string|max:255',
+            'pic_invoice' => 'required|string|max:100',
+            'telp_pic_invoice' => 'required|string|max:20',
+            'email_pic_invoice' => 'required|email|max:100',
+            'materai' => 'required|string|max:50',
+            'joker_reliever' => 'required|string|max:50',
+            'syarat_invoice' => 'required|string|max:255',
+            'alamat_penagihan_invoice' => 'required|string|max:255',
+            'catatan_site' => 'nullable|string',
+            'status_serikat' => 'required|string|max:50',
+            'ada_serikat' => 'nullable|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        // Cari quotation
+        $quotation = Quotation::notDeleted()->findOrFail($id);
+        
+        // Logika untuk status serikat
+        $statusSerikat = $request->status_serikat;
+        if ($request->ada_serikat === "Tidak Ada") {
+            $statusSerikat = "Tidak Ada";
+        }
+
+        // Update quotation data
+        $quotation->update([
+            'npwp' => $request->npwp,
+            'alamat_npwp' => $request->alamat_npwp,
+            'pic_invoice' => $request->pic_invoice,
+            'telp_pic_invoice' => $request->telp_pic_invoice,
+            'email_pic_invoice' => $request->email_pic_invoice,
+            'materai' => $request->materai,
+            'joker_reliever' => $request->joker_reliever,
+            'syarat_invoice' => $request->syarat_invoice,
+            'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
+            'catatan_site' => $request->catatan_site,
+            'status_serikat' => $statusSerikat,
+            'updated_at' => $current_date_time,
+            'updated_by' => $user->full_name
+        ]);
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Checklist submitted successfully',   
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to submit checklist',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
 
     // ======================================================================
     // PRIVATE METHODS - Business Logic

@@ -1305,13 +1305,14 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
             return $nominalUpah < $batasMinimal;
         });
-
+        $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
+        $isLowPercentage = $quotation->persentase < $thresholdPersentase;
         // 4. Evaluasi Akhir
         $needsApprovalLevel2 = (
             $hasMissingBpjs ||
             $hasNoCompensation ||
             $isUnderMinimumWage ||
-            $quotation->top == "Lebih Dari 7 Hari" ||
+            $isLowPercentage ||
             $quotation->persentase < 7 ||
             $quotation->company_id == 17
         );
