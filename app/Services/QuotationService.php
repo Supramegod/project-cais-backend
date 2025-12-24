@@ -1473,10 +1473,12 @@ class QuotationService
                 if ($isApproved) {
                     // ✅ DISETUJUI - Update OT1
                     $updateData['ot1'] = $user->full_name;
+                    $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
+                    $isLowPercentage = $quotation->persentase < $thresholdPersentase;
 
                     // Cek apakah perlu approval level 2
                     $needsLevel2 = (
-                        $quotation->top == "Lebih Dari 7 Hari" 
+                        $isLowPercentage
                         // ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada")
                     );
 

@@ -133,6 +133,8 @@ class QuotationResource extends JsonResource
                 ];
             }
         }
+        $thresholdPersentase = ($this->resource->kebutuhan_id == 1) ? 7 : 6;
+        $isLowPercentage = $this->resource->persentase < $thresholdPersentase;
 
         if (!empty($underMinimumWageDetails)) {
             $highlights[] = [
@@ -155,10 +157,10 @@ class QuotationResource extends JsonResource
         }
 
         // 5. Cek Persentase Management Fee < 7%
-        if ($this->resource->persentase < 7) {
+        if ($isLowPercentage) {
             $highlights[] = [
                 'field' => 'management_fee',
-                'message' => 'Management fee kurang dari 7%',
+                'message' => 'Management fee kurang dari ' . $thresholdPersentase . '%',
                 'type' => 'warning',
                 'value' => $this->resource->persentase . '%'
             ];
