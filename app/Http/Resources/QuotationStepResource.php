@@ -172,6 +172,20 @@ class QuotationStepResource extends JsonResource
                 if ($quotation->relationLoaded('quotationDetails')) {
                     foreach ($quotation->quotationDetails as $detail) {
                         $wage = $detail->wage;
+                        $site = $detail->quotationSite; // Pastikan relasi ini ada di model QuotationDetail
+
+                        // Default keterangan jika UMK tidak ditemukan
+                        $keteranganMinUpah = "Data UMK tidak ditemukan";
+
+                        if ($site && $site->kota_id) {
+                            // Cari data UMK aktif berdasarkan kota dari site
+                            $umkData = Umk::byCity($site->kota_id)->active()->first();
+
+                            if ($umkData) {
+                                $minUpahNominal = $umkData->umk * 0.85;
+                                $keteranganMinUpah = "Upah kurang dari 85% UMK ( Rp " . number_format($minUpahNominal, 0, ',', '.') . " ) membutuhkan approval ";
+                            }
+                        }
 
                         $positionData[] = [
                             'quotation_detail_id' => $detail->id,
@@ -182,7 +196,10 @@ class QuotationStepResource extends JsonResource
                             'jumlah_hc' => $detail->jumlah_hc,
                             'nominal_upah' => $detail->nominal_upah,
 
-                            // Data dari wage (sesuai dengan perhitungan di service)
+                            // Tambahkan field keterangan minimal upah di sini
+                            'keterangan_minimal_upah' => $keteranganMinUpah,
+
+                            // Data dari wage
                             'upah' => $wage->upah ?? null,
                             'hitungan_upah' => $wage->hitungan_upah ?? null,
                             'lembur' => $wage->lembur ?? null,
@@ -195,7 +212,8 @@ class QuotationStepResource extends JsonResource
                             'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
                             'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? 0,
                             'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
-                            // Tambahkan field untuk perhitungan BPJS
+
+                            // Field BPJS
                             'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? null,
                             'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? null,
                             'is_bpjs_jht' => $detail->is_bpjs_jht ?? null,

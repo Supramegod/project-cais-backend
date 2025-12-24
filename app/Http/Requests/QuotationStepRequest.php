@@ -75,8 +75,8 @@ class QuotationStepRequest extends BaseRequest
                 $rules['position_data.*.jenis_bayar_lembur'] = 'required_if:position_data.*.lembur,Flat|in:Per Bulan,Per Hari,Per Jam';
                 $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:0 ';
                 $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
-                $rules['position_data.*.kompensasi'] = 'required|in:Diprovisikan,Ditagihkan,Tidak Ada';
-                $rules['position_data.*.thr'] = 'required|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
+                $rules['position_data.*.kompensasi'] = 'sometimes|in:Diprovisikan,Ditagihkan,Tidak Ada';
+                $rules['position_data.*.thr'] = 'sometimes|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
 
                 $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
                 $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
@@ -238,10 +238,10 @@ class QuotationStepRequest extends BaseRequest
             'position_data.*.jam_per_bulan_lembur.min' => 'Jam per bulan lembur tidak boleh kurang dari 0',
             'position_data.*.lembur_ditagihkan.required_if' => 'Lembur ditagihkan harus diisi ketika memilih lembur Flat atau Normatif',
             'position_data.*.lembur_ditagihkan.in' => 'Lembur ditagihkan harus salah satu dari: Ditagihkan, Ditagihkan Terpisah',
-            'position_data.*.kompensasi.required' => 'Kompensasi harus diisi',
-            'position_data.*.kompensasi.in' => 'Kompensasi harus salah satu dari: Diprovisikan, Ditagihkan, Tidak Ada',
-            'position_data.*.thr.required' => 'THR (tunjangan hari raya) harus diisi',
-            'position_data.*.thr.in' => 'THR harus salah satu dari: Diprovisikan, Ditagihkan, Diberikan Langsung, Tidak Ada',
+            // 'position_data.*.kompensasi.required' => 'Kompensasi harus diisi',
+            // 'position_data.*.kompensasi.in' => 'Kompensasi harus salah satu dari: Diprovisikan, Ditagihkan, Tidak Ada',
+            // 'position_data.*.thr.required' => 'THR (tunjangan hari raya) harus diisi',
+            // 'position_data.*.thr.in' => 'THR harus salah satu dari: Diprovisikan, Ditagihkan, Diberikan Langsung, Tidak Ada',
             'position_data.*.tunjangan_holiday.in' => 'Tunjangan holiday harus salah satu dari: Flat, Tidak Ada, Normatif',
             'position_data.*.nominal_tunjangan_holiday.required_if' => 'Nominal tunjangan holiday harus diisi ketika memilih tunjangan holiday Flat',
             'position_data.*.nominal_tunjangan_holiday.numeric' => 'Nominal tunjangan holiday harus berupa angka',
@@ -504,80 +504,80 @@ class QuotationStepRequest extends BaseRequest
             }
 
             // Validasi custom untuk step 4
-            if ($step == 4) {
-                $hasGlobalData = $this->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase']);
-                $hasPositionData = $this->has('position_data') && !empty($this->position_data);
+            // if ($step == 4) {
+            //     $hasGlobalData = $this->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase']);
+            //     $hasPositionData = $this->has('position_data') && !empty($this->position_data);
 
-                if (!$hasGlobalData && !$hasPositionData) {
-                    $validator->errors()->add('base', 'Minimal satu data (global data atau position data) harus dikirim untuk step 4.');
-                }
+            //     if (!$hasGlobalData && !$hasPositionData) {
+            //         $validator->errors()->add('base', 'Minimal satu data (global data atau position data) harus dikirim untuk step 4.');
+            //     }
 
-                // ✅ VALIDASI BARU: Nominal upah custom minimal 85% dari UMK
-                if ($hasPositionData) {
-                    foreach ($this->position_data as $index => $positionData) {
-                        // Skip jika bukan custom upah
-                        if (($positionData['upah'] ?? null) !== 'Custom') {
-                            continue;
-                        }
+            //     // ✅ VALIDASI BARU: Nominal upah custom minimal 85% dari UMK
+            //     if ($hasPositionData) {
+            //         foreach ($this->position_data as $index => $positionData) {
+            //             // Skip jika bukan custom upah
+            //             if (($positionData['upah'] ?? null) !== 'Custom') {
+            //                 continue;
+            //             }
 
-                        $nominalUpah = $positionData['nominal_upah'] ?? 0;
+            //             $nominalUpah = $positionData['nominal_upah'] ?? 0;
 
-                        // Convert string to numeric if needed
-                        if (is_string($nominalUpah)) {
-                            $nominalUpah = (int) str_replace('.', '', $nominalUpah);
-                        }
+            //             // Convert string to numeric if needed
+            //             if (is_string($nominalUpah)) {
+            //                 $nominalUpah = (int) str_replace('.', '', $nominalUpah);
+            //             }
 
-                        // Get detail untuk ambil site_id
-                        $detailId = $positionData['quotation_detail_id'] ?? null;
-                        if (!$detailId) {
-                            continue;
-                        }
+            //             // Get detail untuk ambil site_id
+            //             $detailId = $positionData['quotation_detail_id'] ?? null;
+            //             if (!$detailId) {
+            //                 continue;
+            //             }
 
-                        $detail = QuotationDetail::find($detailId);
-                        if (!$detail || !$detail->quotation_site_id) {
-                            continue;
-                        }
+            //             $detail = QuotationDetail::find($detailId);
+            //             if (!$detail || !$detail->quotation_site_id) {
+            //                 continue;
+            //             }
 
-                        // Get UMK dari site
-                        $site = QuotationSite::find($detail->quotation_site_id);
-                        if (!$site || !$site->kota_id) {
-                            continue;
-                        }
+            //             // Get UMK dari site
+            //             $site = QuotationSite::find($detail->quotation_site_id);
+            //             if (!$site || !$site->kota_id) {
+            //                 continue;
+            //             }
 
-                        $umk = Umk::byCity($site->kota_id)
-                            ->active()
-                            ->first();
+            //             $umk = Umk::byCity($site->kota_id)
+            //                 ->active()
+            //                 ->first();
 
-                        if (!$umk) {
-                            continue;
-                        }
+            //             if (!$umk) {
+            //                 continue;
+            //             }
 
-                        // Hitung minimal 85% dari UMK
-                        $minimalUpah = $umk->umk * 0.85;
+            //             // Hitung minimal 85% dari UMK
+            //             $minimalUpah = $umk->umk * 0.85;
 
-                        // Validasi
-                        if ($nominalUpah < $minimalUpah) {
-                            $validator->errors()->add(
-                                "position_data.{$index}.nominal_upah",
-                                sprintf(
-                                    'Nominal upah custom minimal 85%% dari UMK (Rp %s). Minimal: Rp %s',
-                                    number_format((float) $umk->umk, 0, ',', '.'),
-                                    number_format($minimalUpah, 0, ',', '.')
-                                )
-                            );
+            //             // Validasi
+            //             if ($nominalUpah < $minimalUpah) {
+            //                 $validator->errors()->add(
+            //                     "position_data.{$index}.nominal_upah",
+            //                     sprintf(
+            //                         'Nominal upah custom minimal 85%% dari UMK (Rp %s). Minimal: Rp %s',
+            //                         number_format((float) $umk->umk, 0, ',', '.'),
+            //                         number_format($minimalUpah, 0, ',', '.')
+            //                     )
+            //                 );
 
-                            \Log::warning("Nominal upah custom kurang dari 85% UMK", [
-                                'detail_id' => $detailId,
-                                'nominal_upah' => $nominalUpah,
-                                'umk' => $umk->umk,
-                                'minimal_85_persen' => $minimalUpah,
-                                'site_id' => $site->id,
-                                'city_id' => $site->kota_id
-                            ]);
-                        }
-                    }
-                }
-            }
+            //                 \Log::warning("Nominal upah custom kurang dari 85% UMK", [
+            //                     'detail_id' => $detailId,
+            //                     'nominal_upah' => $nominalUpah,
+            //                     'umk' => $umk->umk,
+            //                     'minimal_85_persen' => $minimalUpah,
+            //                     'site_id' => $site->id,
+            //                     'city_id' => $site->kota_id
+            //                 ]);
+            //             }
+            //         }
+            //     }
+            // }
         });
     }
 
