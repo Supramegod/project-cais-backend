@@ -1503,6 +1503,7 @@ class QuotationService
                     // ❌ DITOLAK
                     $updateData['status_quotation_id'] = 8; // Rejected
                     $updateData['is_aktif'] = 0;
+                    $updateData['ot1'] = "Ditolak oleh " . $user->full_name;
 
                     \Log::info("Level 1 rejected", [
                         'quotation_id' => $quotation->id,
@@ -1538,6 +1539,8 @@ class QuotationService
                     // ❌ DITOLAK
                     $updateData['status_quotation_id'] = 8; // Rejected
                     $updateData['is_aktif'] = 0;
+                    $updateData['ot1'] = "Ditolak oleh " . $user->full_name;
+                    $updateData['ot2'] = "Ditolak oleh " . $user->full_name;
 
                     \Log::info("Level 2 rejected", [
                         'quotation_id' => $quotation->id,

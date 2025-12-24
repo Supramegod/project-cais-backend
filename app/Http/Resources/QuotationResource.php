@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\JabatanPic;
 use App\Models\SalaryRule;
+use App\Models\Umk;
 use App\Services\QuotationService;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
@@ -11,6 +12,8 @@ use Carbon\Carbon;
 class QuotationResource extends JsonResource
 {// Kemudian tambahkan property di class
     protected $calculatedQuotation;
+
+    protected $approvalHighlights; // Tambahkan property untuk menyimpan highlights
 
     public function __construct($resource)
     {
@@ -21,7 +24,8 @@ class QuotationResource extends JsonResource
             $resource->load([
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
-                'quotationDetails.wage'
+                'quotationDetails.wage',
+                'quotationDetails.quotationSite' // Load relation untuk pengecekan UMK
             ]);
         }
 
@@ -33,7 +37,163 @@ class QuotationResource extends JsonResource
             \Log::error("Error calculating quotation in resource: " . $e->getMessage());
             $this->calculatedQuotation = null;
         }
+
+        // Hitung approval highlights
+        $this->approvalHighlights = $this->calculateApprovalHighlights();
     }
+
+    /**
+     * Calculate approval highlights berdasarkan standar
+     */
+
+    protected function calculateApprovalHighlights()
+    {
+        $highlights = [];
+
+        // 1. Cek BPJS
+        $hasMissingBpjs = $this->resource->quotationDetails()->where(function ($query) {
+            $query->where('is_bpjs_jkk', 0)
+                ->orWhere('is_bpjs_jkm', 0)
+                ->orWhere('is_bpjs_jht', 0)
+                ->orWhere('is_bpjs_jp', 0);
+        })->exists();
+
+        if ($hasMissingBpjs) {
+            $highlights[] = [
+                'field' => 'bpjs',
+                'message' => 'Ada BPJS (JKK/JKM/JHT/JP) yang tidak diaktifkan',
+                'type' => 'warning',
+                'value' => 'Tidak Lengkap'
+            ];
+        }
+
+        // 2. Cek Kompensasi & THR
+        $hasNoCompensation = $this->resource->quotationDetails()->whereHas('wage', function ($query) {
+            $query->where(function ($q) {
+                $q->where('kompensasi', 'Tidak Ada')
+                    ->orWhere('thr', 'Tidak Ada');
+            });
+        })->exists();
+
+        if ($hasNoCompensation) {
+            // Cek apakah kompensasi atau thr yang tidak ada
+            $kompensasiTidakAda = $this->resource->quotationDetails()->whereHas('wage', function ($query) {
+                $query->where('kompensasi', 'Tidak Ada');
+            })->exists();
+            
+            $thrTidakAda = $this->resource->quotationDetails()->whereHas('wage', function ($query) {
+                $query->where('thr', 'Tidak Ada');
+            })->exists();
+            
+            if ($kompensasiTidakAda) {
+                $highlights[] = [
+                    'field' => 'kompensasi',
+                    'message' => 'Kompensasi tidak diberikan',
+                    'type' => 'warning',
+                    'value' => 'Tidak Ada'
+                ];
+            }
+            
+            if ($thrTidakAda) {
+                $highlights[] = [
+                    'field' => 'thr',
+                    'message' => 'THR tidak diberikan',
+                    'type' => 'warning',
+                    'value' => 'Tidak Ada'
+                ];
+            }
+        }
+
+        // 3. Cek Upah Custom < 85% UMK
+        $underMinimumWageDetails = [];
+        
+        foreach ($this->resource->quotationDetails as $detail) {
+            $wage = $detail->wage;
+            $site = $detail->quotationSite;
+
+            if (!$wage || !$site || $wage->upah !== 'Custom') {
+                continue;
+            }
+
+            $umkData = Umk::byCity($site->kota_id)->active()->first();
+            if (!$umkData) {
+                continue;
+            }
+
+            $nominalUpah = (float) $wage->nominal_upah;
+            $batasMinimal = (float) $umkData->umk * 0.85;
+
+            if ($nominalUpah < $batasMinimal) {
+                $underMinimumWageDetails[] = [
+                    'position' => $detail->jabatan_kebutuhan,
+                    'site' => $site->nama_site,
+                    'current_upah' => $nominalUpah,
+                    'min_upah' => $batasMinimal,
+                    'difference_percent' => round((($batasMinimal - $nominalUpah) / $batasMinimal) * 100, 2)
+                ];
+            }
+        }
+
+        if (!empty($underMinimumWageDetails)) {
+            $highlights[] = [
+                'field' => 'minimum_wage',
+                'message' => 'Ada upah custom yang kurang dari 85% UMK',
+                'type' => 'critical',
+                'value' => 'Di Bawah Standar',
+                'details' => $underMinimumWageDetails
+            ];
+        }
+
+        // 4. Cek TOP "Lebih Dari 7 Hari"
+        if ($this->resource->top == "Lebih Dari 7 Hari") {
+            $highlights[] = [
+                'field' => 'top',
+                'message' => 'TOP lebih dari 7 hari',
+                'type' => 'warning',
+                'value' => $this->resource->top
+            ];
+        }
+
+        // 5. Cek Persentase Management Fee < 7%
+        if ($this->resource->persentase < 7) {
+            $highlights[] = [
+                'field' => 'management_fee',
+                'message' => 'Management fee kurang dari 7%',
+                'type' => 'warning',
+                'value' => $this->resource->persentase . '%'
+            ];
+        }
+
+        // 6. Cek Company ID 17
+        if ($this->resource->company_id == 17) {
+            $highlights[] = [
+                'field' => 'company',
+                'message' => 'Perusahaan dengan aturan khusus (PT Indah Optima Nusantara)',
+                'type' => 'info',
+                'value' => 'Perusahaan Khusus'
+            ];
+        }
+
+        // Evaluasi akhir kebutuhan approval level 2
+        $needsApprovalLevel2 = (
+            $hasMissingBpjs ||
+            $hasNoCompensation ||
+            !empty($underMinimumWageDetails) ||
+            $this->resource->top == "Lebih Dari 7 Hari" ||
+            $this->resource->persentase < 7 ||
+            $this->resource->company_id == 17
+        );
+
+        return [
+            'needs_approval' => $needsApprovalLevel2,
+            'highlights' => $highlights,
+            'total_highlights' => count($highlights),
+            'has_critical' => collect($highlights)->where('type', 'critical')->isNotEmpty(),
+            'has_warning' => collect($highlights)->where('type', 'warning')->isNotEmpty(),
+            'has_info' => collect($highlights)->where('type', 'info')->isNotEmpty()
+        ];
+    }
+
     public function toArray($request)
     {
         return [
@@ -63,7 +223,7 @@ class QuotationResource extends JsonResource
             'kontrak_selesai_formatted' => $this->kontrak_selesai ? Carbon::parse($this->kontrak_selesai)->isoFormat('D MMMM Y') : null,
             'tgl_penempatan' => $this->tgl_penempatan,
             'tgl_penempatan_formatted' => $this->tgl_penempatan ? Carbon::parse($this->tgl_penempatan)->isoFormat('D MMMM Y') : null,
-            
+
 
             // Payment details
             'top' => $this->top,
@@ -376,7 +536,7 @@ class QuotationResource extends JsonResource
                     'persen_bpjs_ketenagakerjaan_total' => $this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0,
                     'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
-           
+
                 'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
                     // Ambil data wage untuk mendapatkan info lembur dan tunjangan_holiday
                     $wage = $detail->wage ?? null;
@@ -419,7 +579,7 @@ class QuotationResource extends JsonResource
                         'jumlah_hc' => $detail->jumlah_hc,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
-                        'kota'=> $detail->quotationSite->kota ?? null,
+                        'kota' => $detail->quotationSite->kota ?? null,
 
                         // ✅ DATA HPP
                         'hpp' => [
@@ -588,6 +748,8 @@ class QuotationResource extends JsonResource
                 : [],
             // ...
             // Calculated fields
+            'approval_highlights' => $this->approvalHighlights,
+
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
                 return $this->quotationDetails->sum('jumlah_hc');
             }),
@@ -600,7 +762,9 @@ class QuotationResource extends JsonResource
                 return $this->quotationDetailCosses->sum('total_coss');
             }),
 
+
             'can_create_spk' => $this->is_aktif == 1,
+
 
             // Additional metadata
             'links' => [
