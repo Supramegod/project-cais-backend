@@ -3,6 +3,7 @@
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardApprovalController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -409,6 +410,11 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/list', 'getConfig');
         Route::post('/add', 'saveConfig');
         Route::post('/test', 'testConnection');
+    });
+    // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
+    Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
+        Route::get('/list', 'getListDashboardApprovalData');
+   
     });
 
 });
