@@ -2053,25 +2053,38 @@ class CustomerActivityController extends Controller
         try {
             $user = Auth::user();
 
-            // Gunakan scope dari model
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
+            // Gunakan scope dari model dengan select hanya kolom yang diperlukan
+            $query = Leads::select([
+                'id',
+                'nama_perusahaan',
+                'branch_id',
+                'tgl_leads',
+                'pic',
+                'no_telp'
+            ])
+                ->with([
+                    'branch:id,name' // Hanya ambil id dan name dari branch
+                ])
                 ->availableForActivity($user);
 
             $data = $query->get();
 
             // Transformasi data
-            $data->transform(function ($item) {
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->salesEmail = '';
-                $item->branchManagerEmail = '';
-                $item->branchManager = '';
-                return $item;
+            $transformed = $data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'nama_branch' => $item->branch ? $item->branch->name : null,
+                    'tanggal_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'pic' => $item->pic,
+                    'no_telp_pic' => $item->no_telp
+                ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads tersedia berhasil diambil',
-                'data' => $data
+                'data' => $transformed
             ]);
         } catch (\Exception $e) {
             return response()->json([
