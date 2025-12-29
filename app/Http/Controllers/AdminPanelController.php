@@ -24,7 +24,7 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/hc",
      *     summary="Update step 3 (Headcount dan Position)",
      *     tags={"Admin Panel"},
@@ -53,7 +53,6 @@ class AdminPanelController extends Controller
      *                     @OA\Property(property="jumlah_hc", type="integer", example=3),
      *                     @OA\Property(property="jabatan_kebutuhan", type="string", example="Security Supervisor"),
      *                     @OA\Property(property="nama_site", type="string", example="Site A")
-     *                     )
      *                 )
      *             )
      *         )
@@ -64,7 +63,7 @@ class AdminPanelController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Step 3 berhasil diupdate"),
-     *             @OA\Property(property="data", type="object", example={})
+     *             @OA\Property(property="data", type="object")
      *         )
      *     ),
      *     @OA\Response(
@@ -73,7 +72,7 @@ class AdminPanelController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Data tidak valid"),
-     *             @OA\Property(property="errors", type="object", example={"headCountData": "Data headcount diperlukan"})
+     *             @OA\Property(property="errors", type="object")
      *         )
      *     ),
      *     @OA\Response(
@@ -102,7 +101,7 @@ class AdminPanelController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' =>  $validator->errors()
+                    'message' => $validator->errors()
                 ], 400);
             }
 
@@ -139,7 +138,7 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/kaporlap",
      *     summary="Update step 7 (Kaporlap/APD)",
      *     tags={"Admin Panel"},
@@ -167,7 +166,6 @@ class AdminPanelController extends Controller
      *                     @OA\Property(property="quotation_detail_id", type="integer", example=1),
      *                     @OA\Property(property="jumlah", type="integer", example=5),
      *                     @OA\Property(property="harga", type="number", example=150000),
-     *                     @OA\Property(property="masa_pakai", type="integer", example=12, description="Masa pakai dalam bulan")
      *                 )
      *             )
      *         )
@@ -193,7 +191,6 @@ class AdminPanelController extends Controller
                 'kaporlaps.*.quotation_detail_id' => 'required|integer|exists:sl_quotation_detail,id',
                 'kaporlaps.*.jumlah' => 'required|integer|min:0',
                 'kaporlaps.*.harga' => 'nullable|numeric|min:0',
-                'kaporlaps.*.masa_pakai' => 'nullable|integer|min:1',
             ]);
 
             if ($validator->fails()) {
@@ -236,7 +233,7 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/devices",
      *     summary="Update step 8 (Devices/Peralatan)",
      *     tags={"Admin Panel"},
@@ -262,8 +259,7 @@ class AdminPanelController extends Controller
      *                     required={"barang_id", "jumlah"},
      *                     @OA\Property(property="barang_id", type="integer", example=10),
      *                     @OA\Property(property="jumlah", type="integer", example=2),
-     *                     @OA\Property(property="harga", type="number", example=5000000),
-     *                     @OA\Property(property="masa_pakai", type="integer", example=24, description="Masa pakai dalam bulan")
+     *                     @OA\Property(property="harga", type="number", example=5000000)
      *                 )
      *             )
      *         )
@@ -288,7 +284,6 @@ class AdminPanelController extends Controller
                 'devices.*.barang_id' => 'required|integer|exists:m_barang,id',
                 'devices.*.jumlah' => 'required|integer|min:0',
                 'devices.*.harga' => 'nullable|numeric|min:0',
-                'devices.*.masa_pakai' => 'nullable|integer|min:1',
             ]);
 
             if ($validator->fails()) {
@@ -331,7 +326,7 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/chemical",
      *     summary="Update step 9 (Chemical/Bahan Kimia)",
      *     tags={"Admin Panel"},
@@ -425,7 +420,7 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/ohc",
      *     summary="Update step 10 (OHC, Training, dan Kunjungan)",
      *     tags={"Admin Panel"},
@@ -450,8 +445,7 @@ class AdminPanelController extends Controller
      *                     required={"barang_id", "jumlah"},
      *                     @OA\Property(property="barang_id", type="integer", example=6),
      *                     @OA\Property(property="jumlah", type="integer", example=1),
-     *                     @OA\Property(property="harga", type="number", example=1000000),
-     *                     @OA\Property(property="masa_pakai", type="integer", example=12)
+     *                     @OA\Property(property="harga", type="number", example=1000000)
      *                 )
      *             ),
      *             @OA\Property(
@@ -490,7 +484,6 @@ class AdminPanelController extends Controller
                 'ohcs.*.barang_id' => 'required_with:ohcs|integer|exists:m_barang,id',
                 'ohcs.*.jumlah' => 'required_with:ohcs|integer|min:0',
                 'ohcs.*.harga' => 'nullable|numeric|min:0',
-                'ohcs.*.masa_pakai' => 'nullable|integer|min:1',
                 'quotation_trainings' => 'nullable|array',
                 'quotation_trainings.*' => 'integer|exists:m_training,id',
                 'jumlah_kunjungan_operasional' => 'nullable|integer|min:0',
@@ -544,9 +537,9 @@ class AdminPanelController extends Controller
     }
 
     /**
-     * @OA\Put(
+     * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/harga-jual",
-     *     summary="Update step 11 (Penagihan, HPP, COSS, dan Tunjangan)",
+     *     summary="Update step 11 (Penagihan, HPP, COSS, Tunjangan, dan Note Harga Jual)",
      *     tags={"Admin Panel"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -558,7 +551,7 @@ class AdminPanelController extends Controller
      *     ),
      *     @OA\RequestBody(
      *         required=true,
-     *         description="Data penagihan, HPP, COSS, dan tunjangan",
+     *         description="Data penagihan, HPP, COSS, tunjangan, dan note harga jual",
      *         @OA\JsonContent(
      *             required={"penagihan"},
      *             @OA\Property(property="penagihan", type="string", example="Bulanan", description="Metode penagihan"),
@@ -604,6 +597,12 @@ class AdminPanelController extends Controller
      *                         }
      *                     }
      *                 }
+     *             ),
+     *             @OA\Property(
+     *                 property="note_harga_jual",
+     *                 type="string",
+     *                 example="<b>Upah pokok base on Umk 2024</b><br>Tunjangan overtime flat total 75 jam.",
+     *                 description="Note atau catatan untuk harga jual (HTML format)"
      *             )
      *         )
      *     ),

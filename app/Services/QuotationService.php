@@ -1476,7 +1476,7 @@ class QuotationService
 
                     // Cek apakah perlu approval level 2
                     $needsLevel2 = (
-                        $quotation->top == "Lebih Dari 7 Hari" 
+                        $quotation->top == "Lebih Dari 7 Hari"
                         // ($quotation->jenis_kontrak == "Reguler" && $quotation->kompensasi == "Tidak Ada")
                     );
 
@@ -1638,34 +1638,33 @@ class QuotationService
             ->where('id', $quotation->salary_rule_id)
             ->first();
 
-
         // Build salary schedule table
         $tableSalary = '<table class="table table-bordered" style="width:100%">
-                      <thead>
-                        <tr>
-                          <th class="text-center"><b>No.</b></th>
-                          <th class="text-center"><b>Schedule Plan</b></th>
-                          <th class="text-center"><b>Periode</b></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td class="text-center">1</td>
-                          <td>Cut Off</td>
-                          <td>' . $salaryRuleQ->cutoff . '</td>
-                        </tr>
-                        <tr>
-                          <td class="text-center">2</td>
-                          <td>Pengiriman <i>Invoice</i></td>
-                          <td>' . $salaryRuleQ->pengiriman_invoice . '</td>
-                        </tr>
-                        <tr>
-                          <td class="text-center">3</td>
-                          <td>Rilis <i>Payroll</i> / Gaji</td>
-                          <td>' . $salaryRuleQ->rilis_payroll . '</td>
-                        </tr>
-                      </tbody>
-                    </table>';
+                  <thead>
+                    <tr>
+                      <th class="text-center"><b>No.</b></th>
+                      <th class="text-center"><b>Schedule Plan</b></th>
+                      <th class="text-center"><b>Periode</b></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-center">1</td>
+                      <td>Cut Off</td>
+                      <td>' . $salaryRuleQ->cutoff . '</td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">2</td>
+                      <td>Pengiriman <i>Invoice</i></td>
+                      <td>' . ($quotation->pengiriman_invoice ?: $salaryRuleQ->pengiriman_invoice) . '</td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">3</td>
+                      <td>Rilis <i>Payroll</i> / Gaji</td>
+                      <td>' . $salaryRuleQ->rilis_payroll . '</td>
+                    </tr>
+                  </tbody>
+                </table>';
 
         // Build kunjungan operasional text
         $kunjunganOperasional = "";
@@ -1700,7 +1699,24 @@ class QuotationService
 
         $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
 
-        $perjanjian[] = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b> maksimal 30 hari kalender dengan skema sebagai berikut: <br>" . $tableSalary . "<i><br>*Rilis gaji adalah talangan.<br>*Maksimal pembayaran invoice 30 hari kalender setelah invoice</i>";
+        // LOGIKA PERBAIKAN TOP (POINT 4)
+        $labelMaksimal = ($quotation->top === 'Non TOP') ? "" : " maksimal 30 hari kalender";
+
+        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b>" . $labelMaksimal . " dengan skema sebagai berikut: <br>" . $tableSalary;
+
+        $catatanKaki = "<i><br>*Rilis gaji adalah talangan.";
+
+        // Jika bukan Non TOP, tampilkan detail maksimal pembayaran
+        if ($quotation->top !== 'Non TOP') {
+            $topValue = ($quotation->top === 'Lebih Dari 7 Hari')
+                ? $quotation->jumlah_hari_invoice
+                : $quotation->top;
+
+            $catatanKaki .= "<br>*Maksimal pembayaran invoice " . $topValue . " hari " . $quotation->tipe_hari_invoice . " setelah invoice";
+        }
+
+        $catatanKaki .= "</i>";
+        $perjanjian[] = $perjanjianContent . $catatanKaki;
 
         $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
 
