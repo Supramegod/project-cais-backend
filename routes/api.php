@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminPanelController;
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
@@ -414,7 +415,21 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
     Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
         Route::get('/list', 'getListDashboardApprovalData');
-   
+    });
+    // routes/api.php (tambahkan di bagian yang sesuai, misalnya setelah route quotations-step)
+
+    // Admin Panel Routes - untuk update step quotation secara khusus
+    Route::prefix('admin-panel')->controller(AdminPanelController::class)->group(function () {
+        // Get step data
+        Route::get('/quotations/{quotation}/step-data/{step}', 'getStepData');
+
+        // Update steps
+        Route::put('/quotations/{quotation}/hc', 'updateStep3');
+        Route::put('/quotations/{quotation}/kaporlap', 'updateStep7');
+        Route::put('/quotations/{quotation}/devices', 'updateStep8');
+        Route::put('/quotations/{quotation}/chemical', 'updateStep9');
+        Route::put('/quotations/{quotation}/ohc', 'updateStep10');
+        Route::put('/quotations/{quotation}/harga-jual', 'updateStep11');
     });
 
 });
