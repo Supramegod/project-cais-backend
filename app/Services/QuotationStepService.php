@@ -865,15 +865,25 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             $user = Auth::user()->full_name;
             $currentDateTime = Carbon::now();
 
-            // Update penagihan menggunakan DB facade untuk menghindari masalah attribute model
+            $updateQuotationData = [
+                'penagihan' => $request->penagihan,
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ];
+
+            // TAMBAHKAN: Update note_harga_jual jika ada di request
+            if ($request->has('note_harga_jual')) {
+                $updateQuotationData['note_harga_jual'] = $request->note_harga_jual;
+
+                \Log::info("Updating note_harga_jual in quotation", [
+                    'quotation_id' => $quotation->id,
+                    'note_length' => strlen($request->note_harga_jual)
+                ]);
+            }
+
             DB::table('sl_quotation')
                 ->where('id', $quotation->id)
-                ->update([
-                    'penagihan' => $request->penagihan,
-                    'updated_by' => $user,
-                    'updated_at' => $currentDateTime
-                ]);
-
+                ->update($updateQuotationData);
             // =====================================================
             // UPDATE DATA HPP DARI REQUEST (thr, kompensasi, persen_insentif)
             // =====================================================

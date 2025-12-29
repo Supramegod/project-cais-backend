@@ -7,12 +7,12 @@
     },
     "paths": {
         "/api/admin-panel/quotations/{quotation}/hc": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
                 "summary": "Update step 3 (Headcount dan Position)",
-                "operationId": "b1a6a32d087e5636577407273a9dcdaa",
+                "operationId": "f2670e2242a512c2aab4548d1d5c460a",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -50,7 +50,7 @@
                                                 },
                                                 "position_id": {
                                                     "type": "integer",
-                                                    "example": 5
+                                                    "example": 1820
                                                 },
                                                 "jumlah_hc": {
                                                     "type": "integer",
@@ -63,33 +63,6 @@
                                                 "nama_site": {
                                                     "type": "string",
                                                     "example": "Site A"
-                                                },
-                                                "nominal_upah": {
-                                                    "type": "number",
-                                                    "example": 4500000
-                                                },
-                                                "requirements": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Minimal SMA/SMK"
-                                                    }
-                                                },
-                                                "tunjangans": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "nama_tunjangan": {
-                                                                "type": "string",
-                                                                "example": "Tunjangan Transport"
-                                                            },
-                                                            "nominal": {
-                                                                "type": "number",
-                                                                "example": 300000
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
                                                 }
                                             },
                                             "type": "object"
@@ -117,8 +90,7 @@
                                             "example": "Step 3 berhasil diupdate"
                                         },
                                         "data": {
-                                            "type": "object",
-                                            "example": []
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -141,10 +113,7 @@
                                             "example": "Data tidak valid"
                                         },
                                         "errors": {
-                                            "type": "object",
-                                            "example": {
-                                                "headCountData": "Data headcount diperlukan"
-                                            }
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -181,12 +150,12 @@
             }
         },
         "/api/admin-panel/quotations/{quotation}/kaporlap": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
                 "summary": "Update step 7 (Kaporlap/APD)",
-                "operationId": "db1835a396052e63eac623a1e7a889bc",
+                "operationId": "71ccfcf8ed744d00267ccfdbd3228211",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -233,11 +202,6 @@
                                                 "harga": {
                                                     "type": "number",
                                                     "example": 150000
-                                                },
-                                                "masa_pakai": {
-                                                    "description": "Masa pakai dalam bulan",
-                                                    "type": "integer",
-                                                    "example": 12
                                                 }
                                             },
                                             "type": "object"
@@ -282,12 +246,12 @@
             }
         },
         "/api/admin-panel/quotations/{quotation}/devices": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
                 "summary": "Update step 8 (Devices/Peralatan)",
-                "operationId": "99164479f682b217cb67704cc9a7905a",
+                "operationId": "8b8868416dbcb7599e42760db89d64a0",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -329,11 +293,6 @@
                                                 "harga": {
                                                     "type": "number",
                                                     "example": 5000000
-                                                },
-                                                "masa_pakai": {
-                                                    "description": "Masa pakai dalam bulan",
-                                                    "type": "integer",
-                                                    "example": 24
                                                 }
                                             },
                                             "type": "object"
@@ -378,12 +337,12 @@
             }
         },
         "/api/admin-panel/quotations/{quotation}/chemical": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
                 "summary": "Update step 9 (Chemical/Bahan Kimia)",
-                "operationId": "31267a98fa7c807a7fdc4230fc4c9df3",
+                "operationId": "a21d1b681ae7803bf6b76b8a651ff217",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -474,12 +433,12 @@
             }
         },
         "/api/admin-panel/quotations/{quotation}/ohc": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
                 "summary": "Update step 10 (OHC, Training, dan Kunjungan)",
-                "operationId": "a35a106dd087365e9bacb73964318c7c",
+                "operationId": "074b8d5fddd030b5aa021d16ba180680",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -518,10 +477,6 @@
                                                 "harga": {
                                                     "type": "number",
                                                     "example": 1000000
-                                                },
-                                                "masa_pakai": {
-                                                    "type": "integer",
-                                                    "example": 12
                                                 }
                                             },
                                             "type": "object"
@@ -606,12 +561,12 @@
             }
         },
         "/api/admin-panel/quotations/{quotation}/harga-jual": {
-            "put": {
+            "post": {
                 "tags": [
                     "Admin Panel"
                 ],
-                "summary": "Update step 11 (Penagihan, HPP, COSS, dan Tunjangan)",
-                "operationId": "f98cf1a6d5eb6d22e76c8d5156d9e3fb",
+                "summary": "Update step 11 (Penagihan, HPP, COSS, Tunjangan, dan Note Harga Jual)",
+                "operationId": "28ad30de08e1d1948c00b5655ead5a73",
                 "parameters": [
                     {
                         "name": "quotation",
@@ -624,7 +579,7 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "Data penagihan, HPP, COSS, dan tunjangan",
+                    "description": "Data penagihan, HPP, COSS, tunjangan, dan note harga jual",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -708,6 +663,11 @@
                                                 }
                                             }
                                         }
+                                    },
+                                    "note_harga_jual": {
+                                        "description": "Note atau catatan untuk harga jual (HTML format)",
+                                        "type": "string",
+                                        "example": "<b>Upah pokok base on Umk 2024</b><br>Tunjangan overtime flat total 75 jam."
                                     }
                                 },
                                 "type": "object"
@@ -16939,6 +16899,37 @@
                                         "description": "Union existence",
                                         "type": "string",
                                         "example": "Tidak Ada"
+                                    },
+                                    "pics": {
+                                        "description": "Array of PIC data",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "nama",
+                                                "jabatan",
+                                                "no_telp",
+                                                "email"
+                                            ],
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Jane Doe"
+                                                },
+                                                "jabatan": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "no_telp": {
+                                                    "type": "string",
+                                                    "example": "081234567890"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "jane@example.com"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
                                     }
                                 },
                                 "type": "object"
@@ -16974,6 +16965,10 @@
                                                 "pic_invoice": {
                                                     "type": "string",
                                                     "example": "John Doe"
+                                                },
+                                                "pics_added": {
+                                                    "type": "integer",
+                                                    "example": 2
                                                 }
                                             },
                                             "type": "object"
