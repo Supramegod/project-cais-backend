@@ -6540,6 +6540,183 @@
                 ]
             }
         },
+        "/api/dashboard-approval/list": {
+            "get": {
+                "tags": [
+                    "Dashboard Approval"
+                ],
+                "summary": "Get list dashboard approval data",
+                "description": "Mengambil data quotation untuk dashboard approval berdasarkan role user dan filter tipe",
+                "operationId": "b1ca025bd68ec3aa044a0eb0bcaa4b12",
+                "parameters": [
+                    {
+                        "name": "tipe",
+                        "in": "query",
+                        "description": "Tipe filter data",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "menunggu-anda",
+                                "menunggu-approval",
+                                "quotation-belum-lengkap"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "step": {
+                                                        "type": "integer",
+                                                        "example": 100
+                                                    },
+                                                    "top": {
+                                                        "type": "string",
+                                                        "example": "Lebih Dari 7 Hari"
+                                                    },
+                                                    "ot3": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    },
+                                                    "ot2": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    },
+                                                    "ot1": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "example": "Menunggu Approval"
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "integer",
+                                                        "example": 0
+                                                    },
+                                                    "quotation_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "jenis_kontrak": {
+                                                        "type": "string",
+                                                        "example": "Kontrak Baru"
+                                                    },
+                                                    "company": {
+                                                        "type": "string",
+                                                        "example": "PT ABC"
+                                                    },
+                                                    "kebutuhan": {
+                                                        "type": "string",
+                                                        "example": "Security"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "leads_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "QUO/2023/001"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT ABC Indonesia"
+                                                    },
+                                                    "tgl_quotation": {
+                                                        "type": "string",
+                                                        "example": "01-01-2023"
+                                                    },
+                                                    "tgl": {
+                                                        "type": "string",
+                                                        "example": "1 Januari 2023"
+                                                    },
+                                                    "nama_site": {
+                                                        "type": "string",
+                                                        "example": "Site A<br />Site B"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Invalid parameter"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/devices/list": {
             "get": {
                 "tags": [
@@ -26561,6 +26738,10 @@
         {
             "name": "Customer",
             "description": "API untuk manajemen data Customer. "
+        },
+        {
+            "name": "Dashboard Approval",
+            "description": "API untuk data dashboard approval quotation"
         },
         {
             "name": "Jenis Barang",

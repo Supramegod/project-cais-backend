@@ -37,6 +37,7 @@ class QuotationDetailCoss extends Model
         'provisi_seragam',
         'provisi_peralatan',
         'provisi_chemical',
+        'provisi_ohc',
         'total_exclude_base_manpower',
         'bunga_bank',
         'insentif',

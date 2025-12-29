@@ -867,7 +867,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             $currentDateTime = Carbon::now();
 
             // Update penagihan menggunakan DB facade untuk menghindari masalah attribute model
-            // $this->updateNominalUpahAndInsentif($quotation, $request);
             DB::table('sl_quotation')
                 ->where('id', $quotation->id)
                 ->update([
@@ -875,6 +874,114 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);
+
+            // =====================================================
+            // UPDATE DATA HPP DARI REQUEST (thr, kompensasi, persen_insentif)
+            // =====================================================
+            if ($request->has('hpp_data') && is_array($request->hpp_data)) {
+                foreach ($request->hpp_data as $detailId => $hppFields) {
+                    $hpp = QuotationDetailHpp::where('quotation_detail_id', $detailId)->first();
+
+                    if ($hpp) {
+                        // Update hanya field yang ada di request
+                        $updateData = [];
+
+                        // Tentukan field yang boleh diupdate
+                        $allowedHppFields = ['thr', 'kompensasi', 'persen_insentif'];
+
+                        foreach ($allowedHppFields as $field) {
+                            if (isset($hppFields[$field])) {
+                                // Konversi nilai jika string dengan format angka
+                                $value = $hppFields[$field];
+                                if (is_string($value) && !is_numeric($value)) {
+                                    $value = (float) str_replace(['.', ','], ['', '.'], $value);
+                                }
+                                $updateData[$field] = $value;
+                            }
+                        }
+
+                        if (!empty($updateData)) {
+                            $updateData['updated_by'] = $user;
+                            $updateData['updated_at'] = $currentDateTime;
+                            $hpp->update($updateData);
+
+                            \Log::info("Updated HPP data from request", [
+                                'detail_id' => $detailId,
+                                'hpp_id' => $hpp->id,
+                                'update_data' => $updateData
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // =====================================================
+            // UPDATE DATA COSS DARI REQUEST (provisi items)
+            // =====================================================
+            if ($request->has('coss_data') && is_array($request->coss_data)) {
+                foreach ($request->coss_data as $detailId => $cossFields) {
+                    $coss = QuotationDetailCoss::where('quotation_detail_id', $detailId)->first();
+
+                    if ($coss) {
+                        // Update hanya field yang ada di request
+                        $updateData = [];
+
+                        // Tentukan field yang boleh diupdate
+                        $allowedCossFields = [
+                            'provisi_seragam',
+                            'provisi_peralatan',
+                            'provisi_chemical',
+                            'provisi_ohc'
+                        ];
+
+                        foreach ($allowedCossFields as $field) {
+                            if (isset($cossFields[$field])) {
+                                // Konversi nilai jika string dengan format angka
+                                $value = $cossFields[$field];
+                                if (is_string($value) && !is_numeric($value)) {
+                                    $value = (float) str_replace(['.', ','], ['', '.'], $value);
+                                }
+                                $updateData[$field] = $value;
+                            }
+                        }
+
+                        if (!empty($updateData)) {
+                            $updateData['updated_by'] = $user;
+                            $updateData['updated_at'] = $currentDateTime;
+                            $coss->update($updateData);
+
+                            \Log::info("Updated COSS data from request", [
+                                'detail_id' => $detailId,
+                                'coss_id' => $coss->id,
+                                'update_data' => $updateData
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // =====================================================
+            // UPDATE PERSEN INSENTIF DI QUOTATION JIKA ADA
+            // =====================================================
+            if ($request->has('persen_insentif')) {
+                $persenInsentif = $request->persen_insentif;
+                if (is_string($persenInsentif) && !is_numeric($persenInsentif)) {
+                    $persenInsentif = (float) str_replace(['.', ','], ['', '.'], $persenInsentif);
+                }
+
+                DB::table('sl_quotation')
+                    ->where('id', $quotation->id)
+                    ->update([
+                        'persen_insentif' => $persenInsentif,
+                        'updated_by' => $user,
+                        'updated_at' => $currentDateTime
+                    ]);
+
+                \Log::info("Updated persen_insentif in quotation", [
+                    'quotation_id' => $quotation->id,
+                    'persen_insentif' => $persenInsentif
+                ]);
+            }
 
             // =====================================================
             // TAMBAHAN: SYNC TUNJANGAN DATA
@@ -890,24 +997,27 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // SIMPAN HASIL PERHITUNGAN KE DATABASE MENGGUNAKAN DTO
             // =====================================================
 
-            // Panggil calculateQuotation untuk mendapatkan hasil perhitungan dalam DTO
+            // Panggil calculateQuotation untuk mendapatkan hasil perhitungan terbaru
+            // Dengan data yang sudah diupdate dari request
             $calculationResult = $this->quotationService->calculateQuotation($quotation);
 
             // TAMBAHKAN: Log BPU information
             \Log::info("BPU Information", [
                 'quotation_id' => $quotation->id,
                 'program_bpjs' => $quotation->program_bpjs,
-                'total_potongan_bpu' => $calculationResult->calculation_summary->total_potongan_bpu,
-                'potongan_bpu_per_orang' => $calculationResult->calculation_summary->potongan_bpu_per_orang
+                'total_potongan_bpu' => $calculationResult->calculation_summary->total_potongan_bpu ?? 0,
+                'potongan_bpu_per_orang' => $calculationResult->calculation_summary->potongan_bpu_per_orang ?? 0
             ]);
 
             // Loop setiap detail calculation untuk menyimpan ke HPP dan COSS
+            // PERHATIAN: Method saveHppDataFromCalculation dan saveCossDataFromCalculation
+            // harus diupdate untuk menghormati data yang sudah diinput user
             foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
-                // Simpan ke QuotationDetailHpp
-                $this->saveHppDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime);
+                // Simpan ke QuotationDetailHpp - dengan logika yang menghormati input user
+                $this->saveHppDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime, $request);
 
-                // Simpan ke QuotationDetailCoss  
-                $this->saveCossDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime);
+                // Simpan ke QuotationDetailCoss - dengan logika yang menghormati input user
+                $this->saveCossDataFromCalculation($detailCalculation, $calculationResult, $user, $currentDateTime, $request);
             }
 
             // Update data quotation hanya dengan kolom yang ada - GUNAKAN DB FACADE
@@ -921,7 +1031,9 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'hpp_updated' => true,
                 'coss_updated' => true,
                 'tunjangan_synced' => $request->has('tunjangan_data'),
-                'bpu_total' => $calculationResult->calculation_summary->total_potongan_bpu
+                'bpu_total' => $calculationResult->calculation_summary->total_potongan_bpu ?? 0,
+                'hpp_data_received' => $request->has('hpp_data'),
+                'coss_data_received' => $request->has('coss_data')
             ]);
 
         } catch (\Exception $e) {
@@ -1943,7 +2055,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
     /**
      * Simpan data HPP dari DetailCalculation DTO
      */
-    private function saveHppDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
+    private function saveHppDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime, $request = null): void
     {
         try {
             // Cari existing HPP data
@@ -1955,8 +2067,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // ============================
             // PERBAIKAN: Konversi field string ke numerik
             // ============================
-
-            // Field yang harus numerik
             $numericFields = [
                 'kompensasi',
                 'tunjangan_hari_raya',
@@ -1984,10 +2094,10 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     // Jika string yang mengandung "Tidak", "Tidak Ada", "Ya", dll, konversi ke 0
                     if (is_string($hppData[$field])) {
                         $stringValue = strtolower(trim($hppData[$field]));
-                        if (in_array($stringValue, ['tidak', 'tidak ada', 'tidak ada', 'false', 'no', 'ya'])) {
+                        if (in_array($stringValue, ['tidak', 'tidak ada', 'false', 'no', 'ya'])) {
                             $hppData[$field] = 0;
                         } else {
-                            // Coba konversi string numerik (misal: "1000.50" menjadi 1000.50)
+                            // Coba konversi string numerik
                             $hppData[$field] = (float) str_replace(['.', ','], ['', '.'], $stringValue);
                         }
                     }
@@ -1997,38 +2107,34 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             }
 
             // ============================
-            // PERBAIKAN: Handle khusus untuk kompensasi
+            // LOGIKA KHUSUS: Hormati data yang sudah diinput user dari request
+            // Jika request memiliki data untuk HPP, gunakan nilai dari request
             // ============================
-            if (isset($hppData['kompensasi'])) {
-                if (is_string($hppData['kompensasi'])) {
-                    $kompensasiString = strtolower(trim($hppData['kompensasi']));
-                    // Jika kompensasi adalah string deskriptif, cari nilai numeriknya dari DTO yang lain
-                    if (in_array($kompensasiString, ['tidak', 'tidak ada', 'false'])) {
-                        $hppData['kompensasi'] = 0;
-                    } elseif ($kompensasiString === 'diprovisikan' || $kompensasiString === 'ditagihkan') {
-                        // Hitung kompensasi sebagai upah/12 jika diprovisikan
-                        $nominalUpah = $hppData['gaji_pokok'] ?? 0;
-                        $hppData['kompensasi'] = round($nominalUpah / 12, 2);
-                    } else {
-                        $hppData['kompensasi'] = 0;
-                    }
-                }
-                $hppData['kompensasi'] = (float) $hppData['kompensasi'];
-            }
+            if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
+                $userHppData = $request->hpp_data[$detailCalculation->detail_id];
 
-            // ============================
-            // PERBAIKAN: Handle khusus untuk lembur
-            // ============================
-            if (isset($hppData['lembur'])) {
-                if (is_string($hppData['lembur'])) {
-                    $lemburString = strtolower(trim($hppData['lembur']));
-                    if (in_array($lemburString, ['tidak', 'tidak ada', 'false'])) {
-                        $hppData['lembur'] = 0;
-                    } else {
-                        $hppData['lembur'] = 0; // Default ke 0 jika tidak bisa dikonversi
+                // Field yang boleh diinput user untuk HPP
+                $userEditableFields = ['thr', 'kompensasi', 'persen_insentif'];
+
+                foreach ($userEditableFields as $field) {
+                    if (isset($userHppData[$field])) {
+                        // Konversi nilai dari request
+                        $userValue = $userHppData[$field];
+                        if (is_string($userValue) && !is_numeric($userValue)) {
+                            $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
+                        }
+
+                        // Ganti nilai dari perhitungan dengan nilai dari user
+                        $hppData[$field] = (float) $userValue;
+
+                        \Log::info("Using user input for HPP field", [
+                            'detail_id' => $detailCalculation->detail_id,
+                            'field' => $field,
+                            'user_value' => $userValue,
+                            'calculation_value' => $detailCalculation->hpp_data[$field] ?? 'not_set'
+                        ]);
                     }
                 }
-                $hppData['lembur'] = (float) $hppData['lembur'];
             }
 
             // Tambahkan field tambahan dari calculation summary
@@ -2048,6 +2154,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // Jika existing data ada, update. Jika tidak, create baru
             if ($existingHpp) {
                 // Jangan overwrite value yang sudah ada jika value custom user
+                // Kecuali jika user menginput melalui request
                 $preservedFields = [
                     'gaji_pokok',
                     'tunjangan_hari_raya',
@@ -2058,9 +2165,30 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'insentif'
                 ];
 
-                foreach ($preservedFields as $field) {
-                    if ($existingHpp->$field !== null && $existingHpp->$field != 0) {
-                        unset($hppData[$field]);
+                // Jika ada request data dari user, gunakan nilai dari request
+                if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
+                    // Untuk field yang diinput user, gunakan nilai dari request
+                    $userInput = $request->hpp_data[$detailCalculation->detail_id];
+
+                    foreach ($preservedFields as $field) {
+                        if (isset($userInput[$field])) {
+                            // User menginput field ini, gunakan nilai user
+                            $userValue = $userInput[$field];
+                            if (is_string($userValue) && !is_numeric($userValue)) {
+                                $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
+                            }
+                            $hppData[$field] = (float) $userValue;
+                        } elseif ($existingHpp->$field !== null && $existingHpp->$field != 0) {
+                            // Tidak ada input user, tetapi ada nilai existing, pertahankan
+                            unset($hppData[$field]);
+                        }
+                    }
+                } else {
+                    // Tidak ada request data, pertahankan nilai existing
+                    foreach ($preservedFields as $field) {
+                        if ($existingHpp->$field !== null && $existingHpp->$field != 0) {
+                            unset($hppData[$field]);
+                        }
                     }
                 }
 
@@ -2070,7 +2198,8 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'detail_id' => $detailCalculation->detail_id,
                     'hpp_id' => $existingHpp->id,
                     'kompensasi_value' => $hppData['kompensasi'] ?? 'not_set',
-                    'lembur_value' => $hppData['lembur'] ?? 'not_set'
+                    'lembur_value' => $hppData['lembur'] ?? 'not_set',
+                    'thr_value' => $hppData['tunjangan_hari_raya'] ?? 'not_set'
                 ]);
             } else {
                 $hppData['created_by'] = $user;
@@ -2088,7 +2217,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'detail_id' => $detailCalculation->detail_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'hpp_data' => $hppData
+                'hpp_data' => $hppData ?? []
             ]);
             throw $e;
         }
@@ -2097,7 +2226,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
     /**
      * Simpan data COSS dari DetailCalculation DTO
      */
-    private function saveCossDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime): void
+    private function saveCossDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime, $request = null): void
     {
         try {
             // Cari existing COSS data
@@ -2109,8 +2238,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // ============================
             // PERBAIKAN: Konversi field string ke numerik
             // ============================
-
-            // Field yang harus numerik
             $numericFields = [
                 'kompensasi',
                 'tunjangan_hari_raya',
@@ -2135,7 +2262,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     // Jika string yang mengandung "Tidak", "Tidak Ada", "Ya", dll, konversi ke 0
                     if (is_string($cossData[$field])) {
                         $stringValue = strtolower(trim($cossData[$field]));
-                        if (in_array($stringValue, ['tidak', 'tidak ada', 'tidak ada', 'false', 'no', 'ya'])) {
+                        if (in_array($stringValue, ['tidak', 'tidak ada', 'false', 'no', 'ya'])) {
                             $cossData[$field] = 0;
                         } else {
                             // Coba konversi string numerik
@@ -2144,6 +2271,42 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     }
                     // Pastikan selalu float
                     $cossData[$field] = (float) $cossData[$field];
+                }
+            }
+
+            // ============================
+            // LOGIKA KHUSUS: Hormati data yang sudah diinput user dari request
+            // Jika request memiliki data untuk COSS, gunakan nilai dari request
+            // ============================
+            if ($request && $request->has('coss_data') && isset($request->coss_data[$detailCalculation->detail_id])) {
+                $userCossData = $request->coss_data[$detailCalculation->detail_id];
+
+                // Field yang boleh diinput user untuk COSS
+                $userEditableFields = [
+                    'provisi_seragam',
+                    'provisi_peralatan',
+                    'provisi_chemical',
+                    'provisi_ohc'
+                ];
+
+                foreach ($userEditableFields as $field) {
+                    if (isset($userCossData[$field])) {
+                        // Konversi nilai dari request
+                        $userValue = $userCossData[$field];
+                        if (is_string($userValue) && !is_numeric($userValue)) {
+                            $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
+                        }
+
+                        // Ganti nilai dari perhitungan dengan nilai dari user
+                        $cossData[$field] = (float) $userValue;
+
+                        \Log::info("Using user input for COSS field", [
+                            'detail_id' => $detailCalculation->detail_id,
+                            'field' => $field,
+                            'user_value' => $userValue,
+                            'calculation_value' => $detailCalculation->coss_data[$field] ?? 'not_set'
+                        ]);
+                    }
                 }
             }
 
@@ -2164,6 +2327,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // Jika existing data ada, update. Jika tidak, create baru
             if ($existingCoss) {
                 // Jangan overwrite value yang sudah ada jika value custom user
+                // Kecuali jika user menginput melalui request
                 $preservedFields = [
                     'gaji_pokok',
                     'tunjangan_hari_raya',
@@ -2171,12 +2335,37 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'tunjangan_hari_libur_nasional',
                     'lembur',
                     'bunga_bank',
-                    'insentif'
+                    'insentif',
+                    'provisi_seragam',
+                    'provisi_peralatan',
+                    'provisi_chemical',
+                    'provisi_ohc'
                 ];
 
-                foreach ($preservedFields as $field) {
-                    if ($existingCoss->$field !== null && $existingCoss->$field != 0) {
-                        unset($cossData[$field]);
+                // Jika ada request data dari user, gunakan nilai dari request
+                if ($request && $request->has('coss_data') && isset($request->coss_data[$detailCalculation->detail_id])) {
+                    // Untuk field yang diinput user, gunakan nilai dari request
+                    $userInput = $request->coss_data[$detailCalculation->detail_id];
+
+                    foreach ($preservedFields as $field) {
+                        if (isset($userInput[$field])) {
+                            // User menginput field ini, gunakan nilai user
+                            $userValue = $userInput[$field];
+                            if (is_string($userValue) && !is_numeric($userValue)) {
+                                $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
+                            }
+                            $cossData[$field] = (float) $userValue;
+                        } elseif ($existingCoss->$field !== null && $existingCoss->$field != 0) {
+                            // Tidak ada input user, tetapi ada nilai existing, pertahankan
+                            unset($cossData[$field]);
+                        }
+                    }
+                } else {
+                    // Tidak ada request data, pertahankan nilai existing
+                    foreach ($preservedFields as $field) {
+                        if ($existingCoss->$field !== null && $existingCoss->$field != 0) {
+                            unset($cossData[$field]);
+                        }
                     }
                 }
 
@@ -2184,7 +2373,9 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
                 \Log::debug("Updated existing COSS data", [
                     'detail_id' => $detailCalculation->detail_id,
-                    'coss_id' => $existingCoss->id
+                    'coss_id' => $existingCoss->id,
+                    'provisi_seragam' => $cossData['provisi_seragam'] ?? 'not_set',
+                    'provisi_peralatan' => $cossData['provisi_peralatan'] ?? 'not_set'
                 ]);
             } else {
                 $cossData['created_by'] = $user;
@@ -2202,7 +2393,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'detail_id' => $detailCalculation->detail_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'coss_data' => $cossData
+                'coss_data' => $cossData ?? []
             ]);
             throw $e;
         }
@@ -2223,7 +2414,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
             // HANYA update kolom yang ada di tabel
             $updateData = [
-                'persen_insentif' => $quotation->persen_insentif ?? 0,
+                // 'persen_insentif' => $quotation->persen_insentif ?? 0,
                 'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                 'updated_by' => $user,
                 'updated_at' => $currentDateTime

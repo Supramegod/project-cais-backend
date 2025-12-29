@@ -34,4 +34,11 @@ class District extends Model
     {
         return $this->hasMany(Leads::class, 'kecamatan_id');
     }
+       /**
+     * Scope untuk filter berdasarkan city
+     */
+    public function scopeByCity($query, $cityId)
+    {
+        return $query->where('city_id', $cityId);
+    }
 }
