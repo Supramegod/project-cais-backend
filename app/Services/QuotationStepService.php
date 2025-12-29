@@ -447,7 +447,6 @@ class QuotationStepService
                         'jumlah_hc' => $request->jumlah_hc ?? 0,
                         'jabatan_kebutuhan' => $request->jabatan_kebutuhan ?? null,
                         'nama_site' => $request->nama_site ?? null,
-                        'nominal_upah' => $request->nominal_upah ?? 0,
                     ]
                 ];
             }

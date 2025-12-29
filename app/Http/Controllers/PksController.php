@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\Customer;
 use App\Models\HrisSite;
+use App\Models\JabatanPic;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Leads;
@@ -17,6 +18,7 @@ use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationMargin;
+use App\Models\QuotationPic;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\Site;
@@ -1255,7 +1257,20 @@ class PksController extends Controller
      *             @OA\Property(property="pks_id", type="integer", description="PKS ID if exists", example=1),
      *             @OA\Property(property="ro", type="integer", description="RO user ID", example=10),
      *             @OA\Property(property="crm", type="integer", description="CRM user ID", example=11),
-     *             @OA\Property(property="ada_serikat", type="string", description="Union existence", example="Tidak Ada")
+     *             @OA\Property(property="ada_serikat", type="string", description="Union existence", example="Tidak Ada"),
+     *             @OA\Property(
+     *                 property="pics",
+     *                 type="array",
+     *                 description="Array of PIC data",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     required={"nama", "jabatan", "no_telp", "email"},
+     *                     @OA\Property(property="nama", type="string", example="Jane Doe"),
+     *                     @OA\Property(property="jabatan", type="integer", example=1),
+     *                     @OA\Property(property="no_telp", type="string", example="081234567890"),
+     *                     @OA\Property(property="email", type="string", example="jane@example.com")
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -1267,7 +1282,8 @@ class PksController extends Controller
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="npwp", type="string", example="123456789012345"),
-     *                 @OA\Property(property="pic_invoice", type="string", example="John Doe")
+     *                 @OA\Property(property="pic_invoice", type="string", example="John Doe"),
+     *                 @OA\Property(property="pics_added", type="integer", example=2)
      *             )
      *         )
      *     ),
@@ -1299,79 +1315,102 @@ class PksController extends Controller
      *     )
      * )
      */
-public function submitChecklist(Request $request, string $id): JsonResponse
-{
-    DB::beginTransaction();
-    try {
-        $user = Auth::user();
-        $current_date_time = Carbon::now()->toDateTimeString();
+    public function submitChecklist(Request $request, string $id): JsonResponse
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $current_date_time = Carbon::now()->toDateTimeString();
 
-        // Validasi input
-        $validator = Validator::make($request->all(), [
-            'npwp' => 'required|string|max:50',
-            'alamat_npwp' => 'required|string|max:255',
-            'pic_invoice' => 'required|string|max:100',
-            'telp_pic_invoice' => 'required|string|max:20',
-            'email_pic_invoice' => 'required|email|max:100',
-            'materai' => 'required|string|max:50',
-            'joker_reliever' => 'required|string|max:50',
-            'syarat_invoice' => 'required|string|max:255',
-            'alamat_penagihan_invoice' => 'required|string|max:255',
-            'catatan_site' => 'nullable|string',
-            'status_serikat' => 'required|string|max:50',
-            'ada_serikat' => 'nullable|string'
-        ]);
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'npwp' => 'required|string|max:50',
+                'alamat_npwp' => 'required|string|max:255',
+                'pic_invoice' => 'required|string|max:100',
+                'telp_pic_invoice' => 'required|string|max:20',
+                'email_pic_invoice' => 'required|email|max:100',
+                'materai' => 'required|string|max:50',
+                'joker_reliever' => 'required|string|max:50',
+                'syarat_invoice' => 'required|string|max:255',
+                'alamat_penagihan_invoice' => 'required|string|max:255',
+                'catatan_site' => 'nullable|string',
+                'status_serikat' => 'required|string|max:50',
+                'ada_serikat' => 'nullable|string',
+                // Validasi untuk PICs
+                'pics' => 'nullable|array',
+                'pics.*.nama' => 'required|string|max:100',
+                'pics.*.jabatan' => 'required|integer|exists:m_jabatan_pic,id',
+                'pics.*.no_telp' => 'required|string|max:20',
+                'pics.*.email' => 'required|email|max:100'
+            ]);
 
-        if ($validator->fails()) {
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Cari quotation
+            $quotation = Quotation::notDeleted()->findOrFail($id);
+
+            // Logika untuk status serikat
+            $statusSerikat = $request->status_serikat;
+            if ($request->ada_serikat === "Tidak Ada") {
+                $statusSerikat = "Tidak Ada";
+            }
+
+            // Update quotation data
+            $quotation->update([
+                'npwp' => $request->npwp,
+                'alamat_npwp' => $request->alamat_npwp,
+                'pic_invoice' => $request->pic_invoice,
+                'telp_pic_invoice' => $request->telp_pic_invoice,
+                'email_pic_invoice' => $request->email_pic_invoice,
+                'materai' => $request->materai,
+                'joker_reliever' => $request->joker_reliever,
+                'syarat_invoice' => $request->syarat_invoice,
+                'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
+                'catatan_site' => $request->catatan_site,
+                'status_serikat' => $statusSerikat,
+                'updated_at' => $current_date_time,
+                'updated_by' => $user->full_name
+            ]);
+
+            // Tambah PICs jika ada
+            $picsAdded = 0;
+            if ($request->has('pics') && is_array($request->pics)) {
+                foreach ($request->pics as $picData) {
+                    $this->addDetailPic($quotation, $picData, $current_date_time);
+                    $picsAdded++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checklist submitted successfully',
+                'data' => [
+                    'id' => $quotation->id,
+                    'npwp' => $quotation->npwp,
+                    'pic_invoice' => $quotation->pic_invoice,
+                    'pics_added' => $picsAdded
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to submit checklist: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error',
-                'errors' => $validator->errors()
-            ], 422);
+                'message' => 'Failed to submit checklist',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Cari quotation
-        $quotation = Quotation::notDeleted()->findOrFail($id);
-        
-        // Logika untuk status serikat
-        $statusSerikat = $request->status_serikat;
-        if ($request->ada_serikat === "Tidak Ada") {
-            $statusSerikat = "Tidak Ada";
-        }
-
-        // Update quotation data
-        $quotation->update([
-            'npwp' => $request->npwp,
-            'alamat_npwp' => $request->alamat_npwp,
-            'pic_invoice' => $request->pic_invoice,
-            'telp_pic_invoice' => $request->telp_pic_invoice,
-            'email_pic_invoice' => $request->email_pic_invoice,
-            'materai' => $request->materai,
-            'joker_reliever' => $request->joker_reliever,
-            'syarat_invoice' => $request->syarat_invoice,
-            'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
-            'catatan_site' => $request->catatan_site,
-            'status_serikat' => $statusSerikat,
-            'updated_at' => $current_date_time,
-            'updated_by' => $user->full_name
-        ]);
-
-        DB::commit();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Checklist submitted successfully',   
-        ]);
-
-    } catch (\Exception $e) {
-        DB::rollBack();
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to submit checklist',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
     // ======================================================================
     // PRIVATE METHODS - Business Logic
@@ -2358,5 +2397,38 @@ public function submitChecklist(Request $request, string $id): JsonResponse
             'created_by' => Auth::user()->full_name
         ]);
     }
+    /**
+     * Add Detail PIC to Quotation
+     * 
+     * @param Quotation $quotation
+     * @param array $picData
+     * @param string $current_date_time
+     * @return void
+     */
+    private function addDetailPic($quotation, array $picData, string $current_date_time): void
+    {
+        try {
+            $jabatan = JabatanPic::where('id', $picData['jabatan'])->first();
+
+            if (!$jabatan) {
+                throw new \Exception("Jabatan dengan ID {$picData['jabatan']} tidak ditemukan");
+            }
+
+            QuotationPic::create([
+                'quotation_id' => $quotation->id,
+                'nama' => $picData['nama'],
+                'jabatan_id' => $jabatan->id,
+                'no_telp' => $picData['no_telp'],
+                'email' => $picData['email'],
+                'created_at' => $current_date_time,
+                'created_by' => Auth::user()->full_name
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to add detail PIC: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
 
 }

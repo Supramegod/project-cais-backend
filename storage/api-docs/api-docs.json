@@ -6,6 +6,813 @@
         "version": "1.0.0"
     },
     "paths": {
+        "/api/admin-panel/quotations/{quotation}/hc": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 3 (Headcount dan Position)",
+                "operationId": "b1a6a32d087e5636577407273a9dcdaa",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data untuk update step 3",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "headCountData"
+                                ],
+                                "properties": {
+                                    "headCountData": {
+                                        "description": "Array data headcount per position per site",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "quotation_site_id",
+                                                "position_id",
+                                                "jumlah_hc"
+                                            ],
+                                            "properties": {
+                                                "quotation_site_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "position_id": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "jumlah_hc": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "jabatan_kebutuhan": {
+                                                    "type": "string",
+                                                    "example": "Security Supervisor"
+                                                },
+                                                "nama_site": {
+                                                    "type": "string",
+                                                    "example": "Site A"
+                                                },
+                                                "nominal_upah": {
+                                                    "type": "number",
+                                                    "example": 4500000
+                                                },
+                                                "requirements": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "Minimal SMA/SMK"
+                                                    }
+                                                },
+                                                "tunjangans": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "nama_tunjangan": {
+                                                                "type": "string",
+                                                                "example": "Tunjangan Transport"
+                                                            },
+                                                            "nominal": {
+                                                                "type": "number",
+                                                                "example": 300000
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 3 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 3 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object",
+                                            "example": []
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Request tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data tidak valid"
+                                        },
+                                        "errors": {
+                                            "type": "object",
+                                            "example": {
+                                                "headCountData": "Data headcount diperlukan"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/kaporlap": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 7 (Kaporlap/APD)",
+                "operationId": "db1835a396052e63eac623a1e7a889bc",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data kaporlap/APD",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "kaporlaps"
+                                ],
+                                "properties": {
+                                    "kaporlaps": {
+                                        "description": "Array data kaporlap per barang per detail",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "barang_id",
+                                                "quotation_detail_id",
+                                                "jumlah"
+                                            ],
+                                            "properties": {
+                                                "barang_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "quotation_detail_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "jumlah": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "harga": {
+                                                    "type": "number",
+                                                    "example": 150000
+                                                },
+                                                "masa_pakai": {
+                                                    "description": "Masa pakai dalam bulan",
+                                                    "type": "integer",
+                                                    "example": 12
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 7 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 7 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/devices": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 8 (Devices/Peralatan)",
+                "operationId": "99164479f682b217cb67704cc9a7905a",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data devices/peralatan",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "devices"
+                                ],
+                                "properties": {
+                                    "devices": {
+                                        "description": "Array data devices",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "barang_id",
+                                                "jumlah"
+                                            ],
+                                            "properties": {
+                                                "barang_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "jumlah": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "harga": {
+                                                    "type": "number",
+                                                    "example": 5000000
+                                                },
+                                                "masa_pakai": {
+                                                    "description": "Masa pakai dalam bulan",
+                                                    "type": "integer",
+                                                    "example": 24
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 8 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 8 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/chemical": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 9 (Chemical/Bahan Kimia)",
+                "operationId": "31267a98fa7c807a7fdc4230fc4c9df3",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data chemical/bahan kimia",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "chemicals"
+                                ],
+                                "properties": {
+                                    "chemicals": {
+                                        "description": "Array data chemical",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "barang_id",
+                                                "jumlah"
+                                            ],
+                                            "properties": {
+                                                "barang_id": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "jumlah": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "harga": {
+                                                    "type": "number",
+                                                    "example": 250000
+                                                },
+                                                "masa_pakai": {
+                                                    "description": "Masa pakai dalam bulan",
+                                                    "type": "integer",
+                                                    "example": 6
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 9 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 9 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/ohc": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 10 (OHC, Training, dan Kunjungan)",
+                "operationId": "a35a106dd087365e9bacb73964318c7c",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data OHC, training, dan kunjungan",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "ohcs": {
+                                        "description": "Array data OHC",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "barang_id",
+                                                "jumlah"
+                                            ],
+                                            "properties": {
+                                                "barang_id": {
+                                                    "type": "integer",
+                                                    "example": 6
+                                                },
+                                                "jumlah": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "harga": {
+                                                    "type": "number",
+                                                    "example": 1000000
+                                                },
+                                                "masa_pakai": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "quotation_trainings": {
+                                        "description": "Array ID training yang dipilih",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 1
+                                        }
+                                    },
+                                    "jumlah_kunjungan_operasional": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "bulan_tahun_kunjungan_operasional": {
+                                        "type": "string",
+                                        "example": "Bulan"
+                                    },
+                                    "keterangan_kunjungan_operasional": {
+                                        "type": "string",
+                                        "example": "Kunjungan rutin bulanan"
+                                    },
+                                    "jumlah_kunjungan_tim_crm": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "bulan_tahun_kunjungan_tim_crm": {
+                                        "type": "string",
+                                        "example": "Tahun"
+                                    },
+                                    "keterangan_kunjungan_tim_crm": {
+                                        "type": "string",
+                                        "example": "Kunjungan tahunan"
+                                    },
+                                    "training": {
+                                        "type": "string",
+                                        "example": "Training dasar"
+                                    },
+                                    "persen_bunga_bank": {
+                                        "type": "number",
+                                        "example": 1.3
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 10 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 10 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/harga-jual": {
+            "put": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Update step 11 (Penagihan, HPP, COSS, dan Tunjangan)",
+                "operationId": "f98cf1a6d5eb6d22e76c8d5156d9e3fb",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Data penagihan, HPP, COSS, dan tunjangan",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "penagihan"
+                                ],
+                                "properties": {
+                                    "penagihan": {
+                                        "description": "Metode penagihan",
+                                        "type": "string",
+                                        "example": "Bulanan"
+                                    },
+                                    "hpp_data": {
+                                        "description": "Data HPP per quotation detail",
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {
+                                                "thr": {
+                                                    "type": "number",
+                                                    "example": 450000
+                                                },
+                                                "kompensasi": {
+                                                    "type": "number",
+                                                    "example": 300000
+                                                },
+                                                "persen_insentif": {
+                                                    "type": "number",
+                                                    "example": 5
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "coss_data": {
+                                        "description": "Data COSS per quotation detail",
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {
+                                                "provisi_seragam": {
+                                                    "type": "number",
+                                                    "example": 250000
+                                                },
+                                                "provisi_peralatan": {
+                                                    "type": "number",
+                                                    "example": 150000
+                                                },
+                                                "provisi_chemical": {
+                                                    "type": "number",
+                                                    "example": 100000
+                                                },
+                                                "provisi_ohc": {
+                                                    "type": "number",
+                                                    "example": 50000
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "persen_insentif": {
+                                        "description": "Persentase insentif global",
+                                        "type": "number",
+                                        "example": 5
+                                    },
+                                    "tunjangan_data": {
+                                        "description": "Data tunjangan per quotation detail",
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "nama_tunjangan": {
+                                                        "type": "string",
+                                                        "example": "Tunjangan Transport"
+                                                    },
+                                                    "nominal": {
+                                                        "type": "number",
+                                                        "example": 300000
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step 11 berhasil diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 11 berhasil diupdate"
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin-panel/quotations/{quotation}/step-data/{step}": {
+            "get": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Get data untuk step tertentu",
+                "operationId": "d6a48dc5a0bd9ae0a6653e5e7a004aae",
+                "parameters": [
+                    {
+                        "name": "quotation",
+                        "in": "path",
+                        "description": "ID Quotation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "description": "Step number (3,7,8,9,10,11)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "enum": [
+                                3,
+                                7,
+                                8,
+                                9,
+                                10,
+                                11
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data step berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/auth/login": {
             "post": {
                 "tags": [
@@ -26719,6 +27526,10 @@
         }
     },
     "tags": [
+        {
+            "name": "Admin Panel",
+            "description": "Endpoints untuk admin panel - update step quotation"
+        },
         {
             "name": "Authentication",
             "description": "API Endpoints untuk Authentication"
