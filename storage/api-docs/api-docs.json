@@ -565,7 +565,7 @@
                 "tags": [
                     "Admin Panel"
                 ],
-                "summary": "Update step 11 (Penagihan, HPP, COSS, Tunjangan, dan Note Harga Jual)",
+                "summary": "Update step 11 (Penagihan, Management Fee, HPP, COSS, BPJS, Tunjangan, dan Nominal Upah)",
                 "operationId": "28ad30de08e1d1948c00b5655ead5a73",
                 "parameters": [
                     {
@@ -579,7 +579,7 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "Data penagihan, HPP, COSS, tunjangan, dan note harga jual",
+                    "description": "Data lengkap untuk step 11 termasuk penagihan, management fee, HPP, COSS, BPJS, tunjangan, dan nominal upah",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -591,83 +591,201 @@
                                     "penagihan": {
                                         "description": "Metode penagihan",
                                         "type": "string",
-                                        "example": "Bulanan"
+                                        "enum": [
+                                            "Transfer",
+                                            "Dengan Pembulatan"
+                                        ],
+                                        "example": "Dengan Pembulatan"
                                     },
-                                    "hpp_data": {
-                                        "description": "Data HPP per quotation detail",
-                                        "type": "object",
-                                        "additionalProperties": {
-                                            "type": "object",
-                                            "properties": {
-                                                "thr": {
-                                                    "type": "number",
-                                                    "example": 450000
-                                                },
-                                                "kompensasi": {
-                                                    "type": "number",
-                                                    "example": 300000
-                                                },
-                                                "persen_insentif": {
-                                                    "type": "number",
-                                                    "example": 5
-                                                }
-                                            }
-                                        }
-                                    },
-                                    "coss_data": {
-                                        "description": "Data COSS per quotation detail",
-                                        "type": "object",
-                                        "additionalProperties": {
-                                            "type": "object",
-                                            "properties": {
-                                                "provisi_seragam": {
-                                                    "type": "number",
-                                                    "example": 250000
-                                                },
-                                                "provisi_peralatan": {
-                                                    "type": "number",
-                                                    "example": 150000
-                                                },
-                                                "provisi_chemical": {
-                                                    "type": "number",
-                                                    "example": 100000
-                                                },
-                                                "provisi_ohc": {
-                                                    "type": "number",
-                                                    "example": 50000
-                                                }
-                                            }
-                                        }
+                                    "persentase": {
+                                        "description": "Persentase management fee",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 7.5
                                     },
                                     "persen_insentif": {
                                         "description": "Persentase insentif global",
                                         "type": "number",
-                                        "example": 5
+                                        "format": "float",
+                                        "example": 20
                                     },
-                                    "tunjangan_data": {
-                                        "description": "Data tunjangan per quotation detail",
-                                        "type": "object",
-                                        "additionalProperties": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "nama_tunjangan": {
-                                                        "type": "string",
-                                                        "example": "Tunjangan Transport"
-                                                    },
-                                                    "nominal": {
-                                                        "type": "number",
-                                                        "example": 300000
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    "persen_bunga_bank": {
+                                        "description": "Persentase bunga bank",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 1.3
                                     },
                                     "note_harga_jual": {
                                         "description": "Note atau catatan untuk harga jual (HTML format)",
                                         "type": "string",
-                                        "example": "<b>Upah pokok base on Umk 2024</b><br>Tunjangan overtime flat total 75 jam."
+                                        "example": "<b>Upah pokok base on UMK 2024</b><br>Tunjangan overtime flat total 75 jam."
+                                    },
+                                    "nominal_upah_data": {
+                                        "description": "Data nominal upah per quotation detail (key: quotation_detail_id, value: nominal upah)",
+                                        "type": "object",
+                                        "example": {
+                                            "8436": 5000000,
+                                            "8437": 4800000
+                                        },
+                                        "additionalProperties": {
+                                            "type": "number",
+                                            "format": "float"
+                                        }
+                                    },
+                                    "bpjs_persentase_data": {
+                                        "description": "Data persentase BPJS per quotation detail",
+                                        "type": "object",
+                                        "example": {
+                                            "8436": {
+                                                "jkk": 0.24,
+                                                "jkm": 0.3,
+                                                "jht": 3.7,
+                                                "jp": 2,
+                                                "kes": 4
+                                            }
+                                        },
+                                        "additionalProperties": {
+                                            "properties": {
+                                                "jkk": {
+                                                    "description": "Persentase JKK",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 0.24
+                                                },
+                                                "jkm": {
+                                                    "description": "Persentase JKM",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 0.3
+                                                },
+                                                "jht": {
+                                                    "description": "Persentase JHT",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 3.7
+                                                },
+                                                "jp": {
+                                                    "description": "Persentase JP",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 2
+                                                },
+                                                "kes": {
+                                                    "description": "Persentase Kesehatan",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 4
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "hpp_editable_data": {
+                                        "description": "Data HPP yang bisa diedit per quotation detail (THR dan Kompensasi yang diprovisikan)",
+                                        "type": "object",
+                                        "example": {
+                                            "8436": {
+                                                "tunjangan_hari_raya": 416666.67,
+                                                "kompensasi": 100000
+                                            }
+                                        },
+                                        "additionalProperties": {
+                                            "properties": {
+                                                "tunjangan_hari_raya": {
+                                                    "description": "THR (Tunjangan Hari Raya) - hanya jika diprovisikan",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 416666.67
+                                                },
+                                                "kompensasi": {
+                                                    "description": "Kompensasi - hanya jika diprovisikan",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 100000
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "coss_data": {
+                                        "description": "Data COSS (provisi barang) per quotation detail",
+                                        "type": "object",
+                                        "example": {
+                                            "8436": {
+                                                "provisi_seragam": 180000,
+                                                "provisi_peralatan": 220000,
+                                                "provisi_chemical": 120000,
+                                                "provisi_ohc": 20000
+                                            }
+                                        },
+                                        "additionalProperties": {
+                                            "properties": {
+                                                "provisi_seragam": {
+                                                    "description": "Provisi Seragam",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 180000
+                                                },
+                                                "provisi_peralatan": {
+                                                    "description": "Provisi Peralatan",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 220000
+                                                },
+                                                "provisi_chemical": {
+                                                    "description": "Provisi Chemical",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 120000
+                                                },
+                                                "provisi_ohc": {
+                                                    "description": "Provisi OHC",
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 20000
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "tunjangan_data": {
+                                        "description": "Data tunjangan per quotation detail",
+                                        "type": "object",
+                                        "example": {
+                                            "8436": [
+                                                {
+                                                    "nama_tunjangan": "JABATAN",
+                                                    "nominal": 20333
+                                                },
+                                                {
+                                                    "nama_tunjangan": "TRANSPORT",
+                                                    "nominal": 50000
+                                                }
+                                            ]
+                                        },
+                                        "additionalProperties": {
+                                            "type": "array",
+                                            "items": {
+                                                "required": [
+                                                    "nama_tunjangan",
+                                                    "nominal"
+                                                ],
+                                                "properties": {
+                                                    "nama_tunjangan": {
+                                                        "description": "Nama tunjangan",
+                                                        "type": "string",
+                                                        "example": "JABATAN"
+                                                    },
+                                                    "nominal": {
+                                                        "description": "Nominal tunjangan",
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 20333
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
                                     }
                                 },
                                 "type": "object"
@@ -691,7 +809,101 @@
                                             "example": "Step 11 berhasil diupdate"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "quotation_id": {
+                                                    "type": "integer",
+                                                    "example": 123
+                                                },
+                                                "penagihan": {
+                                                    "type": "string",
+                                                    "example": "Dengan Pembulatan"
+                                                },
+                                                "persentase_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "nominal_upah_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "bpjs_persentase_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "hpp_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "coss_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "tunjangan_updated": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
                                             "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validasi gagal",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "description": "Error validasi",
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Gagal update step 11: Error message"
                                         }
                                     },
                                     "type": "object"

@@ -526,84 +526,78 @@ class QuotationService
             ]);
         }
     }
-    // PERBAIKAN 1: Pastikan nilai THR dihitung dengan benar
+    // PERBAIKAN 1: Pastikan nilai THR dihitung dengan bena
     private function calculateExtras($detail, $quotation, $hpp, $wage)
     {
         try {
-            // DEBUG DETIL: Log semua properti wage
-            \Log::info("=== DEBUG CALCULATE EXTRAS ===", [
+            \Log::info("=== CALCULATE EXTRAS ===", [
                 'detail_id' => $detail->id,
                 'wage_exists' => !empty($wage),
-                'wage_id' => $wage ? ($wage->id ?? 'no_id') : 'no_wage',
-                'wage_data' => $wage ? [
-                    'thr' => $wage->thr ?? 'null',
-                    'kompensasi' => $wage->kompensasi ?? 'null',
-                    'tunjangan_holiday' => $wage->tunjangan_holiday ?? 'null',
-                    'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? 0
-                ] : 'no_wage_data'
+                'wage_thr' => $wage->thr ?? 'null',
+                'wage_kompensasi' => $wage->kompensasi ?? 'null',
+                'hpp_thr' => $hpp->tunjangan_hari_raya ?? 'null',
+                'hpp_kompensasi' => $hpp->kompensasi ?? 'null'
             ]);
 
-            // THR & Kompensasi - GUNAKAN DATA DARI WAGE DENGAN FALLBACK
+            // THR - Gunakan logika yang konsisten
             $thrValue = $wage->thr ?? "Tidak";
-            $kompensasiValue = $wage->kompensasi ?? "Tidak";
+            $isThrDiprovisikan = (is_string($thrValue) && strtolower(trim($thrValue)) === 'diprovisikan');
 
-            // DEBUG: Tampilkan nilai sebenarnya
-            \Log::info("THR Raw Values", [
-                'detail_id' => $detail->id,
-                'thr_raw' => $thrValue,
-                'kompensasi_raw' => $kompensasiValue,
-                'thr_type' => gettype($thrValue),
-                'kompensasi_type' => gettype($kompensasiValue)
-            ]);
-
-            // PERBAIKAN CRITICAL: Normalisasi string comparison
-            $thrIsDiprovisikan = (is_string($thrValue) && strtolower(trim($thrValue)) === 'diprovisikan');
-            $kompensasiIsDiprovisikan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'diprovisikan');
-            $kompensasiIsDitagihkan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'ditagihkan');
-
-            \Log::info("THR Check Results", [
-                'detail_id' => $detail->id,
-                'thr_is_diprovisikan' => $thrIsDiprovisikan,
-                'kompensasi_is_diprovisikan' => $kompensasiIsDiprovisikan,
-                'kompensasi_is_ditagihkan' => $kompensasiIsDitagihkan
-            ]);
-
-            // PERBAIKAN CRITICAL: Jika HPP nilai 0, hitung ulang dari wage
-            // THR: Gunakan nilai dari HPP hanya jika > 0, jika 0 hitung dari wage
-            if ($hpp && $hpp->tunjangan_hari_raya > 0) {
+            // PERBAIKAN: Jika HPP sudah memiliki nilai untuk THR, gunakan nilai HPP
+            if ($hpp && $hpp->tunjangan_hari_raya !== null) {
                 $detail->tunjangan_hari_raya = (float) $hpp->tunjangan_hari_raya;
-                \Log::info("Using THR from HPP (non-zero)", [
+                \Log::info("Using THR from HPP", [
                     'detail_id' => $detail->id,
                     'value' => $hpp->tunjangan_hari_raya
                 ]);
-            } else if ($thrIsDiprovisikan) {
+            } else if ($isThrDiprovisikan) {
+                // Jika diprovisikan dan HPP null, hitung dari nominal upah
                 $detail->tunjangan_hari_raya = round((float) $detail->nominal_upah / 12, 2);
-                \Log::info("Calculated THR from nominal_upah", [
+                \Log::info("Calculated THR from nominal_upah (diprovisikan)", [
                     'detail_id' => $detail->id,
                     'nominal_upah' => $detail->nominal_upah,
-                    'thr_calculated' => $detail->tunjangan_hari_raya,
-                    'reason' => 'HPP value is 0 and wage thr is Diprovisikan'
+                    'thr_calculated' => $detail->tunjangan_hari_raya
                 ]);
             } else {
                 $detail->tunjangan_hari_raya = 0;
-                \Log::info("THR set to 0", [
-                    'detail_id' => $detail->id,
-                    'reason' => 'thr is not Diprovisikan'
+                \Log::info("THR set to 0 (not diprovisikan)", [
+                    'detail_id' => $detail->id
                 ]);
             }
 
-            // Tunjangan Holiday - dengan logging
-            $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
-            \Log::info("Tunjangan Holiday Check", [
-                'detail_id' => $detail->id,
-                'raw_value' => $tunjanganHolidayValue,
-                'is_flat' => (is_string($tunjanganHolidayValue) && strtolower(trim($tunjanganHolidayValue)) === 'flat')
-            ]);
+            // KOMPENSASI - Logika serupa
+            $kompensasiValue = $wage->kompensasi ?? "Tidak";
+            $isKompensasiDiprovisikan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'diprovisikan');
+            $isKompensasiDitagihkan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'ditagihkan');
 
+            // PERBAIKAN: Jika HPP sudah memiliki nilai untuk kompensasi, gunakan nilai HPP
+            if ($hpp && $hpp->kompensasi !== null) {
+                $detail->kompensasi = (float) $hpp->kompensasi;
+                \Log::info("Using kompensasi from HPP", [
+                    'detail_id' => $detail->id,
+                    'value' => $hpp->kompensasi
+                ]);
+            } else if ($isKompensasiDiprovisikan || $isKompensasiDitagihkan) {
+                // Jika diprovisikan atau ditagihkan, hitung dari nominal upah
+                $detail->kompensasi = round((float) $detail->nominal_upah / 12, 2);
+                \Log::info("Calculated kompensasi from nominal_upah", [
+                    'detail_id' => $detail->id,
+                    'nominal_upah' => $detail->nominal_upah,
+                    'kompensasi_calculated' => $detail->kompensasi,
+                    'type' => $isKompensasiDiprovisikan ? 'diprovisikan' : 'ditagihkan'
+                ]);
+            } else {
+                $detail->kompensasi = 0;
+                \Log::info("Kompensasi set to 0 (not diprovisikan/ditagihkan)", [
+                    'detail_id' => $detail->id
+                ]);
+            }
+
+            // Tunjangan Holiday
+            $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
             $isTunjanganHolidayFlat = (is_string($tunjanganHolidayValue) && strtolower(trim($tunjanganHolidayValue)) === 'flat');
 
-            // PERBAIKAN CRITICAL: Jika HPP nilai 0, hitung ulang dari wage
-            if ($hpp && $hpp->tunjangan_hari_libur_nasional > 0) {
+            if ($hpp && $hpp->tunjangan_hari_libur_nasional !== null) {
                 $detail->tunjangan_holiday = $hpp->tunjangan_hari_libur_nasional;
             } else if ($isTunjanganHolidayFlat) {
                 $detail->tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
@@ -611,13 +605,11 @@ class QuotationService
                 $detail->tunjangan_holiday = 0;
             }
 
-            // Log hasil akhir
             \Log::info("Extras Calculation Result", [
                 'detail_id' => $detail->id,
                 'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                 'kompensasi' => $detail->kompensasi,
-                'tunjangan_holiday' => $detail->tunjangan_holiday,
-                'lembur' => $detail->lembur
+                'tunjangan_holiday' => $detail->tunjangan_holiday
             ]);
 
         } catch (\Exception $e) {
