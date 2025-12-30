@@ -136,8 +136,7 @@ class DashboardApprovalController extends Controller
                 break;
 
             case 'quotation-belum-lengkap':
-                $query->where('status_quotation_id', 2)
-                    ->where('step', '!=', 100);
+                $query->where('step', '!=', 100);
                 break;
 
             default:

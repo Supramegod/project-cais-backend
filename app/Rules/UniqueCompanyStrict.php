@@ -198,7 +198,8 @@ class UniqueCompanyStrict implements Rule
         $commonWords = [
             'pt', 'cv', 'ud', 'tbk', 'company', 'corp', 'inc', 'ltd', 
             'group', 'holding', 'corporation', 'international', 'global',
-            'national', 'pusat', 'cabang', 'kantor', 'toko', 'warung'
+            'national', 'pusat', 'cabang', 'kantor', 'toko', 'warung','industri', 'perusahaan', 'enterprise', 'services', 'solution', 'tech',
+            'technology','nasional','cabang'
         ];
         
         // Hapus nama geografis dari text

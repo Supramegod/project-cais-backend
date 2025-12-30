@@ -489,6 +489,7 @@ class QuotationStepResource extends JsonResource
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                                 'tunjangan_data' => $tunjanganData,
+                                'upah' => $wage ? $wage->upah : 0,
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
                                     'total_tunjangan' => $detail->total_tunjangan,
