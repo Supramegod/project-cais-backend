@@ -539,7 +539,7 @@ class AdminPanelController extends Controller
     /**
      * @OA\Post(
      *     path="/api/admin-panel/quotations/{quotation}/harga-jual",
-     *     summary="Update step 11 (Penagihan, HPP, COSS, Tunjangan, dan Note Harga Jual)",
+     *     summary="Update step 11 (Penagihan, Management Fee, HPP, COSS, BPJS, Tunjangan, dan Nominal Upah)",
      *     tags={"Admin Panel"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -551,58 +551,130 @@ class AdminPanelController extends Controller
      *     ),
      *     @OA\RequestBody(
      *         required=true,
-     *         description="Data penagihan, HPP, COSS, tunjangan, dan note harga jual",
+     *         description="Data lengkap untuk step 11 termasuk penagihan, management fee, HPP, COSS, BPJS, tunjangan, dan nominal upah",
      *         @OA\JsonContent(
      *             required={"penagihan"},
-     *             @OA\Property(property="penagihan", type="string", example="Bulanan", description="Metode penagihan"),
      *             @OA\Property(
-     *                 property="hpp_data",
+     *                 property="penagihan",
+     *                 type="string",
+     *                 enum={"Transfer", "Dengan Pembulatan"},
+     *                 example="Dengan Pembulatan",
+     *                 description="Metode penagihan"
+     *             ),
+     *             @OA\Property(
+     *                 property="persentase",
+     *                 type="number",
+     *                 format="float",
+     *                 example=7.5,
+     *                 description="Persentase management fee"
+     *             ),
+     *             @OA\Property(
+     *                 property="persen_insentif",
+     *                 type="number",
+     *                 format="float",
+     *                 example=20,
+     *                 description="Persentase insentif global"
+     *             ),
+     *             @OA\Property(
+     *                 property="persen_bunga_bank",
+     *                 type="number",
+     *                 format="float",
+     *                 example=1.3,
+     *                 description="Persentase bunga bank"
+     *             ),
+     *             @OA\Property(
+     *                 property="note_harga_jual",
+     *                 type="string",
+     *                 example="<b>Upah pokok base on UMK 2024</b><br>Tunjangan overtime flat total 75 jam.",
+     *                 description="Note atau catatan untuk harga jual (HTML format)"
+     *             ),
+     *             @OA\Property(
+     *                 property="nominal_upah_data",
      *                 type="object",
-     *                 description="Data HPP per quotation detail",
+     *                 description="Data nominal upah per quotation detail (key: quotation_detail_id, value: nominal upah)",
+     *                 example={"8436": 5000000, "8437": 4800000},
      *                 additionalProperties={
-     *                     "type": "object",
-     *                     "properties": {
-     *                         "thr": {"type": "number", "example": 450000},
-     *                         "kompensasi": {"type": "number", "example": 300000},
-     *                         "persen_insentif": {"type": "number", "example": 5}
+     *                     "type": "number",
+     *                     "format": "float"
+     *                 }
+     *             ),
+     *             @OA\Property(
+     *                 property="bpjs_persentase_data",
+     *                 type="object",
+     *                 description="Data persentase BPJS per quotation detail",
+     *                 @OA\AdditionalProperties(
+     *                     type="object",
+     *                     @OA\Property(property="jkk", type="number", format="float", example=0.24, description="Persentase JKK"),
+     *                     @OA\Property(property="jkm", type="number", format="float", example=0.3, description="Persentase JKM"),
+     *                     @OA\Property(property="jht", type="number", format="float", example=3.7, description="Persentase JHT"),
+     *                     @OA\Property(property="jp", type="number", format="float", example=2, description="Persentase JP"),
+     *                     @OA\Property(property="kes", type="number", format="float", example=4, description="Persentase Kesehatan")
+     *                 ),
+     *                 example={
+     *                     "8436": {
+     *                         "jkk": 0.24,
+     *                         "jkm": 0.3,
+     *                         "jht": 3.7,
+     *                         "jp": 2,
+     *                         "kes": 4
+     *                     }
+     *                 }
+     *             ),
+     *             @OA\Property(
+     *                 property="hpp_editable_data",
+     *                 type="object",
+     *                 description="Data HPP yang bisa diedit per quotation detail (THR dan Kompensasi yang diprovisikan)",
+     *                 @OA\AdditionalProperties(
+     *                     type="object",
+     *                     @OA\Property(property="tunjangan_hari_raya", type="number", format="float", example=416666.67, description="THR (Tunjangan Hari Raya) - hanya jika diprovisikan"),
+     *                     @OA\Property(property="kompensasi", type="number", format="float", example=100000, description="Kompensasi - hanya jika diprovisikan")
+     *                 ),
+     *                 example={
+     *                     "8436": {
+     *                         "tunjangan_hari_raya": 416666.67,
+     *                         "kompensasi": 100000
      *                     }
      *                 }
      *             ),
      *             @OA\Property(
      *                 property="coss_data",
      *                 type="object",
-     *                 description="Data COSS per quotation detail",
-     *                 additionalProperties={
-     *                     "type": "object",
-     *                     "properties": {
-     *                         "provisi_seragam": {"type": "number", "example": 250000},
-     *                         "provisi_peralatan": {"type": "number", "example": 150000},
-     *                         "provisi_chemical": {"type": "number", "example": 100000},
-     *                         "provisi_ohc": {"type": "number", "example": 50000}
+     *                 description="Data COSS (provisi barang) per quotation detail",
+     *                 @OA\AdditionalProperties(
+     *                     type="object",
+     *                     @OA\Property(property="provisi_seragam", type="number", format="float", example=180000, description="Provisi Seragam"),
+     *                     @OA\Property(property="provisi_peralatan", type="number", format="float", example=220000, description="Provisi Peralatan"),
+     *                     @OA\Property(property="provisi_chemical", type="number", format="float", example=120000, description="Provisi Chemical"),
+     *                     @OA\Property(property="provisi_ohc", type="number", format="float", example=20000, description="Provisi OHC")
+     *                 ),
+     *                 example={
+     *                     "8436": {
+     *                         "provisi_seragam": 180000,
+     *                         "provisi_peralatan": 220000,
+     *                         "provisi_chemical": 120000,
+     *                         "provisi_ohc": 20000
      *                     }
      *                 }
      *             ),
-     *             @OA\Property(property="persen_insentif", type="number", example=5, description="Persentase insentif global"),
      *             @OA\Property(
      *                 property="tunjangan_data",
      *                 type="object",
      *                 description="Data tunjangan per quotation detail",
-     *                 additionalProperties={
-     *                     "type": "array",
-     *                     "items": {
-     *                         "type": "object",
-     *                         "properties": {
-     *                             "nama_tunjangan": {"type": "string", "example": "Tunjangan Transport"},
-     *                             "nominal": {"type": "number", "example": 300000}
-     *                         }
+     *                 @OA\AdditionalProperties(
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         required={"nama_tunjangan", "nominal"},
+     *                         @OA\Property(property="nama_tunjangan", type="string", example="JABATAN", description="Nama tunjangan"),
+     *                         @OA\Property(property="nominal", type="number", format="float", example=20333, description="Nominal tunjangan")
+     *                     )
+     *                 ),
+     *                 example={
+     *                     "8436": {
+     *                         {"nama_tunjangan": "JABATAN", "nominal": 20333},
+     *                         {"nama_tunjangan": "TRANSPORT", "nominal": 50000}
      *                     }
      *                 }
-     *             ),
-     *             @OA\Property(
-     *                 property="note_harga_jual",
-     *                 type="string",
-     *                 example="<b>Upah pokok base on Umk 2024</b><br>Tunjangan overtime flat total 75 jam.",
-     *                 description="Note atau catatan untuk harga jual (HTML format)"
      *             )
      *         )
      *     ),
@@ -612,7 +684,42 @@ class AdminPanelController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Step 11 berhasil diupdate"),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="quotation_id", type="integer", example=123),
+     *                 @OA\Property(property="penagihan", type="string", example="Dengan Pembulatan"),
+     *                 @OA\Property(property="persentase_updated", type="boolean", example=true),
+     *                 @OA\Property(property="nominal_upah_updated", type="boolean", example=true),
+     *                 @OA\Property(property="bpjs_persentase_updated", type="boolean", example=true),
+     *                 @OA\Property(property="hpp_updated", type="boolean", example=true),
+     *                 @OA\Property(property="coss_updated", type="boolean", example=true),
+     *                 @OA\Property(property="tunjangan_updated", type="boolean", example=true)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Validasi gagal",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="object", description="Error validasi")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Quotation tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Quotation tidak ditemukan")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Gagal update step 11: Error message")
      *         )
      *     )
      * )
@@ -620,19 +727,39 @@ class AdminPanelController extends Controller
     public function updateStep11(Request $request, Quotation $quotation)
     {
         try {
-            // Validasi input
+            // Validasi input - DIPERBAIKI sesuai dengan nama field yang benar
             $validator = Validator::make($request->all(), [
                 'penagihan' => 'required|string|max:100',
-                'hpp_data' => 'nullable|array',
-                'hpp_data.*.thr' => 'nullable|numeric|min:0',
-                'hpp_data.*.kompensasi' => 'nullable|numeric|min:0',
-                'hpp_data.*.persen_insentif' => 'nullable|numeric|min:0|max:100',
+                'persentase' => 'nullable|numeric|min:0|max:100',
+                'persen_insentif' => 'nullable|numeric|min:0|max:100',
+                'persen_bunga_bank' => 'nullable|numeric|min:0|max:100',
+                'note_harga_jual' => 'nullable|string',
+
+                // Nominal upah data
+                'nominal_upah_data' => 'nullable|array',
+                'nominal_upah_data.*' => 'nullable|numeric|min:0',
+
+                // BPJS persentase data
+                'bpjs_persentase_data' => 'nullable|array',
+                'bpjs_persentase_data.*.jkk' => 'nullable|numeric|min:0|max:100',
+                'bpjs_persentase_data.*.jkm' => 'nullable|numeric|min:0|max:100',
+                'bpjs_persentase_data.*.jht' => 'nullable|numeric|min:0|max:100',
+                'bpjs_persentase_data.*.jp' => 'nullable|numeric|min:0|max:100',
+                'bpjs_persentase_data.*.kes' => 'nullable|numeric|min:0|max:100',
+
+                // HPP editable data (bukan hpp_data)
+                'hpp_editable_data' => 'nullable|array',
+                'hpp_editable_data.*.tunjangan_hari_raya' => 'nullable|numeric|min:0',
+                'hpp_editable_data.*.kompensasi' => 'nullable|numeric|min:0',
+
+                // COSS data
                 'coss_data' => 'nullable|array',
                 'coss_data.*.provisi_seragam' => 'nullable|numeric|min:0',
                 'coss_data.*.provisi_peralatan' => 'nullable|numeric|min:0',
                 'coss_data.*.provisi_chemical' => 'nullable|numeric|min:0',
                 'coss_data.*.provisi_ohc' => 'nullable|numeric|min:0',
-                'persen_insentif' => 'nullable|numeric|min:0|max:100',
+
+                // Tunjangan data
                 'tunjangan_data' => 'nullable|array',
                 'tunjangan_data.*' => 'array',
                 'tunjangan_data.*.*.nama_tunjangan' => 'required_with:tunjangan_data.*|string|max:255',
@@ -649,7 +776,10 @@ class AdminPanelController extends Controller
             Log::info('Admin Panel - Update Step 11', [
                 'quotation_id' => $quotation->id,
                 'user_id' => auth()->id(),
-                'has_hpp_data' => $request->has('hpp_data'),
+                'has_persentase' => $request->has('persentase'),
+                'has_nominal_upah_data' => $request->has('nominal_upah_data'),
+                'has_bpjs_persentase_data' => $request->has('bpjs_persentase_data'),
+                'has_hpp_editable_data' => $request->has('hpp_editable_data'),
                 'has_coss_data' => $request->has('coss_data'),
                 'has_tunjangan_data' => $request->has('tunjangan_data')
             ]);
@@ -663,7 +793,10 @@ class AdminPanelController extends Controller
                 'data' => [
                     'quotation_id' => $quotation->id,
                     'penagihan' => $request->penagihan,
-                    'hpp_updated' => $request->has('hpp_data'),
+                    'persentase_updated' => $request->has('persentase'),
+                    'nominal_upah_updated' => $request->has('nominal_upah_data'),
+                    'bpjs_persentase_updated' => $request->has('bpjs_persentase_data'),
+                    'hpp_updated' => $request->has('hpp_editable_data'),
                     'coss_updated' => $request->has('coss_data'),
                     'tunjangan_updated' => $request->has('tunjangan_data')
                 ]
@@ -682,7 +815,6 @@ class AdminPanelController extends Controller
             ], 500);
         }
     }
-
     /**
      * @OA\Get(
      *     path="/api/admin-panel/quotations/{quotation}/step-data/{step}",
