@@ -1236,17 +1236,30 @@ class QuotationController extends Controller
 
             // Base query dengan relasi yang diperlukan
             $query = Leads::with([
-                'statusLeads',
-                'branch'
+                'statusLeads:id,nama',
+                'branch:id,name'
             ])
                 ->filterByUserRole();
 
-            // Filter berdasarkan tipe quotation
-            if ($tipe_quotation === 'baru') {
-                $query->whereNull('customer_id'); // Leads baru yang belum menjadi customer
-            } else {
-                $query->whereNotNull('customer_id'); // Leads untuk revisi/rekontrak yang sudah menjadi customer
+            // Filter berdasarkan tipe quotation menggunakan switch case
+            switch ($tipe_quotation) {
+                case 'baru':
+                    // Leads baru: status_leads_id = 1 (New Lead)
+                    $query->where('status_leads_id', 1);
+                    break;
+
+                case 'rekontrak':
+                    // Leads rekontrak: status_leads_id = 102 (atau sesuai konfigurasi)
+                    $query->where('status_leads_id', 102);
+                    break;
+
+                case 'revisi':
+                    // Leads revisi: status_leads_id bukan 3 (misalnya exclude Draft)
+                    // Atau bisa juga status tertentu untuk revisi
+                    $query->where('status_leads_id', '!=', 3);
+                    break;
             }
+
             // Order by terbaru
             $query->orderBy('created_at', 'desc');
 
@@ -1259,14 +1272,20 @@ class QuotationController extends Controller
                     'nama_perusahaan' => $lead->nama_perusahaan,
                     'pic' => $lead->pic,
                     'wilayah' => $lead->branch->name ?? 'Unknown',
+                    'status_leads_id' => $lead->status_leads_id,
                     'status_leads' => $lead->statusLeads->nama ?? 'Unknown',
+                    'customer_id' => $lead->customer_id,
+                    'telp_perusahaan' => $lead->telp_perusahaan,
+                    'email' => $lead->email,
+                    'created_at' => $lead->created_at,
                 ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => "Data leads untuk quotation {$tipe_quotation} berhasil diambil",
-                'data' => $data
+                'data' => $data,
+                
             ]);
         } catch (\Exception $e) {
             return response()->json([
