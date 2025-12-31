@@ -502,7 +502,7 @@ class SpkController extends Controller
                 'nama_pic' => $spk->leads->pic ?? null,
                 'telepon_pic' => $spk->leads->no_telp ?? null,
                 'email_pic' => $spk->leads->email ?? null,
-                'alamat_perusahaan' => $spk->leads->alamat?? null,
+                'alamat_perusahaan' => $spk->leads->alamat ?? null,
                 'jabatan_nama' => $spk->leads->jabatanPic?->nama ?? null,
             ];
 
@@ -541,7 +541,7 @@ class SpkController extends Controller
                     'company_name' => $companyModel ? ($companyModel->name ?? null) : null,
                     'company_address' => $companyModel ? ($companyModel->address ?? null) : null,
                     'tanggal_quotation' => $quotation->tgl_quotation ?? null,
-                    'npwp'=>$quotation->npwp ?? null,
+                    'npwp' => $quotation->npwp ?? null,
                     'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
                         return [
                             'id' => $detail->id,
@@ -739,7 +739,13 @@ class SpkController extends Controller
      *         description="File berhasil diupload",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="File uploaded successfully")
+     *             @OA\Property(property="message", type="string", example="SPK file uploaded successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nomor", type="string", example="SPK/LEAD001-012024-00001"),
+     *                 @OA\Property(property="status_spk_id", type="integer", example=2),
+     *                 @OA\Property(property="link_spk_disetujui", type="string", example="http://example.com/public/spk/file.pdf")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -749,13 +755,29 @@ class SpkController extends Controller
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SPK tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error uploading SPK file")
+     *         )
      *     )
      * )
      */
     public function uploadSpk(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // max 10MB
         ]);
 
         if ($validator->fails()) {
@@ -763,26 +785,66 @@ class SpkController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
+            // Cari SPK berdasarkan ID
             $spk = Spk::find($id);
+
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
+            // Validasi status SPK - opsional, sesuaikan dengan business logic Anda
+            // Misalnya hanya SPK dengan status Draft (1) yang bisa diupload
+            if ($spk->status_spk_id == 2) {
+                return $this->errorResponse('SPK sudah disetujui sebelumnya', null, 400);
+            }
+
+            // Hapus file lama jika ada
+            if ($spk->link_spk_disetujui) {
+                $oldFileName = basename(parse_url($spk->link_spk_disetujui, PHP_URL_PATH));
+                if (Storage::disk('spk')->exists($oldFileName)) {
+                    Storage::disk('spk')->delete($oldFileName);
+                }
+            }
+
+            // Upload file baru menggunakan helper method yang sudah ada
             $fileName = $this->storeSpkFile($request->file('file'));
 
+            // Update SPK
             $spk->update([
-                'status_spk_id' => 2,
+                'status_spk_id' => 2, // Status: Approved/Disetujui
                 'link_spk_disetujui' => env('APP_URL') . "/public/spk/" . $fileName,
                 'updated_by' => Auth::user()->full_name
             ]);
 
-            return $this->successResponse('File uploaded successfully');
+            // Catat aktivitas customer
+            $this->createUploadActivity($spk);
+
+            DB::commit();
+
+            // Load relasi untuk response
+            $spk->load(['leads', 'statusSpk']);
+
+            return $this->successResponse('SPK file uploaded successfully', [
+                'id' => $spk->id,
+                'nomor' => $spk->nomor,
+                'status_spk_id' => $spk->status_spk_id,
+                'status' => $spk->statusSpk->nama ?? null,
+                'link_spk_disetujui' => $spk->link_spk_disetujui
+            ]);
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error uploading file', $e->getMessage());
+            DB::rollBack();
+
+            // Hapus file yang sudah diupload jika ada error
+            if (isset($fileName) && Storage::disk('spk')->exists($fileName)) {
+                Storage::disk('spk')->delete($fileName);
+            }
+
+            return $this->errorResponse('Error uploading SPK file', $e->getMessage());
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/spk/ajukan-ulang/{spkId}",
@@ -1704,6 +1766,26 @@ class SpkController extends Controller
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
             'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'is_activity' => 0,
+            'user_id' => Auth::user()->id,
+            'created_by' => Auth::user()->full_name
+        ]);
+    }
+    /**
+     * Helper method untuk membuat aktivitas upload SPK
+     */
+    private function createUploadActivity($spk): void
+    {
+        $leads = Leads::find($spk->leads_id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'spk_id' => $spk->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $this->generateActivityNomor($leads->id),
+            'tipe' => 'SPK',
+            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name

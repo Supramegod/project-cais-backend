@@ -22954,7 +22954,28 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "File uploaded successfully"
+                                            "example": "SPK file uploaded successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "SPK/LEAD001-012024-00001"
+                                                },
+                                                "status_spk_id": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "link_spk_disetujui": {
+                                                    "type": "string",
+                                                    "example": "http://example.com/public/spk/file.pdf"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -22975,6 +22996,46 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Validation error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "SPK tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "SPK not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error server",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error uploading SPK file"
                                         }
                                     },
                                     "type": "object"
