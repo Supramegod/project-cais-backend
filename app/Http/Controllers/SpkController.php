@@ -777,7 +777,7 @@ class SpkController extends Controller
     public function uploadSpk(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // max 10MB
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
         ]);
 
         if ($validator->fails()) {
@@ -787,44 +787,44 @@ class SpkController extends Controller
         try {
             DB::beginTransaction();
 
-            // Cari SPK berdasarkan ID
             $spk = Spk::find($id);
 
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
-            // Validasi status SPK - opsional, sesuaikan dengan business logic Anda
-            // Misalnya hanya SPK dengan status Draft (1) yang bisa diupload
-            if ($spk->status_spk_id == 2) {
-                return $this->errorResponse('SPK sudah disetujui sebelumnya', null, 400);
-            }
-
             // Hapus file lama jika ada
             if ($spk->link_spk_disetujui) {
-                $oldFileName = basename(parse_url($spk->link_spk_disetujui, PHP_URL_PATH));
+                $oldFileName = basename($spk->link_spk_disetujui);
                 if (Storage::disk('spk')->exists($oldFileName)) {
                     Storage::disk('spk')->delete($oldFileName);
                 }
             }
 
-            // Upload file baru menggunakan helper method yang sudah ada
+            // Upload file baru
             $fileName = $this->storeSpkFile($request->file('file'));
 
-            // Update SPK
+            // ✅ Generate URL yang benar
+            $fileUrl = url('spk/' . $fileName);
+            \Log::info('Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . public_path('spk/' . $fileName));
+            \Log::info('File exists: ' . (file_exists(public_path('spk/' . $fileName)) ? 'Yes' : 'No'));
+
+
             $spk->update([
-                'status_spk_id' => 2, // Status: Approved/Disetujui
-                'link_spk_disetujui' => env('APP_URL') . "/public/spk/" . $fileName,
+                'status_spk_id' => 2,
+                'link_spk_disetujui' => $fileUrl,
                 'updated_by' => Auth::user()->full_name
             ]);
 
-            // Catat aktivitas customer
+            // Catat aktivitas
             $this->createUploadActivity($spk);
 
             DB::commit();
 
-            // Load relasi untuk response
-            $spk->load(['leads', 'statusSpk']);
+            $spk->load(['statusSpk']);
+
 
             return $this->successResponse('SPK file uploaded successfully', [
                 'id' => $spk->id,
@@ -837,7 +837,6 @@ class SpkController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // Hapus file yang sudah diupload jika ada error
             if (isset($fileName) && Storage::disk('spk')->exists($fileName)) {
                 Storage::disk('spk')->delete($fileName);
             }

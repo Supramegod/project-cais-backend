@@ -46,6 +46,21 @@ return [
             'throw' => false,
             'report' => false,
         ],
+        // config/filesystems.php
+        'spk' => [
+            'driver' => 'local',
+            'root' => public_path('/spk'),
+            'url' => env('APP_URL') . '/spk', // ✅ Tetap pakai /public/
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+        'pks' => [
+            'driver' => 'local',
+            'root' => public_path() . '/pks',
+            'url' => env('APP_URL') . '/public/pks',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
 
         's3' => [
             'driver' => 's3',
