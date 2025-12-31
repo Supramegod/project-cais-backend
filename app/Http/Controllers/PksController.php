@@ -1347,8 +1347,7 @@ class PksController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
@@ -1406,8 +1405,7 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit checklist',
-                'error' => $e->getMessage()
+                'message' =>  $e->getMessage()
             ], 500);
         }
     }

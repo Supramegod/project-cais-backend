@@ -59,10 +59,10 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 4:
-                $rules['is_ppn'] = 'sometimes|in:0,1';
-                $rules['ppn_pph_dipotong'] = 'sometimes|in:Total Invoice,Management Fee';
-                $rules['management_fee_id'] = 'sometimes|exists:m_management_fee,id';
-                $rules['persentase'] = 'sometimes|numeric|min:0|max:100';
+                $rules['is_ppn'] = 'required|in:0,1';
+                $rules['ppn_pph_dipotong'] = 'required|in:Total Invoice,Management Fee';
+                $rules['management_fee_id'] = 'required|exists:m_management_fee,id';
+                $rules['persentase'] = 'required|numeric|min:0|max:100';
                 $rules['position_data'] = 'required|array|min:1';
 
                 $rules['position_data.*.quotation_detail_id'] = 'required|exists:sl_quotation_detail,id';
@@ -212,6 +212,10 @@ class QuotationStepRequest extends BaseRequest
             'management_fee_id.exists' => 'Management fee tidak valid',
             'persentase.numeric' => 'Persentase harus berupa angka',
             'persentase.min' => 'Persentase tidak boleh kurang dari 0',
+            'persentase.required' => 'Persentase harus diisi',
+            'management_fee_id.required' => 'Management fee harus diisi',
+            'is_ppn.required' => 'Status PPN harus diisi',
+            'ppn_pph_dipotong.required' => 'PPN PPH dipotong harus diisi',
             'persentase.max' => 'Persentase tidak boleh lebih dari 100',
 
             // Step 4 Messages - POSITION DATA
