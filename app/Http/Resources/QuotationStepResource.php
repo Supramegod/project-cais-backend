@@ -44,16 +44,23 @@ class QuotationStepResource extends JsonResource
     {
         $quotation = $this['quotation'] ?? $this->resource;
         $step = $this->step;
+
+        // Ambil metadata jika ada
+        $metadata = $this['metadata'] ?? [];
+        $actualStep = $metadata['actual_step'] ?? $quotation->step;
+        $isFinal = $metadata['is_final'] ?? ($actualStep >= 100);
+        $readonly = $metadata['readonly'] ?? $isFinal;
+
         $baseData = [
             'id' => $this->id ?? $this['quotation']->id,
             'step' => $this->step,
+            'metadata' =>$actualStep
         ];
 
         // Hanya tambahkan data dasar jika diperlukan
-        if (in_array($this->step, [1, 2])) {
-            $baseData['nomor'] = $this->nomor ?? $this['quotation']->nomor;
+        if (in_array($this->step, [1])) {
             $baseData['nama_perusahaan'] = $this->nama_perusahaan ?? $this['quotation']->nama_perusahaan;
-            $baseData['jumlah_site'] = $this->jumlah_site ?? $this['quotation']->jumlah_site;
+            $baseData['kebutuhan'] = $this->kebutuhan ?? $this['quotation']->kebutuhan;
         }
 
         $stepData = $this->getStepSpecificData($quotation, $step);
@@ -64,7 +71,6 @@ class QuotationStepResource extends JsonResource
             'additional_data' => $additionalData,
         ]);
     }
-
     private function getStepSpecificData($quotation, $step)
     {
 
@@ -620,16 +626,6 @@ class QuotationStepResource extends JsonResource
         switch ($step) {
             case 1:
                 return [
-                    'company_list' => Company::where('is_active', 1)->get(),
-                    'kebutuhan_list' => Kebutuhan::all(),
-                    'province_list' => Province::get()->map(function ($province) {
-                        $ump = Ump::where('is_aktif', 1)
-                            ->where('province_id', $province->id)
-                            ->first();
-                        $umpValue = $ump ? $ump->ump : 0;
-                        $province->ump = $ump ? "UMP : Rp. " . number_format($umpValue, 2, ",", ".") : "UMP : Rp. 0";
-                        return $province;
-                    }),
                 ];
 
             case 2:

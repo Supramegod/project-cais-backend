@@ -120,19 +120,6 @@ class QuotationStepService
 
         switch ($step) {
             case 1:
-                $data['additional_data']['company_list'] = Company::where('is_active', 1)->get();
-
-                $data['additional_data']['province_list'] = Province::all()->map(function ($province) {
-                    $ump = Ump::byProvince($province->id)
-                        ->active()
-                        ->first();
-
-                    $province->ump_display = $ump
-                        ? $ump->formatted_ump
-                        : "UMP : Rp. 0";
-
-                    return $province;
-                });
                 break;
 
             case 2:
@@ -521,15 +508,19 @@ class QuotationStepService
             ];
 
             foreach ($globalFields as $field => $requestField) {
-                if ($request->has($requestField)) {
+                if ($request->filled($requestField)) {  // Gunakan filled() bukan has()
                     $globalData[$field] = $request->$requestField;
                     \Log::info("Global data found", [
                         'field' => $field,
                         'value' => $request->$requestField
                     ]);
+                } else {
+                    \Log::info("Global field not filled, keeping existing value", [
+                        'field' => $field,
+                        'request_value' => $request->$requestField ?? 'null'
+                    ]);
                 }
             }
-
             // Update global data jika ada
             if (!empty($globalData)) {
                 $globalData['updated_by'] = Auth::user()->full_name;
@@ -2436,6 +2427,9 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
     /**
      * Prepare quotation data for update dari request Step 11
      */
+    /**
+     * Prepare quotation data for update dari request Step 11
+     */
     private function prepareQuotationDataForUpdate(Quotation $quotation, Request $request, string $user, Carbon $currentDateTime): array
     {
         $data = [
@@ -2451,8 +2445,8 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             $data['penagihan'] = $quotation->penagihan ?? 'Transfer';
         }
 
-        // Persentase management fee (bisa diedit di Step 11)
-        if ($request->has('persentase')) {
+        // PERBAIKAN: Persentase management fee - hanya update jika ada nilai baru
+        if ($request->filled('persentase')) {
             $persentase = $request->persentase;
             if (is_string($persentase) && !is_numeric($persentase)) {
                 $persentase = (float) str_replace(['.', ','], ['', '.'], $persentase);
@@ -2464,10 +2458,18 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'old_persentase' => $quotation->persentase,
                 'new_persentase' => $persentase
             ]);
+        } else {
+            // Jika tidak ada request, gunakan nilai yang sudah ada di database
+            $data['persentase'] = $quotation->persentase;
+
+            \Log::info("Persentase not in request, using existing value", [
+                'quotation_id' => $quotation->id,
+                'persentase' => $quotation->persentase
+            ]);
         }
 
         // Persen insentif (jika ada di request)
-        if ($request->has('persen_insentif')) {
+        if ($request->filled('persen_insentif')) {
             $persenInsentif = $request->persen_insentif;
             if (is_string($persenInsentif) && !is_numeric($persenInsentif)) {
                 $persenInsentif = (float) str_replace(['.', ','], ['', '.'], $persenInsentif);
@@ -2479,20 +2481,29 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'old_persen_insentif' => $quotation->persen_insentif,
                 'new_persen_insentif' => $persenInsentif
             ]);
+        } else {
+            // Jika tidak ada request, gunakan nilai yang sudah ada di database
+            $data['persen_insentif'] = $quotation->persen_insentif;
         }
 
         // Persen bunga bank (jika ada di request)
-        if ($request->has('persen_bunga_bank')) {
+        if ($request->filled('persen_bunga_bank')) {
             $persenBungaBank = $request->persen_bunga_bank;
             if (is_string($persenBungaBank) && !is_numeric($persenBungaBank)) {
                 $persenBungaBank = (float) str_replace(['.', ','], ['', '.'], $persenBungaBank);
             }
             $data['persen_bunga_bank'] = $persenBungaBank;
+        } else {
+            // Jika tidak ada request, gunakan nilai yang sudah ada di database
+            $data['persen_bunga_bank'] = $quotation->persen_bunga_bank;
         }
 
         // Note harga jual (opsional)
-        if ($request->has('note_harga_jual')) {
+        if ($request->filled('note_harga_jual')) {
             $data['note_harga_jual'] = $request->note_harga_jual;
+        } else {
+            // Jika tidak ada request, gunakan nilai yang sudah ada di database
+            $data['note_harga_jual'] = $quotation->note_harga_jual;
         }
 
         return $data;
@@ -2502,9 +2513,10 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
      */
     private function updateBpjsPersentaseFromRequest(Quotation $quotation, array $bpjsPersentaseData, string $user, Carbon $currentDateTime): void
     {
-        \Log::info("Updating BPJS persentase from request", [
+        \Log::info("Updating BPJS persentase from request - DETAILED LOG", [
             'quotation_id' => $quotation->id,
-            'details_count' => count($bpjsPersentaseData)
+            'details_count' => count($bpjsPersentaseData),
+            'data_received' => $bpjsPersentaseData
         ]);
 
         $updatedCount = 0;
@@ -2536,15 +2548,19 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             foreach ($bpjsFields as $field => $key) {
                 if (isset($bpjsData[$key])) {
                     $value = $bpjsData[$key];
-                    if (is_string($value) && !is_numeric($value)) {
+
+                    // Konversi string ke float
+                    if (is_string($value)) {
                         $value = (float) str_replace(['.', ','], ['', '.'], $value);
                     }
+
                     $updateData[$field] = (float) $value;
 
-                    \Log::debug("Setting BPJS persentase", [
+                    \Log::info("Setting BPJS persentase in detail", [
                         'detail_id' => $detailId,
                         'field' => $field,
-                        'value' => $value
+                        'value' => $value,
+                        'key_from_request' => $key
                     ]);
                 }
             }
@@ -2552,19 +2568,34 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             if (!empty($updateData)) {
                 $updateData['updated_by'] = $user;
                 $updateData['updated_at'] = $currentDateTime;
+
+                // Update detail dengan persentase baru
                 $detail->update($updateData);
                 $updatedCount++;
 
-                \Log::info("Updated BPJS persentase for detail", [
+                \Log::info("Updated BPJS persentase for detail - SUCCESS", [
                     'detail_id' => $detailId,
-                    'update_data' => $updateData
+                    'update_data' => $updateData,
+                    'previous_values' => [
+                        'persen_bpjs_jkk' => $detail->getOriginal('persen_bpjs_jkk'),
+                        'persen_bpjs_jkm' => $detail->getOriginal('persen_bpjs_jkm'),
+                        'persen_bpjs_jht' => $detail->getOriginal('persen_bpjs_jht'),
+                        'persen_bpjs_jp' => $detail->getOriginal('persen_bpjs_jp'),
+                        'persen_bpjs_kes' => $detail->getOriginal('persen_bpjs_kes')
+                    ]
+                ]);
+            } else {
+                \Log::warning("No BPJS persentase data to update for detail", [
+                    'detail_id' => $detailId,
+                    'received_data' => $bpjsData
                 ]);
             }
         }
 
         \Log::info("BPJS persentase update completed", [
             'quotation_id' => $quotation->id,
-            'details_updated' => $updatedCount
+            'details_updated' => $updatedCount,
+            'total_requested' => count($bpjsPersentaseData)
         ]);
     }
     /**
