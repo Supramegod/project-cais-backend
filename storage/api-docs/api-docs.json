@@ -481,46 +481,6 @@
                                             },
                                             "type": "object"
                                         }
-                                    },
-                                    "quotation_trainings": {
-                                        "description": "Array ID training yang dipilih",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer",
-                                            "example": 1
-                                        }
-                                    },
-                                    "jumlah_kunjungan_operasional": {
-                                        "type": "integer",
-                                        "example": 2
-                                    },
-                                    "bulan_tahun_kunjungan_operasional": {
-                                        "type": "string",
-                                        "example": "Bulan"
-                                    },
-                                    "keterangan_kunjungan_operasional": {
-                                        "type": "string",
-                                        "example": "Kunjungan rutin bulanan"
-                                    },
-                                    "jumlah_kunjungan_tim_crm": {
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "bulan_tahun_kunjungan_tim_crm": {
-                                        "type": "string",
-                                        "example": "Tahun"
-                                    },
-                                    "keterangan_kunjungan_tim_crm": {
-                                        "type": "string",
-                                        "example": "Kunjungan tahunan"
-                                    },
-                                    "training": {
-                                        "type": "string",
-                                        "example": "Training dasar"
-                                    },
-                                    "persen_bunga_bank": {
-                                        "type": "number",
-                                        "example": 1.3
                                     }
                                 },
                                 "type": "object"

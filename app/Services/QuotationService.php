@@ -461,47 +461,60 @@ class QuotationService
             ];
 
             foreach ($bpjsConfig as $key => $config) {
-                $hppValue = $hpp->{$config['field']} ?? null;
+                // PERBAIKAN KRITIS: Utamakan persentase dari detail (yang diupdate di step 11)
+                $persentase = $detail->{$config['percent']} ?? $config['default'];
 
-                // PERBAIKAN: Cek apakah nilai dari HPP null atau 0
-                if ($hppValue === null || $hppValue === 0) {
+                // Jika ada nilai persentase di detail, hitung ulang tanpa melihat HPP
+                if (isset($detail->{$config['percent']}) && $detail->{$config['percent']} !== null) {
                     $base = $config['base'] ?? $upahBpjs;
-                    $persentase = $config['default'];
 
-                    // PERBAIKAN: Gunakan persentase dari detail jika ada, otherwise gunakan default
-                    $detail->{$config['percent']} = $detail->{$config['percent']} ?? $persentase;
-
-                    // PERBAIKAN KHUSUS: Untuk BPJS Kesehatan, jika menggunakan asuransi swasta, gunakan nominal_takaful
+                    // PERBAIKAN KHUSUS: Untuk BPJS Kesehatan dengan asuransi swasta/takaful
                     if ($key === 'kes' && ($detail->penjamin_kesehatan === "Asuransi Swasta" || $detail->penjamin_kesehatan === "Takaful")) {
                         $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
-                        \Log::info("Using Takaful for BPJS Kesehatan", [
-                            'detail_id' => $detail->id,
-                            'nominal_takaful' => $detail->nominal_takaful,
-                            'penjamin_kesehatan' => $detail->penjamin_kesehatan
-                        ]);
+                        $detail->{$config['percent']} = 0;
                     } else {
-                        $detail->{$config['field']} = $base * $detail->{$config['percent']} / 100;
+                        $detail->{$config['field']} = $base * $persentase / 100;
+                        $detail->{$config['percent']} = $persentase;
                     }
 
-                    \Log::info("BPJS calculated", [
+                    \Log::info("BPJS dihitung dengan persentase baru dari detail", [
                         'detail_id' => $detail->id,
                         'type' => $key,
-                        'base' => $base,
-                        'persentase' => $detail->{$config['percent']},
+                        'persentase' => $persentase,
                         'nilai' => $detail->{$config['field']},
-                        'keterangan' => $config['keterangan']
+                        'source' => 'detail'
                     ]);
-                } else {
-                    // Gunakan nilai dari HPP
-                    $detail->{$config['field']} = $hppValue;
-                    $detail->{$config['percent']} = $hpp->{"persen_{$config['field']}"} ?? $config['default'];
+                }
+                // Jika tidak ada persentase di detail, cek HPP
+                else {
+                    $hppValue = $hpp->{$config['field']} ?? null;
+                    $hppPersentase = $hpp->{$config['percent']} ?? null;
 
-                    \Log::info("BPJS from HPP", [
-                        'detail_id' => $detail->id,
-                        'type' => $key,
-                        'nilai' => $detail->{$config['field']},
-                        'persentase' => $detail->{$config['percent']}
-                    ]);
+                    if ($hppValue !== null && $hppValue > 0) {
+                        $detail->{$config['field']} = $hppValue;
+                        $detail->{$config['percent']} = $hppPersentase ?? $config['default'];
+
+                        \Log::info("BPJS dari HPP", [
+                            'detail_id' => $detail->id,
+                            'type' => $key,
+                            'nilai' => $hppValue,
+                            'persentase' => $hppPersentase,
+                            'source' => 'hpp'
+                        ]);
+                    } else {
+                        // Gunakan default jika tidak ada data
+                        $base = $config['base'] ?? $upahBpjs;
+                        $detail->{$config['field']} = $base * $config['default'] / 100;
+                        $detail->{$config['percent']} = $config['default'];
+
+                        \Log::info("BPJS dihitung dengan default", [
+                            'detail_id' => $detail->id,
+                            'type' => $key,
+                            'persentase' => $config['default'],
+                            'nilai' => $detail->{$config['field']},
+                            'source' => 'default'
+                        ]);
+                    }
                 }
             }
 

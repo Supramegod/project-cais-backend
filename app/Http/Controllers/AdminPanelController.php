@@ -447,21 +447,7 @@ class AdminPanelController extends Controller
      *                     @OA\Property(property="jumlah", type="integer", example=1),
      *                     @OA\Property(property="harga", type="number", example=1000000)
      *                 )
-     *             ),
-     *             @OA\Property(
-     *                 property="quotation_trainings",
-     *                 type="array",
-     *                 description="Array ID training yang dipilih",
-     *                 @OA\Items(type="integer", example=1)
-     *             ),
-     *             @OA\Property(property="jumlah_kunjungan_operasional", type="integer", example=2),
-     *             @OA\Property(property="bulan_tahun_kunjungan_operasional", type="string", example="Bulan"),
-     *             @OA\Property(property="keterangan_kunjungan_operasional", type="string", example="Kunjungan rutin bulanan"),
-     *             @OA\Property(property="jumlah_kunjungan_tim_crm", type="integer", example=1),
-     *             @OA\Property(property="bulan_tahun_kunjungan_tim_crm", type="string", example="Tahun"),
-     *             @OA\Property(property="keterangan_kunjungan_tim_crm", type="string", example="Kunjungan tahunan"),
-     *             @OA\Property(property="training", type="string", example="Training dasar"),
-     *             @OA\Property(property="persen_bunga_bank", type="number", example=1.3)
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -479,29 +465,29 @@ class AdminPanelController extends Controller
     {
         try {
             // Validasi input
-            $validator = Validator::make($request->all(), [
-                'ohcs' => 'nullable|array',
-                'ohcs.*.barang_id' => 'required_with:ohcs|integer|exists:m_barang,id',
-                'ohcs.*.jumlah' => 'required_with:ohcs|integer|min:0',
-                'ohcs.*.harga' => 'nullable|numeric|min:0',
-                'quotation_trainings' => 'nullable|array',
-                'quotation_trainings.*' => 'integer|exists:m_training,id',
-                'jumlah_kunjungan_operasional' => 'nullable|integer|min:0',
-                'bulan_tahun_kunjungan_operasional' => 'nullable|string|in:Bulan,Tahun',
-                'keterangan_kunjungan_operasional' => 'nullable|string|max:500',
-                'jumlah_kunjungan_tim_crm' => 'nullable|integer|min:0',
-                'bulan_tahun_kunjungan_tim_crm' => 'nullable|string|in:Bulan,Tahun',
-                'keterangan_kunjungan_tim_crm' => 'nullable|string|max:500',
-                'training' => 'nullable|string|max:500',
-                'persen_bunga_bank' => 'nullable|numeric|min:0',
-            ]);
+            // $validator = Validator::make($request->all(), [
+            //     'ohcs' => 'nullable|array',
+            //     'ohcs.*.barang_id' => 'required_with:ohcs|integer|exists:m_barang,id',
+            //     'ohcs.*.jumlah' => 'required_with:ohcs|integer|min:0',
+            //     'ohcs.*.harga' => 'nullable|numeric|min:0',
+            //     'quotation_trainings' => 'nullable|array',
+            //     'quotation_trainings.*' => 'integer|exists:m_training,id',
+            //     'jumlah_kunjungan_operasional' => 'nullable|integer|min:0',
+            //     'bulan_tahun_kunjungan_operasional' => 'nullable|string|in:Bulan,Tahun',
+            //     'keterangan_kunjungan_operasional' => 'nullable|string|max:500',
+            //     'jumlah_kunjungan_tim_crm' => 'nullable|integer|min:0',
+            //     'bulan_tahun_kunjungan_tim_crm' => 'nullable|string|in:Bulan,Tahun',
+            //     'keterangan_kunjungan_tim_crm' => 'nullable|string|max:500',
+            //     'training' => 'nullable|string|max:500',
+            //     'persen_bunga_bank' => 'nullable|numeric|min:0',
+            // ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
+            // if ($validator->fails()) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => $validator->errors()
+            //     ], 400);
+            // }
 
             Log::info('Admin Panel - Update Step 10', [
                 'quotation_id' => $quotation->id,
