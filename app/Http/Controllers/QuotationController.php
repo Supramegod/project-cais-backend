@@ -391,7 +391,7 @@ class QuotationController extends Controller
                 $quotationReferensi = Quotation::with([
                     'quotationDetails.quotationDetailHpps',
                     'quotationDetails.quotationDetailCosses',
-                    'quotationDetails.wage', // ✅ PASTIKAN WAGE DIMUAT
+                    'quotationDetails.wage',
                     'quotationDetails.quotationDetailRequirements',
                     'quotationDetails.quotationDetailTunjangans',
                     'leads',
@@ -407,10 +407,8 @@ class QuotationController extends Controller
                     'quotationKerjasamas'
                 ])->findOrFail($request->quotation_referensi_id);
 
-
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
 
-                // ✅ TAMBAHKAN LOG UNTUK DEBUG
                 \Log::info('Quotation Referensi loaded', [
                     'id' => $quotationReferensi->id,
                     'nomor' => $quotationReferensi->nomor,
@@ -440,50 +438,41 @@ class QuotationController extends Controller
                 'tipe' => $tipe_quotation
             ]);
 
-            // Untuk revisi/rekontrak, copy data dari referensi
-            // Untuk revisi/rekontrak, copy data dari referensi
-            if ($quotationReferensi) {
-                \Log::info('Starting duplication process');
-                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
-
-                $this->quotationDuplicationService->duplicateQuotationData(
-                    $quotation,
-                    $quotationReferensi
-                );
-
-                // ✅ VERIFIKASI SETELAH DUPLIKASI
-                $quotation->load([
-                    'quotationSites',
-                    'quotationDetails.wage',
-                    'quotationDetails.quotationDetailHpps',
-                    'quotationDetails.quotationDetailCosses',
-                    'quotationDetails.quotationDetailTunjangans',
-                    'quotationPics',
-                    'quotationAplikasis',
-                    'quotationKaporlaps',
-                    'quotationDevices',
-                    'quotationChemicals',
-                    'quotationOhcs',
-                    'quotationTrainings',
-                    'quotationKerjasamas'
-                ]);
-
-                \Log::info('Duplication Verification', [
-                    'new_quotation_id' => $quotation->id,
-                    'sites_created' => $quotation->quotationSites->count(),
-                    'details_created' => $quotation->quotationDetails->count(),
-                    'details_with_wage' => $quotation->quotationDetails->where('wage')->count(),
-                    'hpp_count' => $quotation->quotationDetails->flatMap->quotationDetailHpps->count(),
-                    'coss_count' => $quotation->quotationDetails->flatMap->quotationDetailCosses->count(),
-                    'tunjangan_count' => $quotation->quotationDetails->flatMap->quotationDetailTunjangans->count(),
-                    'pics_created' => $quotation->quotationPics->count()
-                ]);
+            // ✅ PERBAIKAN: Cek apakah ada request site baru
+            $hasNewSiteRequest = false;
+            if ($request->jumlah_site == "Multi Site") {
+                $hasNewSiteRequest = $request->has('multisite') && !empty($request->multisite);
             } else {
-                // Hanya buat site dan PIC awal jika BUKAN revisi/rekontrak
-                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
-                $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
+                $hasNewSiteRequest = $request->has('nama_site') && !empty($request->nama_site);
             }
 
+            \Log::info('Site request check', [
+                'jumlah_site' => $request->jumlah_site,
+                'has_new_site_request' => $hasNewSiteRequest,
+                'multisite_data' => $request->multisite ?? null,
+                'nama_site' => $request->nama_site ?? null
+            ]);
+
+            // ✅ LOGIC REVISI/REKONTRAK - SOLUSI DIPERBAIKI
+            if ($quotationReferensi) {
+                \Log::info('Starting duplication process for ' . $tipe_quotation);
+
+                if (!$hasNewSiteRequest) {
+                    // ✅ 1. JIKA TIDAK ADA SITE BARU: Copy SEMUA data termasuk sites
+                    $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
+
+
+                    \Log::info('Copied ALL data including sites from reference quotation');
+                } else {
+                    // ✅ 2. JIKA ADA SITE BARU: Buat site baru dulu, lalu copy data TANPA sites
+                    $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
+                    $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
+
+                    \Log::info('Copied all data EXCEPT sites, created new sites from request');
+                }
+            }
+
+            // Create initial activity untuk semua tipe
             $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
 
             DB::commit();
@@ -1251,6 +1240,10 @@ class QuotationController extends Controller
                 case 'rekontrak':
                     // Leads rekontrak: status_leads_id = 102 (atau sesuai konfigurasi)
                     $query->where('status_leads_id', 102);
+                    $query->whereHas('pks', function ($q) {
+                        $q->where('is_aktif', 1)
+                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
+                    });
                     break;
 
                 case 'revisi':
@@ -1285,7 +1278,7 @@ class QuotationController extends Controller
                 'success' => true,
                 'message' => "Data leads untuk quotation {$tipe_quotation} berhasil diambil",
                 'data' => $data,
-                
+
             ]);
         } catch (\Exception $e) {
             return response()->json([
