@@ -21,27 +21,21 @@ class QuotationStoreRequest extends BaseRequest
             'jumlah_site' => 'required|string|in:Single Site,Multi Site',
         ];
 
-        // Conditional validation untuk referensi berdasarkan tipe_quotation
-        if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
-            $rules['quotation_referensi_id'] = 'required|exists:sl_quotation,id';
-        } else {
-            // Untuk quotation baru, quotation_referensi_id tidak diperlukan
-            $rules['quotation_referensi_id'] = 'nullable';
-        }
-
+        // Validasi eksistensi hanya jika ada nilai
+        $rules['quotation_referensi_id'] = 'nullable|exists:sl_quotation,id';
         // Untuk quotation BARU atau jika ada request site baru untuk REVISI/REKONTRAK
         // Kita perlu cek apakah user ingin membuat site baru atau menggunakan site dari referensi
 
         // SINGLE SITE: Wajib hanya jika jumlah_site = 'Single Site' 
         // DAN (tipe_quotation = 'baru' ATAU ada nama_site dalam request)
         if ($this->jumlah_site == 'Single Site') {
-            if ($tipe_quotation === 'baru') {
-                // Quotation baru HARUS punya site
-                $rules['nama_site'] = 'required|string|max:255';
-                $rules['provinsi'] = 'required|exists:mysqlhris.m_province,id';
-                $rules['kota'] = 'required|exists:mysqlhris.m_city,id';
-                $rules['penempatan'] = 'required|string|max:255';
-            } else {
+            // if ($tipe_quotation === 'baru') {
+            //     // Quotation baru HARUS punya site
+            //     $rules['nama_site'] = 'required|string|max:255';
+            //     $rules['provinsi'] = 'required|exists:mysqlhris.m_province,id';
+            //     $rules['kota'] = 'required|exists:mysqlhris.m_city,id';
+            //     $rules['penempatan'] = 'required|string|max:255';
+            // } else {
                 // Untuk revisi/rekontrak, site baru optional
                 // Jika ada salah satu field site, maka semua harus ada
                 if ($this->has('nama_site') && !empty($this->nama_site)) {
@@ -57,22 +51,22 @@ class QuotationStoreRequest extends BaseRequest
                     $rules['penempatan'] = 'nullable';
                 }
             }
-        }
+        // }
 
         // MULTI SITE: Wajib hanya jika jumlah_site = 'Multi Site'
         // DAN (tipe_quotation = 'baru' ATAU ada multisite dalam request)
         if ($this->jumlah_site == 'Multi Site') {
-            if ($tipe_quotation === 'baru') {
-                // Quotation baru HARUS punya site
-                $rules['multisite'] = 'required|array|min:1';
-                $rules['multisite.*'] = 'required|string|max:255';
-                $rules['provinsi_multi'] = 'required|array|min:1';
-                $rules['provinsi_multi.*'] = 'required|exists:mysqlhris.m_province,id';
-                $rules['kota_multi'] = 'required|array|min:1';
-                $rules['kota_multi.*'] = 'required|exists:mysqlhris.m_city,id';
-                $rules['penempatan_multi'] = 'required|array|min:1';
-                $rules['penempatan_multi.*'] = 'required|string|max:255';
-            } else {
+            // if ($tipe_quotation === 'baru') {
+            //     // Quotation baru HARUS punya site
+            //     $rules['multisite'] = 'required|array|min:1';
+            //     $rules['multisite.*'] = 'required|string|max:255';
+            //     $rules['provinsi_multi'] = 'required|array|min:1';
+            //     $rules['provinsi_multi.*'] = 'required|exists:mysqlhris.m_province,id';
+            //     $rules['kota_multi'] = 'required|array|min:1';
+            //     $rules['kota_multi.*'] = 'required|exists:mysqlhris.m_city,id';
+            //     $rules['penempatan_multi'] = 'required|array|min:1';
+            //     $rules['penempatan_multi.*'] = 'required|string|max:255';
+            // } else {
                 // Untuk revisi/rekontrak, site baru optional
                 // Jika ada array multisite, maka semua array harus ada
                 if ($this->has('multisite') && !empty($this->multisite)) {
@@ -92,7 +86,7 @@ class QuotationStoreRequest extends BaseRequest
                     $rules['penempatan_multi'] = 'nullable|array';
                 }
             }
-        }
+        // }
 
         // Validasi ukuran array harus sama untuk multi site (jika ada)
         if ($this->jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
@@ -127,20 +121,20 @@ class QuotationStoreRequest extends BaseRequest
             $messages['quotation_referensi_id.exists'] = 'Quotation referensi tidak valid';
         }
 
-        // Pesan untuk quotation baru
-        if ($tipe_quotation === 'baru') {
-            if ($this->jumlah_site == 'Single Site') {
-                $messages['nama_site.required'] = 'Nama site wajib diisi untuk quotation baru';
-                $messages['provinsi.required'] = 'Provinsi wajib dipilih untuk quotation baru';
-                $messages['kota.required'] = 'Kota wajib dipilih untuk quotation baru';
-                $messages['penempatan.required'] = 'Penempatan wajib diisi untuk quotation baru';
-            } else if ($this->jumlah_site == 'Multi Site') {
-                $messages['multisite.required'] = 'Data multisite wajib diisi untuk quotation baru';
-                $messages['provinsi_multi.required'] = 'Provinsi multisite wajib dipilih untuk quotation baru';
-                $messages['kota_multi.required'] = 'Kota multisite wajib dipilih untuk quotation baru';
-                $messages['penempatan_multi.required'] = 'Penempatan multisite wajib diisi untuk quotation baru';
-            }
-        }
+        // // Pesan untuk quotation baru
+        // if ($tipe_quotation === 'baru') {
+        //     if ($this->jumlah_site == 'Single Site') {
+        //         $messages['nama_site.required'] = 'Nama site wajib diisi untuk quotation baru';
+        //         $messages['provinsi.required'] = 'Provinsi wajib dipilih untuk quotation baru';
+        //         $messages['kota.required'] = 'Kota wajib dipilih untuk quotation baru';
+        //         $messages['penempatan.required'] = 'Penempatan wajib diisi untuk quotation baru';
+        //     } else if ($this->jumlah_site == 'Multi Site') {
+        //         $messages['multisite.required'] = 'Data multisite wajib diisi untuk quotation baru';
+        //         $messages['provinsi_multi.required'] = 'Provinsi multisite wajib dipilih untuk quotation baru';
+        //         $messages['kota_multi.required'] = 'Kota multisite wajib dipilih untuk quotation baru';
+        //         $messages['penempatan_multi.required'] = 'Penempatan multisite wajib diisi untuk quotation baru';
+        //     }
+        // }
 
         // Pesan untuk multisite
         if ($this->jumlah_site == 'Multi Site' && $this->has('multisite')) {
@@ -185,9 +179,9 @@ class QuotationStoreRequest extends BaseRequest
         $tipe_quotation = $this->tipe_quotation ?? 'baru';
 
         // ✅ Untuk quotation baru, hapus quotation_referensi_id jika ada
-        if ($tipe_quotation === 'baru' && $this->has('quotation_referensi_id')) {
-            $this->merge(['quotation_referensi_id' => null]);
-        }
+        // if ($tipe_quotation === 'baru' && $this->has('quotation_referensi_id')) {
+        //     $this->merge(['quotation_referensi_id' => null]);
+        // }
 
         // ✅ Pastikan array untuk multi site selalu ada (meski empty)
         if ($this->jumlah_site == 'Multi Site') {
@@ -217,45 +211,50 @@ class QuotationStoreRequest extends BaseRequest
             $tipe_quotation = $this->tipe_quotation ?? 'baru';
             $jumlah_site = $this->jumlah_site;
 
-            // Validasi tambahan untuk revisi/rekontrak dengan site baru
-            if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
-                // Jika ada quotation_referensi_id, pastikan valid
-                if ($this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id)) {
-                    // Cek apakah quotation referensi exist dan tidak dihapus
-                    $referensiExists = \App\Models\Quotation::where('id', $this->quotation_referensi_id)
-                        ->withoutTrashed()
-                        ->exists();
+            // Validasi tambahan untuk quotation_referensi_id
+            if ($this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id)) {
+                // Cek apakah quotation referensi exist dan tidak dihapus
+                $referensiExists = \App\Models\Quotation::where('id', $this->quotation_referensi_id)
+                    ->withoutTrashed()
+                    ->exists();
 
-                    if (!$referensiExists) {
-                        $validator->errors()->add('quotation_referensi_id', 'Quotation referensi tidak ditemukan atau telah dihapus');
-                    }
+                if (!$referensiExists) {
+                    $validator->errors()->add('quotation_referensi_id', 'Quotation referensi tidak ditemukan atau telah dihapus');
                 }
+            }
 
-                // Untuk revisi/rekontrak dengan single site: jika ada salah satu field site, semua harus ada
-                if ($jumlah_site == 'Single Site') {
-                    $hasSiteField = $this->has('nama_site') && !empty($this->nama_site);
-                    $hasProvinceField = $this->has('provinsi') && !empty($this->provinsi);
-                    $hasCityField = $this->has('kota') && !empty($this->kota);
-                    $hasPenempatanField = $this->has('penempatan') && !empty($this->penempatan);
+            // Untuk revisi/rekontrak, quotation_referensi_id wajib
+            if (
+                in_array($tipe_quotation, ['revisi', 'rekontrak']) &&
+                (!$this->has('quotation_referensi_id') || empty($this->quotation_referensi_id))
+            ) {
+                $validator->errors()->add('quotation_referensi_id', 'Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
+            }
 
-                    $siteFieldsCount = ($hasSiteField ? 1 : 0) + ($hasProvinceField ? 1 : 0) +
-                        ($hasCityField ? 1 : 0) + ($hasPenempatanField ? 1 : 0);
+            // Untuk revisi/rekontrak dengan single site: jika ada salah satu field site, semua harus ada
+            if ($jumlah_site == 'Single Site') {
+                $hasSiteField = $this->has('nama_site') && !empty($this->nama_site);
+                $hasProvinceField = $this->has('provinsi') && !empty($this->provinsi);
+                $hasCityField = $this->has('kota') && !empty($this->kota);
+                $hasPenempatanField = $this->has('penempatan') && !empty($this->penempatan);
 
-                    if ($siteFieldsCount > 0 && $siteFieldsCount < 4) {
-                        $validator->errors()->add('nama_site', 'Untuk membuat site baru pada revisi/rekontrak, semua field site (nama_site, provinsi, kota, penempatan) harus diisi');
-                    }
+                $siteFieldsCount = ($hasSiteField ? 1 : 0) + ($hasProvinceField ? 1 : 0) +
+                    ($hasCityField ? 1 : 0) + ($hasPenempatanField ? 1 : 0);
+
+                if ($siteFieldsCount > 0 && $siteFieldsCount < 4) {
+                    $validator->errors()->add('nama_site', 'Untuk membuat site baru pada revisi/rekontrak, semua field site (nama_site, provinsi, kota, penempatan) harus diisi');
                 }
+            }
 
-                // Untuk revisi/rekontrak dengan multi site: validasi konsistensi array
-                if ($jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
-                    $siteCount = count($this->multisite);
-                    $provinceCount = count($this->provinsi_multi ?? []);
-                    $cityCount = count($this->kota_multi ?? []);
-                    $penempatanCount = count($this->penempatan_multi ?? []);
+            // Untuk revisi/rekontrak dengan multi site: validasi konsistensi array
+            if ($jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
+                $siteCount = count($this->multisite);
+                $provinceCount = count($this->provinsi_multi ?? []);
+                $cityCount = count($this->kota_multi ?? []);
+                $penempatanCount = count($this->penempatan_multi ?? []);
 
-                    if ($siteCount !== $provinceCount || $siteCount !== $cityCount || $siteCount !== $penempatanCount) {
-                        $validator->errors()->add('multisite', 'Jumlah data multisite, provinsi, kota, dan penempatan harus sama');
-                    }
+                if ($siteCount !== $provinceCount || $siteCount !== $cityCount || $siteCount !== $penempatanCount) {
+                    $validator->errors()->add('multisite', 'Jumlah data multisite, provinsi, kota, dan penempatan harus sama');
                 }
             }
         });
