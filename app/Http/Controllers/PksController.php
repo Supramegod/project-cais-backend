@@ -1326,15 +1326,11 @@ class PksController extends Controller
             $validator = Validator::make($request->all(), [
                 'npwp' => 'required|string|max:50',
                 'alamat_npwp' => 'required|string|max:255',
-                'pic_invoice' => 'required|string|max:100',
-                'telp_pic_invoice' => 'required|string|max:20',
-                'email_pic_invoice' => 'required|email|max:100',
                 'materai' => 'required|string|max:50',
                 'joker_reliever' => 'required|string|max:50',
                 'syarat_invoice' => 'required|string|max:255',
                 'alamat_penagihan_invoice' => 'required|string|max:255',
                 'catatan_site' => 'nullable|string',
-                'status_serikat' => 'required|string|max:50',
                 'ada_serikat' => 'nullable|string',
                 // Validasi untuk PICs
                 'pics' => 'nullable|array',

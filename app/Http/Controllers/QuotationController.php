@@ -374,19 +374,23 @@ class QuotationController extends Controller
             // Merge tipe_quotation ke request untuk validasi
             $request->merge(['tipe_quotation' => $tipe_quotation]);
 
-            // ✅ VALIDASI QUOTATION REFERENSI DULU
+            // ✅ PERUBAHAN 1: Validasi quotation referensi berdasarkan tipe
             if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
+                // Untuk revisi dan rekontrak, quotation_referensi_id wajib
                 if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
                     throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
                 }
             }
+            // Untuk 'baru', quotation_referensi_id opsional
 
             // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
 
-            // Handle quotation referensi untuk revisi/rekontrak
+            // ✅ PERUBAHAN 2: Handle quotation referensi untuk SEMUA tipe jika ada
             $quotationReferensi = null;
-            if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
+
+            // Cek apakah ada quotation_referensi_id dalam request (berlaku untuk semua tipe)
+            if ($request->has('quotation_referensi_id') && $request->quotation_referensi_id) {
                 // ✅ PASTIKAN SEMUA RELASI DIMUAT
                 $quotationReferensi = Quotation::with([
                     'quotationDetails.quotationDetailHpps',
@@ -409,12 +413,11 @@ class QuotationController extends Controller
 
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
 
-                \Log::info('Quotation Referensi loaded', [
-                    'id' => $quotationReferensi->id,
-                    'nomor' => $quotationReferensi->nomor,
-                    'sites_count' => $quotationReferensi->quotationSites->count(),
-                    'details_count' => $quotationReferensi->quotationDetails->count(),
-                    'pics_count' => $quotationReferensi->quotationPics->count()
+                \Log::info('Reference quotation loaded with relations', [
+                    'quotation_id' => $quotationReferensi->id,
+                    'tipe_quotation' => $tipe_quotation,
+                    'kaporlap_count' => $quotationReferensi->quotationKaporlaps->count(),
+                    'details_count' => $quotationReferensi->quotationDetails->count()
                 ]);
             }
 
@@ -435,42 +438,132 @@ class QuotationController extends Controller
             \Log::info('New Quotation created', [
                 'id' => $quotation->id,
                 'nomor' => $quotation->nomor,
-                'tipe' => $tipe_quotation
+                'tipe' => $tipe_quotation,
+                'has_referensi' => $quotationReferensi !== null
             ]);
 
-            // ✅ PERBAIKAN: Cek apakah ada request site baru
+            // ✅ PERUBAHAN 3: Cek apakah ada request site baru
             $hasNewSiteRequest = false;
             if ($request->jumlah_site == "Multi Site") {
                 $hasNewSiteRequest = $request->has('multisite') && !empty($request->multisite);
             } else {
                 $hasNewSiteRequest = $request->has('nama_site') && !empty($request->nama_site);
             }
+            $hasNewSiteRequest = false;
+            $hasExistingSite = false;
+
+            if ($request->jumlah_site == "Multi Site") {
+                if ($request->has('multisite') && !empty($request->multisite)) {
+                    // Cek setiap site apakah sudah existing
+                    foreach ($request->multisite as $key => $namaSite) {
+                        $isExisting = $this->checkSiteExists(
+                            $request->perusahaan_id,
+                            $namaSite,
+                            $request->provinsi_multi[$key] ?? null,
+                            $request->kota_multi[$key] ?? null
+                        );
+
+                        if ($isExisting) {
+                            $hasExistingSite = true;
+                            \Log::info('Site sudah existing', [
+                                'nama_site' => $namaSite,
+                                'perusahaan_id' => $request->perusahaan_id
+                            ]);
+                        } else {
+                            $hasNewSiteRequest = true;
+                        }
+                    }
+                }
+            } else {
+                if ($request->has('nama_site') && !empty($request->nama_site)) {
+                    $isExisting = $this->checkSiteExists(
+                        $request->perusahaan_id,
+                        $request->nama_site,
+                        $request->provinsi,
+                        $request->kota
+                    );
+
+                    if ($isExisting) {
+                        $hasExistingSite = true;
+                        \Log::info('Site sudah existing', [
+                            'nama_site' => $request->nama_site,
+                            'perusahaan_id' => $request->perusahaan_id
+                        ]);
+                    } else {
+                        $hasNewSiteRequest = true;
+                    }
+                }
+            }
 
             \Log::info('Site request check', [
                 'jumlah_site' => $request->jumlah_site,
                 'has_new_site_request' => $hasNewSiteRequest,
-                'multisite_data' => $request->multisite ?? null,
-                'nama_site' => $request->nama_site ?? null
+                'has_existing_site' => $hasExistingSite,
+                'has_referensi' => $quotationReferensi !== null,
+                'tipe_quotation' => $tipe_quotation
             ]);
 
-            // ✅ LOGIC REVISI/REKONTRAK - SOLUSI DIPERBAIKI
+            // ✅ PERUBAHAN: LOGIC BERDASARKAN ADA/TIDAKNYA REFERENSI DAN STATUS SITE
             if ($quotationReferensi) {
-                \Log::info('Starting duplication process for ' . $tipe_quotation);
+                // ✅ KASUS 1: ADA REFERENSI
+                \Log::info('Starting duplication process from reference for ' . $tipe_quotation);
 
-                if (!$hasNewSiteRequest) {
-                    // ✅ 1. JIKA TIDAK ADA SITE BARU: Copy SEMUA data termasuk sites
+                if (!$hasNewSiteRequest && !$hasExistingSite) {
+                    // ✅ MODE 1: TIDAK ADA SITE BARU DAN TIDAK ADA SITE EXISTING - Copy semua data termasuk sites
                     $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
-
-
                     \Log::info('Copied ALL data including sites from reference quotation');
-                } else {
-                    // ✅ 2. JIKA ADA SITE BARU: Buat site baru dulu, lalu copy data TANPA sites
-                    $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
+                } else if ($hasExistingSite && !$hasNewSiteRequest) {
+                    // ✅ MODE 1B: ADA SITE EXISTING TAPI TIDAK ADA SITE BARU - Gunakan site existing
+                    // Untuk kasus ini, kita perlu link ke site yang sudah ada
+                    $this->linkExistingSites($quotation, $request, $user->full_name);
                     $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
+                    \Log::info('Linked to existing sites and copied other data');
+                } else {
+                    // ✅ MODE 2: ADA SITE BARU - Buat site baru, lalu duplikasi data
+                    // Cek apakah jumlah site yang diminta sama dengan referensi
+                    $jumlahSiteRequest = 0;
+                    if ($request->jumlah_site == "Multi Site") {
+                        $jumlahSiteRequest = is_array($request->multisite) ? count($request->multisite) : 0;
+                    } else {
+                        $jumlahSiteRequest = 1; // Single Site
+                    }
 
-                    \Log::info('Copied all data EXCEPT sites, created new sites from request');
+                    $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
+
+                    \Log::info('Site comparison', [
+                        'jumlah_site_request' => $jumlahSiteRequest,
+                        'jumlah_site_referensi' => $jumlahSiteReferensi
+                    ]);
+
+                    // Buat hanya site baru (yang belum existing)
+                    $this->createNewSitesOnly($quotation, $request, $user->full_name);
+
+                    if ($jumlahSiteRequest === $jumlahSiteReferensi) {
+                        // ✅ JUMLAH SITE SAMA - Mapping per site
+                        $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
+                        \Log::info('Copied data with site mapping (same count)');
+                    } else {
+                        // ✅ JUMLAH SITE BERBEDA - Duplikasi semua detail ke semua site
+                        $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
+                        \Log::info('Copied all data to new sites (different count)');
+                    }
                 }
+            } else {
+                // ✅ KASUS 2: TIDAK ADA REFERENSI (hanya untuk tipe 'baru')
+                \Log::info('Creating quotation WITHOUT reference (brand new)');
+
+                // Validasi: Untuk quotation baru tanpa referensi, wajib ada data site
+                if (!$hasNewSiteRequest && !$hasExistingSite) {
+                    throw new \Exception('Data site wajib diisi untuk quotation baru tanpa referensi');
+                }
+
+                // Buat hanya site baru (yang belum existing)
+                $this->createNewSitesOnly($quotation, $request, $user->full_name);
+
+                // Buat PIC awal dari leads
+                $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
             }
+
 
             // Create initial activity untuk semua tipe
             $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
@@ -484,11 +577,18 @@ class QuotationController extends Controller
                 'quotationDetails',
                 'statusQuotation'
             ]);
-
+            $newSitesCount = $quotation->quotationSites()->count();
+            $existingSitesCount = $hasExistingSite;
             return response()->json([
                 'success' => true,
                 'data' => new QuotationResource($quotation),
-                'message' => 'Quotation ' . $tipe_quotation . ' created successfully'
+                'message' => 'Quotation ' . $tipe_quotation . ' created successfully',
+                'metadata' => [
+                    'sites_created' => $newSitesCount,
+                    'sites_existing' => $existingSitesCount,
+                    'has_new_sites' => $hasNewSiteRequest,
+                    'has_existing_sites' => $hasExistingSite
+                ]
             ], 201);
 
         } catch (\Exception $e) {
@@ -1575,6 +1675,127 @@ class QuotationController extends Controller
                 'message' => 'Failed to fetch data',
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
+        }
+    }
+    /**
+     * Check if site already exists for this leads
+     */
+    private function checkSiteExists($leadsId, $namaSite, $provinsiId, $kotaId): bool
+    {
+        return QuotationSite::where('leads_id', $leadsId)
+            ->where('nama_site', $namaSite)
+            ->where('provinsi_id', $provinsiId)
+            ->where('kota_id', $kotaId)
+            ->exists();
+    }
+
+    /**
+     * Create only new sites (skip existing ones)
+     */
+    private function createNewSitesOnly(Quotation $quotation, Request $request, string $createdBy): void
+    {
+        if ($request->jumlah_site == "Multi Site") {
+            foreach ($request->multisite as $key => $value) {
+                // Cek apakah site sudah existing
+                $isExisting = $this->checkSiteExists(
+                    $request->perusahaan_id,
+                    $value,
+                    $request->provinsi_multi[$key],
+                    $request->kota_multi[$key]
+                );
+
+                if (!$isExisting) {
+                    $this->quotationBusinessService->createQuotationSite(
+                        $quotation,
+                        $request,
+                        $key,
+                        true,
+                        $createdBy
+                    );
+                } else {
+                    \Log::info('Skip creating existing site', [
+                        'nama_site' => $value,
+                        'leads_id' => $request->perusahaan_id
+                    ]);
+                }
+            }
+        } else {
+            // Cek apakah site sudah existing
+            $isExisting = $this->checkSiteExists(
+                $request->perusahaan_id,
+                $request->nama_site,
+                $request->provinsi,
+                $request->kota
+            );
+
+            if (!$isExisting) {
+                $this->quotationBusinessService->createQuotationSite(
+                    $quotation,
+                    $request,
+                    null,
+                    false,
+                    $createdBy
+                );
+            } else {
+                \Log::info('Skip creating existing site', [
+                    'nama_site' => $request->nama_site,
+                    'leads_id' => $request->perusahaan_id
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Link quotation to existing sites
+     */
+    private function linkExistingSites(Quotation $quotation, Request $request, string $createdBy): void
+    {
+        if ($request->jumlah_site == "Multi Site") {
+            foreach ($request->multisite as $key => $value) {
+                // Cari site yang sudah ada
+                $existingSite = QuotationSite::where('leads_id', $request->perusahaan_id)
+                    ->where('nama_site', $value)
+                    ->where('provinsi_id', $request->provinsi_multi[$key])
+                    ->where('kota_id', $request->kota_multi[$key])
+                    ->first();
+
+                if ($existingSite) {
+                    // Duplikat site untuk quotation baru (dengan quotation_id yang berbeda)
+                    $newSite = $existingSite->replicate();
+                    $newSite->quotation_id = $quotation->id;
+                    $newSite->created_by = $createdBy;
+                    $newSite->created_at = Carbon::now();
+                    $newSite->save();
+
+                    \Log::info('Linked to existing site (duplicated)', [
+                        'old_site_id' => $existingSite->id,
+                        'new_site_id' => $newSite->id,
+                        'nama_site' => $value
+                    ]);
+                }
+            }
+        } else {
+            // Cari site yang sudah ada
+            $existingSite = QuotationSite::where('leads_id', $request->perusahaan_id)
+                ->where('nama_site', $request->nama_site)
+                ->where('provinsi_id', $request->provinsi)
+                ->where('kota_id', $request->kota)
+                ->first();
+
+            if ($existingSite) {
+                // Duplikat site untuk quotation baru
+                $newSite = $existingSite->replicate();
+                $newSite->quotation_id = $quotation->id;
+                $newSite->created_by = $createdBy;
+                $newSite->created_at = Carbon::now();
+                $newSite->save();
+
+                \Log::info('Linked to existing site (duplicated)', [
+                    'old_site_id' => $existingSite->id,
+                    'new_site_id' => $newSite->id,
+                    'nama_site' => $request->nama_site
+                ]);
+            }
         }
     }
 }
