@@ -291,12 +291,12 @@ class QuotationBusinessService
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5]);
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
-                    // ->whereDoesntHave('pks_id', function ($q) {
-                    //     $q->where('is_aktif', 1)
-                    //         ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
-                    // });
+                    ->whereDoesntHave('pks', function ($q) {
+                        $q->where('is_aktif', 1)
+                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                    });
                 break;
 
             case 'revisi':
@@ -304,10 +304,9 @@ class QuotationBusinessService
                 break;
 
             case 'rekontrak':
-                $query->whereHas('pks', function ($q) {
-                    $q->where('is_aktif', 1)
-                        ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                });
+                $query
+                    // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
+                    ->where('status_quotation_id', 3);
                 break;
         }
 

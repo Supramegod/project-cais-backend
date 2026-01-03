@@ -1340,10 +1340,10 @@ class QuotationController extends Controller
                 case 'rekontrak':
                     // Leads rekontrak: status_leads_id = 102 (atau sesuai konfigurasi)
                     $query->where('status_leads_id', 102);
-                    $query->whereHas('pks', function ($q) {
-                        $q->where('is_aktif', 1)
-                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                    });
+                    // $query->whereHas('pks', function ($q) {
+                    //     $q->where('is_aktif', 1)
+                    //         ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
+                    // });
                     break;
 
                 case 'revisi':
