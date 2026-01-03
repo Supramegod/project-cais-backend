@@ -54,7 +54,7 @@ class QuotationStepResource extends JsonResource
         $baseData = [
             'id' => $this->id ?? $this['quotation']->id,
             'step' => $this->step,
-            'metadata' =>$actualStep
+            'metadata' => $actualStep
         ];
 
         // Hanya tambahkan data dasar jika diperlukan
@@ -348,6 +348,7 @@ class QuotationStepResource extends JsonResource
                         $quotation->quotationTrainings->pluck('training_id')->toArray() : [],
                 ];
             // Di method getStepSpecificData - case 11:
+// Di method getStepSpecificData - case 11:
             case 11:
                 $calculatedQuotation = $this['additional_data']['calculated_quotation'] ?? null;
                 $persenBpjsTotalHpp = 0;
@@ -438,7 +439,6 @@ class QuotationStepResource extends JsonResource
                             $wage = $detail->wage ?? null;
                             $potonganBpu = $detail->potongan_bpu ?? 0;
 
-
                             $bpjsJkk = $detail->bpjs_jkk ?? 0;
                             $bpjsJkm = $detail->bpjs_jkm ?? 0;
                             $bpjsJht = $detail->bpjs_jht ?? 0;
@@ -463,28 +463,47 @@ class QuotationStepResource extends JsonResource
                                     ];
                                 })->toArray();
                             }
+
+                            // PERBAIKAN DI SINI: Logika display lembur yang diperbaiki
                             $lemburDisplay = '';
+                            $lemburValue = $detail->nominal_lembur ?? 0;
+
                             if ($wage) {
                                 if ($wage->lembur == 'Normatif' || $wage->lembur_ditagihkan == 'Ditagihkan Terpisah') {
                                     $lemburDisplay = 'Ditagihkan terpisah';
                                 } elseif ($wage->lembur == 'Flat') {
-                                    // Tambahkan (float) di sini
-                                    $lemburDisplay = 'Rp. ' . number_format((float) ($detail->lembur ?? 0), 2, ',', '.');
+                                    // Tampilkan nilai lembur flat yang sudah dihitung
+                                    if ($lemburValue > 0) {
+                                        $lemburDisplay =  $lemburValue;
+                                    } else {
+                                        $lemburDisplay = 'Tidak Ada';
+                                    }
                                 } else {
                                     $lemburDisplay = 'Tidak Ada';
                                 }
+                            } else {
+                                $lemburDisplay = 'Tidak Ada';
                             }
 
+                            // PERBAIKAN: Logika untuk tunjangan holiday juga
                             $tunjanganHolidayDisplay = '';
+                            $tunjanganHolidayValue = $detail->tunjangan_holiday ?? 0;
+
                             if ($wage) {
                                 if ($wage->tunjangan_holiday == 'Normatif') {
                                     $tunjanganHolidayDisplay = 'Ditagihkan terpisah';
                                 } elseif ($wage->tunjangan_holiday == 'Flat') {
-                                    // Tambahkan (float) di sini
-                                    $tunjanganHolidayDisplay = 'Rp. ' . number_format((float) ($detail->tunjangan_holiday ?? 0), 2, ',', '.');
+                                    // Tampilkan nilai tunjangan holiday flat yang sudah dihitung
+                                    if ($tunjanganHolidayValue > 0) {
+                                        $tunjanganHolidayDisplay =  $tunjanganHolidayValue;
+                                    } else {
+                                        $tunjanganHolidayDisplay = 'Tidak Ada';
+                                    }
                                 } else {
                                     $tunjanganHolidayDisplay = 'Tidak Ada';
                                 }
+                            } else {
+                                $tunjanganHolidayDisplay = 'Tidak Ada';
                             }
 
                             return [
