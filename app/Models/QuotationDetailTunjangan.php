@@ -17,6 +17,7 @@ class QuotationDetailTunjangan extends Model
         'quotation_detail_id',
         'nama_tunjangan',
         'nominal',
+        'nominal_coss',
         'created_by',
         'updated_by',
         'deleted_by'
