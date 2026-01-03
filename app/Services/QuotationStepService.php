@@ -2310,13 +2310,37 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                             continue;
                         }
 
-                        // Convert string nominal to integer if needed
+                        // ============================================
+                        // PERBAIKAN: Konversi ke FLOAT (bukan int)
+                        // ============================================
+
+                        // Convert string nominal to float if needed
                         if (is_string($nominal)) {
-                            $nominal = (int) str_replace('.', '', $nominal);
+                            // Hapus karakter pemisah ribuan dan ubah ke float
+                            $nominal = (float) str_replace(['.', ','], ['', '.'], $nominal);
+                            \Log::debug("Converted nominal from string to float", [
+                                'detail_id' => $detailId,
+                                'nama_tunjangan' => $namaTunjangan,
+                                'original' => $tunjanganData['nominal'],
+                                'converted' => $nominal
+                            ]);
                         }
+
+                        // Convert string nominal_coss to float if needed
                         if (is_string($nominalCoss)) {
-                            $nominalCoss = (int) str_replace('.', '', $nominalCoss);
+                            // Hapus karakter pemisah ribuan dan ubah ke float
+                            $nominalCoss = (float) str_replace(['.', ','], ['', '.'], $nominalCoss);
+                            \Log::debug("Converted nominal_coss from string to float", [
+                                'detail_id' => $detailId,
+                                'nama_tunjangan' => $namaTunjangan,
+                                'original' => $tunjanganData['nominal_coss'] ?? 'null',
+                                'converted' => $nominalCoss
+                            ]);
                         }
+
+                        // Pastikan nilai numerik
+                        $nominal = is_numeric($nominal) ? (float) $nominal : 0.0;
+                        $nominalCoss = is_numeric($nominalCoss) ? (float) $nominalCoss : 0.0;
 
                         $processedTunjanganNames[] = $namaTunjangan;
 
@@ -2331,11 +2355,13 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                                 'updated_by' => $user
                             ]);
 
-                            \Log::debug("Updated tunjangan", [
+                            \Log::debug("Updated tunjangan with FLOAT values", [
                                 'detail_id' => $detailId,
                                 'nama_tunjangan' => $namaTunjangan,
                                 'nominal' => $nominal,
+                                'nominal_type' => gettype($nominal),
                                 'nominal_coss' => $nominalCoss,
+                                'nominal_coss_type' => gettype($nominalCoss)
                             ]);
                         } else {
                             // Create new
@@ -2349,10 +2375,13 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                                 'created_by' => $user
                             ]);
 
-                            \Log::debug("Created tunjangan", [
+                            \Log::debug("Created tunjangan with FLOAT values", [
                                 'detail_id' => $detailId,
                                 'nama_tunjangan' => $namaTunjangan,
-                                'nominal' => $nominal
+                                'nominal' => $nominal,
+                                'nominal_type' => gettype($nominal),
+                                'nominal_coss' => $nominalCoss,
+                                'nominal_coss_type' => gettype($nominalCoss)
                             ]);
                         }
                     }
@@ -2376,7 +2405,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 }
             }
 
-            \Log::info("Tunjangan data sync completed", [
+            \Log::info("Tunjangan data sync completed with FLOAT conversion", [
                 'quotation_id' => $quotation->id
             ]);
 

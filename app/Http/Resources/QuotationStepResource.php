@@ -8,6 +8,7 @@ use App\Models\JenisBarang;
 use App\Models\Kebutuhan;
 use App\Models\Province;
 use App\Models\Quotation;
+use App\Models\QuotationDetailHpp;
 use App\Models\QuotationDetailTunjangan;
 use App\Models\QuotationDevices;
 use App\Models\QuotationKaporlap;
@@ -506,11 +507,13 @@ class QuotationStepResource extends JsonResource
                             } else {
                                 $tunjanganHolidayDisplay = 'Tidak Ada';
                             }
+                            $hpp=QuotationDetailHpp::where('quotation_detail_id',$detail->id)->first();
 
                             return [
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
-                                'jumlah_hc' => $detail->jumlah_hc,
+                                'jumlah_hc_hpp' => $hpp->jumlah_hc,
+                                'jumlah_hc_coss'=>$detail->jumlah_hc,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
