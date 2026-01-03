@@ -369,20 +369,26 @@ class QuotationService
     private function calculateTunjangan($detail, $daftarTunjangan)
     {
         $totalTunjangan = 0;
+        $totalTunjanganCoss = 0;
         foreach ($daftarTunjangan as $tunjangan) {
             $dtTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)
                 ->where('nama_tunjangan', $tunjangan->nama)->first();
 
             $value = (float) ($dtTunjangan->nominal ?? 0);
+            $valuecoss = (float) ($dtTunjangan->nominal_coss ?? 0);
             $detail->{$tunjangan->nama} = $value;
             $totalTunjangan += $value;
+            $totalTunjanganCoss += $valuecoss;
         }
         $detail->total_tunjangan = $totalTunjangan;
-        return $totalTunjangan;
+        $detail->total_tunjangan_coss = $totalTunjanganCoss;
+        return [
+            'total' => $totalTunjangan,
+            'total_coss' => $totalTunjanganCoss
+        ];
     }
     private function calculateBpjs($detail, $quotation, $hpp)
     {
-        // DEBUG: Log untuk troubleshooting
         \Log::info("Calculating BPJS for detail", [
             'detail_id' => $detail->id,
             'program_bpjs' => $quotation->program_bpjs,
@@ -390,7 +396,7 @@ class QuotationService
             'nominal_upah' => $detail->nominal_upah,
             'umk' => $detail->umk,
             'ump' => $detail->ump,
-            'nominal_takaful' => $detail->nominal_takaful // Tambahkan log untuk nominal_takaful
+            'nominal_takaful' => $detail->nominal_takaful
         ]);
 
         // PERBAIKAN: Terima kedua nilai "BPJS" dan "BPJS Kesehatan"
@@ -425,6 +431,7 @@ class QuotationService
             if ($detail->penjamin_kesehatan === 'BPJS Kesehatan') {
                 $detail->penjamin_kesehatan = 'BPJS';
             }
+
             // PERBAIKAN: Sesuaikan dengan peraturan Indonesia 2024
             $bpjsConfig = [
                 'jkk' => [
@@ -461,60 +468,70 @@ class QuotationService
             ];
 
             foreach ($bpjsConfig as $key => $config) {
-                // PERBAIKAN KRITIS: Utamakan persentase dari detail (yang diupdate di step 11)
-                $persentase = $detail->{$config['percent']} ?? $config['default'];
+                // ============================================================
+                // LOGIKA BARU: UTAMAKAN PERSENTASE DARI DETAIL (STEP 11)
+                // ============================================================
 
-                // Jika ada nilai persentase di detail, hitung ulang tanpa melihat HPP
-                if (isset($detail->{$config['percent']}) && $detail->{$config['percent']} !== null) {
-                    $base = $config['base'] ?? $upahBpjs;
+                // 1. Ambil persentase dari detail terlebih dahulu
+                $persentase = null;
+                $base = $config['base'] ?? $upahBpjs;
 
-                    // PERBAIKAN KHUSUS: Untuk BPJS Kesehatan dengan asuransi swasta/takaful
-                    if ($key === 'kes' && ($detail->penjamin_kesehatan === "Asuransi Swasta" || $detail->penjamin_kesehatan === "Takaful")) {
-                        $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
-                        $detail->{$config['percent']} = 0;
-                    } else {
-                        $detail->{$config['field']} = $base * $persentase / 100;
-                        $detail->{$config['percent']} = $persentase;
-                    }
-
-                    \Log::info("BPJS dihitung dengan persentase baru dari detail", [
+                // Cek apakah ada nilai persentase di detail (dari step 11)
+                if (property_exists($detail, $config['percent']) && $detail->{$config['percent']} !== null) {
+                    $persentase = (float) $detail->{$config['percent']};
+                    \Log::info("Found persentase in detail", [
                         'detail_id' => $detail->id,
                         'type' => $key,
                         'persentase' => $persentase,
-                        'nilai' => $detail->{$config['field']},
                         'source' => 'detail'
                     ]);
                 }
-                // Jika tidak ada persentase di detail, cek HPP
+                // Jika tidak ada di detail, cek HPP
+                else if ($hpp && $hpp->{$config['percent']} !== null) {
+                    $persentase = (float) $hpp->{$config['percent']};
+                    \Log::info("Found persentase in HPP", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'persentase' => $persentase,
+                        'source' => 'hpp'
+                    ]);
+                }
+                // Jika tidak ada di HPP, gunakan default
                 else {
-                    $hppValue = $hpp->{$config['field']} ?? null;
-                    $hppPersentase = $hpp->{$config['percent']} ?? null;
+                    $persentase = $config['default'];
+                    \Log::info("Using default persentase", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'persentase' => $persentase,
+                        'source' => 'default'
+                    ]);
+                }
 
-                    if ($hppValue !== null && $hppValue > 0) {
-                        $detail->{$config['field']} = $hppValue;
-                        $detail->{$config['percent']} = $hppPersentase ?? $config['default'];
+                // ============================================================
+                // PERHITUNGAN NOMINAL
+                // ============================================================
 
-                        \Log::info("BPJS dari HPP", [
-                            'detail_id' => $detail->id,
-                            'type' => $key,
-                            'nilai' => $hppValue,
-                            'persentase' => $hppPersentase,
-                            'source' => 'hpp'
-                        ]);
-                    } else {
-                        // Gunakan default jika tidak ada data
-                        $base = $config['base'] ?? $upahBpjs;
-                        $detail->{$config['field']} = $base * $config['default'] / 100;
-                        $detail->{$config['percent']} = $config['default'];
+                // PERBAIKAN: Untuk BPJS Kesehatan dengan asuransi swasta/takaful
+                if ($key === 'kes' && ($detail->penjamin_kesehatan === "Asuransi Swasta" || $detail->penjamin_kesehatan === "Takaful")) {
+                    $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
+                    $detail->{$config['percent']} = 0;
 
-                        \Log::info("BPJS dihitung dengan default", [
-                            'detail_id' => $detail->id,
-                            'type' => $key,
-                            'persentase' => $config['default'],
-                            'nilai' => $detail->{$config['field']},
-                            'source' => 'default'
-                        ]);
-                    }
+                    \Log::info("Using Takaful for health insurance", [
+                        'detail_id' => $detail->id,
+                        'nominal_takaful' => $detail->{$config['field']}
+                    ]);
+                } else {
+                    // Hitung nominal berdasarkan persentase yang sudah ditentukan
+                    $detail->{$config['field']} = $base * $persentase / 100;
+                    $detail->{$config['percent']} = $persentase;
+
+                    \Log::info("Calculated BPJS nominal", [
+                        'detail_id' => $detail->id,
+                        'type' => $key,
+                        'base' => $base,
+                        'persentase' => $persentase,
+                        'nominal' => $detail->{$config['field']}
+                    ]);
                 }
             }
 
@@ -692,26 +709,7 @@ class QuotationService
         $bungaBank = (float) ($detail->bunga_bank ?? 0);
         $insentif = (float) ($detail->insentif ?? 0);
         $jumlahHc = (int) ($detail->jumlah_hc ?? 0);
-
-        // Debug tipe data
-        \Log::info("Data Types Check", [
-            'detail_id' => $detail->id,
-            'nominal_upah_type' => gettype($detail->nominal_upah ?? 0),
-            'tunjangan_hari_raya_type' => gettype($detail->tunjangan_hari_raya ?? 0),
-            'kompensasi_type' => gettype($detail->kompensasi ?? 0),
-            'total_tunjangan_type' => gettype($totalTunjangan)
-        ]);
-
-        // Log komponen perhitungan dengan nilai sudah dikonversi
-        \Log::info("Final Totals Components (Converted)", [
-            'detail_id' => $detail->id,
-            'tunjangan_hari_raya' => $tunjanganHariRaya,
-            'kompensasi' => $kompensasi,
-            'tunjangan_holiday' => $tunjanganHoliday,
-            'total_tunjangan' => $totalTunjangan,
-            'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
-            'biaya_kesehatan' => $biayaKesehatan
-        ]);
+        $totalTunjanganCoss = (float) ($detail->total_tunjangan_coss ?? 0);
 
         // PERBAIKAN: Pastikan semua komponen dijumlahkan dengan aman
         $detail->total_personil = $nominalUpah
@@ -733,7 +731,7 @@ class QuotationService
         $detail->sub_total_personil = $detail->total_personil * $jumlahHc;
 
         // COSS Calculations
-        $detail->total_base_manpower = round($nominalUpah + $totalTunjangan, 2);
+        $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
 
         $detail->total_exclude_base_manpower = round(
             $tunjanganHariRaya
@@ -1143,11 +1141,12 @@ class QuotationService
             'is_bpjs_jkk' => ['bpjs_jkk', 'persen_bpjs_jkk'],
             'is_bpjs_jkm' => ['bpjs_jkm', 'persen_bpjs_jkm'],
             'is_bpjs_jht' => ['bpjs_jht', 'persen_bpjs_jht'],
-            'is_bpjs_jp' => ['bpjs_jp', 'persen_bpjs_jp']
+            'is_bpjs_jp' => ['bpjs_jp', 'persen_bpjs_jp'],
+            'is_bpjs_kes' => ['bpjs_kes', 'persen_bpjs_kes']
         ];
 
         foreach ($optOuts as $optField => $targetFields) {
-            // PERBAIKAN: Cek dengan lebih teliti nilai opt-out
+            // Cek dengan lebih teliti nilai opt-out
             $isOptOut = false;
 
             if (isset($detail->{$optField})) {
@@ -1162,14 +1161,16 @@ class QuotationService
             }
 
             if ($isOptOut) {
+                // **PERBAIKAN**: Tidak hanya set ke 0, tapi juga hapus nilai HPP yang ada
                 $detail->{$targetFields[0]} = 0;
                 $detail->{$targetFields[1]} = 0;
 
-                \Log::info("BPJS opt-out applied", [
+                // Log opt-out yang diterapkan
+                \Log::info("BPJS opt-out applied and HPP values cleared", [
                     'detail_id' => $detail->id,
                     'field' => $optField,
                     'bpjs_field' => $targetFields[0],
-                    'opt_value' => $detail->{$optField}
+                    'persentase_field' => $targetFields[1]
                 ]);
             }
         }
