@@ -255,7 +255,7 @@ class QuotationService
             $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
 
             // Final totals
-            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan,$hpp);
+            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
 
             // Simpan data ke DTO
             $this->populateDetailCalculation($detail, $quotation, $detailCalculation);
@@ -580,258 +580,155 @@ class QuotationService
     private function calculateExtras($detail, $quotation, $hpp, $coss, $wage)
     {
         try {
-            \Log::info("=== CALCULATE EXTRAS (WITH HPP/COSS PRIORITY) ===", [
+            \Log::info("=== CALCULATE EXTRAS (ENHANCED) ===", [
                 'detail_id' => $detail->id,
-                'has_hpp' => !empty($hpp),
-                'has_coss' => !empty($coss),
-                'has_wage' => !empty($wage),
-                'hpp_kompensasi' => $hpp->kompensasi ?? 'null',
-                'coss_kompensasi' => $coss->kompensasi ?? 'null',
-                'wage_kompensasi' => $wage->kompensasi ?? 'null'
+                'hpp_data' => $hpp ? ['thr' => $hpp->tunjangan_hari_raya, 'komp' => $hpp->kompensasi] : 'no_hpp',
+                'coss_data' => $coss ? ['thr' => $coss->tunjangan_hari_raya, 'komp' => $coss->kompensasi] : 'no_coss',
+                'wage_data' => $wage ? ['thr' => $wage->thr, 'komp' => $wage->kompensasi, 'lembur' => $wage->lembur] : 'no_wage'
             ]);
+
+            // ============================================
+            // HELPER FUNCTION: Normalize string values
+            // ============================================
+            $normalizeString = function ($value) {
+                if (!is_string($value))
+                    return $value;
+                $value = strtolower(trim($value));
+
+                // Handle various "Tidak Ada" formats
+                if (str_contains($value, 'tidak ada')) {
+                    return 'tidak';
+                }
+
+                // Handle various "Diprovisikan" formats
+                if (str_contains($value, 'diprovisikan')) {
+                    return 'diprovisikan';
+                }
+
+                // Handle various "Ditagihkan" formats
+                if (str_contains($value, 'ditagihkan')) {
+                    return 'ditagihkan';
+                }
+
+                // Handle various "Flat" formats
+                if (str_contains($value, 'flat')) {
+                    return 'flat';
+                }
+
+                return $value;
+            };
 
             // ============================================
             // 1. TUNJANGAN HARI RAYA (THR)
             // ============================================
 
-            // **LOGIKA DIUBAH: Gunakan nilai jika ada (termasuk 0)**
+            // **LOGIKA PERBAIKAN: Gunakan hierarki yang jelas**
+            // HPP: Wage -> HPP -> COSS (tapi prioritaskan user input)
+            // COSS: Wage -> COSS -> HPP (tapi prioritaskan user input)
 
-            // Untuk HPP: Prioritas 1. HPP → 2. COSS → 3. WAGE
-            if ($hpp && isset($hpp->tunjangan_hari_raya) && $hpp->tunjangan_hari_raya !== null && $hpp->tunjangan_hari_raya !== 0) {
+            $wageThr = $wage->thr ?? "Tidak";
+            $wageThrNormalized = $normalizeString($wageThr);
+
+            // Untuk HPP
+            if ($wageThrNormalized === 'diprovisikan' || $wageThrNormalized === 'ditagihkan') {
+                $detail->tunjangan_hari_raya_hpp = round((float) $detail->nominal_upah / 12, 2);
+                \Log::info("THR HPP from wage (diprovisikan/ditagihkan)", [
+                    'detail_id' => $detail->id,
+                    'value' => $detail->tunjangan_hari_raya_hpp
+                ]);
+            } else if ($hpp && $hpp->tunjangan_hari_raya !== null) {
+                // Jika HPP ada nilai eksplisit (termasuk 0), gunakan itu
                 $detail->tunjangan_hari_raya_hpp = (float) $hpp->tunjangan_hari_raya;
-                \Log::info("THR from HPP", [
+                \Log::info("THR HPP from HPP table", [
                     'detail_id' => $detail->id,
-                    'source' => 'hpp',
                     'value' => $detail->tunjangan_hari_raya_hpp
                 ]);
-            }
-            // Cek COSS jika HPP tidak ada
-            else if ($coss && isset($coss->tunjangan_hari_raya) && $coss->tunjangan_hari_raya !== null && $coss->tunjangan_hari_raya !== 0) {
-                $detail->tunjangan_hari_raya_hpp = (float) $coss->tunjangan_hari_raya;
-                \Log::info("THR from COSS (HPP fallback)", [
-                    'detail_id' => $detail->id,
-                    'source' => 'coss',
-                    'value' => $detail->tunjangan_hari_raya_hpp
-                ]);
-            }
-            // Gunakan WAGE jika HPP dan COSS tidak ada
-            else {
-                \Log::info("THR: Using WAGE (HPP/COSS not found)", ['detail_id' => $detail->id]);
-                $thrValue = $wage->thr ?? "Tidak";
-                $thrValueString = is_string($thrValue) ? strtolower(trim($thrValue)) : '';
-                $isThrDiprovisikan = ($thrValueString === 'diprovisikan');
-                $isThrDitagihkan = ($thrValueString === 'ditagihkan');
-
-                \Log::info("THR wage check", [
-                    'detail_id' => $detail->id,
-                    'thr_value' => $thrValue,
-                    'thr_value_string' => $thrValueString,
-                    'is_diprovisikan' => $isThrDiprovisikan,
-                    'is_ditagihkan' => $isThrDitagihkan
-                ]);
-
-                if ($isThrDiprovisikan || $isThrDitagihkan) {
-                    $detail->tunjangan_hari_raya_hpp = round((float) $detail->nominal_upah / 12, 2);
-                    \Log::info("THR from wage (diprovisikan/ditagihkan)", [
-                        'detail_id' => $detail->id,
-                        'source' => 'wage',
-                        'value' => $detail->tunjangan_hari_raya_hpp
-                    ]);
-                } else {
-                    $detail->tunjangan_hari_raya_hpp = 0;
-                    \Log::info("THR set to 0 (not diprovisikan/ditagihkan)", [
-                        'detail_id' => $detail->id,
-                        'thr_value' => $thrValue
-                    ]);
-                }
+            } else {
+                $detail->tunjangan_hari_raya_hpp = 0;
             }
 
-            // Untuk COSS: Prioritas 1. COSS → 2. HPP → 3. WAGE
-            if ($coss && isset($coss->tunjangan_hari_raya) && $coss->tunjangan_hari_raya !== null && $coss->tunjangan_hari_raya !== 0) {
+            // Untuk COSS
+            if ($wageThrNormalized === 'diprovisikan' || $wageThrNormalized === 'ditagihkan') {
+                $detail->tunjangan_hari_raya_coss = round((float) $detail->nominal_upah / 12, 2);
+            } else if ($coss && $coss->tunjangan_hari_raya !== null) {
                 $detail->tunjangan_hari_raya_coss = (float) $coss->tunjangan_hari_raya;
-                \Log::info("THR from COSS", [
-                    'detail_id' => $detail->id,
-                    'source' => 'coss',
-                    'value' => $detail->tunjangan_hari_raya_coss
-                ]);
-            }
-            // Fallback ke HPP untuk COSS
-            else if ($hpp && isset($hpp->tunjangan_hari_raya) && $hpp->tunjangan_hari_raya !== null && $hpp->tunjangan_hari_raya !== 0) {
+            } else if ($hpp && $hpp->tunjangan_hari_raya !== null) {
                 $detail->tunjangan_hari_raya_coss = (float) $hpp->tunjangan_hari_raya;
-                \Log::info("THR from HPP (COSS fallback)", [
-                    'detail_id' => $detail->id,
-                    'source' => 'hpp',
-                    'value' => $detail->tunjangan_hari_raya_coss
-                ]);
-            }
-            // Gunakan WAGE jika HPP dan COSS tidak ada
-            else {
-                $thrValue = $wage->thr ?? "Tidak";
-                $thrValueString = is_string($thrValue) ? strtolower(trim($thrValue)) : '';
-                $isThrDiprovisikan = ($thrValueString === 'diprovisikan');
-                $isThrDitagihkan = ($thrValueString === 'ditagihkan');
-
-                if ($isThrDiprovisikan || $isThrDitagihkan) {
-                    $detail->tunjangan_hari_raya_coss = round((float) $detail->nominal_upah / 12, 2);
-                } else {
-                    $detail->tunjangan_hari_raya_coss = 0;
-                }
+            } else {
+                $detail->tunjangan_hari_raya_coss = 0;
             }
 
             // ============================================
             // 2. KOMPENSASI
             // ============================================
 
-            // **PERBAIKAN UTAMA: Gunakan metode string handling yang konsisten**
+            $wageKompensasi = $wage->kompensasi ?? "Tidak";
+            $wageKompensasiNormalized = $normalizeString($wageKompensasi);
 
-            // Untuk HPP: Prioritas 1. HPP → 2. COSS → 3. WAGE
-            if ($hpp && isset($hpp->kompensasi) && $hpp->kompensasi !== null && $hpp->kompensasi !== 0) {
+            // Untuk HPP
+            if ($wageKompensasiNormalized === 'diprovisikan' || $wageKompensasiNormalized === 'ditagihkan') {
+                $detail->kompensasi_hpp = round((float) $detail->nominal_upah / 12, 2);
+            } else if ($hpp && $hpp->kompensasi !== null) {
                 $detail->kompensasi_hpp = (float) $hpp->kompensasi;
-                \Log::info("Kompensasi from HPP", [
-                    'detail_id' => $detail->id,
-                    'source' => 'hpp',
-                    'value' => $detail->kompensasi_hpp
-                ]);
-            }
-            // Cek COSS jika HPP tidak ada
-            else if ($coss && isset($coss->kompensasi) && $coss->kompensasi !== null && $coss->kompensasi !== 0) {
-                $detail->kompensasi_hpp = (float) $coss->kompensasi;
-                \Log::info("Kompensasi from COSS (HPP fallback)", [
-                    'detail_id' => $detail->id,
-                    'source' => 'coss',
-                    'value' => $detail->kompensasi_hpp
-                ]);
-            }
-            // Gunakan WAGE jika HPP dan COSS tidak ada
-            else {
-                \Log::info("Kompensasi: Using WAGE (HPP/COSS not found)", ['detail_id' => $detail->id]);
-                $kompensasiValue = $wage->kompensasi ?? "Tidak";
-
-                // **PERBAIKAN: Gunakan string handling yang konsisten**
-                $kompensasiValueString = is_string($kompensasiValue) ? strtolower(trim($kompensasiValue)) : '';
-                $isKompensasiDiprovisikan = ($kompensasiValueString === 'diprovisikan');
-                $isKompensasiDitagihkan = ($kompensasiValueString === 'ditagihkan');
-
-                \Log::info("Kompensasi wage check", [
-                    'detail_id' => $detail->id,
-                    'kompensasi_value' => $kompensasiValue,
-                    'kompensasi_value_string' => $kompensasiValueString,
-                    'is_diprovisikan' => $isKompensasiDiprovisikan,
-                    'is_ditagihkan' => $isKompensasiDitagihkan
-                ]);
-
-                // **PERBAIKAN: Cek kedua kondisi (Diprovisikan ATAU Ditagihkan)**
-                if ($isKompensasiDiprovisikan || $isKompensasiDitagihkan) {
-                    $detail->kompensasi_hpp = round((float) $detail->nominal_upah / 12, 2);
-                    \Log::info("Kompensasi from wage (diprovisikan/ditagihkan)", [
-                        'detail_id' => $detail->id,
-                        'source' => 'wage',
-                        'value' => $detail->kompensasi_hpp
-                    ]);
-                } else {
-                    $detail->kompensasi_hpp = 0;
-                    \Log::info("Kompensasi set to 0 (not diprovisikan/ditagihkan)", [
-                        'detail_id' => $detail->id,
-                        'kompensasi_value' => $kompensasiValue
-                    ]);
-                }
+            } else {
+                $detail->kompensasi_hpp = 0;
             }
 
-            // Untuk COSS: Prioritas 1. COSS → 2. HPP → 3. WAGE
-            if ($coss && isset($coss->kompensasi) && $coss->kompensasi !== null && $coss->kompensasi !== 0) {
+            // Untuk COSS
+            if ($wageKompensasiNormalized === 'diprovisikan' || $wageKompensasiNormalized === 'ditagihkan') {
+                $detail->kompensasi_coss = round((float) $detail->nominal_upah / 12, 2);
+            } else if ($coss && $coss->kompensasi !== null) {
                 $detail->kompensasi_coss = (float) $coss->kompensasi;
-                \Log::info("Kompensasi from COSS", [
-                    'detail_id' => $detail->id,
-                    'source' => 'coss',
-                    'value' => $detail->kompensasi_coss
-                ]);
-            }
-            // Fallback ke HPP untuk COSS
-            else if ($hpp && isset($hpp->kompensasi) && $hpp->kompensasi !== null && $hpp->kompensasi !== 0) {
+            } else if ($hpp && $hpp->kompensasi !== null) {
                 $detail->kompensasi_coss = (float) $hpp->kompensasi;
-                \Log::info("Kompensasi from HPP (COSS fallback)", [
-                    'detail_id' => $detail->id,
-                    'source' => 'hpp',
-                    'value' => $detail->kompensasi_coss
-                ]);
-            }
-            // Gunakan WAGE jika HPP dan COSS tidak ada
-            else {
-                $kompensasiValue = $wage->kompensasi ?? "Tidak";
-                $kompensasiValueString = is_string($kompensasiValue) ? strtolower(trim($kompensasiValue)) : '';
-                $isKompensasiDiprovisikan = ($kompensasiValueString === 'diprovisikan');
-                $isKompensasiDitagihkan = ($kompensasiValueString === 'ditagihkan');
-
-                if ($isKompensasiDiprovisikan || $isKompensasiDitagihkan) {
-                    $detail->kompensasi_coss = round((float) $detail->nominal_upah / 12, 2);
-                } else {
-                    $detail->kompensasi_coss = 0;
-                }
+            } else {
+                $detail->kompensasi_coss = 0;
             }
 
             // ============================================
             // 3. TUNJANGAN HOLIDAY
             // ============================================
-            $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
-            $tunjanganHolidayValueString = is_string($tunjanganHolidayValue) ? strtolower(trim($tunjanganHolidayValue)) : '';
-            $isTunjanganHolidayFlat = ($tunjanganHolidayValueString === 'flat');
+            $wageTunjanganHoliday = $wage->tunjangan_holiday ?? "Tidak";
+            $wageTunjanganHolidayNormalized = $normalizeString($wageTunjanganHoliday);
 
-            \Log::info("Tunjangan holiday check", [
-                'detail_id' => $detail->id,
-                'value' => $tunjanganHolidayValue,
-                'value_string' => $tunjanganHolidayValueString,
-                'is_flat' => $isTunjanganHolidayFlat
-            ]);
-
-            if ($isTunjanganHolidayFlat) {
+            if ($wageTunjanganHolidayNormalized === 'flat') {
                 $detail->tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
-                \Log::info("Tunjangan holiday set to flat value from wage", [
+                \Log::info("Tunjangan holiday set to flat", [
                     'detail_id' => $detail->id,
-                    'nominal_tunjangan_holiday' => $detail->tunjangan_holiday
+                    'value' => $detail->tunjangan_holiday
                 ]);
+            } else if ($hpp && $hpp->tunjangan_hari_libur_nasional !== null) {
+                $detail->tunjangan_holiday = (float) $hpp->tunjangan_hari_libur_nasional;
             } else {
                 $detail->tunjangan_holiday = 0;
-                \Log::info("Tunjangan holiday set to 0 (not flat)", [
-                    'detail_id' => $detail->id,
-                    'tunjangan_holiday_value' => $tunjanganHolidayValue
-                ]);
             }
 
             // ============================================
             // 4. LEMBUR
             // ============================================
-            $lemburValue = $wage->lembur ?? "Tidak";
-            $lemburValueString = is_string($lemburValue) ? strtolower(trim($lemburValue)) : '';
+            $wageLembur = $wage->lembur ?? "Tidak";
+            $wageLemburNormalized = $normalizeString($wageLembur);
 
-            \Log::info("Lembur check", [
-                'detail_id' => $detail->id,
-                'lembur_value' => $lemburValue,
-                'lembur_value_string' => $lemburValueString
-            ]);
-
-            if ($lemburValueString === "flat") {
+            if ($wageLemburNormalized === 'flat') {
                 $detail->lembur = $this->calculateLemburFromWage($wage);
                 \Log::info("Lembur calculated from wage", [
                     'detail_id' => $detail->id,
-                    'lembur_value' => $detail->lembur
+                    'value' => $detail->lembur
                 ]);
+            } else if ($hpp && $hpp->lembur !== null) {
+                $detail->lembur = (float) $hpp->lembur;
             } else {
                 $detail->lembur = 0;
-                \Log::info("Lembur set to 0 (not flat)", [
-                    'detail_id' => $detail->id,
-                    'lembur_value' => $lemburValue
-                ]);
             }
 
             \Log::info("=== EXTRAS CALCULATION COMPLETE ===", [
                 'detail_id' => $detail->id,
-                'tunjangan_hari_raya_hpp' => $detail->tunjangan_hari_raya_hpp ?? 0,
-                'tunjangan_hari_raya_coss' => $detail->tunjangan_hari_raya_coss ?? 0,
-                'kompensasi_hpp' => $detail->kompensasi_hpp ?? 0,
-                'kompensasi_coss' => $detail->kompensasi_coss ?? 0,
-                'tunjangan_holiday' => $detail->tunjangan_holiday ?? 0,
-                'lembur' => $detail->lembur ?? 0,
-                'source_hierarchy' => 'HPP → COSS → WAGE'
+                'tunjangan_hari_raya_hpp' => $detail->tunjangan_hari_raya_hpp,
+                'tunjangan_hari_raya_coss' => $detail->tunjangan_hari_raya_coss,
+                'kompensasi_hpp' => $detail->kompensasi_hpp,
+                'kompensasi_coss' => $detail->kompensasi_coss,
+                'tunjangan_holiday' => $detail->tunjangan_holiday,
+                'lembur' => $detail->lembur
             ]);
 
         } catch (\Exception $e) {
@@ -843,19 +740,28 @@ class QuotationService
     // **TAMBAHKAN METHOD BARU untuk menghitung lembur dari wage**
     private function calculateLemburFromWage($wage)
     {
-        if ($wage->lembur !== "Flat") {
+        $lemburValue = $wage->lembur ?? "Tidak";
+        $lemburNormalized = strtolower(trim($lemburValue));
+
+        if (!str_contains($lemburNormalized, 'flat')) {
             return 0;
         }
 
         $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
 
-        if ($lemburDitagihkan == "Ditagihkan Terpisah") {
+        // PERBAIKAN: Cek apakah "Ditagihkan Terpisah" dengan berbagai format
+        if (str_contains(strtolower($lemburDitagihkan), 'terpisah')) {
             return 0;
         }
 
         $jenisBayar = $wage->jenis_bayar_lembur ?? null;
-        $nominalLembur = $wage->nominal_lembur ?? 0;
-        $jamPerBulan = $wage->jam_per_bulan_lembur ?? 0;
+        $nominalLembur = (float) ($wage->nominal_lembur ?? 0);
+        $jamPerBulan = (float) ($wage->jam_per_bulan_lembur ?? 0);
+
+        // Bersihkan nominal jika string
+        if (is_string($nominalLembur)) {
+            $nominalLembur = (float) str_replace(['.', ','], ['', '.'], $nominalLembur);
+        }
 
         $result = match ($jenisBayar) {
             "Per Jam" => $nominalLembur * $jamPerBulan,
@@ -863,126 +769,194 @@ class QuotationService
             default => $nominalLembur
         };
 
-        return $result;
+        return round($result, 2);
     }
-    private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
+    private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
         $items = [
-            'kaporlap' => ['hpp_field' => 'provisi_seragam', 'coss_field' => 'provisi_seragam', 'model' => QuotationKaporlap::class, 'detail_id' => $detail->id],
-            'devices' => ['hpp_field' => 'provisi_peralatan', 'coss_field' => 'provisi_peralatan', 'model' => QuotationDevices::class, 'divider' => $jumlahHc],
-            'ohc' => ['hpp_field' => 'provisi_ohc', 'coss_field' => 'provisi_ohc', 'model' => QuotationOhc::class, 'divider' => $jumlahHc],
-            'chemical' => ['hpp_field' => 'provisi_chemical', 'coss_field' => 'provisi_chemical', 'model' => QuotationChemical::class, 'special' => 'chemical']
+            'kaporlap' => ['hpp_field' => 'provisi_seragam', 'coss_field' => 'provisi_seragam', 'model' => QuotationKaporlap::class, 'detail_id' => $detail->id, 'divider' => $detail->jumlah_hc],
+            'devices' => ['hpp_field' => 'provisi_peralatan', 'coss_field' => 'provisi_peralatan', 'model' => QuotationDevices::class, 'divider' => $detail->jumlah_hc], // Ganti ke detail->jumlah_hc
+            'ohc' => ['hpp_field' => 'provisi_ohc', 'coss_field' => 'provisi_ohc', 'model' => QuotationOhc::class, 'divider' => $detail->jumlah_hc], // Ganti ke detail->jumlah_hc
+            'chemical' => ['hpp_field' => 'provisi_chemical', 'coss_field' => 'provisi_chemical', 'model' => QuotationChemical::class, 'special' => 'chemical', 'divider' => $detail->jumlah_hc] // Tambah divider
         ];
 
         foreach ($items as $key => $config) {
-            $this->calculateItem($detail, $quotation, $key, $config, $hpp, $coss, $jumlahHc);
+            $this->calculateItem($detail, $quotation, $key, $config, $hpp, $coss, $detail->jumlah_hc, $totalJumlahHc);
         }
     }
 
-    private function calculateItem($detail, $quotation, $itemName, $config, $hpp, $coss, $jumlahHc)
+    private function calculateItem($detail, $quotation, $itemName, $config, $hpp, $coss, $detailJumlahHc, $totalJumlahHc)
     {
-        $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
-            $config['model'],
-            $quotation->id,
-            $config['detail_id'] ?? null,
-            $quotation->provisi,
-            $config['divider'] ?? 1,
-            $config['special'] ?? null,
-            $jumlahHc
-        );
+        // Gunakan $detailJumlahHc untuk perhitungan per detail
+        $divider = $config['divider'] ?? 1;
+
+        // Jika divider adalah "detail", gunakan jumlah HC detail
+        if ($divider === 'detail') {
+            $divider = $detailJumlahHc;
+        }
+        // Jika divider adalah "total", gunakan total jumlah HC
+        else if ($divider === 'total') {
+            $divider = $totalJumlahHc;
+        }
+        // Jika divider adalah angka, gunakan langsung (sudah ditangani di atas)
+
+        // PERBAIKAN: Untuk chemical khusus, gunakan $detailJumlahHc sebagai parameter ke-7
+        if (isset($config['special']) && $config['special'] === 'chemical') {
+            $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
+                $config['model'],
+                $quotation->id,
+                $config['detail_id'] ?? null,
+                $quotation->provisi,
+                1, // Untuk chemical, divider tidak digunakan (divider=1)
+                $config['special'],
+                $detailJumlahHc // Parameter ke-7 untuk chemical
+            );
+        } else {
+            $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
+                $config['model'],
+                $quotation->id,
+                $config['detail_id'] ?? null,
+                $quotation->provisi,
+                $divider, // Untuk non-chemical, gunakan divider
+                $config['special'] ?? null,
+                $detailJumlahHc // Tetap dikirim untuk konsistensi
+            );
+        }
 
         $detail->{"personil_$itemName"} = $hppValue;
         $detail->{"personil_{$itemName}_coss"} = $coss->{$config['coss_field']} ?? $hppValue;
     }
 
     // ============================ FINAL TOTALS ============================
-    private function calculateFinalTotals($detail, $quotation, $totalTunjangan,$hpp)
+    private function calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss)
     {
-        // Hitung potongan BPU jika ada
-        $potonganBpu = 0;
-        if ($detail->penjamin_kesehatan === 'BPU') {
-            $potonganBpu = 16800; // Fixed 16 ribu per karyawan
-            $detail->potongan_bpu = $potonganBpu;
+        try {
+            // ============================================
+            // EXTRACT TUNJANGAN DATA
+            // ============================================
+            // Pastikan $totalTunjanganResult adalah array
+            if (is_array($totalTunjanganResult)) {
+                $totalTunjanganHpp = (float) ($totalTunjanganResult['total'] ?? 0);
+                $totalTunjanganCoss = (float) ($totalTunjanganResult['total_coss'] ?? 0);
+            } else {
+                // Fallback jika format tidak sesuai
+                $totalTunjanganHpp = (float) ($detail->total_tunjangan ?? 0);
+                $totalTunjanganCoss = (float) ($detail->total_tunjangan_coss ?? 0);
+            }
 
-            \Log::info("BPU potongan applied", [
-                'detail_id' => $detail->id,
-                'potongan_bpu' => $potonganBpu
-            ]);
+            // Hitung potongan BPU jika ada
+            $potonganBpu = 0;
+            if ($detail->penjamin_kesehatan === 'BPU') {
+                $potonganBpu = 16800; // Fixed 16 ribu per karyawan
+                $detail->potongan_bpu = $potonganBpu;
+
+                \Log::info("BPU potongan applied", [
+                    'detail_id' => $detail->id,
+                    'potongan_bpu' => $potonganBpu
+                ]);
+            }
+
+            // ============================================
+            // GET ALL NECESSARY VALUES
+            // ============================================
+
+            // Nilai dari HPP
+            $tunjanganHariRayaHpp = (float) ($detail->tunjangan_hari_raya_hpp ?? 0);
+            $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
+
+            // Nilai dari COSS
+            $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
+            $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
+
+            // Nilai umum
+            $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
+            $nominalUpah = (float) ($detail->nominal_upah ?? 0);
+            $lembur = (float) ($detail->lembur ?? 0);
+
+            // **PERUBAHAN: BPJS Ketenagakerjaan dan Kesehatan bisa berbeda antara HPP dan COSS**
+            // Karena persentase bisa di-set berbeda di Step 11
+            $bpjsKetenagakerjaanHpp = (float) ($detail->bpjs_ketenagakerjaan ?? 0);
+            $biayaKesehatanHpp = (float) ($detail->bpjs_kesehatan ?? 0);
+
+            // Untuk COSS, gunakan field yang sama atau hitung ulang jika berbeda
+            $bpjsKetenagakerjaanCoss = (float) ($detail->bpjs_ketenagakerjaan ?? 0); // Sementara sama
+            $biayaKesehatanCoss = (float) ($detail->bpjs_kesehatan ?? 0); // Sementara sama
+
+            // Item provisi
+            $personilKaporlap = (float) ($detail->personil_kaporlap ?? 0);
+            $personilDevices = (float) ($detail->personil_devices ?? 0);
+            $personilChemical = (float) ($detail->personil_chemical ?? 0);
+            $personilOhc = (float) ($detail->personil_ohc ?? 0);
+            $personilKaporlapCoss = (float) ($detail->personil_kaporlap_coss ?? 0);
+            $personilDevicesCoss = (float) ($detail->personil_devices_coss ?? 0);
+            $personilChemicalCoss = (float) ($detail->personil_chemical_coss ?? 0);
+            $personilOhcCoss = (float) ($detail->personil_ohc_coss ?? 0);
+
+            // Bunga bank dan insentif (sama untuk HPP dan COSS karena gross-up)
+            $bungaBank = (float) ($detail->bunga_bank ?? 0);
+            $insentif = (float) ($detail->insentif ?? 0);
+
+            // **PERUBAHAN: Ambil jumlah HC dari HPP jika ada, jika tidak dari detail**
+            $jumlahHc = (int) ($hpp->jumlah_hc ?? $detail->jumlah_hc ?? 0);
+
+            // ============================================
+            // HPP CALCULATION
+            // ============================================
+            $detail->total_personil = round(
+                $nominalUpah
+                + $totalTunjanganHpp
+                + $tunjanganHariRayaHpp
+                + $kompensasiHpp
+                + $tunjanganHoliday
+                + $lembur
+                + $bpjsKetenagakerjaanHpp
+                + $biayaKesehatanHpp
+                + $personilKaporlap
+                + $personilDevices
+                + $personilChemical
+                + $personilOhc
+                + $bungaBank
+                + $insentif
+                - $potonganBpu,
+                2
+            );
+
+            $detail->sub_total_personil = round($detail->total_personil * $jumlahHc, 2);
+
+            // ============================================
+            // COSS CALCULATIONS
+            // ============================================
+            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
+
+            $detail->total_exclude_base_manpower = round(
+                $tunjanganHariRayaCoss
+                + $kompensasiCoss
+                + $tunjanganHoliday
+                + $lembur
+                + $biayaKesehatanCoss
+                + $bpjsKetenagakerjaanCoss
+                + $personilKaporlapCoss
+                + $personilDevicesCoss
+                + $personilChemicalCoss
+                + $insentif
+                + $bungaBank,
+                2
+            );
+
+            $detail->total_personil_coss = round(
+                $detail->total_base_manpower
+                + $detail->total_exclude_base_manpower
+                + $personilOhcCoss
+                - $potonganBpu,
+                2
+            );
+
+            $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHc, 2);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateFinalTotals for detail {$detail->id}: " . $e->getMessage());
+            throw $e;
         }
-
-
-        // PERBAIKAN CRITICAL: Pastikan THR dan komponen lainnya digunakan
-        $tunjanganHariRayaHpp = (float) ($detail->tunjangan_hari_raya_hpp ?? 0);
-        $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
-        $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
-        $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
-        $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
-        $nominalUpah = (float) ($detail->nominal_upah ?? 0);
-        $totalTunjangan = (float) $totalTunjangan;
-        $lembur = (float) ($detail->lembur ?? 0);
-        $bpjsKetenagakerjaan = (float) ($detail->bpjs_ketenagakerjaan ?? 0);
-        $biayaKesehatan = (float) ($detail->bpjs_kesehatan ?? 0);
-        $personilKaporlap = (float) ($detail->personil_kaporlap ?? 0);
-        $personilDevices = (float) ($detail->personil_devices ?? 0);
-        $personilChemical = (float) ($detail->personil_chemical ?? 0);
-        $personilOhc = (float) ($detail->personil_ohc ?? 0);
-        $bungaBank = (float) ($detail->bunga_bank ?? 0);
-        $insentif = (float) ($detail->insentif ?? 0);
-        $jumlahHc = (int) ($hpp->jumlah_hc || $detail->jumlah_hc ?? 0);
-        $totalTunjanganCoss = (float) ($detail->total_tunjangan_coss ?? 0);
-
-        // PERBAIKAN: Pastikan semua komponen dijumlahkan dengan aman
-        $detail->total_personil = $nominalUpah
-            + $totalTunjangan
-            + $tunjanganHariRayaHpp
-            + $kompensasiHpp
-            + $tunjanganHoliday
-            + $lembur
-            + $bpjsKetenagakerjaan
-            + $biayaKesehatan
-            + $personilKaporlap
-            + $personilDevices
-            + $personilChemical
-            + $personilOhc
-            + $bungaBank
-            + $insentif
-            - $potonganBpu;
-
-        $detail->sub_total_personil = $detail->total_personil * $jumlahHc;
-
-        // COSS Calculations
-        $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
-
-        $detail->total_exclude_base_manpower = round(
-            $tunjanganHariRayaCoss
-            + $kompensasiCoss
-            + $tunjanganHoliday
-            + $lembur
-            + $biayaKesehatan
-            + $bpjsKetenagakerjaan
-            + ($detail->personil_kaporlap_coss ?? 0)
-            + ($detail->personil_devices_coss ?? 0)
-            + ($detail->personil_chemical_coss ?? 0),
-            2
-        );
-
-        $detail->total_personil_coss = round(
-            $detail->total_base_manpower
-            + $detail->total_exclude_base_manpower
-            + ($detail->personil_ohc_coss ?? 0)
-            - $potonganBpu,
-            2
-        );
-
-        $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHc, 2);
-
-        \Log::info("Final totals calculated", [
-            'detail_id' => $detail->id,
-            'total_personil' => $detail->total_personil,
-            'sub_total_personil' => $detail->sub_total_personil,
-            'total_personil_coss' => $detail->total_personil_coss,
-            'sub_total_personil_coss' => $detail->sub_total_personil_coss
-        ]);
     }
     // ============================ GROSS UP RECALCULATION ============================
     private function calculateBankInterestAndIncentive($quotation, $jumlahHc, QuotationCalculationResult $result): void
@@ -1344,17 +1318,19 @@ class QuotationService
     private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
     {
         $query = $model::where('quotation_id', $quotationId);
-        if ($detailId)
+        if ($detailId) {
             $query->where('quotation_detail_id', $detailId);
+        }
 
         return $query->get()->sum(function ($item) use ($provisi, $divider, $special, $jumlahHc) {
             if ($special === 'chemical') {
-                return ((($item->jumlah * $item->harga) / $item->masa_pakai)) / $jumlahHc;
+                // Untuk chemical, bagikan berdasarkan jumlah HC
+                return ((($item->jumlah * $item->harga) / $item->masa_pakai)) / max($jumlahHc, 1);
             }
-            return (($item->harga * $item->jumlah) / $provisi) / $divider;
+            // Untuk item lain, bagikan berdasarkan divider (biasanya jumlah HC juga)
+            return (($item->harga * $item->jumlah) / $provisi) / max($divider, 1);
         });
     }
-
     private function applyBpjsOptOut($detail)
     {
         $optOuts = [

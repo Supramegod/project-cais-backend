@@ -384,7 +384,7 @@ class QuotationStepResource extends JsonResource
                 // **PERBAIKAN UTAMA: Fungsi untuk menentukan display tunjangan dengan HPP dan COSS terpisah**
                 $getTunjanganDisplayForBoth = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkanTerpisah = null) {
                     if (!$wage) {
-                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
+                        return ['hpp' => 'Tidak Ada1', 'coss' => 'Tidak Ada1'];
                     }
 
                     // Ambil jenis value terlebih dahulu
@@ -407,19 +407,21 @@ class QuotationStepResource extends JsonResource
                             return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
                         }
                     }
+                    $ditagihkanValue = $wage->$fieldDitagihkanTerpisah;
+                    $ditagihkanValueString = is_string($ditagihkanValue) ? strtolower(trim($ditagihkanValue)) : '';
 
                     // CEK PRIORITAS 2: Jenis tunjangan
                     if ($jenisValueString == 'normatif' && $jenisValueString == 'ditagihkan terpisah') {
                         return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
-                    } elseif ($jenisValueString == 'flat' || $jenisValueString == 'diprovisikan' || $jenisValueString == 'ditagihkan') {
+                    } elseif ($jenisValueString == 'flat' && $ditagihkanValueString == 'ditagihkan' || $jenisValueString == 'diprovisikan' || $jenisValueString == 'flat' ) {
                         // **PERUBAHAN PENTING**: Gunakan nilai yang sesuai (HPP atau COSS)
-                        $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada';
-                        $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada';
+                        $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada2';
+                        $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada2';
                         return ['hpp' => $hppDisplay, 'coss' => $cossDisplay];
                     } elseif ($jenisValueString == 'diberikan langsung' || $jenisValueString == 'diberikan langsung oleh client') {
                         return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
                     } else {
-                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
+                        return ['hpp' => 'Tidak Ada3', 'coss' => 'Tidak Ada3'];
                     }
                 };
 
@@ -525,6 +527,7 @@ class QuotationStepResource extends JsonResource
 
                             $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
                             $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
+                            \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
 
                             $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
                             $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
@@ -568,7 +571,7 @@ class QuotationStepResource extends JsonResource
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                                 'tunjangan_data' => $tunjanganData,
-                                'upah' => $wage ? $wage->upah : 0,                   
+                                'upah' => $wage ? $wage->upah : 0,
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
                                     'total_tunjangan' => $detail->total_tunjangan ?? 0,
@@ -601,7 +604,7 @@ class QuotationStepResource extends JsonResource
                                     'sub_total_personil' => $detail->sub_total_personil ?? 0,
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
                                     'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-                                    
+
                                 ],
                                 'coss' => [
                                     'nominal_upah' => $detail->nominal_upah,
@@ -635,7 +638,7 @@ class QuotationStepResource extends JsonResource
                                     'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
                                     'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-                                   
+
                                 ],
                                 'debug_info' => [ // Untuk debugging
                                     'has_wage' => !empty($wage),
