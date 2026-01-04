@@ -595,25 +595,18 @@ class QuotationService
                 'wage_exists' => !empty($wage),
                 'wage_thr' => $wage->thr ?? 'null',
                 'wage_kompensasi' => $wage->kompensasi ?? 'null',
-                'hpp_thr' => $hpp->tunjangan_hari_raya ?? 'null',
-                'hpp_kompensasi' => $hpp->kompensasi ?? 'null'
+                'wage_tunjangan_holiday' => $wage->tunjangan_holiday ?? 'null',
+                'wage_lembur' => $wage->lembur ?? 'null'
             ]);
 
-            // THR - Gunakan logika yang konsisten
+            // **PERBAIKAN 1: THR - Prioritaskan dari wage bukan dari HPP**
             $thrValue = $wage->thr ?? "Tidak";
             $isThrDiprovisikan = (is_string($thrValue) && strtolower(trim($thrValue)) === 'diprovisikan');
 
-            // PERBAIKAN: Jika HPP sudah memiliki nilai untuk THR, gunakan nilai HPP
-            if ($hpp && $hpp->tunjangan_hari_raya !== null) {
-                $detail->tunjangan_hari_raya = (float) $hpp->tunjangan_hari_raya;
-                \Log::info("Using THR from HPP", [
-                    'detail_id' => $detail->id,
-                    'value' => $hpp->tunjangan_hari_raya
-                ]);
-            } else if ($isThrDiprovisikan) {
-                // Jika diprovisikan dan HPP null, hitung dari nominal upah
+            // **PERUBAHAN: Selalu hitung dari wage, jangan dari HPP**
+            if ($isThrDiprovisikan) {
                 $detail->tunjangan_hari_raya = round((float) $detail->nominal_upah / 12, 2);
-                \Log::info("Calculated THR from nominal_upah (diprovisikan)", [
+                \Log::info("Calculated THR from wage (diprovisikan)", [
                     'detail_id' => $detail->id,
                     'nominal_upah' => $detail->nominal_upah,
                     'thr_calculated' => $detail->tunjangan_hari_raya
@@ -621,26 +614,20 @@ class QuotationService
             } else {
                 $detail->tunjangan_hari_raya = 0;
                 \Log::info("THR set to 0 (not diprovisikan)", [
-                    'detail_id' => $detail->id
+                    'detail_id' => $detail->id,
+                    'thr_value' => $thrValue
                 ]);
             }
 
-            // KOMPENSASI - Logika serupa
+            // **PERBAIKAN 2: KOMPENSASI - Prioritaskan dari wage**
             $kompensasiValue = $wage->kompensasi ?? "Tidak";
             $isKompensasiDiprovisikan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'diprovisikan');
             $isKompensasiDitagihkan = (is_string($kompensasiValue) && strtolower(trim($kompensasiValue)) === 'ditagihkan');
 
-            // PERBAIKAN: Jika HPP sudah memiliki nilai untuk kompensasi, gunakan nilai HPP
-            if ($hpp && $hpp->kompensasi !== null) {
-                $detail->kompensasi = (float) $hpp->kompensasi;
-                \Log::info("Using kompensasi from HPP", [
-                    'detail_id' => $detail->id,
-                    'value' => $hpp->kompensasi
-                ]);
-            } else if ($isKompensasiDiprovisikan || $isKompensasiDitagihkan) {
-                // Jika diprovisikan atau ditagihkan, hitung dari nominal upah
+            // **PERUBAHAN: Selalu hitung dari wage, jangan dari HPP**
+            if ($isKompensasiDiprovisikan || $isKompensasiDitagihkan) {
                 $detail->kompensasi = round((float) $detail->nominal_upah / 12, 2);
-                \Log::info("Calculated kompensasi from nominal_upah", [
+                \Log::info("Calculated kompensasi from wage", [
                     'detail_id' => $detail->id,
                     'nominal_upah' => $detail->nominal_upah,
                     'kompensasi_calculated' => $detail->kompensasi,
@@ -649,33 +636,87 @@ class QuotationService
             } else {
                 $detail->kompensasi = 0;
                 \Log::info("Kompensasi set to 0 (not diprovisikan/ditagihkan)", [
-                    'detail_id' => $detail->id
+                    'detail_id' => $detail->id,
+                    'kompensasi_value' => $kompensasiValue
                 ]);
             }
 
-            // Tunjangan Holiday
+            // **PERBAIKAN 3: TUNJANGAN HOLIDAY - Prioritaskan dari wage**
             $tunjanganHolidayValue = $wage->tunjangan_holiday ?? "Tidak";
             $isTunjanganHolidayFlat = (is_string($tunjanganHolidayValue) && strtolower(trim($tunjanganHolidayValue)) === 'flat');
 
-            if ($hpp && $hpp->tunjangan_hari_libur_nasional !== null) {
-                $detail->tunjangan_holiday = $hpp->tunjangan_hari_libur_nasional;
-            } else if ($isTunjanganHolidayFlat) {
+            // **PERUBAHAN: Selalu ambil dari wage, jangan dari HPP**
+            if ($isTunjanganHolidayFlat) {
                 $detail->tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
+                \Log::info("Tunjangan holiday set to flat value from wage", [
+                    'detail_id' => $detail->id,
+                    'nominal_tunjangan_holiday' => $detail->tunjangan_holiday
+                ]);
             } else {
                 $detail->tunjangan_holiday = 0;
+                \Log::info("Tunjangan holiday set to 0 (not flat)", [
+                    'detail_id' => $detail->id,
+                    'tunjangan_holiday_value' => $tunjanganHolidayValue
+                ]);
             }
 
-            \Log::info("Extras Calculation Result", [
+            // **PERBAIKAN 4: LEMBUR - Prioritaskan dari wage**
+            $lemburValue = $wage->lembur ?? "Tidak";
+
+            // **PERUBAHAN: Selalu hitung dari wage, jangan dari HPP**
+            if ($lemburValue === "Flat") {
+                $detail->lembur = $this->calculateLemburFromWage($wage);
+                \Log::info("Lembur calculated from wage", [
+                    'detail_id' => $detail->id,
+                    'lembur_value' => $detail->lembur
+                ]);
+            } else {
+                $detail->lembur = 0;
+                \Log::info("Lembur set to 0 (not flat)", [
+                    'detail_id' => $detail->id,
+                    'lembur_value' => $lemburValue
+                ]);
+            }
+
+            \Log::info("Extras Calculation Result (FROM WAGE)", [
                 'detail_id' => $detail->id,
                 'tunjangan_hari_raya' => $detail->tunjangan_hari_raya,
                 'kompensasi' => $detail->kompensasi,
-                'tunjangan_holiday' => $detail->tunjangan_holiday
+                'tunjangan_holiday' => $detail->tunjangan_holiday,
+                'lembur' => $detail->lembur,
+                'source' => 'wage'
             ]);
 
         } catch (\Exception $e) {
             \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    // **TAMBAHKAN METHOD BARU untuk menghitung lembur dari wage**
+    private function calculateLemburFromWage($wage)
+    {
+        if ($wage->lembur !== "Flat") {
+            return 0;
+        }
+
+        $lemburDitagihkan = $wage->lembur_ditagihkan ?? "Tidak Ditagihkan";
+
+        if ($lemburDitagihkan == "Ditagihkan Terpisah") {
+            return 0;
+        }
+
+        $jenisBayar = $wage->jenis_bayar_lembur ?? null;
+        $nominalLembur = $wage->nominal_lembur ?? 0;
+        $jamPerBulan = $wage->jam_per_bulan_lembur ?? 0;
+
+        $result = match ($jenisBayar) {
+            "Per Jam" => $nominalLembur * $jamPerBulan,
+            "Per Hari" => $nominalLembur * 25, // 25 hari kerja
+            default => $nominalLembur
+        };
+
+        return $result;
     }
     private function calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss)
     {
