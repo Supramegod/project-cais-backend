@@ -612,7 +612,7 @@ class QuotationService
                     'thr_calculated' => $detail->tunjangan_hari_raya
                 ]);
             } else {
-                $detail->tunjangan_hari_raya = 0;
+                $detail->tunjangan_hari_raya = "Tidak ada";
                 \Log::info("THR set to 0 (not diprovisikan)", [
                     'detail_id' => $detail->id,
                     'thr_value' => $thrValue
