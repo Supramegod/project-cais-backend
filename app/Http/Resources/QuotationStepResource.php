@@ -8,6 +8,7 @@ use App\Models\JenisBarang;
 use App\Models\Kebutuhan;
 use App\Models\Province;
 use App\Models\Quotation;
+use App\Models\QuotationDetailCoss;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationDetailTunjangan;
 use App\Models\QuotationDevices;
@@ -380,38 +381,45 @@ class QuotationStepResource extends JsonResource
                     ];
                 }
 
-                // HELPER FUNCTION: Fungsi untuk menentukan display tunjangan
-                $getTunjanganDisplay = function ($wage, $jenisField, $nominalValue, $fieldDitagihkanTerpisah = null) {
+                // **PERBAIKAN UTAMA: Fungsi untuk menentukan display tunjangan dengan HPP dan COSS terpisah**
+                $getTunjanganDisplayForBoth = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkanTerpisah = null) {
                     if (!$wage) {
-                        return 'Tidak Ada';
+                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     }
 
                     // Ambil jenis value terlebih dahulu
                     $jenisValue = $wage->$jenisField ?? null;
 
+                    // **PERBAIKAN: Check if jenisValue is string for string operations**
+                    $jenisValueString = is_string($jenisValue) ? strtolower(trim($jenisValue)) : '';
+
                     // CEK PRIORITAS 1: Field ditagihkan terpisah (HANYA untuk lembur yang punya field ini)
                     if ($fieldDitagihkanTerpisah && isset($wage->$fieldDitagihkanTerpisah)) {
                         $ditagihkanValue = $wage->$fieldDitagihkanTerpisah;
+                        $ditagihkanValueString = is_string($ditagihkanValue) ? strtolower(trim($ditagihkanValue)) : '';
 
-                        // Jika value adalah "Ditagihkan" atau "Ditagihkan Terpisah"
-                        if ($ditagihkanValue == 'Ditagihkan' || $ditagihkanValue == 'Ditagihkan Terpisah') {
-                            return 'Ditagihkan terpisah';
+                        // Jika value adalah "Ditagihkan Terpisah"
+                        if ($ditagihkanValueString == 'ditagihkan terpisah') {
+                            return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
                         }
                         // Jika diberikan langsung oleh client
-                        if ($ditagihkanValue == 'Diberikan Langsung' || $ditagihkanValue == 'Diberikan Langsung oleh Client') {
-                            return 'Diberikan Langsung oleh Client';
+                        if ($ditagihkanValueString == 'diberikan langsung' || $ditagihkanValueString == 'diberikan langsung oleh client') {
+                            return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
                         }
                     }
 
                     // CEK PRIORITAS 2: Jenis tunjangan
-                    if ($jenisValue == 'Normatif' || $jenisValue == 'Ditagihkan') {
-                        return 'Ditagihkan terpisah';
-                    } elseif ($jenisValue == 'Flat' || $jenisValue == 'Diprovisikan') {
-                        return $nominalValue > 0 ? $nominalValue : 'Tidak Ada';
-                    } elseif ($jenisValue == 'Diberikan Langsung' || $jenisValue == 'Diberikan Langsung oleh Client') {
-                        return 'Diberikan Langsung oleh Client';
+                    if ($jenisValueString == 'normatif' && $jenisValueString == 'ditagihkan terpisah') {
+                        return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
+                    } elseif ($jenisValueString == 'flat' || $jenisValueString == 'diprovisikan' || $jenisValueString == 'ditagihkan') {
+                        // **PERUBAHAN PENTING**: Gunakan nilai yang sesuai (HPP atau COSS)
+                        $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada';
+                        $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada';
+                        return ['hpp' => $hppDisplay, 'coss' => $cossDisplay];
+                    } elseif ($jenisValueString == 'diberikan langsung' || $jenisValueString == 'diberikan langsung oleh client') {
+                        return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
                     } else {
-                        return 'Tidak Ada';
+                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     }
                 };
 
@@ -422,6 +430,8 @@ class QuotationStepResource extends JsonResource
                     'management_fee_nama' => $quotation->managementFee->nama ?? null,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
                     'note_harga_jual' => $quotation->note_harga_jual,
+                    'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
+                    'persen_insentif' => $quotation->persen_insentif ?? 0,
                     'quotation_pics' => $quotation->relationLoaded('quotationPics') ?
                         $quotation->quotationPics->map(function ($pic) {
                             return [
@@ -452,6 +462,7 @@ class QuotationStepResource extends JsonResource
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
                             'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
+                            'persen_bpjs_ketenagakerjaan' => $persenBpjsTotalHpp,
                         ],
                         'coss' => [
                             'total_sebelum_management_fee_coss' => $calculatedQuotation->calculation_summary->total_sebelum_management_fee_coss ?? 0,
@@ -467,10 +478,16 @@ class QuotationStepResource extends JsonResource
                             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
                             'persen_insentif' => $quotation->persen_insentif ?? 0,
                             'persen_bpjs_ksht' => $calculatedQuotation->calculation_summary->persen_bpjs_kesehatan_coss ?? 0,
+                            'persen_bpjs_ketenagakerjaan' => $persenBpjsTotalCoss,
+
                         ],
-                        'quotation_details' => $calculatedQuotation->quotation->quotation_detail->map(function ($detail) use ($getTunjanganDisplay) {
+                        'quotation_details' => $calculatedQuotation->quotation->quotation_detail->map(function ($detail) use ($getTunjanganDisplayForBoth) {
                             $wage = $detail->wage ?? null;
                             $potonganBpu = $detail->potongan_bpu ?? 0;
+
+                            // **PERUBAHAN PENTING: Ambil data HPP dan COSS langsung dari database**
+                            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+                            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
 
                             $bpjsJkk = $detail->bpjs_jkk ?? 0;
                             $bpjsJkm = $detail->bpjs_jkm ?? 0;
@@ -499,50 +516,62 @@ class QuotationStepResource extends JsonResource
                                 })->toArray();
                             }
 
-                            // PENGGUNAAN HELPER FUNCTION - Semua tunjangan menggunakan fungsi yang sama
-                            $lemburDisplay = $getTunjanganDisplay(
-                                $wage,
-                                'lembur',
-                                $detail->nominal_lembur ?? 0,
-                                'lembur_ditagihkan' // Field ini ADA di tabel
-                            );
+                            // **PERUBAHAN: Gunakan nilai dari HPP dan COSS dengan fallback ke detail jika tidak ada**
+                            $tunjanganHariRayaHpp = $hpp->tunjangan_hari_raya ?? $detail->tunjangan_hari_raya_hpp ?? 0;
+                            $tunjanganHariRayaCoss = $coss->tunjangan_hari_raya ?? $detail->tunjangan_hari_raya_coss ?? 0;
 
-                            $tunjanganHolidayDisplay = $getTunjanganDisplay(
-                                $wage,
-                                'tunjangan_holiday',
-                                $detail->tunjangan_holiday ?? 0
-                                // TIDAK ada field tunjangan_holiday_ditagihkan
-                            );
+                            $kompensasiHpp = $hpp->kompensasi ?? $detail->kompensasi_hpp ?? 0;
+                            $kompensasiCoss = $coss->kompensasi ?? $detail->kompensasi_coss ?? 0;
 
-                            $tunjanganHariRayaDisplay = $getTunjanganDisplay(
+                            $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
+                            $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
+
+                            $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
+                            $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
+
+                            // **PERUBAHAN: Gunakan fungsi baru yang mendukung HPP dan COSS**
+                            $thrDisplay = $getTunjanganDisplayForBoth(
                                 $wage,
                                 'thr',
-                                $detail->tunjangan_hari_raya ?? 0
-                                // TIDAK ada field thr_ditagihkan
+                                $tunjanganHariRayaHpp,
+                                $tunjanganHariRayaCoss
                             );
 
-                            $kompensasiDisplay = $getTunjanganDisplay(
+                            $kompensasiDisplay = $getTunjanganDisplayForBoth(
                                 $wage,
                                 'kompensasi',
-                                $detail->kompensasi ?? 0
-                                // TIDAK ada field kompensasi_ditagihkan
+                                $kompensasiHpp,
+                                $kompensasiCoss
                             );
 
-                            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+                            $lemburDisplay = $getTunjanganDisplayForBoth(
+                                $wage,
+                                'lembur',
+                                $lemburHpp,
+                                $lemburCoss,
+                                'lembur_ditagihkan'
+                            );
+
+                            $tunjanganHolidayDisplay = $getTunjanganDisplayForBoth(
+                                $wage,
+                                'tunjangan_holiday',
+                                $tunjanganHolidayHpp,
+                                $tunjanganHolidayCoss
+                            );
 
                             return [
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
                                 'jumlah_hc_hpp' => $hpp->jumlah_hc ?? 0,
-                                'jumlah_hc_coss' => $detail->jumlah_hc,
+                                'jumlah_hc_coss' => $coss->jumlah_hc ?? 0,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                                 'tunjangan_data' => $tunjanganData,
-                                'upah' => $wage ? $wage->upah : 0,
+                                'upah' => $wage ? $wage->upah : 0,                   
                                 'hpp' => [
                                     'nominal_upah' => $detail->nominal_upah,
-                                    'total_tunjangan' => $detail->total_tunjangan,
+                                    'total_tunjangan' => $detail->total_tunjangan ?? 0,
                                     'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
                                     'bpjs_kesehatan' => $bpjsKesehatan,
                                     'bpjs_jkk' => $bpjsJkk,
@@ -558,24 +587,25 @@ class QuotationStepResource extends JsonResource
                                     'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
                                     'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
                                     'potongan_bpu' => $potonganBpu,
-                                    'tunjangan_hari_raya' => $tunjanganHariRayaDisplay,
-                                    'kompensasi' => $kompensasiDisplay,
-                                    'lembur' => $lemburDisplay,
-                                    'tunjangan_holiday' => $tunjanganHolidayDisplay,
-                                    'bunga_bank' => $detail->bunga_bank,
-                                    'insentif' => $detail->insentif,
+                                    'tunjangan_hari_raya' => $thrDisplay['hpp'],
+                                    'kompensasi' => $kompensasiDisplay['hpp'],
+                                    'lembur' => $lemburDisplay['hpp'],
+                                    'tunjangan_holiday' => $tunjanganHolidayDisplay['hpp'],
+                                    'bunga_bank' => $detail->bunga_bank ?? 0,
+                                    'insentif' => $detail->insentif ?? 0,
                                     'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
                                     'personil_devices' => $detail->personil_devices ?? 0,
                                     'personil_ohc' => $detail->personil_ohc ?? 0,
                                     'personil_chemical' => $detail->personil_chemical ?? 0,
-                                    'total_personil' => $detail->total_personil,
-                                    'sub_total_personil' => $detail->sub_total_personil,
+                                    'total_personil' => $detail->total_personil ?? 0,
+                                    'sub_total_personil' => $detail->sub_total_personil ?? 0,
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
                                     'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                                    
                                 ],
                                 'coss' => [
                                     'nominal_upah' => $detail->nominal_upah,
-                                    'total_tunjangan' => $detail->total_tunjangan,
+                                    'total_tunjangan' => $detail->total_tunjangan_coss ?? 0,
                                     'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
                                     'bpjs_kesehatan' => $bpjsKesehatan,
                                     'bpjs_jkk' => $bpjsJkk,
@@ -591,12 +621,12 @@ class QuotationStepResource extends JsonResource
                                     'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
                                     'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
                                     'potongan_bpu' => $potonganBpu,
-                                    'tunjangan_hari_raya' => $tunjanganHariRayaDisplay,
-                                    'kompensasi' => $kompensasiDisplay,
-                                    'lembur' => $lemburDisplay,
-                                    'tunjangan_holiday' => $tunjanganHolidayDisplay,
-                                    'bunga_bank' => $detail->bunga_bank,
-                                    'insentif' => $detail->insentif,
+                                    'tunjangan_hari_raya' => $thrDisplay['coss'],
+                                    'kompensasi' => $kompensasiDisplay['coss'],
+                                    'lembur' => $lemburDisplay['coss'],
+                                    'tunjangan_holiday' => $tunjanganHolidayDisplay['coss'],
+                                    'bunga_bank' => $detail->bunga_bank ?? 0,
+                                    'insentif' => $detail->insentif ?? 0,
                                     'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
                                     'personil_devices_coss' => $detail->personil_devices_coss ?? 0,
                                     'personil_ohc_coss' => $detail->personil_ohc_coss ?? 0,
@@ -605,6 +635,16 @@ class QuotationStepResource extends JsonResource
                                     'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
                                     'total_base_manpower' => $detail->total_base_manpower ?? 0,
                                     'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                                   
+                                ],
+                                'debug_info' => [ // Untuk debugging
+                                    'has_wage' => !empty($wage),
+                                    'wage_thr' => $wage->thr ?? 'null',
+                                    'wage_kompensasi' => $wage->kompensasi ?? 'null',
+                                    'wage_lembur' => $wage->lembur ?? 'null',
+                                    'wage_tunjangan_holiday' => $wage->tunjangan_holiday ?? 'null',
+                                    'hpp_tunjangan_hari_raya' => $hpp->tunjangan_hari_raya ?? 'null',
+                                    'coss_tunjangan_hari_raya' => $coss->tunjangan_hari_raya ?? 'null',
                                 ]
                             ];
                         })->toArray()

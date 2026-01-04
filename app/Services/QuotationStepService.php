@@ -1883,7 +1883,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
                 $userHppData = $request->hpp_data[$detailCalculation->detail_id];
 
-                $userEditableFields = ['thr', 'kompensasi', 'jumlah_hc'];
+                $userEditableFields = ['tunjangan_hari_raya', 'kompensasi', 'jumlah_hc'];
 
                 foreach ($userEditableFields as $field) {
                     if (array_key_exists($field, $userHppData)) {
@@ -3232,6 +3232,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
         foreach ($quotation->quotationDetails as $detail) {
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
 
             if ($hpp) {
                 // Reset nilai-nilai yang berasal dari wage (step 4)
@@ -3247,6 +3248,22 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $hpp->update($resetData);
 
                 \Log::info("Reset HPP values for detail", [
+                    'detail_id' => $detail->id,
+                    'reset_fields' => array_keys($resetData)
+                ]);
+            }
+            if ($coss) {
+                $resetData = [
+                    'tunjangan_hari_raya' => null,
+                    'kompensasi' => null,
+                    'tunjangan_hari_libur_nasional' => null,
+                    'lembur' => null,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ];
+                $coss->update($resetData);
+
+                \Log::info("Reset COSS values for detail", [
                     'detail_id' => $detail->id,
                     'reset_fields' => array_keys($resetData)
                 ]);
