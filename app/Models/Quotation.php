@@ -165,6 +165,10 @@ class Quotation extends Model
     {
         return $this->hasOne(Spk::class, 'quotation_id');
     }
+    public function jenisperusahaan()
+    {
+        return $this->belongsTo(JenisPerusahaan::class, 'jenis_perusahaan_id');
+    }
 
     public function quotationDetails()
     {
