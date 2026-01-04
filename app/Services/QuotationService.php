@@ -255,7 +255,7 @@ class QuotationService
             $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
 
             // Final totals
-            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan,$hpp);
+            $this->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
 
             // Simpan data ke DTO
             $this->populateDetailCalculation($detail, $quotation, $detailCalculation);
@@ -896,93 +896,135 @@ class QuotationService
     }
 
     // ============================ FINAL TOTALS ============================
-    private function calculateFinalTotals($detail, $quotation, $totalTunjangan,$hpp)
+    private function calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss)
     {
-        // Hitung potongan BPU jika ada
-        $potonganBpu = 0;
-        if ($detail->penjamin_kesehatan === 'BPU') {
-            $potonganBpu = 16800; // Fixed 16 ribu per karyawan
-            $detail->potongan_bpu = $potonganBpu;
+        try {
+            // ============================================
+            // EXTRACT TUNJANGAN DATA
+            // ============================================
+            // Pastikan $totalTunjanganResult adalah array
+            if (is_array($totalTunjanganResult)) {
+                $totalTunjanganHpp = (float) ($totalTunjanganResult['total'] ?? 0);
+                $totalTunjanganCoss = (float) ($totalTunjanganResult['total_coss'] ?? 0);
+            } else {
+                // Fallback jika format tidak sesuai
+                $totalTunjanganHpp = (float) ($detail->total_tunjangan ?? 0);
+                $totalTunjanganCoss = (float) ($detail->total_tunjangan_coss ?? 0);
+            }
 
-            \Log::info("BPU potongan applied", [
-                'detail_id' => $detail->id,
-                'potongan_bpu' => $potonganBpu
-            ]);
+            // Hitung potongan BPU jika ada
+            $potonganBpu = 0;
+            if ($detail->penjamin_kesehatan === 'BPU') {
+                $potonganBpu = 16800; // Fixed 16 ribu per karyawan
+                $detail->potongan_bpu = $potonganBpu;
+
+                \Log::info("BPU potongan applied", [
+                    'detail_id' => $detail->id,
+                    'potongan_bpu' => $potonganBpu
+                ]);
+            }
+
+            // ============================================
+            // GET ALL NECESSARY VALUES
+            // ============================================
+
+            // Nilai dari HPP
+            $tunjanganHariRayaHpp = (float) ($detail->tunjangan_hari_raya_hpp ?? 0);
+            $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
+
+            // Nilai dari COSS
+            $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
+            $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
+
+            // Nilai umum
+            $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
+            $nominalUpah = (float) ($detail->nominal_upah ?? 0);
+            $lembur = (float) ($detail->lembur ?? 0);
+
+            // **PERUBAHAN: BPJS Ketenagakerjaan dan Kesehatan bisa berbeda antara HPP dan COSS**
+            // Karena persentase bisa di-set berbeda di Step 11
+            $bpjsKetenagakerjaanHpp = (float) ($detail->bpjs_ketenagakerjaan ?? 0);
+            $biayaKesehatanHpp = (float) ($detail->bpjs_kesehatan ?? 0);
+
+            // Untuk COSS, gunakan field yang sama atau hitung ulang jika berbeda
+            $bpjsKetenagakerjaanCoss = (float) ($detail->bpjs_ketenagakerjaan ?? 0); // Sementara sama
+            $biayaKesehatanCoss = (float) ($detail->bpjs_kesehatan ?? 0); // Sementara sama
+
+            // Item provisi
+            $personilKaporlap = (float) ($detail->personil_kaporlap ?? 0);
+            $personilDevices = (float) ($detail->personil_devices ?? 0);
+            $personilChemical = (float) ($detail->personil_chemical ?? 0);
+            $personilOhc = (float) ($detail->personil_ohc ?? 0);
+            $personilKaporlapCoss = (float) ($detail->personil_kaporlap_coss ?? 0);
+            $personilDevicesCoss = (float) ($detail->personil_devices_coss ?? 0);
+            $personilChemicalCoss = (float) ($detail->personil_chemical_coss ?? 0);
+            $personilOhcCoss = (float) ($detail->personil_ohc_coss ?? 0);
+
+            // Bunga bank dan insentif (sama untuk HPP dan COSS karena gross-up)
+            $bungaBank = (float) ($detail->bunga_bank ?? 0);
+            $insentif = (float) ($detail->insentif ?? 0);
+
+            // **PERUBAHAN: Ambil jumlah HC dari HPP jika ada, jika tidak dari detail**
+            $jumlahHc = (int) ($hpp->jumlah_hc ?? $detail->jumlah_hc ?? 0);
+
+            // ============================================
+            // HPP CALCULATION
+            // ============================================
+            $detail->total_personil = round(
+                $nominalUpah
+                + $totalTunjanganHpp
+                + $tunjanganHariRayaHpp
+                + $kompensasiHpp
+                + $tunjanganHoliday
+                + $lembur
+                + $bpjsKetenagakerjaanHpp
+                + $biayaKesehatanHpp
+                + $personilKaporlap
+                + $personilDevices
+                + $personilChemical
+                + $personilOhc
+                + $bungaBank
+                + $insentif
+                - $potonganBpu,
+                2
+            );
+
+            $detail->sub_total_personil = round($detail->total_personil * $jumlahHc, 2);
+
+            // ============================================
+            // COSS CALCULATIONS
+            // ============================================
+            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
+
+            $detail->total_exclude_base_manpower = round(
+                $tunjanganHariRayaCoss
+                + $kompensasiCoss
+                + $tunjanganHoliday
+                + $lembur
+                + $biayaKesehatanCoss
+                + $bpjsKetenagakerjaanCoss
+                + $personilKaporlapCoss
+                + $personilDevicesCoss
+                + $personilChemicalCoss
+                + $insentif
+                + $bungaBank,
+                2
+            );
+
+            $detail->total_personil_coss = round(
+                $detail->total_base_manpower
+                + $detail->total_exclude_base_manpower
+                + $personilOhcCoss
+                - $potonganBpu,
+                2
+            );
+
+            $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHc, 2);
+
+        } catch (\Exception $e) {
+            \Log::error("Error in calculateFinalTotals for detail {$detail->id}: " . $e->getMessage());
+            throw $e;
         }
-
-
-        // PERBAIKAN CRITICAL: Pastikan THR dan komponen lainnya digunakan
-        $tunjanganHariRayaHpp = (float) ($detail->tunjangan_hari_raya_hpp ?? 0);
-        $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
-        $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
-        $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
-        $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
-        $nominalUpah = (float) ($detail->nominal_upah ?? 0);
-        $totalTunjangan = (float) $totalTunjangan;
-        $lembur = (float) ($detail->lembur ?? 0);
-        $bpjsKetenagakerjaan = (float) ($detail->bpjs_ketenagakerjaan ?? 0);
-        $biayaKesehatan = (float) ($detail->bpjs_kesehatan ?? 0);
-        $personilKaporlap = (float) ($detail->personil_kaporlap ?? 0);
-        $personilDevices = (float) ($detail->personil_devices ?? 0);
-        $personilChemical = (float) ($detail->personil_chemical ?? 0);
-        $personilOhc = (float) ($detail->personil_ohc ?? 0);
-        $bungaBank = (float) ($detail->bunga_bank ?? 0);
-        $insentif = (float) ($detail->insentif ?? 0);
-        $jumlahHc = (int) ($hpp->jumlah_hc || $detail->jumlah_hc ?? 0);
-        $totalTunjanganCoss = (float) ($detail->total_tunjangan_coss ?? 0);
-
-        // PERBAIKAN: Pastikan semua komponen dijumlahkan dengan aman
-        $detail->total_personil = $nominalUpah
-            + $totalTunjangan
-            + $tunjanganHariRayaHpp
-            + $kompensasiHpp
-            + $tunjanganHoliday
-            + $lembur
-            + $bpjsKetenagakerjaan
-            + $biayaKesehatan
-            + $personilKaporlap
-            + $personilDevices
-            + $personilChemical
-            + $personilOhc
-            + $bungaBank
-            + $insentif
-            - $potonganBpu;
-
-        $detail->sub_total_personil = $detail->total_personil * $jumlahHc;
-
-        // COSS Calculations
-        $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
-
-        $detail->total_exclude_base_manpower = round(
-            $tunjanganHariRayaCoss
-            + $kompensasiCoss
-            + $tunjanganHoliday
-            + $lembur
-            + $biayaKesehatan
-            + $bpjsKetenagakerjaan
-            + ($detail->personil_kaporlap_coss ?? 0)
-            + ($detail->personil_devices_coss ?? 0)
-            + ($detail->personil_chemical_coss ?? 0),
-            2
-        );
-
-        $detail->total_personil_coss = round(
-            $detail->total_base_manpower
-            + $detail->total_exclude_base_manpower
-            + ($detail->personil_ohc_coss ?? 0)
-            - $potonganBpu,
-            2
-        );
-
-        $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHc, 2);
-
-        \Log::info("Final totals calculated", [
-            'detail_id' => $detail->id,
-            'total_personil' => $detail->total_personil,
-            'sub_total_personil' => $detail->sub_total_personil,
-            'total_personil_coss' => $detail->total_personil_coss,
-            'sub_total_personil_coss' => $detail->sub_total_personil_coss
-        ]);
     }
     // ============================ GROSS UP RECALCULATION ============================
     private function calculateBankInterestAndIncentive($quotation, $jumlahHc, QuotationCalculationResult $result): void
