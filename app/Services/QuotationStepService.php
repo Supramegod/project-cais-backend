@@ -876,11 +876,14 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
             $statusData = $this->calculateFinalStatus($quotation);
 
-            // Update quotation status
-            $quotation->update(array_merge([
-                'step' => 100,
-                'updated_by' => $user
-            ], $statusData));
+            // **PERBAIKAN: Gunakan DB::table untuk menghindari attribute yang tidak diinginkan**
+            DB::table('sl_quotation')
+                ->where('id', $quotation->id)
+                ->update(array_merge([
+                    'step' => 100,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ], $statusData));
 
             // Update kerjasama data - menggunakan pendekatan pengecekan seperti training
             $this->updateKerjasamaData($quotation, $request, $currentDateTime);
@@ -2445,16 +2448,11 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             ]);
 
             // =====================================================
-            // 1. LOG SEMUA DATA YANG DITERIMA UNTUK DEBUG
-            // =====================================================
-            // $this->logAllRequestDataForDebug($request, $quotation->id);
-
-            // =====================================================
-            // 2. PROCESS ALL DATA TYPES (MULTI-FORMAT SUPPORT)
+            // 1. PROCESS ALL DATA TYPES (MULTI-FORMAT SUPPORT)
             // =====================================================
 
             // A. Process wage data (if exists in any format)
-            $this->processAllWageFormats($quotation, $request, $user, $currentDateTime);
+            // $this->processAllWageFormats($quotation, $request, $user, $currentDateTime);
 
             // B. Process HPP editable data
             if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
@@ -2467,6 +2465,13 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     $this->updateCossDataFromRequest($detailId, $cossFields, $user, $currentDateTime, $quotation->id);
                 }
             }
+            if ($request->has('wage_data') && is_array($request->wage_data)) {
+                foreach ($request->wage_data as $detailId => $wageFields) {
+                    $this->updateSingleWageData($detailId, $wageFields, $user, $currentDateTime, $quotation->id);
+                    // $processedCount++;
+                }
+            }
+
 
             // D. Process BPJS persentase
             if ($request->has('bpjs_persentase_data') && is_array($request->bpjs_persentase_data)) {
@@ -2484,33 +2489,38 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             }
 
             // =====================================================
-            // 3. RESET VALUES UNTUK PERHITUNGAN ULANG
+            // 2. RESET VALUES UNTUK PERHITUNGAN ULANG
             // =====================================================
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
 
             // =====================================================
-            // 4. UPDATE QUOTATION GLOBAL DATA
-            // =====================================================
-            $quotationData = $this->prepareQuotationDataForUpdate($quotation, $request, $user, $currentDateTime);
-            $quotation->update($quotationData);
-
-            // =====================================================
-            // 5. JALANKAN PERHITUNGAN ULANG
+            // 3. JALANKAN PERHITUNGAN ULANG
             // =====================================================
             $calculationResult = $this->quotationService->calculateQuotation($quotation);
 
             // =====================================================
-            // 6. FORCE SYNC HPP & COSS VALUES
+            // 4. FORCE SYNC HPP & COSS VALUES
             // =====================================================
             $this->forceSyncHppAndCossValues($quotation, $calculationResult, $user, $currentDateTime);
 
             // =====================================================
-            // 7. SIMPAN HASIL PERHITUNGAN
+            // 5. SIMPAN HASIL PERHITUNGAN
             // =====================================================
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
 
             // =====================================================
-            // 8. GENERATE KERJASAMA
+            // 6. UPDATE QUOTATION GLOBAL DATA
+            // =====================================================
+            $quotationData = $this->prepareQuotationDataForUpdate($quotation, $request, $user, $currentDateTime);
+            $this->cleanQuotationAttributes($quotation);
+
+            // **PERBAIKAN: Gunakan DB::table untuk menghindari attribute yang tidak diinginkan**
+            DB::table('sl_quotation')
+                ->where('id', $quotation->id)
+                ->update($quotationData);
+
+            // =====================================================
+            // 7. GENERATE KERJASAMA
             // =====================================================
             $this->generateKerjasama($quotation);
 
@@ -2539,12 +2549,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
         $processedCount = 0;
 
         // FORMAT 1: wage_data array (standard)
-        if ($request->has('wage_data') && is_array($request->wage_data)) {
-            foreach ($request->wage_data as $detailId => $wageFields) {
-                $this->updateSingleWageData($detailId, $wageFields, $user, $currentDateTime, $quotation->id);
-                $processedCount++;
-            }
-        }
 
         // FORMAT 2: Data dari hpp_editable_data yang mengandung field wage
         if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
@@ -2674,20 +2678,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $persentase = (float) str_replace(['.', ','], ['', '.'], $persentase);
             }
             $data['persentase'] = $persentase;
-
-            \Log::info("Persentase updated from request", [
-                'quotation_id' => $quotation->id,
-                'old_persentase' => $quotation->persentase,
-                'new_persentase' => $persentase
-            ]);
-        } else {
-            // Jika tidak ada request, gunakan nilai yang sudah ada di database
-            $data['persentase'] = $quotation->persentase;
-
-            \Log::info("Persentase not in request, using existing value", [
-                'quotation_id' => $quotation->id,
-                'persentase' => $quotation->persentase
-            ]);
         }
 
         // Persen insentif (jika ada di request)
@@ -2697,15 +2687,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $persenInsentif = (float) str_replace(['.', ','], ['', '.'], $persenInsentif);
             }
             $data['persen_insentif'] = $persenInsentif;
-
-            \Log::info("Persen insentif updated from request", [
-                'quotation_id' => $quotation->id,
-                'old_persen_insentif' => $quotation->persen_insentif,
-                'new_persen_insentif' => $persenInsentif
-            ]);
-        } else {
-            // Jika tidak ada request, gunakan nilai yang sudah ada di database
-            $data['persen_insentif'] = $quotation->persen_insentif;
         }
 
         // Persen bunga bank (jika ada di request)
@@ -2715,18 +2696,37 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $persenBungaBank = (float) str_replace(['.', ','], ['', '.'], $persenBungaBank);
             }
             $data['persen_bunga_bank'] = $persenBungaBank;
-        } else {
-            // Jika tidak ada request, gunakan nilai yang sudah ada di database
-            $data['persen_bunga_bank'] = $quotation->persen_bunga_bank;
         }
 
         // Note harga jual (opsional)
         if ($request->filled('note_harga_jual')) {
             $data['note_harga_jual'] = $request->note_harga_jual;
-        } else {
-            // Jika tidak ada request, gunakan nilai yang sudah ada di database
-            $data['note_harga_jual'] = $quotation->note_harga_jual;
         }
+
+        // **PERBAIKAN: Tambahkan field yang mungkin ada di request untuk Step 11**
+        $optionalFields = ['is_ppn', 'ppn_pph_dipotong', 'management_fee_id'];
+        foreach ($optionalFields as $field) {
+            if ($request->filled($field)) {
+                $data[$field] = $request->$field;
+            }
+        }
+
+        // **PERBAIKAN: Pastikan hanya field yang ada di tabel yang dikembalikan**
+        $validFields = [
+            'penagihan',
+            'persentase',
+            'persen_insentif',
+            'persen_bunga_bank',
+            'note_harga_jual',
+            'is_ppn',
+            'ppn_pph_dipotong',
+            'management_fee_id',
+            'updated_by',
+            'updated_at'
+        ];
+
+        // Filter hanya field yang valid
+        $data = array_intersect_key($data, array_flip($validFields));
 
         return $data;
     }
@@ -3610,6 +3610,33 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'sync_fields' => $syncFields
             ]);
         }
+    }
+    /**
+     * Clean quotation attributes that are not database columns
+     */
+    private function cleanQuotationAttributes(Quotation $quotation): void
+    {
+        // Hapus attribute yang tidak ada di tabel database
+        $nonDatabaseAttributes = [
+            'quotation_detail',
+            'quotation_site',
+            'management_fee',
+            'jumlah_hc',
+            'provisi',
+            'persen_bpjs_ketenagakerjaan',
+            'persen_bpjs_kesehatan'
+        ];
+
+        foreach ($nonDatabaseAttributes as $attribute) {
+            if (isset($quotation->$attribute)) {
+                unset($quotation->$attribute);
+            }
+        }
+
+        // Hapus relations yang mungkin terbawa
+        $quotation->setRelation('quotation_detail', null);
+        $quotation->setRelation('quotation_site', null);
+        $quotation->setRelation('quotation_detail_wage', null);
     }
 
 }

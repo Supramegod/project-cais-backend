@@ -411,9 +411,9 @@ class QuotationStepResource extends JsonResource
                     $ditagihkanValueString = is_string($ditagihkanValue) ? strtolower(trim($ditagihkanValue)) : '';
 
                     // CEK PRIORITAS 2: Jenis tunjangan
-                    if ($jenisValueString == 'normatif' && $jenisValueString == 'ditagihkan terpisah') {
+                    if ($jenisValueString == 'normatif' || $jenisValueString == 'ditagihkan') {
                         return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
-                    } elseif ($jenisValueString == 'flat' && $ditagihkanValueString == 'ditagihkan' || $jenisValueString == 'diprovisikan' || $jenisValueString == 'flat' ) {
+                    } elseif (($jenisValueString == 'flat' && $ditagihkanValueString == 'ditagihkan') || $jenisValueString == 'diprovisikan' || $jenisValueString == 'flat' ) {
                         // **PERUBAHAN PENTING**: Gunakan nilai yang sesuai (HPP atau COSS)
                         $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada2';
                         $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada2';
