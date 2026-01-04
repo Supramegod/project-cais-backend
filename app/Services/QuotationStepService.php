@@ -1905,7 +1905,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             if ($request && $request->has('hpp_editable_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
                 $userHppData = $request->hpp_editable_data[$detailCalculation->detail_id];
 
-                $userEditableFields = ['thr', 'kompensasi', 'jumlah_hc'];
+                $userEditableFields = ['kompensasi', 'jumlah_hc', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional',];
 
                 foreach ($userEditableFields as $field) {
                     if (array_key_exists($field, $userHppData)) {
@@ -1984,6 +1984,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // ============================
             $numericFields = [
                 'kompensasi',
+                'jumlah_hc',
                 'tunjangan_hari_raya',
                 'tunjangan_hari_libur_nasional',
                 'lembur',
@@ -2035,7 +2036,8 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             // Jika existing data ada, update. Jika tidak, create baru
             if ($existingHpp) {
                 // Field BPJS persentase yang harus dipertahankan jika user sudah input
-                $userEditableFields = ['thr', 'kompensasi', 'jumlah_hc'];
+                $userEditableFields = ['kompensasi', 'jumlah_hc', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional',];
+
                 $bpjsPercentFields = ['persen_bpjs_jkk', 'persen_bpjs_jkm', 'persen_bpjs_jht', 'persen_bpjs_jp', 'persen_bpjs_kes'];
 
                 // Cek apakah ada input BPJS dari user
@@ -2045,6 +2047,9 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                         $hasUserInput = true;
                     }
                     if ($request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
+                        $hasUserInput = true;
+                    }
+                    if ($request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailCalculation->detail_id])) {
                         $hasUserInput = true;
                     }
                 }
@@ -2435,6 +2440,11 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'quotation_id' => $quotation->id,
                 'request_keys' => array_keys($request->all())
             ]);
+            // =====================================================
+            // **PERBAIKAN: RESET HPP VALUES SEBELUM PERHITUNGAN**
+            // =====================================================
+            $this->resetHppValuesForRecalculation($quotation, $user, $currentDateTime);
+
 
             // =====================================================
             // 1. UPDATE DATA QUOTATION UTAMA
@@ -2658,7 +2668,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $updateData['updated_at'] = $currentDateTime;
 
                 // ================================================
-                // **PERBAIKAN KRITIS**: CLEAR NILAI BPJS DI HPP
+                // **PERBAIKAN KRITIS 1: CLEAR NILAI BPJS DI HPP**
                 // ================================================
                 $hpp = QuotationDetailHpp::where('quotation_detail_id', $detailId)->first();
                 if ($hpp) {
@@ -2669,13 +2679,19 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                         'bpjs_jht' => null,
                         'bpjs_jp' => null,
                         'bpjs_ks' => null,
+                        // **PERBAIKAN 2: CLEAR NILAI KOMPENSASI, THR, LEMBUR JIKA ADA PERUBAHAN DI STEP 4**
+                        'tunjangan_hari_raya' => null,
+                        'kompensasi' => null,
+                        'tunjangan_hari_libur_nasional' => null,
+                        'lembur' => null,
                         'updated_by' => $user,
                         'updated_at' => $currentDateTime
                     ]);
 
-                    \Log::info("Cleared HPP BPJS values to force recalculation", [
+                    \Log::info("Cleared HPP values to force recalculation from wage", [
                         'detail_id' => $detailId,
-                        'hpp_id' => $hpp->id
+                        'hpp_id' => $hpp->id,
+                        'fields_cleared' => ['bpjs_jkk', 'bpjs_jkm', 'bpjs_jht', 'bpjs_jp', 'bpjs_ks', 'tunjangan_hari_raya', 'kompensasi', 'tunjangan_hari_libur_nasional', 'lembur']
                     ]);
                 }
 
@@ -3204,6 +3220,38 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             'hpp_updated' => $updatedCount,
             'total_requested' => count($request->hpp_editable_data)
         ]);
+    }
+    /**
+     * Reset HPP values untuk memaksa perhitungan ulang dari wage
+     */
+    private function resetHppValuesForRecalculation(Quotation $quotation, string $user, Carbon $currentDateTime): void
+    {
+        \Log::info("Resetting HPP values for recalculation", [
+            'quotation_id' => $quotation->id
+        ]);
+
+        foreach ($quotation->quotationDetails as $detail) {
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+
+            if ($hpp) {
+                // Reset nilai-nilai yang berasal dari wage (step 4)
+                $resetData = [
+                    'tunjangan_hari_raya' => null,
+                    'kompensasi' => null,
+                    'tunjangan_hari_libur_nasional' => null,
+                    'lembur' => null,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ];
+
+                $hpp->update($resetData);
+
+                \Log::info("Reset HPP values for detail", [
+                    'detail_id' => $detail->id,
+                    'reset_fields' => array_keys($resetData)
+                ]);
+            }
+        }
     }
 
 }
