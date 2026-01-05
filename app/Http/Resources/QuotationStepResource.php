@@ -404,7 +404,7 @@ class QuotationStepResource extends JsonResource
                         }
                         // Jika diberikan langsung oleh client
                         if ($ditagihkanValueString == 'diberikan langsung' || $ditagihkanValueString == 'diberikan langsung oleh client') {
-                            return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
+                            return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
                         }
                     }
                     $ditagihkanValue = $wage->$fieldDitagihkanTerpisah;
@@ -419,15 +419,15 @@ class QuotationStepResource extends JsonResource
                         $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada2';
                         return ['hpp' => $hppDisplay, 'coss' => $cossDisplay];
                     } elseif ($jenisValueString == 'diberikan langsung' || $jenisValueString == 'diberikan langsung oleh client') {
-                        return ['hpp' => 'Diberikan Langsung oleh Client', 'coss' => 'Diberikan Langsung oleh Client'];
+                        return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
                     } else {
-                        return ['hpp' => 'Tidak Ada3', 'coss' => 'Tidak Ada3'];
+                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     }
                 };
 
                 return [
                     'penagihan' => $quotation->penagihan,
-                    'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,   
                     'persentase' => $quotation->persentase,
                     'management_fee_nama' => $quotation->managementFee->nama ?? null,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
