@@ -3014,33 +3014,75 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
         $coss = QuotationDetailCoss::where('quotation_detail_id', $detailId)->first();
 
-        if ($coss) {
-            $updateData = [];
-            $allowedCossFields = [
-                'provisi_seragam',
-                'provisi_peralatan',
-                'provisi_chemical',
-                'provisi_ohc',
-                'lembur',
-                'tunjangan_hari_raya',
-                'tunjangan_hari_libur_nasional',
-            ];
+        if (!$coss) {
+            \Log::warning("COSS record not found for detail, creating new one", [
+                'detail_id' => $detailId
+            ]);
 
-            foreach ($allowedCossFields as $field) {
-                if (isset($cossFields[$field])) {
-                    $value = $cossFields[$field];
-                    if (is_string($value) && !is_numeric($value)) {
-                        $value = (float) str_replace(['.', ','], ['', '.'], $value);
-                    }
-                    $updateData[$field] = $value;
+            $coss = QuotationDetailCoss::create([
+                'quotation_detail_id' => $detailId,
+                'quotation_id' => $quotationId,
+                'leads_id' => $detail->quotation->leads_id,
+                'position_id' => $detail->position_id,
+                'jumlah_hc' => $detail->jumlah_hc,
+                'created_by' => $user,
+                'created_at' => $currentDateTime
+            ]);
+        }
+
+        $updateData = [];
+
+        // **PERBAIKAN: Tambahkan semua field yang ada di input, bukan hanya yang di $allowedCossFields**
+        $allCossFields = [
+            'provisi_seragam',
+            'provisi_peralatan',
+            'provisi_chemical',
+            'provisi_ohc',
+            'lembur',
+            'tunjangan_hari_raya',
+            'tunjangan_hari_libur_nasional',
+            'kompensasi' // **TAMBAHKAN INI karena ada di input**
+        ];
+
+        foreach ($allCossFields as $field) {
+            if (isset($cossFields[$field])) {
+                $value = $cossFields[$field];
+
+                // **PERBAIKAN KRITIKAL: Pastikan konversi ke float dengan benar**
+                if ($value === null || trim($value) === '') {
+                    $updateData[$field] = null;
+                } elseif (is_string($value)) {
+                    // Hapus titik sebagai pemisah ribuan, ganti koma dengan titik untuk desimal
+                    $cleanedValue = str_replace(['.', ','], ['', '.'], $value);
+                    $updateData[$field] = (float) $cleanedValue;
+                } else {
+                    $updateData[$field] = (float) $value;
                 }
-            }
 
-            if (!empty($updateData)) {
-                $updateData['updated_by'] = $user;
-                $updateData['updated_at'] = $currentDateTime;
-                $coss->update($updateData);
+                \Log::info("Setting COSS field from Step 11 input", [
+                    'detail_id' => $detailId,
+                    'field' => $field,
+                    'original_value' => $value,
+                    'converted_value' => $updateData[$field] ?? 'null'
+                ]);
             }
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+
+            $coss->update($updateData);
+
+            \Log::info("COSS data updated successfully from Step 11", [
+                'detail_id' => $detailId,
+                'update_data' => $updateData
+            ]);
+        } else {
+            \Log::warning("No COSS data to update for detail", [
+                'detail_id' => $detailId,
+                'coss_fields_received' => $cossFields
+            ]);
         }
     }
     /**
@@ -3548,10 +3590,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'kompensasi' => null,
                     'tunjangan_hari_libur_nasional' => null,
                     'lembur' => null,
-                    'provisi_ohc' => null,
-                    'provisi_seragam' => null,
-                    'provisi_peralatan' => null,
-                    'provisi_chemical' => null,
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);
@@ -3565,10 +3603,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'kompensasi' => null,
                     'tunjangan_hari_libur_nasional' => null,
                     'lembur' => null,
-                    'provisi_ohc' => null,
-                    'provisi_seragam' => null,
-                    'provisi_peralatan' => null,
-                    'provisi_chemical' => null,
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);

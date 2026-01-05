@@ -527,7 +527,7 @@ class QuotationStepResource extends JsonResource
 
                             $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
                             $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
-                            \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
+                            // \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
 
                             $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
                             $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;

@@ -70,7 +70,7 @@ class Sysmenu extends Model
                 ->where('sysmenu_role.role_id', $roleId);
         });
     }
-       public function scopeWithGroupInfo($query)
+    public function scopeWithGroupInfo($query)
     {
         return $query->leftJoin('sysmenu_group', 'sysmenu_group.id', '=', 'sysmenu.group_id');
     }

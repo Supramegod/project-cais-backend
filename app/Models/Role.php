@@ -22,11 +22,11 @@ class Role extends Model
     // Relasi ke user
     public function users()
     {
-        return $this->hasMany(User::class, 'role_id', 'id');
+        return $this->hasMany(User::class, 'cais_role_id', 'id');
     }
     public function scopeActive($query)
-{
-    return $query->where('is_active', '!=', 0);
-}
+    {
+        return $query->where('is_active', '!=', 0);
+    }
 
 }

@@ -987,7 +987,7 @@ class QuotationController extends Controller
      *     path="/api/quotations/{id}/submit-approval",
      *     tags={"Quotations"},
      *     summary="Submit quotation for approval",
-     *     description="Submits quotation for approval at different levels based on user role (role_id 96, 97, 40)",
+     *     description="Submits quotation for approval at different levels based on user role (cais_role_id 96, 97, 40)",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="id",

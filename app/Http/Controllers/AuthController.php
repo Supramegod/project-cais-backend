@@ -61,7 +61,7 @@ class AuthController extends Controller
      *                     @OA\Property(property="username", type="string", example="3578142602980002"),
      *                     @OA\Property(property="name", type="string", example="John Doe"),
      *                     @OA\Property(property="email", type="string", example="john@example.com"),
-     *                     @OA\Property(property="role_id", type="integer", example=1),
+     *                     @OA\Property(property="cais_role_id", type="integer", example=1),
      *                     @OA\Property(property="branch_id", type="integer", example=1)
      *                 ),
      *                 @OA\Property(property="access_token", type="string", example="1|abcdefghijklmnopqrstuvwxyz123456789", description="Sanctum access token berlaku 2 jam"),
@@ -144,7 +144,7 @@ class AuthController extends Controller
                         'username' => $user->username,
                         'name' => $user->full_name ?? $user->name,
                         'email' => $user->email,
-                        'role_id' => $user->role_id,
+                        'cais_role_id' => $user->cais_role_id,
                         'branch_id' => $user->branch_id,
                     ],
                     'access_token' => $tokenPair['access_token']->plainTextToken,

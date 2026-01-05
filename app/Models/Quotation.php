@@ -363,20 +363,20 @@ class Quotation extends Model
         }
 
         // 🌟 PERUBAHAN: TAMBAHKAN ROLE ID 2 (SUPERADMIN) DI SINI
-        if ($user->role_id == 2) {
+        if ($user->cais_role_id == 2) {
             // Superadmin dapat mengakses SEMUA data tanpa filter.
             return $query;
         }
         // -----------------------------------------------------
 
         // Sales division
-        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-            if ($user->role_id == 29) {
+        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            if ($user->cais_role_id == 29) {
                 // Sales
                 $query->whereHas('leads.timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
-            } elseif ($user->role_id == 31) {
+            } elseif ($user->cais_role_id == 31) {
                 // SPV Sales - menggunakan model dengan scope
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
@@ -388,7 +388,7 @@ class Quotation extends Model
                     });
                 }
             }
-        } elseif (in_array($user->role_id, [4, 5])) {
+        } elseif (in_array($user->cais_role_id, [4, 5])) {
             // RO
             $query->whereHas('leads', function ($q) use ($user) {
                 $q->where('ro_id', $user->id);
