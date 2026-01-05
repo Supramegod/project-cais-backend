@@ -3611,9 +3611,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             ]);
         }
     }
-    /**
-     * Clean quotation attributes that are not database columns
-     */
     private function cleanQuotationAttributes(Quotation $quotation): void
     {
         // Hapus attribute yang tidak ada di tabel database
