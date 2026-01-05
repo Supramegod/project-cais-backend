@@ -574,7 +574,7 @@ class OptionController extends Controller
      *                     @OA\Property(property="full_name", type="string", example="John Doe"),
      *                     @OA\Property(property="username", type="string", example="john.doe"),
      *                     @OA\Property(property="email", type="string", example="john@example.com"),
-     *                     @OA\Property(property="role_id", type="integer", example=29),
+     *                     @OA\Property(property="cais_role_id", type="integer", example=29),
      *                     @OA\Property(property="branch_id", type="integer", example=2)
      *                 )
      *             )
@@ -602,9 +602,9 @@ class OptionController extends Controller
             }
 
             $users = User::where('is_active', 1)
-                ->whereIn('role_id', [29, 31, 32, 33])
+                ->whereIn('cais_role_id', [29, 31, 32, 33])
                 ->where('branch_id', $request->branch_id)
-                ->select('id', 'full_name', 'username', 'email', 'role_id', 'branch_id')
+                ->select('id', 'full_name', 'username', 'email', 'cais_role_id', 'branch_id')
                 ->get();
 
             return response()->json([

@@ -391,7 +391,7 @@ class CustomerController extends Controller
                 'data' => array_merge([
                     'customer' => $data,
                     'activity' => $activity
-                ],)
+                ], )
             ]);
 
         } catch (\Exception $e) {
@@ -537,7 +537,7 @@ class CustomerController extends Controller
      */
     private function applyRoleFilter($query)
     {
-        $roleId = Auth::user()->role_id;
+        $roleId = Auth::user()->cais_role_id;
 
         // Sales division filtering
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
@@ -583,7 +583,7 @@ class CustomerController extends Controller
      */
     private function applyComplexRoleFilter($query)
     {
-        $roleId = Auth::user()->role_id;
+        $roleId = Auth::user()->cais_role_id;
 
         // divisi sales
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
@@ -630,7 +630,7 @@ class CustomerController extends Controller
      */
     private function checkViewPermission($data, $tim): bool
     {
-        if (Auth::user()->role_id == 29) {
+        if (Auth::user()->cais_role_id == 29) {
             return $data->tim_sales_d_id == $tim->id;
         }
         return true;

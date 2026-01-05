@@ -137,7 +137,7 @@ class RoleController extends Controller
 
             return $this->successResponse($roleData);
         } catch (\Exception $e) {
-            $this->logError('Fetch role error', $e, ['role_id' => $id]);
+            $this->logError('Fetch role error', $e, ['cais_role_id' => $id]);
             return $this->errorResponse();
         }
     }
@@ -199,13 +199,13 @@ class RoleController extends Controller
     {
         try {
             $user = Auth::user();
-            if (!$user || !$user->role_id) {
+            if (!$user || !$user->cais_role_id) {
                 return $this->forbiddenResponse('User role not found');
             }
 
             // Ambil semua menu aktif dengan LEFT JOIN ke permissions
             $menus = Sysmenu::active()
-                ->withPermissions($user->role_id)
+                ->withPermissions($user->cais_role_id)
                 ->withGroupInfo()
                 ->selectMenuFields()
                 ->ordered()
@@ -326,7 +326,7 @@ class RoleController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             $this->logError('Update permissions error', $e, [
-                'role_id' => $id,
+                'cais_role_id' => $id,
                 'permissions' => $request->input('akses')
             ]);
             return $this->errorResponse('Failed to update permissions');
@@ -347,7 +347,7 @@ class RoleController extends Controller
 
         if (!empty($childMenuIds)) {
             // Batch update existing records
-            SysmenuRole::where('role_id', $roleId)
+            SysmenuRole::where('cais_role_id', $roleId)
                 ->whereIn('sysmenu_id', $childMenuIds)
                 ->update([
                     $field => $value,
@@ -355,7 +355,7 @@ class RoleController extends Controller
                 ]);
 
             // Find which child menus don't have permission records yet
-            $existingRecords = SysmenuRole::where('role_id', $roleId)
+            $existingRecords = SysmenuRole::where('cais_role_id', $roleId)
                 ->whereIn('sysmenu_id', $childMenuIds)
                 ->pluck('sysmenu_id')
                 ->toArray();
@@ -368,7 +368,7 @@ class RoleController extends Controller
 
             foreach ($newMenuIds as $menuId) {
                 $batchData[] = [
-                    'role_id' => $roleId,
+                    'cais_role_id' => $roleId,
                     'sysmenu_id' => $menuId,
                     $field => $value,
                     // Set default values untuk field lainnya
@@ -412,7 +412,7 @@ class RoleController extends Controller
 
     private function updateOrCreatePermission($roleId, $permission): void
     {
-        $record = SysmenuRole::where('role_id', $roleId)
+        $record = SysmenuRole::where('cais_role_id', $roleId)
             ->where('sysmenu_id', $permission['sysmenu_id'])
             ->first();
 
@@ -425,7 +425,7 @@ class RoleController extends Controller
             $record->update($data);
         } else {
             SysmenuRole::create(array_merge($data, [
-                'role_id' => $roleId,
+                'cais_role_id' => $roleId,
                 'sysmenu_id' => $permission['sysmenu_id'],
                 'created_by' => Auth::id(),
                 // Set default values untuk field lainnya

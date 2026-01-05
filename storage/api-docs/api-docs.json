@@ -1013,7 +1013,7 @@
                                                             "type": "string",
                                                             "example": "john@example.com"
                                                         },
-                                                        "role_id": {
+                                                        "cais_role_id": {
                                                             "type": "integer",
                                                             "example": 1
                                                         },
@@ -12739,7 +12739,7 @@
                     "Leads"
                 ],
                 "summary": "Mengassign sales ke leads berdasarkan kebutuhan",
-                "description": "Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
+                "description": "Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan cais_role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
                 "operationId": "302b4ec882a47d5cc7bbf878c7ef4dbc",
                 "parameters": [
                     {
@@ -14724,7 +14724,7 @@
                                                         "type": "string",
                                                         "example": "john@example.com"
                                                     },
-                                                    "role_id": {
+                                                    "cais_role_id": {
                                                         "type": "integer",
                                                         "example": 29
                                                     },
@@ -19626,7 +19626,7 @@
                     "Quotations"
                 ],
                 "summary": "Submit quotation for approval",
-                "description": "Submits quotation for approval at different levels based on user role (role_id 96, 97, 40)",
+                "description": "Submits quotation for approval at different levels based on user role (cais_role_id 96, 97, 40)",
                 "operationId": "021f68ceb6a992b138d5fa3cbfb2e899",
                 "parameters": [
                     {
@@ -24574,7 +24574,7 @@
                                                                 "type": "string",
                                                                 "example": "john@example.com"
                                                             },
-                                                            "role_id": {
+                                                            "cais_role_id": {
                                                                 "type": "integer",
                                                                 "example": 29
                                                             }
@@ -24904,7 +24904,7 @@
                                                         "type": "string",
                                                         "example": "john@example.com"
                                                     },
-                                                    "role_id": {
+                                                    "cais_role_id": {
                                                         "type": "integer",
                                                         "example": 29
                                                     }

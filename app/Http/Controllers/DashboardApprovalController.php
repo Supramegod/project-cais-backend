@@ -167,20 +167,20 @@ class DashboardApprovalController extends Controller
         // Build conditions berdasarkan role
         $conditions = [];
 
-        if ($user->role_id == 96) {
+        if ($user->cais_role_id == 96) {
             $conditions[] = function ($q) {
                 $q->whereNull('ot1');
             };
         }
 
-        if (in_array($user->role_id, [97, 40])) {
+        if (in_array($user->cais_role_id, [97, 40])) {
             $conditions[] = function ($q) {
                 $q->whereNull('ot2')
                     ->where('top', 'Lebih Dari 7 Hari');
             };
         }
 
-        if ($user->role_id == 99) {
+        if ($user->cais_role_id == 99) {
             $conditions[] = function ($q) {
                 $q->whereNotNull('ot1')
                     ->whereNotNull('ot2')
