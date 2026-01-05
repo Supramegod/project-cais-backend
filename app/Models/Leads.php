@@ -254,10 +254,7 @@ class Leads extends Model
         }
         // CRM division
         elseif (in_array($user->cais_role_id, [54, 55, 56])) {
-            // CRM - filter berdasarkan crm_id (jika kolom ada)
-            if ($user->cais_role_id == 54) {
-                $query->where('crm_id', $user->id);
-            }
+            return $query;
             // Role 55,56 - tanpa filter (lihat semua)
         }
 

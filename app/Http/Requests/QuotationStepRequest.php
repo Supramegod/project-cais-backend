@@ -343,15 +343,21 @@ class QuotationStepRequest extends BaseRequest
 
             // Validasi custom untuk step 2
             if ($step == 2) {
-                if ($this->mulai_kontrak && $this->kontrak_selesai) {
-                    if ($this->mulai_kontrak > $this->kontrak_selesai) {
-                        $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
-                    }
-                    if ($this->tgl_penempatan < $this->mulai_kontrak) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
-                    }
-                    if ($this->tgl_penempatan > $this->kontrak_selesai) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+                // Daftar role_id yang boleh melewati validasi (CRM)
+                $excludedRoles = [53, 54, 55, 56];
+
+                // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
+                if (!in_array($this->cais_role_id, $excludedRoles)) {
+                    if ($this->mulai_kontrak && $this->kontrak_selesai) {
+                        if ($this->mulai_kontrak > $this->kontrak_selesai) {
+                            $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
+                        }
+                        if ($this->tgl_penempatan < $this->mulai_kontrak) {
+                            $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
+                        }
+                        if ($this->tgl_penempatan > $this->kontrak_selesai) {
+                            $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+                        }
                     }
                 }
 
