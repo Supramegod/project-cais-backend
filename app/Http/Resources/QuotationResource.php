@@ -80,11 +80,11 @@ class QuotationResource extends JsonResource
             $kompensasiTidakAda = $this->resource->quotationDetails()->whereHas('wage', function ($query) {
                 $query->where('kompensasi', 'Tidak Ada');
             })->exists();
-            
+
             $thrTidakAda = $this->resource->quotationDetails()->whereHas('wage', function ($query) {
                 $query->where('thr', 'Tidak Ada');
             })->exists();
-            
+
             if ($kompensasiTidakAda) {
                 $highlights[] = [
                     'field' => 'kompensasi',
@@ -93,7 +93,7 @@ class QuotationResource extends JsonResource
                     'value' => 'Tidak Ada'
                 ];
             }
-            
+
             if ($thrTidakAda) {
                 $highlights[] = [
                     'field' => 'thr',
@@ -106,7 +106,7 @@ class QuotationResource extends JsonResource
 
         // 3. Cek Upah Custom < 85% UMK
         $underMinimumWageDetails = [];
-        
+
         foreach ($this->resource->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
@@ -216,6 +216,26 @@ class QuotationResource extends JsonResource
             'alasan_revisi' => $this->alasan_revisi,
             'quotation_asal_id' => $this->quotation_asal_id,
             'pengiriman_invoice' => $this->pengiriman_invoice,
+            'npwp' => $this->npwp,
+            'alamat_npwp' => $this->alamat_npwp,
+            'pic_invoice' => $this->pic_invoice,
+            'telp_pic_invoice' => $this->telp_pic_invoice,
+            'email_pic_invoice' => $this->email_pic_invoice,
+            'materai' => $this->materai,
+            'joker_reliever' => $this->joker_reliever,
+            'syarat_invoice' => $this->syarat_invoice,
+            'alamat_penagihan_invoice' => $this->alamat_penagihan_invoice,
+            'catatan_site' => $this->catatan_site,
+
+            'status_serikat' => $this->whenLoaded('status_serikat', function () {
+                $statusSerikat = $this->status_serikat;
+                if ($this->ada_serikat === "Tidak Ada") {
+                    $statusSerikat = "Tidak Ada";
+                }
+                return [
+                    'status_serikat' => $statusSerikat,
+                ];
+            }),
 
             // Contract details
             'jenis_kontrak' => $this->jenis_kontrak,

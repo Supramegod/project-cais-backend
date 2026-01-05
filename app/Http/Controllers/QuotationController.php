@@ -1334,7 +1334,7 @@ class QuotationController extends Controller
             switch ($tipe_quotation) {
                 case 'baru':
                     // Leads baru: status_leads_id = 1 (New Lead)
-                    $query->where('status_leads_id', 1);
+                    return $query;
                     break;
 
                 case 'rekontrak':

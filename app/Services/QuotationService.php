@@ -254,7 +254,6 @@ class QuotationService
             // Calculate items
             $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
 
-            // Final totals
             $this->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
 
             // Simpan data ke DTO
@@ -789,42 +788,45 @@ class QuotationService
 
     private function calculateItem($detail, $quotation, $itemName, $config, $hpp, $coss, $detailJumlahHc, $totalJumlahHc)
     {
-        // Gunakan $detailJumlahHc untuk perhitungan per detail
+        // Gunakan divider dari config
         $divider = $config['divider'] ?? 1;
 
-        // Jika divider adalah "detail", gunakan jumlah HC detail
+        // PERBAIKAN: Logika divider yang benar:
         if ($divider === 'detail') {
-            $divider = $detailJumlahHc;
+            $divider = $detailJumlahHc;  // Jumlah HC untuk detail ini
+        } elseif ($divider === 'total') {
+            $divider = $totalJumlahHc;   // Total jumlah HC semua detail
         }
-        // Jika divider adalah "total", gunakan total jumlah HC
-        else if ($divider === 'total') {
-            $divider = $totalJumlahHc;
-        }
-        // Jika divider adalah angka, gunakan langsung (sudah ditangani di atas)
 
-        // PERBAIKAN: Untuk chemical khusus, gunakan $detailJumlahHc sebagai parameter ke-7
+        // Pastikan divider minimal 1
+        $divider = max($divider, 1);
+
+        // Hitung nilai untuk HPP
         if (isset($config['special']) && $config['special'] === 'chemical') {
+            // Chemical: pembagian berdasarkan jumlah HC detail
             $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
                 $config['model'],
                 $quotation->id,
                 $config['detail_id'] ?? null,
                 $quotation->provisi,
-                1, // Untuk chemical, divider tidak digunakan (divider=1)
-                $config['special'],
-                $detailJumlahHc // Parameter ke-7 untuk chemical
+                1,  // Untuk chemical, divider 1 (tidak digunakan di calculateItemTotal)
+                'chemical',
+                $detailJumlahHc  // Parameter ke-7 untuk chemical
             );
         } else {
+            // Non-chemical: pembagian berdasarkan divider
             $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
                 $config['model'],
                 $quotation->id,
                 $config['detail_id'] ?? null,
                 $quotation->provisi,
-                $divider, // Untuk non-chemical, gunakan divider
-                $config['special'] ?? null,
-                $detailJumlahHc // Tetap dikirim untuk konsistensi
+                $divider,  // Gunakan divider yang sudah dihitung
+                null,
+                $detailJumlahHc
             );
         }
 
+        // Simpan ke detail
         $detail->{"personil_$itemName"} = $hppValue;
         $detail->{"personil_{$itemName}_coss"} = $coss->{$config['coss_field']} ?? $hppValue;
     }
@@ -1326,10 +1328,10 @@ class QuotationService
 
         return $query->get()->sum(function ($item) use ($provisi, $divider, $special, $jumlahHc) {
             if ($special === 'chemical') {
-                // Untuk chemical, bagikan berdasarkan jumlah HC
+                // Untuk chemical: total dibagi jumlah HC detail ini
                 return ((($item->jumlah * $item->harga) / $item->masa_pakai)) / max($jumlahHc, 1);
             }
-            // Untuk item lain, bagikan berdasarkan divider (biasanya jumlah HC juga)
+            // Untuk item lain: total dibagi jumlah HC (bisa detail atau total tergantung config)
             return (($item->harga * $item->jumlah) / $provisi) / max($divider, 1);
         });
     }
