@@ -42,6 +42,7 @@ class Quotation extends Model
         'ot1',
         'ot2',
         'ot3',
+        'pengiriman_invoice',
         // Kolom baru yang ditambahkan
         'quotation_client_id',
         'layanan_id',
@@ -164,6 +165,10 @@ class Quotation extends Model
     {
         return $this->hasOne(Spk::class, 'quotation_id');
     }
+    public function jenisperusahaan()
+    {
+        return $this->belongsTo(JenisPerusahaan::class, 'jenis_perusahaan_id');
+    }
 
     public function quotationDetails()
     {
@@ -274,6 +279,17 @@ class Quotation extends Model
     public function timSalesDetail()
     {
         return $this->belongsTo(TimSalesDetail::class, 'tim_sales_d_id');
+    }
+    // Di file Quotation.php, tambahkan method relasi ini:
+
+    public function salaryRule()
+    {
+        return $this->belongsTo(SalaryRule::class, 'salary_rule_id');
+    }
+
+    public function ruleThr()
+    {
+        return $this->belongsTo(RuleThr::class, 'rule_thr_id');
     }
 
     // ACCESSOR/METHOD BARU YANG DIPERLUKAN:

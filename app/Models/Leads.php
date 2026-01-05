@@ -130,7 +130,7 @@ class Leads extends Model
     {
         return $this->hasMany(Pks::class, 'leads_id');
     }
-        /**
+    /**
      * Relasi ke SPK (Surat Perintah Kerja)
      */
     public function spk()
@@ -152,6 +152,33 @@ class Leads extends Model
     {
         return $this->hasOne(Customer::class, 'leads_id');
     }
+    public function jabatanPic()
+    {
+        return $this->belongsTo(JabatanPic::class, 'jabatan');
+    }
+    /**
+     * Relasi ke LeadsKebutuhan untuk akses tim sales
+     */
+    public function leadsKebutuhan()
+    {
+        return $this->hasMany(LeadsKebutuhan::class, 'leads_id');
+    }
+
+    /**
+     * Relasi untuk mendapatkan tim sales details melalui leads_kebutuhan
+     */
+    public function timSalesDThroughKebutuhan()
+    {
+        return $this->hasManyThrough(
+            TimSalesDetail::class,
+            LeadsKebutuhan::class,
+            'leads_id',        // Foreign key di leads_kebutuhan
+            'id',              // Foreign key di tim_sales_details
+            'id',              // Local key di leads
+            'tim_sales_d_id'   // Local key di leads_kebutuhan
+        );
+    }
+
 
     // Update scope AvailableCustomers
     public function scopeAvailableCustomers($query)
@@ -197,7 +224,8 @@ class Leads extends Model
         if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
             if ($user->role_id == 29) {
                 // Sales - hanya melihat leads mereka sendiri
-                $query->whereHas('timSalesD', function ($q) use ($user) {
+                // Filter berdasarkan sl_leads_kebutuhan
+                $query->whereHas('leadsKebutuhan.timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
             } elseif ($user->role_id == 31) {
@@ -207,7 +235,9 @@ class Leads extends Model
                     $memberSales = TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
                         ->pluck('user_id')
                         ->toArray();
-                    $query->whereHas('timSalesD', function ($q) use ($memberSales) {
+
+                    // Filter berdasarkan sl_leads_kebutuhan
+                    $query->whereHas('leadsKebutuhan.timSalesD', function ($q) use ($memberSales) {
                         $q->whereIn('user_id', $memberSales);
                     });
                 }

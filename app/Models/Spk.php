@@ -64,6 +64,10 @@ class Spk extends Model
     {
         return $this->hasMany(SpkSite::class, 'spk_id');
     }
+    public function kebutuhan()
+    {
+        return $this->belongsTo(Kebutuhan::class, 'kebutuhan_id');
+    }
 
     public function customerActivities()
     {

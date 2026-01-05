@@ -3,16 +3,70 @@
 namespace App\Rules;
 
 use App\Models\Leads;
+use App\Models\Village;
+use App\Models\Benua;
+use App\Models\City;
+use App\Models\Province;
+use App\Models\District;
 use Illuminate\Contracts\Validation\Rule;
 
 class UniqueCompanyStrict implements Rule
 {
     protected $excludeId;
     protected $similarCompanies = [];
+    protected $geographicNames = [];
 
     public function __construct($excludeId = null)
     {
         $this->excludeId = $excludeId;
+        $this->loadGeographicNames();
+    }
+
+    /**
+     * Load semua nama geografis dari database
+     */
+    private function loadGeographicNames()
+    {
+        // Ambil nama villages
+        $villages = Village::pluck('name')
+            ->map(fn($name) => strtolower(trim($name)))
+            ->filter()
+            ->toArray();
+
+        // Ambil nama benua
+        $benuas = Benua::pluck('nama_benua')
+            ->map(fn($name) => strtolower(trim($name)))
+            ->filter()
+            ->toArray();
+
+        // Ambil nama cities
+        $cities = City::where('is_active', 1)
+            ->pluck('name')
+            ->map(fn($name) => strtolower(trim($name)))
+            ->filter()
+            ->toArray();
+
+        // Ambil nama provinces
+        $provinces = Province::where('is_active', 1)
+            ->pluck('name')
+            ->map(fn($name) => strtolower(trim($name)))
+            ->filter()
+            ->toArray();
+
+        // Ambil nama districts
+        $districts = District::pluck('name')
+            ->map(fn($name) => strtolower(trim($name)))
+            ->filter()
+            ->toArray();
+
+        // Gabungkan semua nama geografis
+        $this->geographicNames = array_unique(array_merge(
+            $villages,
+            $benuas,
+            $cities,
+            $provinces,
+            $districts
+        ));
     }
 
     public function passes($attribute, $value)
@@ -62,24 +116,24 @@ class UniqueCompanyStrict implements Rule
                 $similarityReasons[] = "mengandung nama yang sama";
             }
 
-            // 3. Cek kemiripan menggunakan similar_text dengan threshold ketat
+            // 3. Cek kemiripan menggunakan similar_text dengan threshold yang lebih longgar
             similar_text($input, $normalized, $percent);
-            if ($percent > 80) {
+            if ($percent > 90) { // Naik dari 80 ke 90
                 $similarityReasons[] = "tingkat kemiripan {$percent}%";
             }
 
-            // 4. Cek kata kunci utama (token matching)
+            // 4. Cek kata kunci utama (token matching) - hanya jika kata panjang dan banyak yang sama
             if ($this->hasCommonKeywords($input, $normalized)) {
                 $similarityReasons[] = "memiliki kata kunci yang sama";
             }
 
-            // 5. Cek Levenshtein distance (edit distance)
+            // 5. Cek Levenshtein distance (edit distance) dengan threshold lebih longgar
             $distance = levenshtein($input, $normalized);
             $maxLength = max(strlen($input), strlen($normalized));
             if ($maxLength > 0) {
                 $similarity = (1 - $distance / $maxLength) * 100;
                 
-                if ($similarity > 85) {
+                if ($similarity > 92) { // Naik dari 85 ke 92
                     $similarityReasons[] = "tingkat kemiripan {$similarity}% berdasarkan edit distance";
                 }
             }
@@ -130,8 +184,12 @@ class UniqueCompanyStrict implements Rule
         // Ubah huruf ke kecil
         $text = strtolower(trim($text));
         
-        // Hapus semua karakter non-alphanumeric dan non-spasi, termasuk tanda baca
-        $text = preg_replace('/[^a-z0-9\s]/', '', $text);
+        // Hapus semua tanda baca dan karakter khusus terlebih dahulu
+        // Termasuk: . , ! ? ; : " ' ` ( ) [ ] { } / \ | @ # $ % ^ & * + = - _ ~ < >
+        $text = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $text);
+        
+        // Hapus angka jika tidak diperlukan dalam perbandingan
+        $text = preg_replace('/[0-9]/', '', $text);
         
         // Ganti multiple spaces dengan single space
         $text = preg_replace('/\s+/', ' ', $text);
@@ -139,29 +197,46 @@ class UniqueCompanyStrict implements Rule
         // Hapus kata umum yang tidak penting untuk perbandingan
         $commonWords = [
             'pt', 'cv', 'ud', 'tbk', 'company', 'corp', 'inc', 'ltd', 
-            'indonesia', 'surabaya', 'jakarta', 'bandung', 'semarang', 
-            'yogyakarta', 'indonesia', 'group', 'holding', 'corporation',
-            'kupang', 'bali', 'medan', 'makassar', 'palembang', 'kebumen',
-            // Tambahkan kata umum lainnya yang sering muncul
+            'group', 'holding', 'corporation', 'international', 'global',
+            'national', 'pusat', 'cabang', 'kantor', 'toko', 'warung','industri', 'perusahaan', 'enterprise', 'services', 'solution', 'tech',
+            'technology','nasional','cabang'
         ];
         
-        $words = array_filter(explode(' ', $text), function($word) use ($commonWords) {
-            return !in_array($word, $commonWords) && strlen($word) > 2;
+        // Hapus nama geografis dari text
+        $words = explode(' ', $text);
+        $filteredWords = array_filter($words, function($word) use ($commonWords) {
+            // Hapus common words
+            if (in_array($word, $commonWords)) {
+                return false;
+            }
+            
+            // Hapus nama geografis
+            if (in_array($word, $this->geographicNames)) {
+                return false;
+            }
+            
+            // Hapus kata yang terlalu pendek
+            if (strlen($word) <= 2) {
+                return false;
+            }
+            
+            return true;
         });
         
         // Urutkan kata untuk konsistensi dan gabungkan kembali
-        sort($words);
-        return implode(' ', $words);
+        sort($filteredWords);
+        return implode(' ', $filteredWords);
     }
 
     private function hasCommonKeywords($text1, $text2)
     {
+        // Filter kata yang panjangnya lebih dari 4 karakter (lebih spesifik)
         $words1 = array_filter(explode(' ', $text1), function($word) {
-            return strlen($word) > 3;
+            return strlen($word) > 4; // Naik dari 3 ke 4
         });
         
         $words2 = array_filter(explode(' ', $text2), function($word) {
-            return strlen($word) > 3;
+            return strlen($word) > 4; // Naik dari 3 ke 4
         });
 
         if (empty($words1) || empty($words2)) {
@@ -171,7 +246,19 @@ class UniqueCompanyStrict implements Rule
         // Cari kata yang sama di kedua teks
         $commonWords = array_intersect($words1, $words2);
         
-        // Jika ada minimal 3 kata kunci yang sama, anggap mirip
-        return count($commonWords) >= 3;
+        // Perlu ada minimal 2 kata kunci yang sama DAN panjang
+        // ATAU 1 kata yang sangat panjang (lebih dari 8 karakter)
+        if (count($commonWords) >= 2) {
+            return true;
+        }
+        
+        // Cek apakah ada 1 kata yang sangat spesifik (panjang)
+        foreach ($commonWords as $word) {
+            if (strlen($word) > 8) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 }

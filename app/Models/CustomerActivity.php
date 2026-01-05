@@ -14,6 +14,7 @@ class CustomerActivity extends Model
     protected $table = 'sl_customer_activity';
     protected $fillable = [
         'tgl_activity',
+        'quotation_id',
         'branch_id',
         'nomor',
         'leads_id',
@@ -84,9 +85,26 @@ class CustomerActivity extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+    // CustomerActivity.php - tambahkan method ini
+
+    public function pks()
+    {
+        return $this->belongsTo(Pks::class, 'pks_id');
+    }
+
+    public function spk()
+    {
+        return $this->belongsTo(Spk::class, 'spk_id');
+    }
+
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
     public function getCreatedAtAttribute($value)
     {
-        return Carbon::parse($value)->format('d-m-Y');
+        // Menggunakan 'd-m-Y H:i:s' untuk menyertakan jam (24-jam), menit, dan detik.
+        return Carbon::parse($value)->format('d-m-Y H:i:s');
     }
 
 

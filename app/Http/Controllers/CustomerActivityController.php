@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
+use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -22,11 +23,17 @@ use Illuminate\Support\Str;
 /**
  * @OA\Tag(
  *     name="Customer Activity",
- *     description="Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
+ *     description="Endpoints untuk manajemen aktivitas customer"
  * )
  */
 class CustomerActivityController extends Controller
 {
+    private $dynamicMailerService;
+
+    public function __construct(DynamicMailerService $dynamicMailerService)
+    {
+        $this->dynamicMailerService = $dynamicMailerService;
+    }
     /**
      * @OA\Get(
      *     path="/api/customer-activities/list",
@@ -148,11 +155,9 @@ class CustomerActivityController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            // Set default tanggal jika tidak ada parameter
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi tanggal hanya jika kedua parameter ada
             if ($request->tgl_dari && $request->tgl_sampai) {
                 if (Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
                     return response()->json([
@@ -162,7 +167,6 @@ class CustomerActivityController extends Controller
                 }
             }
 
-            // Query dasar dengan eager loading
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
@@ -170,12 +174,10 @@ class CustomerActivityController extends Controller
                 'timSalesDetail:id,nama'
             ])->whereNull('deleted_at');
 
-            // Filter tanggal - hanya diterapkan jika ada parameter tanggal
             if ($request->tgl_dari || $request->tgl_sampai) {
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
-            // Apply filters - hanya jika parameter ada dan tidak null/empty
             if ($request->filled('branch')) {
                 $query->whereHas('leads', function ($q) use ($request) {
                     $q->where('branch_id', $request->branch);
@@ -196,20 +198,16 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            // Filter berdasarkan role user
             $user = Auth::user();
             if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                // Logic filter untuk divisi sales - menampilkan hanya aktivitas user tersebut
                 $query->where('user_id', $user->id);
             }
 
-            // Order dan get data
             $activities = $query->orderBy('tgl_activity', 'desc')
                 ->orderBy('created_at', 'desc')
                 ->get();
 
-            // Map data untuk menampilkan hanya field yang diperlukan
-            $mappedActivities = $activities->map(function ($activity) {
+            $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
                 return [
                     'id' => $activity->id,
                     'nomor' => $activity->nomor,
@@ -222,6 +220,10 @@ class CustomerActivityController extends Controller
                     'kebutuhan' => $activity->leads?->kebutuhan->first()?->nama,
                     'branch' => $activity->leads?->branch?->name,
                     'sales' => $activity->timSalesDetail?->nama,
+                    'leads_id' => $activity->leads_id,
+                    'quotation_id' => $activity->quotation_id,
+                    'spk_id' => $activity->spk_id,
+                    'pks_id' => $activity->pks_id
                 ];
             });
 
@@ -249,6 +251,7 @@ class CustomerActivityController extends Controller
             ], 500);
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/customer-activities/view/{id}",
@@ -1007,20 +1010,37 @@ class CustomerActivityController extends Controller
     }
 
 
-
     /**
      * @OA\Post(
      *     path="/api/customer-activities/send-email",
-     *     summary="Send email notification",
-     *     description="Mengirim email notifikasi terkait customer activity",
+     *     summary="Send email notification with dynamic SMTP configuration",
+     *     description="Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. 
+     *                 Jika user memiliki konfigurasi email, akan digunakan. 
+     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"subject", "body", "recipients"},
-     *             @OA\Property(property="subject", type="string", example="Update Customer Activity"),
-     *             @OA\Property(property="body", type="string", example="Customer activity telah diupdate"),
+     *             required={"subject", "body", "recipients", "leads_id"},
+     *             @OA\Property(
+     *                 property="subject", 
+     *                 type="string", 
+     *                 example="Update Customer Activity",
+     *                 description="Subject email"
+     *             ),
+     *             @OA\Property(
+     *                 property="body", 
+     *                 type="string", 
+     *                 example="Customer activity telah diupdate. Berikut detailnya:\n\nNama Perusahaan: PT ABC\nTanggal: 2024-12-09\nTipe: Meeting\nCatatan: Follow up penawaran produk",
+     *                 description="Isi email (mendukung line breaks)"
+     *             ),
+     *             @OA\Property(
+     *                 property="leads_id", 
+     *                 type="integer", 
+     *                 example=1,
+     *                 description="ID leads untuk membuat activity baru"
+     *             ),
      *             @OA\Property(
      *                 property="recipients", 
      *                 type="array", 
@@ -1030,51 +1050,315 @@ class CustomerActivityController extends Controller
      *                     format="email",
      *                     example="customer@example.com"
      *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="cc", 
+     *                 type="array", 
+     *                 description="Optional: CC recipients",
+     *                 @OA\Items(type="string", format="email")
+     *             ),
+     *             @OA\Property(
+     *                 property="bcc", 
+     *                 type="array", 
+     *                 description="Optional: BCC recipients",
+     *                 @OA\Items(type="string", format="email")
+     *             ),
+     *             @OA\Property(
+     *                 property="attachments", 
+     *                 type="array", 
+     *                 description="Optional: File attachments",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="name", type="string", example="document.pdf"),
+     *                     @OA\Property(property="content", type="string", description="Base64 encoded file content"),
+     *                     @OA\Property(property="mime", type="string", example="application/pdf")
+     *                 )
      *             )
      *         )
      *     ),
      *     @OA\Response(
-     *         response=200,
-     *         description="Email berhasil dikirim",
+     *         response=201,
+     *         description="Email berhasil dikirim dan activity baru dibuat",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim")
+     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@example.com>"),
+     *                 @OA\Property(property="recipients_count", type="integer", example=3),
+     *                 @OA\Property(
+     *                     property="activity",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-122024-00001"),
+     *                     @OA\Property(property="tipe", type="string", example="Email")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="config_source",
+     *                     type="string",
+     *                     example="user_custom",
+     *                     description="user_custom, user_default, or system_default"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=207,
+     *         description="Multi-Status - Beberapa email berhasil, beberapa gagal",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 2 dari 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(property="partial_success", type="boolean", example=true),
+     *             @OA\Property(property="failed_recipients", type="array", @OA\Items(type="string"))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Gagal mengirim email: SMTP connection failed")
      *         )
      *     )
      * )
      */
     public function sendEmail(Request $request): JsonResponse
     {
+        set_time_limit(0);
+
         try {
+            DB::beginTransaction();
+
+            // === VALIDASI REQUEST ===
             $validator = Validator::make($request->all(), [
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
-                'recipients' => 'required|array',
-                'recipients.*' => 'email'
+                'leads_id' => 'required|exists:sl_leads,id',
+                'recipients' => 'required|array|min:1',
+                'recipients.*' => 'required|email',
+                'cc' => 'nullable|array',
+                'cc.*' => 'email',
+                'bcc' => 'nullable|array',
+                'bcc.*' => 'email',
+                'attachments' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
-            foreach ($request->recipients as $recipient) {
-                // Mail::to($recipient)->send(new CustomerActivityEmail($request->subject, $request->body));
+            // === DAPATKAN USER DAN KONFIGURASI ===
+            $user = Auth::user();
+
+            // === SETUP DYNAMIC MAILER ===
+            try {
+                $mailerSetup = $this->dynamicMailerService->setupMailer($user);
+            } catch (\Exception $e) {
+                throw new \Exception('Gagal mengkonfigurasi email: ' . $e->getMessage());
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Email berhasil dikirim'
-            ]);
+            $mailerName = $mailerSetup['name'];
+            $fromConfig = $mailerSetup['config'];
+            $configSource = $mailerSetup['config_source'];
+
+            // === BUAT ACTIVITY BARU (TIPE EMAIL) ===
+            $leads = Leads::find($request->leads_id);
+            $nomor = $this->generateNomor($request->leads_id);
+            $current_date_time = Carbon::now();
+
+            // Gabungkan recipients untuk disimpan di notes
+            $recipientsList = implode(', ', $request->recipients);
+            $notes = "Email dikirim ke: {$recipientsList}\nSubject: {$request->subject}\n\n{$request->body}";
+
+            if ($request->cc) {
+                $notes .= "\nCC: " . implode(', ', $request->cc);
+            }
+
+            if ($request->bcc) {
+                $notes .= "\nBCC: " . implode(', ', $request->bcc);
+            }
+
+            // Buat activity baru
+            $activityData = [
+                'nomor' => $nomor,
+                'leads_id' => $request->leads_id,
+                'tgl_activity' => $current_date_time->toDateString(),
+                'tipe' => 'Email',
+                'notes' => $notes,
+                'branch_id' => $leads->branch_id,
+                'user_id' => $user->id,
+                'created_by' => $user->full_name,
+                'created_at' => $current_date_time
+            ];
+
+            $activity = CustomerActivity::create($activityData);
+
+            // === PREPARE EMAIL CONTENT ===
+            $fullBody = $request->body;
+
+            // Tambahkan info activity ke body email
+            $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
+            $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
+            $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
+            $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
+            $activityInfo .= "Tipe: " . $activity->tipe . "\n";
+
+            $fullBody .= $activityInfo;
+
+            // === SEND EMAILS ===
+            $sentCount = 0;
+            $failedRecipients = [];
+            $successRecipients = [];
+
+            $totalRecipients = count($request->recipients);
+
+            foreach ($request->recipients as $index => $recipient) {
+                $attempt = $index + 1;
+
+                try {
+                    // Buat email instance
+                    $email = new \App\Mail\CustomerActivityEmail(
+                        subject: $request->subject,
+                        body: $fullBody,
+                        fromAddress: $fromConfig['address'],
+                        fromName: $fromConfig['name']
+                    );
+
+                    // Tambahkan CC jika ada
+                    if (!empty($request->cc)) {
+                        $email->cc($request->cc);
+                    }
+
+                    // Tambahkan BCC jika ada
+                    if (!empty($request->bcc)) {
+                        $email->bcc($request->bcc);
+                    }
+
+                    // Kirim email menggunakan mailer dinamis
+                    Mail::mailer($mailerName)->to($recipient)->send($email);
+
+                    $sentCount++;
+                    $successRecipients[] = $recipient;
+
+                } catch (\Exception $e) {
+                    $failedRecipients[] = [
+                        'email' => $recipient,
+                        'error' => $e->getMessage(),
+                        'attempt' => $attempt
+                    ];
+                }
+
+                // Delay kecil antar email untuk menghindari rate limit
+                if ($attempt < $totalRecipients) {
+                    usleep(50000); // 50ms delay
+                }
+            }
+
+            DB::commit();
+
+            // === RESPONSE ===
+            if ($sentCount === $totalRecipients) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Email berhasil dikirim ke {$sentCount} penerima dan activity baru telah dibuat",
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'recipients_count' => $sentCount,
+                        'recipients' => $successRecipients,
+                        'activity' => [
+                            'id' => $activity->id,
+                            'nomor' => $activity->nomor,
+                            'tipe' => $activity->tipe,
+                            'tgl_activity' => $activity->tgl_activity,
+                            'created_at' => $activity->created_at
+                        ],
+                        'cc' => $request->cc ?? [],
+                        'bcc' => $request->bcc ?? []
+                    ]
+                ], 201);
+            } elseif ($sentCount > 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Email berhasil dikirim ke {$sentCount} dari {$totalRecipients} penerima dan activity baru telah dibuat",
+                    'partial_success' => true,
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'success_recipients' => $successRecipients,
+                        'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'activity' => [
+                            'id' => $activity->id,
+                            'nomor' => $activity->nomor,
+                            'tipe' => $activity->tipe,
+                            'tgl_activity' => $activity->tgl_activity,
+                            'created_at' => $activity->created_at
+                        ],
+                        'success_count' => $sentCount,
+                        'failed_count' => count($failedRecipients)
+                    ]
+                ], 207);
+            } else {
+                // Rollback activity jika semua email gagal
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mengirim email ke semua penerima',
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'errors' => array_column($failedRecipients, 'error')
+                    ]
+                ], 500);
+            }
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('=== CRITICAL ERROR in sendEmail ===');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('Trace: ' . $e->getTraceAsString());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengirim email'
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Helper untuk test koneksi mailer
+     */
+    private function testMailerConnection($mailerName, $fromConfig): array
+    {
+        try {
+            // Coba kirim email test ke diri sendiri
+            Mail::mailer($mailerName)->raw('Test connection', function ($message) use ($fromConfig) {
+                $message->to($fromConfig['address'])
+                    ->subject('Test Connection - ' . date('Y-m-d H:i:s'))
+                    ->from($fromConfig['address'], $fromConfig['name']);
+            });
+
+            return ['success' => true, 'message' => 'Connection successful'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
@@ -1696,121 +1980,121 @@ class CustomerActivityController extends Controller
         }
     }
 
+
     /**
      * @OA\Get(
-     *     path="/api/customer-activities/paginated",
-     *     summary="Get paginated customer activities",
-     *     description="Mengambil daftar customer activities dengan pagination untuk feed",
+     *     path="/api/customer-activities/available",
+     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas",
+     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:
+     *                 - Sales (29): hanya melihat leads mereka sendiri
+     *                 - Team Leader (31): melihat leads seluruh anggota tim
+     *                 - RO (6,8): melihat semua leads
+     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Halaman",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Jumlah data per halaman",
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Success",
+     *         description="Berhasil mengambil data leads tersedia",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
      *             @OA\Property(
-     *                 property="data", 
+     *                 property="data",
      *                 type="array",
      *                 @OA\Items(
-     *                     type="object",
      *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-092024-00001"),
-     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2024-09-23"),
-     *                     @OA\Property(property="tipe", type="string", example="Telepon"),
-     *                     @OA\Property(property="keterangan", type="string", example="Follow up customer"),
-     *                     @OA\Property(property="created_at", type="string", format="date-time"),
-     *                     @OA\Property(property="nama", type="string", example="PT. Contoh Perusahaan"),
-     *                     @OA\Property(property="sales", type="string", example="John Doe"),
-     *                     @OA\Property(property="kebutuhan", type="string", example="Laboratory Service"),
-     *                     @OA\Property(property="status_leads", type="string", example="Follow Up")
+     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="salesEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManagerEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManager", type="string", example=""),
+     *                     @OA\Property(
+     *                         property="status_leads",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="branch",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="kebutuhan",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     )
      *                 )
-     *             ),
-     *             @OA\Property(property="current_page", type="integer", example=1),
-     *             @OA\Property(property="per_page", type="integer", example=10),
-     *             @OA\Property(property="total", type="integer", example=50),
-     *             @OA\Property(property="last_page", type="integer", example=5)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
      *         )
      *     )
      * )
      */
-    public function getPaginatedActivities(Request $request): JsonResponse
+    public function availableLeads()
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $page = $request->get('page', 1);
+            $user = Auth::user();
 
-            $db2 = DB::connection('mysqlhris')->getDatabaseName();
-
-            $query = DB::table('sl_customer_activity')
-                ->join('sl_leads', 'sl_leads.id', 'sl_customer_activity.leads_id')
-                ->leftJoin('m_tim_sales_d', 'sl_leads.tim_sales_d_id', '=', 'm_tim_sales_d.id')
-                ->leftJoin('m_kebutuhan', 'sl_leads.kebutuhan_id', '=', 'm_kebutuhan.id')
-                ->leftJoin('m_status_leads', 'sl_customer_activity.status_leads_id', '=', 'm_status_leads.id')
-                ->select([
-                    'sl_customer_activity.id',
-                    'sl_customer_activity.nomor',
-                    'sl_customer_activity.tgl_activity',
-                    'sl_customer_activity.tipe',
-                    'sl_customer_activity.notes as keterangan',
-                    'sl_customer_activity.created_at',
-                    'sl_leads.nama_perusahaan as nama',
-                    'm_tim_sales_d.nama as sales',
-                    'm_kebutuhan.nama as kebutuhan',
-                    'm_status_leads.nama as status_leads'
+            // Gunakan scope dari model dengan select hanya kolom yang diperlukan
+            $query = Leads::select([
+                'id',
+                'nama_perusahaan',
+                'branch_id',
+                'tgl_leads',
+                'pic',
+                'no_telp'
+            ])
+                ->with([
+                    'branch:id,name' // Hanya ambil id dan name dari branch
                 ])
-                ->whereNull('sl_customer_activity.deleted_at')
-                ->orderBy('sl_customer_activity.tgl_activity', 'desc');
+                ->availableForActivity($user);
 
-            // Apply filters if provided
-            if ($request->tgl_dari && $request->tgl_sampai) {
-                $query->whereBetween('sl_customer_activity.tgl_activity', [$request->tgl_dari, $request->tgl_sampai]);
-            }
+            $data = $query->get();
 
-            if ($request->branch) {
-                $query->where('sl_leads.branch_id', $request->branch);
-            }
-
-            if ($request->kebutuhan) {
-                $query->where('m_kebutuhan.id', $request->kebutuhan);
-            }
-
-            if ($request->tipe) {
-                $query->where('sl_customer_activity.tipe', $request->tipe);
-            }
-
-            $total = $query->count();
-            $results = $query->offset(($page - 1) * $perPage)
-                ->limit($perPage)
-                ->get();
+            // Transformasi data
+            $transformed = $data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'nama_branch' => $item->branch ? $item->branch->name : null,
+                    'tanggal_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'pic' => $item->pic,
+                    'no_telp_pic' => $item->no_telp
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $results,
-                'current_page' => (int) $page,
-                'per_page' => (int) $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage)
+                'message' => 'Data leads tersedia berhasil diambil',
+                'data' => $transformed
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
     }
+
+
     //=====halper functions=====//
     /**
      * Menggabungkan dan mengelola validation rules untuk Add (Create) dan Update.

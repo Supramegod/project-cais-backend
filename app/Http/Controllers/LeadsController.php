@@ -866,7 +866,7 @@ class LeadsController extends Controller
                 'nomor' => $nomorActivity,
                 'notes' => 'Leads Diupdate' .
                     (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
-                'tipe' => 'Leads Update',
+                'tipe' => 'Leads',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
@@ -1479,106 +1479,6 @@ class LeadsController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads belum aktif berhasil diambil',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/leads/available",
-     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas",
-     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:
-     *                 - Sales (29): hanya melihat leads mereka sendiri
-     *                 - Team Leader (31): melihat leads seluruh anggota tim
-     *                 - RO (6,8): melihat semua leads
-     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
-     *     tags={"Leads"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Berhasil mengambil data leads tersedia",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
-     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
-     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
-     *                     @OA\Property(property="salesEmail", type="string", example=""),
-     *                     @OA\Property(property="branchManagerEmail", type="string", example=""),
-     *                     @OA\Property(property="branchManager", type="string", example=""),
-     *                     @OA\Property(
-     *                         property="status_leads",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="branch",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="kebutuhan",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal Server Error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
-     *         )
-     *     )
-     * )
-     */
-    public function availableLeads()
-    {
-        try {
-            $user = Auth::user();
-
-            // Gunakan scope dari model
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
-                ->availableForActivity($user);
-
-            $data = $query->get();
-
-            // Transformasi data
-            $data->transform(function ($item) {
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->salesEmail = '';
-                $item->branchManagerEmail = '';
-                $item->branchManager = '';
-                return $item;
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data leads tersedia berhasil diambil',
                 'data' => $data
             ]);
         } catch (\Exception $e) {

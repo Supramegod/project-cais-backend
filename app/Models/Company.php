@@ -80,6 +80,10 @@ class Company extends Model
     {
         return $this->belongsTo(User::class, 'deleted_by', 'id');
     }
+    public function quotation()
+    {
+        return $this->hasMany(Quotation::class, 'company_id');
+    }
 
     public function getCreatedByAttribute($value)
     {

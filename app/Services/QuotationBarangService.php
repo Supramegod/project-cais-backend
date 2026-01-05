@@ -152,7 +152,7 @@ class QuotationBarangService
         }
 
         $createData = [
-            'quotation_id' => $quotation->id,
+            'quotation_id' => $quotation->id,            
             'barang_id' => $barang_id,
             'jumlah' => $jumlah,
             'harga' => $harga,

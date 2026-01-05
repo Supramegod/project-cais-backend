@@ -86,7 +86,7 @@ class QuotationBusinessService
             'provinsi_id' => $provinceId,
             'provinsi' => $province->nama,
             'kota_id' => $cityId,
-            'kota' => $city->nama,
+            'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
@@ -291,7 +291,7 @@ class QuotationBusinessService
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereNotIn('status_quotation_id', [1, 2, 4, 5])
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -304,10 +304,9 @@ class QuotationBusinessService
                 break;
 
             case 'rekontrak':
-                $query->whereHas('pks', function ($q) {
-                    $q->where('is_aktif', 1)
-                        ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                });
+                $query
+                    // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
+                    ->where('status_quotation_id', 3);
                 break;
         }
 

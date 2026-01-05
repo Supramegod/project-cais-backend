@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AdminPanelController;
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardApprovalController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -234,10 +237,12 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
+        Route::post('/send-email', 'sendEmail');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
         Route::get('/leads/{leadsId}/track', 'trackActivity');
+        Route::get('/available', 'availableLeads');
     });
 
     // Company Group Routes - UPDATED
@@ -280,7 +285,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/child/{id}', 'childLeads');
         Route::post('/child/{id}', 'saveChildLeads');
         Route::get('/belum-aktif', 'leadsBelumAktif');
-        Route::get('/available', 'availableLeads');
         Route::get('/available-quotation', 'availableQuotation');
         Route::post('/activate/{id}', 'activateLead');
         Route::post('/import', 'import');
@@ -349,6 +353,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Available Resources
         Route::get('/available-leads', 'getAvailableLeads');
         Route::get('/available-sites/{leadsId}', 'getAvailableSites');
+        Route::post('/{id}/submit-checklist', 'submitChecklist');
+        // });
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
@@ -364,6 +370,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/{id}/status', 'getStatus');
         Route::get('/available-leads/{tipe_quotation}', 'availableLeads');
         Route::get('/reference/{leads_id}', 'getReferenceQuotations');
+        Route::get('/hc-high-cost', 'getSitesWithHighHcAndCost');
     });
 
     // Quotation Step Management
@@ -391,7 +398,37 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/kecamatan/{kotaId}', 'getKecamatan');
         Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
         Route::get('/negara/{benuaId}', 'getNegara');
+        Route::get('/loyalty', 'loyaltylist');
+        Route::get('/kategori-sesuai-hc', 'kategorusesuaihc');
+        Route::get('/rule-thr', 'rulethr');
+        Route::get('/salary-rule', 'salaryrule');
+        Route::get('/status-pks', 'statuspks');
+        Route::get('/status-spk', 'statusspk');
 
+    });
+    // User Email Config
+    Route::prefix('user')->controller(UserEmailConfigController::class)->group(function () {
+        Route::get('/list', 'getConfig');
+        Route::post('/add', 'saveConfig');
+        Route::post('/test', 'testConnection');
+    });
+    // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
+    Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
+        Route::get('/list', 'getListDashboardApprovalData');
+    });
+
+    // Admin Panel Routes - untuk update step quotation secara khusus
+    Route::prefix('admin-panel')->controller(AdminPanelController::class)->group(function () {
+        // Get step data
+        Route::get('/quotations/{quotation}/step-data/{step}', 'getStepData');
+
+        // Update steps - menggunakan POST (jika ingin konsisten)
+        Route::post('/quotations/{quotation}/hc', 'updateStep3');
+        Route::post('/quotations/{quotation}/kaporlap', 'updateStep7');
+        Route::post('/quotations/{quotation}/devices', 'updateStep8');
+        Route::post('/quotations/{quotation}/chemical', 'updateStep9');
+        Route::post('/quotations/{quotation}/ohc', 'updateStep10');
+        Route::post('/quotations/{quotation}/harga-jual', 'updateStep11');
     });
 
 });
