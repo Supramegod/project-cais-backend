@@ -643,8 +643,6 @@ class QuotationService
                     'detail_id' => $detail->id,
                     'value' => $detail->tunjangan_hari_raya_hpp
                 ]);
-            } else if ($wageThrNormalized === 'diberikan langsung') {
-                $detail->tunjangan_hari_raya_hpp = 'Diberikan Langsung Oleh Client';
             } else {
                 $detail->tunjangan_hari_raya_hpp = 0;
 
@@ -657,10 +655,8 @@ class QuotationService
                 $detail->tunjangan_hari_raya_coss = (float) $coss->tunjangan_hari_raya;
             } else if ($hpp && $hpp->tunjangan_hari_raya !== null) {
                 $detail->tunjangan_hari_raya_coss = (float) $hpp->tunjangan_hari_raya;
-            } else if ($wageThrNormalized === 'diberikan langsung') {
-                $detail->tunjangan_hari_raya_hpp = 'Diberikan Langsung Oleh Client';
             } else {
-                $detail->tunjangan_hari_raya_hpp = 0;
+                $detail->tunjangan_hari_raya_coss = 0;
 
             }
 
