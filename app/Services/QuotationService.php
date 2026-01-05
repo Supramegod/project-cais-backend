@@ -772,39 +772,111 @@ class QuotationService
 
         return round($result, 2);
     }
+    // ============================ ITEM CALCULATIONS ============================
     private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
+        \Log::info("=== START calculateAllItems ===", [
+            'detail_id' => $detail->id,
+            'detail_jumlah_hc' => $detail->jumlah_hc,
+            'total_jumlah_hc_all_details' => $totalJumlahHc,
+            'hpp_exists' => !is_null($hpp),
+            'coss_exists' => !is_null($coss),
+            'hpp_values' => $hpp ? [
+                'provisi_seragam' => $hpp->provisi_seragam ?? 0,
+                'provisi_peralatan' => $hpp->provisi_peralatan ?? 0,
+                'provisi_ohc' => $hpp->provisi_ohc ?? 0,
+                'provisi_chemical' => $hpp->provisi_chemical ?? 0,
+            ] : 'no_hpp',
+            'coss_values' => $coss ? [
+                'provisi_seragam' => $coss->provisi_seragam ?? 0,
+                'provisi_peralatan' => $coss->provisi_peralatan ?? 0,
+                'provisi_ohc' => $coss->provisi_ohc ?? 0,
+                'provisi_chemical' => $coss->provisi_chemical ?? 0,
+            ] : 'no_coss'
+        ]);
         $items = [
-            'kaporlap' => ['hpp_field' => 'provisi_seragam', 'coss_field' => 'provisi_seragam', 'model' => QuotationKaporlap::class, 'detail_id' => $detail->id, 'divider' => $detail->jumlah_hc],
-            'devices' => ['hpp_field' => 'provisi_peralatan', 'coss_field' => 'provisi_peralatan', 'model' => QuotationDevices::class, 'divider' => $detail->jumlah_hc], // Ganti ke detail->jumlah_hc
-            'ohc' => ['hpp_field' => 'provisi_ohc', 'coss_field' => 'provisi_ohc', 'model' => QuotationOhc::class, 'divider' => $detail->jumlah_hc], // Ganti ke detail->jumlah_hc
-            'chemical' => ['hpp_field' => 'provisi_chemical', 'coss_field' => 'provisi_chemical', 'model' => QuotationChemical::class, 'special' => 'chemical', 'divider' => $detail->jumlah_hc] // Tambah divider
+            'kaporlap' => [
+                'hpp_field' => 'provisi_seragam',
+                'coss_field' => 'provisi_seragam',
+                'model' => QuotationKaporlap::class,
+                'detail_id' => $detail->id,
+                'divider' => $detail->jumlah_hc  // PERBAIKAN: Gunakan jumlah_hc dari detail ini
+            ],
+            'devices' => [
+                'hpp_field' => 'provisi_peralatan',
+                'coss_field' => 'provisi_peralatan',
+                'model' => QuotationDevices::class,
+                'divider' => $detail->jumlah_hc  // PERBAIKAN: Gunakan jumlah_hc dari detail ini
+            ],
+            'ohc' => [
+                'hpp_field' => 'provisi_ohc',
+                'coss_field' => 'provisi_ohc',
+                'model' => QuotationOhc::class,
+                'divider' => $detail->jumlah_hc  // PERBAIKAN: Gunakan jumlah_hc dari detail ini
+            ],
+            'chemical' => [
+                'hpp_field' => 'provisi_chemical',
+                'coss_field' => 'provisi_chemical',
+                'model' => QuotationChemical::class,
+                'special' => 'chemical',
+                'divider' => $detail->jumlah_hc  // PERBAIKAN: Gunakan jumlah_hc dari detail ini
+            ]
         ];
 
         foreach ($items as $key => $config) {
+            \Log::info("Processing item: {$key}", [
+                'detail_id' => $detail->id,
+                'hpp_field' => $config['hpp_field'],
+                'divider' => $config['divider'],
+                'has_special' => $config['special'] ?? false
+            ]);
+
             $this->calculateItem($detail, $quotation, $key, $config, $hpp, $coss, $detail->jumlah_hc, $totalJumlahHc);
         }
+
+        \Log::info("=== END calculateAllItems ===", [
+            'detail_id' => $detail->id,
+            'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
+            'personil_devices' => $detail->personil_devices ?? 0,
+            'personil_chemical' => $detail->personil_chemical ?? 0,
+            'personil_ohc' => $detail->personil_ohc ?? 0
+        ]);
     }
 
     private function calculateItem($detail, $quotation, $itemName, $config, $hpp, $coss, $detailJumlahHc, $totalJumlahHc)
     {
-        // Gunakan divider dari config
-        $divider = $config['divider'] ?? 1;
+        // **PERBAIKAN KRITIS**: Tentukan apakah barang ini umum atau khusus detail
+        // Barang umum (tanpa detail_id) harus dibagi dengan TOTAL jumlah HC
+        // Barang khusus detail (dengan detail_id) dibagi dengan jumlah HC detail tersebut
 
-        // PERBAIKAN: Logika divider yang benar:
-        if ($divider === 'detail') {
-            $divider = $detailJumlahHc;  // Jumlah HC untuk detail ini
-        } elseif ($divider === 'total') {
-            $divider = $totalJumlahHc;   // Total jumlah HC semua detail
+        $isGeneralItem = false;
+
+        // Cek apakah barang ini umum (tidak terkait detail tertentu)
+        if (in_array($config['model'], [QuotationDevices::class, QuotationOhc::class])) {
+            // Devices dan OHC biasanya barang umum
+            $isGeneralItem = true;
         }
+
+        // **PERUBAHAN PENTING**: Gunakan totalJumlahHc untuk barang umum
+        $divider = $isGeneralItem ? $totalJumlahHc : $detailJumlahHc;
 
         // Pastikan divider minimal 1
         $divider = max($divider, 1);
 
+        \Log::info("calculateItem - Starting calculation", [
+            'detail_id' => $detail->id,
+            'item_name' => $itemName,
+            'is_general_item' => $isGeneralItem,
+            'divider_final' => $divider,
+            'detail_jumlah_hc' => $detailJumlahHc,
+            'total_jumlah_hc' => $totalJumlahHc,
+            'model' => $config['model']
+        ]);
+
         // Hitung nilai untuk HPP
         if (isset($config['special']) && $config['special'] === 'chemical') {
             // Chemical: pembagian berdasarkan jumlah HC detail
-            $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
+            $hppValue = $this->calculateItemTotal(
                 $config['model'],
                 $quotation->id,
                 $config['detail_id'] ?? null,
@@ -814,21 +886,106 @@ class QuotationService
                 $detailJumlahHc  // Parameter ke-7 untuk chemical
             );
         } else {
-            // Non-chemical: pembagian berdasarkan divider
-            $hppValue = $hpp->{$config['hpp_field']} ?? $this->calculateItemTotal(
+            // Non-chemical: pembagian berdasarkan divider yang sudah ditentukan
+            $hppValue = $this->calculateItemTotal(
                 $config['model'],
                 $quotation->id,
                 $config['detail_id'] ?? null,
                 $quotation->provisi,
-                $divider,  // Gunakan divider yang sudah dihitung
+                $divider,  // **INI PERUBAHAN PENTING**: Gunakan divider yang sesuai
                 null,
                 $detailJumlahHc
             );
         }
 
+        // **PERBAIKAN**: Untuk COSS, jika barang umum juga harus sama dengan HPP
+        $cossValue = $hppValue;
+
         // Simpan ke detail
         $detail->{"personil_$itemName"} = $hppValue;
-        $detail->{"personil_{$itemName}_coss"} = $coss->{$config['coss_field']} ?? $hppValue;
+        $detail->{"personil_{$itemName}_coss"} = $cossValue;
+
+        \Log::info("calculateItem - Result (DIVIDER FIXED)", [
+            'detail_id' => $detail->id,
+            'item_name' => $itemName,
+            'is_general_item' => $isGeneralItem,
+            'divider_used' => $divider,
+            'hpp_value_calculated' => $hppValue,
+            'coss_value_calculated' => $cossValue,
+            'field_name' => "personil_$itemName",
+            'final_value_set' => $detail->{"personil_$itemName"}
+        ]);
+    }
+
+    private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
+    {
+        \Log::info("=== START calculateItemTotal ===", [
+            'model' => $model,
+            'quotation_id' => $quotationId,
+            'detail_id' => $detailId,
+            'provisi' => $provisi,
+            'divider' => $divider,
+            'special' => $special,
+            'jumlah_hc' => $jumlahHc
+        ]);
+
+        $query = $model::where('quotation_id', $quotationId);
+        if ($detailId) {
+            $query->where('quotation_detail_id', $detailId);
+            \Log::info("Added detail_id filter", ['detail_id' => $detailId]);
+        }
+
+        $items = $query->get();
+        \Log::info("Found items count", ['count' => $items->count()]);
+
+        $total = 0;
+        $itemIndex = 0;
+
+        foreach ($items as $item) {
+            $itemIndex++;
+            \Log::info("Processing item {$itemIndex}", [
+                'item_id' => $item->id,
+                'jumlah' => $item->jumlah,
+                'harga' => $item->harga,
+                'masa_pakai' => $item->masa_pakai ?? null,
+                'model_type' => get_class($item)
+            ]);
+
+            if ($special === 'chemical') {
+                // Untuk chemical: total dibagi jumlah HC detail ini
+                $itemTotal = (($item->jumlah * $item->harga) / $item->masa_pakai);
+                $perPerson = $itemTotal / max($jumlahHc, 1);
+
+                \Log::info("Chemical calculation", [
+                    'item_id' => $item->id,
+                    'formula' => "(({$item->jumlah} * {$item->harga}) / {$item->masa_pakai}) / max({$jumlahHc}, 1)",
+                    'item_total' => $itemTotal,
+                    'per_person' => $perPerson
+                ]);
+
+                $total += $perPerson;
+            } else {
+                // Untuk item lain: total dibagi jumlah HC (bisa detail atau total tergantung config)
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+                $perPerson = $itemTotal / max($divider, 1);
+
+                \Log::info("Non-chemical calculation", [
+                    'item_id' => $item->id,
+                    'formula' => "(({$item->harga} * {$item->jumlah}) / {$provisi}) / max({$divider}, 1)",
+                    'item_total' => $itemTotal,
+                    'per_person' => $perPerson
+                ]);
+
+                $total += $perPerson;
+            }
+        }
+
+        \Log::info("=== END calculateItemTotal ===", [
+            'total_result' => $total,
+            'items_processed' => $itemIndex
+        ]);
+
+        return $total;
     }
 
     // ============================ FINAL TOTALS ============================
@@ -1319,22 +1476,22 @@ class QuotationService
         return $result;
     }
 
-    private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
-    {
-        $query = $model::where('quotation_id', $quotationId);
-        if ($detailId) {
-            $query->where('quotation_detail_id', $detailId);
-        }
+    // private function calculateItemTotal($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
+    // {
+    //     $query = $model::where('quotation_id', $quotationId);
+    //     if ($detailId) {
+    //         $query->where('quotation_detail_id', $detailId);
+    //     }
 
-        return $query->get()->sum(function ($item) use ($provisi, $divider, $special, $jumlahHc) {
-            if ($special === 'chemical') {
-                // Untuk chemical: total dibagi jumlah HC detail ini
-                return ((($item->jumlah * $item->harga) / $item->masa_pakai)) / max($jumlahHc, 1);
-            }
-            // Untuk item lain: total dibagi jumlah HC (bisa detail atau total tergantung config)
-            return (($item->harga * $item->jumlah) / $provisi) / max($divider, 1);
-        });
-    }
+    //     return $query->get()->sum(function ($item) use ($provisi, $divider, $special, $jumlahHc) {
+    //         if ($special === 'chemical') {
+    //             // Untuk chemical: total dibagi jumlah HC detail ini
+    //             return ((($item->jumlah * $item->harga) / $item->masa_pakai)) / max($jumlahHc, 1);
+    //         }
+    //         // Untuk item lain: total dibagi jumlah HC (bisa detail atau total tergantung config)
+    //         return (($item->harga * $item->jumlah) / $provisi) / max($divider, 1);
+    //     });
+    // }
     private function applyBpjsOptOut($detail)
     {
         $optOuts = [
