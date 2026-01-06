@@ -565,8 +565,8 @@ class QuotationStepResource extends JsonResource
                             return [
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
-                                'jumlah_hc_hpp' => $hpp->jumlah_hc ?? 0,
-                                'jumlah_hc_coss' => $coss->jumlah_hc ?? 0,
+                                'jumlah_hc_hpp' => $hpp->jumlah_hc ?? $detail->jumlah_hc ?? 0,
+                                'jumlah_hc_coss' => $coss->jumlah_hc ?? $detail->jumlah_hc ?? 0,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,
