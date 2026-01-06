@@ -1401,7 +1401,7 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' =>  $e->getMessage()
+                'message' => $e->getMessage()
             ], 500);
         }
     }
@@ -1934,8 +1934,8 @@ class PksController extends Controller
         $user = Auth::user();
 
         return Leads::with(['timSalesD.user'])
-            // Jika role_id BUKAN 2 (Bukan Superadmin), maka filter berdasarkan user_id login
-            ->when($user->role_id != 2, function ($query) use ($user) {
+            // Jika cais_role_id BUKAN 2 (Bukan Superadmin), maka filter berdasarkan user_id login
+            ->when($user->cais_role_id != 2, function ($query) use ($user) {
                 $query->whereHas('timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });

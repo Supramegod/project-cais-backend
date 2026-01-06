@@ -275,7 +275,7 @@ class SpkController extends Controller
 
             // Role 2 (Superadmin) bisa lihat semua data
             // Role lainnya hanya bisa lihat data tim sales mereka
-            if ($user->role_id != 2) {
+            if ($user->cais_role_id != 2) {
                 $query->whereHas('timSalesD', function ($query) use ($user) {
                     $query->where('user_id', $user->id);
                 });

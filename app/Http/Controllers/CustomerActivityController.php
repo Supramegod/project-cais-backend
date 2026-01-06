@@ -199,7 +199,7 @@ class CustomerActivityController extends Controller
             }
 
             $user = Auth::user();
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
+            if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
                 $query->where('user_id', $user->id);
             }
 

@@ -29,7 +29,7 @@ class User extends Authenticatable
         'password',
         'full_name',
         'email',
-        'role_id',
+        'cais_role_id',
         'branch_id',
         'is_active',
         'created_by',
@@ -62,7 +62,7 @@ class User extends Authenticatable
     // Relasi ke role
     public function role()
     {
-        return $this->belongsTo(Role::class, 'role_id', 'id');
+        return $this->belongsTo(Role::class, 'cais_role_id', 'id');
     }
 
     // Relasi ke branch

@@ -527,7 +527,7 @@ class QuotationStepResource extends JsonResource
 
                             $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
                             $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
-                            \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
+                            // \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
 
                             $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
                             $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
@@ -565,8 +565,8 @@ class QuotationStepResource extends JsonResource
                             return [
                                 'id' => $detail->id,
                                 'position_name' => $detail->jabatan_kebutuhan,
-                                'jumlah_hc_hpp' => $hpp->jumlah_hc ?? 0,
-                                'jumlah_hc_coss' => $coss->jumlah_hc ?? 0,
+                                'jumlah_hc_hpp' => $hpp->jumlah_hc ?? $detail->jumlah_hc ?? 0,
+                                'jumlah_hc_coss' => $coss->jumlah_hc ?? $detail->jumlah_hc ?? 0,
                                 'nama_site' => $detail->nama_site,
                                 'quotation_site_id' => $detail->quotation_site_id,
                                 'penjamin_kesehatan' => $detail->penjamin_kesehatan,

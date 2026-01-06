@@ -243,7 +243,7 @@ class LeadsController extends Controller
 
     private function canViewLead($lead, $tim)
     {
-        if (Auth::user()->role_id == 29) {
+        if (Auth::user()->cais_role_id == 29) {
             return $tim && $lead->tim_sales_d_id == $tim->id;
         }
         return true;
@@ -571,7 +571,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (Auth::user()->role_id == 29) {
+            if (Auth::user()->cais_role_id == 29) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -845,7 +845,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES (SAMA SEPERTI DI ADD)
             // CASE 1: Auto assign jika user adalah sales (role 29) dan lead belum memiliki sales
-            if (Auth::user()->role_id == 29 && !$lead->tim_sales_d_id) {
+            if (Auth::user()->cais_role_id == 29 && !$lead->tim_sales_d_id) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -1370,7 +1370,7 @@ class LeadsController extends Controller
                 'created_by' => Auth::user()->full_name
             ]);
 
-            if (Auth::user()->role_id == 29) {
+            if (Auth::user()->cais_role_id == 29) {
                 $timSalesD = DB::table('m_tim_sales_d')->where('user_id', Auth::id())->first();
                 if ($timSalesD) {
                     $newLead->update([
@@ -2141,7 +2141,7 @@ class LeadsController extends Controller
             $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
             // Cek apakah user memiliki akses
-            if (!in_array($user->role_id, $allowedRoles)) {
+            if (!in_array($user->cais_role_id, $allowedRoles)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses untuk melihat daftar tim sales'
@@ -2172,7 +2172,7 @@ class LeadsController extends Controller
             ]);
 
             // Filter berdasarkan role
-            if ($user->role_id == 31) { // Sales Leader
+            if ($user->cais_role_id == 31) { // Sales Leader
                 // Dapatkan tim sales leader
                 $leaderTim = TimSalesDetail::where('user_id', $user->id)
                     ->first();
@@ -2246,7 +2246,7 @@ class LeadsController extends Controller
      * @OA\Put(
      *     path="/api/leads/assign-sales/{id}",
      *     summary="Mengassign sales ke leads berdasarkan kebutuhan",
-     *     description="Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
+     *     description="Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan cais_role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
      *     tags={"Leads"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -2305,11 +2305,11 @@ class LeadsController extends Controller
                 ], 404);
             }
 
-            // Cek authorization - hanya user dengan role_id tertentu yang bisa assign sales
+            // Cek authorization - hanya user dengan cais_role_id tertentu yang bisa assign sales
             $user = Auth::user();
             $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-            if (!in_array($user->role_id, $allowedRoles)) {
+            if (!in_array($user->cais_role_id, $allowedRoles)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses untuk mengassign sales'
@@ -2780,7 +2780,7 @@ class LeadsController extends Controller
         $user = Auth::user();
         $assignmentResults = [];
 
-        if ($user->role_id == 29) {
+        if ($user->cais_role_id == 29) {
             $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
 
             if ($timSalesD) {
@@ -2825,7 +2825,7 @@ class LeadsController extends Controller
         $assignmentResults = [];
         $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-        if (!in_array($user->role_id, $allowedRoles)) {
+        if (!in_array($user->cais_role_id, $allowedRoles)) {
             return $assignmentResults;
         }
 

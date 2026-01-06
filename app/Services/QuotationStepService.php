@@ -1572,15 +1572,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 return;
             }
 
-            // DEBUG: Cek apakah wage sudah ada
-            $existingWage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
-
-            \Log::info("Wage check before update", [
-                'quotation_detail_id' => $detail->id,
-                'wage_exists' => !is_null($existingWage),
-                'wage_id' => $existingWage ? $existingWage->id : 'none'
-            ]);
-
             // Calculate upah data untuk position ini
             $upahData = $this->calculateUpahForPosition($detail, $positionData);
 
@@ -1590,7 +1581,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'upah' => $positionData['upah'] ?? 'UMK',
                 'hitungan_upah' => $upahData['hitungan_upah'] ?? 'Per Bulan',
                 'lembur' => $positionData['lembur'] ?? 'Tidak Ada',
-                'nominal_upah' => $positionData['nominal_upah'] ?? null,
+                'nominal_upah' => $upahData['nominal_upah'] ?? null,
                 'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
                 'jenis_bayar_lembur' => $positionData['jenis_bayar_lembur'] ?? null,
                 'jam_per_bulan_lembur' => $positionData['jam_per_bulan_lembur'] ?? null,
@@ -1603,21 +1594,50 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 'updated_by' => Auth::user()->full_name
             ];
 
-            // APPROACH: Gunakan updateOrCreate dengan kondisi yang tepat
+            // Simpan data wage
             $wage = QuotationDetailWage::updateOrCreate(
-                [
-                    'quotation_detail_id' => $detail->id
-                ],
+                ['quotation_detail_id' => $detail->id],
                 array_merge($wageData, [
                     'created_by' => Auth::user()->full_name
                 ])
             );
 
-            \Log::info("Wage operation result", [
-                'quotation_detail_id' => $detail->id,
-                'operation' => $wage->wasRecentlyCreated ? 'CREATED' : 'UPDATED',
-                'wage_id' => $wage->id
-            ]);
+            // **PERBAIKAN KRITIKAL: HAPUS NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR SAAT UPDATE STEP 4**
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            if ($hpp) {
+                $hppUpdateData = [];
+
+                // Jika THR di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                if (in_array(strtolower($wageData['thr']), ['diprovisikan', 'ditagihkan'])) {
+                    $hppUpdateData['tunjangan_hari_raya'] = $upahData['nominal_upah'] / 12;
+                }
+
+                // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
+                    $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] * 0.10;
+                }
+
+                // **PERBAIKAN: KOSONGKAN NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR**
+                // Ini akan memaksa perhitungan menggunakan nilai dari wage
+                $hppUpdateData['tunjangan_hari_libur_nasional'] = null;
+                $hppUpdateData['lembur'] = null;
+
+                if (!empty($hppUpdateData)) {
+                    $hppUpdateData['updated_by'] = Auth::user()->full_name;
+                    $hpp->update($hppUpdateData);
+
+                    \Log::info("Updated HPP and cleared tunjangan_holiday & lembur values", [
+                        'detail_id' => $detail->id,
+                        'hpp_update_data' => $hppUpdateData,
+                        'wage_values' => [
+                            'tunjangan_holiday' => $wageData['tunjangan_holiday'],
+                            'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
+                            'lembur' => $wageData['lembur'],
+                            'nominal_lembur' => $wageData['nominal_lembur']
+                        ]
+                    ]);
+                }
+            }
 
             // Update nominal_upah di quotation_detail
             $detail->update([
@@ -1628,17 +1648,37 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             \Log::info("Successfully updated step 4 wage for position", [
                 'quotation_detail_id' => $detail->id,
                 'position_id' => $detail->position_id,
-                'upah' => $positionData['upah'] ?? 'null'
+                'thr' => $wageData['thr'],
+                'kompensasi' => $wageData['kompensasi'],
+                'tunjangan_holiday' => $wageData['tunjangan_holiday'],
+                'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
+                'lembur' => $wageData['lembur'],
+                'nominal_lembur' => $wageData['nominal_lembur']
             ]);
 
         } catch (\Exception $e) {
             \Log::error("Error in updatePositionStep4", [
                 'quotation_detail_id' => $positionData['quotation_detail_id'] ?? 'unknown',
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'error' => $e->getMessage()
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Helper untuk konversi field numerik
+     */
+    private function convertNumericField($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_string($value)) {
+            return (float) str_replace(['.', ','], ['', '.'], $value);
+        }
+
+        return (float) $value;
     }
     /**
      * Helper method to convert various boolean representations to proper boolean
@@ -2487,6 +2527,10 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             if ($request->has('detail_data') && is_array($request->detail_data)) {
                 $this->updateQuotationDetailData($quotation, $request->detail_data, $user, $currentDateTime);
             }
+            // =====================================================
+            // 0. SYNC WAGE DATA DARI STEP 4 KE STEP 11
+            // =====================================================
+            $this->syncWageDataForStep11($quotation, $user, $currentDateTime);
 
             // =====================================================
             // 2. RESET VALUES UNTUK PERHITUNGAN ULANG
@@ -3014,33 +3058,75 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
         $coss = QuotationDetailCoss::where('quotation_detail_id', $detailId)->first();
 
-        if ($coss) {
-            $updateData = [];
-            $allowedCossFields = [
-                'provisi_seragam',
-                'provisi_peralatan',
-                'provisi_chemical',
-                'provisi_ohc',
-                'lembur',
-                'tunjangan_hari_raya',
-                'tunjangan_hari_libur_nasional',
-            ];
+        if (!$coss) {
+            \Log::warning("COSS record not found for detail, creating new one", [
+                'detail_id' => $detailId
+            ]);
 
-            foreach ($allowedCossFields as $field) {
-                if (isset($cossFields[$field])) {
-                    $value = $cossFields[$field];
-                    if (is_string($value) && !is_numeric($value)) {
-                        $value = (float) str_replace(['.', ','], ['', '.'], $value);
-                    }
-                    $updateData[$field] = $value;
+            $coss = QuotationDetailCoss::create([
+                'quotation_detail_id' => $detailId,
+                'quotation_id' => $quotationId,
+                'leads_id' => $detail->quotation->leads_id,
+                'position_id' => $detail->position_id,
+                'jumlah_hc' => $detail->jumlah_hc,
+                'created_by' => $user,
+                'created_at' => $currentDateTime
+            ]);
+        }
+
+        $updateData = [];
+
+        // **PERBAIKAN: Tambahkan semua field yang ada di input, bukan hanya yang di $allowedCossFields**
+        $allCossFields = [
+            'provisi_seragam',
+            'provisi_peralatan',
+            'provisi_chemical',
+            'provisi_ohc',
+            'lembur',
+            'tunjangan_hari_raya',
+            'tunjangan_hari_libur_nasional',
+            'kompensasi' // **TAMBAHKAN INI karena ada di input**
+        ];
+
+        foreach ($allCossFields as $field) {
+            if (isset($cossFields[$field])) {
+                $value = $cossFields[$field];
+
+                // **PERBAIKAN KRITIKAL: Pastikan konversi ke float dengan benar**
+                if ($value === null || trim($value) === '') {
+                    $updateData[$field] = null;
+                } elseif (is_string($value)) {
+                    // Hapus titik sebagai pemisah ribuan, ganti koma dengan titik untuk desimal
+                    $cleanedValue = str_replace(['.', ','], ['', '.'], $value);
+                    $updateData[$field] = (float) $cleanedValue;
+                } else {
+                    $updateData[$field] = (float) $value;
                 }
-            }
 
-            if (!empty($updateData)) {
-                $updateData['updated_by'] = $user;
-                $updateData['updated_at'] = $currentDateTime;
-                $coss->update($updateData);
+                \Log::info("Setting COSS field from Step 11 input", [
+                    'detail_id' => $detailId,
+                    'field' => $field,
+                    'original_value' => $value,
+                    'converted_value' => $updateData[$field] ?? 'null'
+                ]);
             }
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+
+            $coss->update($updateData);
+
+            \Log::info("COSS data updated successfully from Step 11", [
+                'detail_id' => $detailId,
+                'update_data' => $updateData
+            ]);
+        } else {
+            \Log::warning("No COSS data to update for detail", [
+                'detail_id' => $detailId,
+                'coss_fields_received' => $cossFields
+            ]);
         }
     }
     /**
@@ -3634,6 +3720,51 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
         $quotation->setRelation('quotation_detail', null);
         $quotation->setRelation('quotation_site', null);
         $quotation->setRelation('quotation_detail_wage', null);
+    }
+    /**
+     * Sync wage data from step 4 to ensure THR and Kompensasi are calculated
+     */
+    private function syncWageDataForStep11(Quotation $quotation, string $user, Carbon $currentDateTime): void
+    {
+        foreach ($quotation->quotationDetails as $detail) {
+            $wage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
+
+            if ($wage) {
+                // Update HPP dengan data dari wage (step 4)
+                $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+
+                if ($hpp) {
+                    $updateData = [];
+
+                    // Hanya update jika nilai di HPP null atau 0
+                    if (
+                        ($hpp->tunjangan_hari_raya == null || $hpp->tunjangan_hari_raya == 0) &&
+                        $wage->thr && in_array(strtolower($wage->thr), ['diprovisikan', 'ditagihkan'])
+                    ) {
+                        $updateData['tunjangan_hari_raya'] = ($detail->nominal_upah ?? 0) / 12;
+                    }
+
+                    if (
+                        ($hpp->kompensasi == null || $hpp->kompensasi == 0) &&
+                        $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan'])
+                    ) {
+                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) * 0.10;
+                    }
+
+                    if (!empty($updateData)) {
+                        $updateData['updated_by'] = $user;
+                        $updateData['updated_at'] = $currentDateTime;
+
+                        $hpp->update($updateData);
+
+                        \Log::info("Synced wage data to HPP", [
+                            'detail_id' => $detail->id,
+                            'update_data' => $updateData
+                        ]);
+                    }
+                }
+            }
+        }
     }
 
 }

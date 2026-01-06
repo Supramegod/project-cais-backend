@@ -216,19 +216,19 @@ class Leads extends Model
         }
 
         // 🌟 Superadmin dapat mengakses SEMUA data tanpa filter
-        if ($user->role_id == 2) {
+        if ($user->cais_role_id == 2) {
             return $query;
         }
 
         // Sales division
-        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-            if ($user->role_id == 29) {
+        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            if ($user->cais_role_id == 29) {
                 // Sales - hanya melihat leads mereka sendiri
                 // Filter berdasarkan sl_leads_kebutuhan
                 $query->whereHas('leadsKebutuhan.timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
-            } elseif ($user->role_id == 31) {
+            } elseif ($user->cais_role_id == 31) {
                 // Sales Leader - melihat leads seluruh anggota tim
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
@@ -245,19 +245,16 @@ class Leads extends Model
             // Untuk role 30, 32, 33 (Sales lainnya) - tidak ada filter khusus
         }
         // RO division
-        elseif (in_array($user->role_id, [4, 5, 6, 8])) {
+        elseif (in_array($user->cais_role_id, [4, 5, 6, 8])) {
             // RO - filter berdasarkan ro_id (jika kolom ada)
-            if (in_array($user->role_id, [4, 5])) {
+            if (in_array($user->cais_role_id, [4, 5])) {
                 $query->where('ro_id', $user->id);
             }
             // Role 6,8 - tanpa filter (lihat semua)
         }
         // CRM division
-        elseif (in_array($user->role_id, [54, 55, 56])) {
-            // CRM - filter berdasarkan crm_id (jika kolom ada)
-            if ($user->role_id == 54) {
-                $query->where('crm_id', $user->id);
-            }
+        elseif (in_array($user->cais_role_id, [54, 55, 56])) {
+            return $query;
             // Role 55,56 - tanpa filter (lihat semua)
         }
 

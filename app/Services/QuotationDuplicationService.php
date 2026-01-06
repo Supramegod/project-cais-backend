@@ -367,6 +367,7 @@ class QuotationDuplicationService
                     'quotation_id' => $newQuotation->id,
                     'nama_tunjangan' => $tunjangan->nama_tunjangan,
                     'nominal' => $tunjangan->nominal,
+                    'nominal_coss' => $tunjangan->nominal_coss,
                     'created_by' => $newQuotation->created_by
                 ]);
             }
@@ -376,6 +377,7 @@ class QuotationDuplicationService
                 $hpp = $detailReferensi->quotationDetailHpp;
                 $newDetail->quotationDetailHpp()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $hpp->jumlah_hc,
                     'gaji_pokok' => $hpp->gaji_pokok,
                     'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
                     'kompensasi' => $hpp->kompensasi,
@@ -403,6 +405,7 @@ class QuotationDuplicationService
                 $coss = $detailReferensi->quotationDetailCoss;
                 $newDetail->quotationDetailCoss()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $coss->jumlah_hc,
                     'gaji_pokok' => $coss->gaji_pokok,
                     'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
                     'kompensasi' => $coss->kompensasi,
@@ -514,6 +517,7 @@ class QuotationDuplicationService
                     'quotation_id' => $newQuotation->id,
                     'nama_tunjangan' => $tunjangan->nama_tunjangan,
                     'nominal' => $tunjangan->nominal,
+                    'nominal_coss' => $tunjangan->nominal_coss,
                     'created_by' => $newQuotation->created_by
                 ]);
             }
@@ -523,6 +527,7 @@ class QuotationDuplicationService
                 $hpp = $detailReferensi->quotationDetailHpp;
                 $newDetail->quotationDetailHpp()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $hpp->jumlah_hc,
                     'gaji_pokok' => $hpp->gaji_pokok,
                     'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
                     'kompensasi' => $hpp->kompensasi,
@@ -550,6 +555,7 @@ class QuotationDuplicationService
                 $coss = $detailReferensi->quotationDetailCoss;
                 $newDetail->quotationDetailCoss()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $coss->jumlah_hc,    
                     'gaji_pokok' => $coss->gaji_pokok,
                     'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
                     'kompensasi' => $coss->kompensasi,
@@ -1132,6 +1138,7 @@ class QuotationDuplicationService
                     'quotation_id' => $newQuotation->id,
                     'nama_tunjangan' => $tunjangan->nama_tunjangan,
                     'nominal' => $tunjangan->nominal,
+                    'nominal_coss' => $tunjangan->nominal_coss,
                     'created_by' => $newQuotation->created_by
                 ]);
             }
@@ -1141,6 +1148,7 @@ class QuotationDuplicationService
                 $hpp = $detailReferensi->quotationDetailHpp;
                 $newDetail->quotationDetailHpp()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $hpp->jumlah_hc,
                     'gaji_pokok' => $hpp->gaji_pokok,
                     'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
                     'kompensasi' => $hpp->kompensasi,
@@ -1168,6 +1176,7 @@ class QuotationDuplicationService
                 $coss = $detailReferensi->quotationDetailCoss;
                 $newDetail->quotationDetailCoss()->create([
                     'quotation_id' => $newQuotation->id,
+                    'jumlah_hc' => $coss->jumlah_hc,
                     'gaji_pokok' => $coss->gaji_pokok,
                     'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
                     'kompensasi' => $coss->kompensasi,

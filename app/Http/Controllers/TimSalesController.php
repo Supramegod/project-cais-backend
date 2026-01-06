@@ -530,7 +530,7 @@ class TimSalesController extends Controller
      *                         nullable=true,
      *                         @OA\Property(property="full_name", type="string", example="John Doe"),
      *                         @OA\Property(property="email", type="string", example="john@example.com"),
-     *                         @OA\Property(property="role_id", type="integer", example=29)
+     *                         @OA\Property(property="cais_role_id", type="integer", example=29)
      *                     )
      *                 )
      *             )
@@ -566,7 +566,7 @@ class TimSalesController extends Controller
                     'user_detail' => $member->user ? [
                         'full_name' => $member->user->full_name,
                         'email' => $member->user->email,
-                        'role_id' => $member->user->role_id
+                        'cais_role_id' => $member->user->cais_role_id
                     ] : null
                 ];
             });
@@ -681,7 +681,7 @@ class TimSalesController extends Controller
             // Get user info
             $user = User::where('id', $request->user_id)
                 ->where('is_active', 1)
-                ->whereIn('role_id', [29, 31, 32, 33])
+                ->whereIn('cais_role_id', [29, 31, 32, 33])
                 ->where('branch_id', $timSales->branch_id)
                 ->first();
 
@@ -936,7 +936,7 @@ class TimSalesController extends Controller
      *                     @OA\Property(property="full_name", type="string", example="John Doe"),
      *                     @OA\Property(property="username", type="string", example="john.doe"),
      *                     @OA\Property(property="email", type="string", example="john@example.com"),
-     *                     @OA\Property(property="role_id", type="integer", example=29)
+     *                     @OA\Property(property="cais_role_id", type="integer", example=29)
      *                 )
      *             )
      *         )
@@ -973,10 +973,10 @@ class TimSalesController extends Controller
 
             // Ambil user yang aktif, role sesuai, branch sama, dan
             $availableUsers = User::where('is_active', 1)
-                ->whereIn('role_id', [29, 31, 32, 33])
+                ->whereIn('cais_role_id', [29, 31, 32, 33])
                 ->where('branch_id', $timSales->branch_id)
                 ->whereNotIn('id', $existingUserIds)
-                ->select('id', 'full_name', 'username', 'email', 'role_id')
+                ->select('id', 'full_name', 'username', 'email', 'cais_role_id')
                 ->get();
 
             return response()->json([

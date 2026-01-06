@@ -36,18 +36,18 @@ class QuotationStepRequest extends BaseRequest
                 $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
                 $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|integer|min:1';
                 $rules['tipe_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|string|in:Kerja,Kalender';
-                $rules['evaluasi_kontrak'] = 'sometimes|string';
-                $rules['durasi_kerjasama'] = 'sometimes|string';
-                $rules['durasi_karyawan'] = 'sometimes|string';
-                $rules['evaluasi_karyawan'] = 'sometimes|string';
+                $rules['evaluasi_kontrak'] = 'required|string';
+                $rules['durasi_kerjasama'] = 'required|string';
+                $rules['durasi_karyawan'] = 'required|string';
+                $rules['evaluasi_karyawan'] = 'required|string';
                 $rules['ada_cuti'] = 'required|string|in:Ada,Tidak Ada';
                 $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
                 $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Cuti Roster,Tidak Ada';
                 $rules['gaji_saat_cuti'] = 'sometimes|string|in:No Work No Pay,Prorate';
                 $rules['prorate'] = 'required_if:gaji_saat_cuti,Prorate|integer|min:0';
                 $rules['shift_kerja'] = 'sometimes|string';
-                $rules['hari_kerja'] = 'sometimes|string';
-                $rules['jam_kerja'] = 'sometimes|string';
+                $rules['hari_kerja'] = 'required|string';
+                $rules['jam_kerja'] = 'required|string';
                 break;
             case 3:
                 $rules['headCountData'] = 'required|array';
@@ -190,6 +190,12 @@ class QuotationStepRequest extends BaseRequest
             'shift_kerja.string' => 'Shift kerja harus berupa teks',
             'hari_kerja.string' => 'Hari kerja harus berupa teks',
             'jam_kerja.string' => 'Jam kerja harus berupa teks',
+            'hari_kerja.required' => 'Hari kerja harus diisi',
+            'jam_kerja.required' => 'Jam kerja harus diisi',
+            'evaluasi_kontrak.required' => 'Evaluasi kontrak harus diisi',
+            'durasi_kerjasama.required' => 'Durasi kerjasama harus diisi',
+            'durasi_karyawan.required' => 'Durasi karyawan harus diisi',
+            'evaluasi_karyawan.required' => 'Evaluasi karyawan harus diisi',
 
             // Step 3 Messages
             'headCountData.required' => 'Data headcount harus diisi',
@@ -343,15 +349,21 @@ class QuotationStepRequest extends BaseRequest
 
             // Validasi custom untuk step 2
             if ($step == 2) {
-                if ($this->mulai_kontrak && $this->kontrak_selesai) {
-                    if ($this->mulai_kontrak > $this->kontrak_selesai) {
-                        $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
-                    }
-                    if ($this->tgl_penempatan < $this->mulai_kontrak) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
-                    }
-                    if ($this->tgl_penempatan > $this->kontrak_selesai) {
-                        $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+                // Daftar role_id yang boleh melewati validasi (CRM)
+                $excludedRoles = [53, 54, 55, 56,2];
+
+                // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
+                if (!in_array($this->cais_role_id, $excludedRoles)) {
+                    if ($this->mulai_kontrak && $this->kontrak_selesai) {
+                        if ($this->mulai_kontrak > $this->kontrak_selesai) {
+                            $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
+                        }
+                        if ($this->tgl_penempatan < $this->mulai_kontrak) {
+                            $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh kurang dari Mulai Kontrak');
+                        }
+                        if ($this->tgl_penempatan > $this->kontrak_selesai) {
+                            $validator->errors()->add('tgl_penempatan', 'Tanggal Penempatan tidak boleh lebih dari Kontrak Selesai');
+                        }
                     }
                 }
 
