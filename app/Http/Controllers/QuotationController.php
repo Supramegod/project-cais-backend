@@ -1334,16 +1334,22 @@ class QuotationController extends Controller
             switch ($tipe_quotation) {
                 case 'baru':
                     // Leads baru: status_leads_id = 1 (New Lead)
-                    return $query;
+                    $query;
                     break;
 
                 case 'rekontrak':
-                    // Leads rekontrak: status_leads_id = 102 (atau sesuai konfigurasi)
-                    $query->where('status_leads_id', 102);
-                    // $query->whereHas('pks', function ($q) {
-                    //     $q->where('is_aktif', 1)
-                    //         ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                    // });
+                    // Leads rekontrak: status_leads_id = 102
+                    $query->where('status_leads_id', 102)
+                        ->whereHas('quotations', function ($q) {
+                            // Menggunakan nested parameter grouping untuk logic OR
+                            $q->where(function ($innerQuery) {
+                                $innerQuery->where('status_quotation_id', 3)
+                                    ->orWhereNotNull('ot1');
+                            });
+
+                            // Contoh jika kontrak_akhir ingin diaktifkan kembali:
+                            // $q->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
+                        });
                     break;
 
                 case 'revisi':

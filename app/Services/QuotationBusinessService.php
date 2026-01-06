@@ -306,7 +306,8 @@ class QuotationBusinessService
             case 'rekontrak':
                 $query
                     // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
-                    ->where('status_quotation_id', 3);
+                    ->where('status_quotation_id', 3)
+                    ->orWhereNotNull('ot1');
                 break;
         }
 
