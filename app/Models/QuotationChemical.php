@@ -13,6 +13,7 @@ class QuotationChemical extends Model
     protected $table = 'sl_quotation_chemical';
     protected $fillable = [
         'quotation_detail_id',
+        'quotation_site_id',
         'quotation_id',
         'barang_id',
         'jumlah',

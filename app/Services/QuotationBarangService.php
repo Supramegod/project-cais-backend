@@ -28,29 +28,89 @@ class QuotationBarangService
             $modelClass = $modelConfig['model'];
             $jenisBarangIds = $modelConfig['jenis_barang_ids'];
             $useDetailId = $modelConfig['use_detail_id'];
+            $useSiteId = $modelConfig['use_site_id'];
 
-            // 1. FIRST, collect all incoming barang_ids
-            $incomingBarangIds = collect($barangData)
-                ->pluck('barang_id')
-                ->filter()
+            // 1. FIRST, collect all incoming keys (barang_id + identifier)
+            $incomingKeys = collect($barangData)
+                ->map(function ($data) use ($useDetailId, $useSiteId) {
+                    $key = (string)$data['barang_id'];
+                    
+                    if ($useDetailId && isset($data['quotation_detail_id'])) {
+                        $key .= '_detail_' . (int)$data['quotation_detail_id'];
+                    }
+                    
+                    if ($useSiteId && isset($data['quotation_site_id'])) {
+                        $key .= '_site_' . (int)$data['quotation_site_id'];
+                    }
+                    
+                    return $key;
+                })
                 ->unique()
                 ->toArray();
 
             // 2. SOFT DELETE only items that are NOT in the incoming data
-            $modelClass::where('quotation_id', $quotation->id)
-                ->whereNotIn('barang_id', $incomingBarangIds)
-                ->update([
-                    'deleted_at' => now(),
-                    'deleted_by' => Auth::user()->full_name
-                ]);
+            $deleteQuery = $modelClass::where('quotation_id', $quotation->id);
+
+            // Jika ada data incoming, soft delete yang tidak ada
+            if (!empty($incomingKeys)) {
+                $deleteQuery->where(function($query) use ($incomingKeys, $useDetailId, $useSiteId) {
+                    // Build condition untuk mengecualikan item yang ada di incomingKeys
+                    $firstCondition = true;
+                    
+                    foreach ($incomingKeys as $key) {
+                        $parts = explode('_', $key);
+                        $barang_id = $parts[0];
+                        
+                        $conditions = [];
+                        $conditions[] = "barang_id = {$barang_id}";
+                        
+                        if (in_array('detail', $parts)) {
+                            $detailIndex = array_search('detail', $parts) + 1;
+                            if (isset($parts[$detailIndex])) {
+                                $detail_id = $parts[$detailIndex];
+                                $conditions[] = "quotation_detail_id = {$detail_id}";
+                            }
+                        }
+                        
+                        if (in_array('site', $parts)) {
+                            $siteIndex = array_search('site', $parts) + 1;
+                            if (isset($parts[$siteIndex])) {
+                                $site_id = $parts[$siteIndex];
+                                $conditions[] = "quotation_site_id = {$site_id}";
+                            }
+                        }
+                        
+                        if ($firstCondition) {
+                            $query->whereRaw("NOT (" . implode(' AND ', $conditions) . ")");
+                            $firstCondition = false;
+                        } else {
+                            $query->orWhereRaw("NOT (" . implode(' AND ', $conditions) . ")");
+                        }
+                    }
+                });
+            }
+
+            $deleteQuery->update([
+                'deleted_at' => now(),
+                'deleted_by' => Auth::user()->full_name
+            ]);
 
             $createdCount = 0;
             $updatedCount = 0;
             $skippedCount = 0;
 
+            // Load relasi yang diperlukan sebelum processing
+            if ($useDetailId && !$quotation->relationLoaded('quotationDetails')) {
+                $quotation->load('quotationDetails');
+            }
+            
+            if ($useSiteId && !$quotation->relationLoaded('quotationSites')) {
+                $quotation->load('quotationSites');
+            }
+
             // 3. PROCESS each incoming item
             foreach ($barangData as $data) {
-                $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId);
+                $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId, $useSiteId);
 
                 if ($result['success']) {
                     if ($result['action'] === 'created') {
@@ -76,7 +136,7 @@ class QuotationBarangService
                 'jenis_barang' => $jenisBarang,
                 'created' => $createdCount,
                 'updated' => $updatedCount,
-                'deleted' => count($incomingBarangIds), // items that were soft deleted
+                'deleted' => count($incomingKeys), // items that were soft deleted
                 'skipped' => $skippedCount
             ];
 
@@ -91,10 +151,11 @@ class QuotationBarangService
             throw $e;
         }
     }
+
     /**
      * Process individual barang item
      */
-    private function processBarangItem($quotation, string $jenisBarang, array $data, string $modelClass, array $jenisBarangIds, bool $useDetailId): array
+    private function processBarangItem($quotation, string $jenisBarang, array $data, string $modelClass, array $jenisBarangIds, bool $useDetailId, bool $useSiteId): array
     {
         // Validasi data minimal
         if (!isset($data['barang_id']) || !isset($data['jumlah'])) {
@@ -118,8 +179,10 @@ class QuotationBarangService
             return ['success' => false, 'reason' => 'barang_not_found'];
         }
 
-        // Validasi quotation_detail_id jika diperlukan
+        // Validasi identifier berdasarkan jenis barang
         $quotation_detail_id = null;
+        $quotation_site_id = null;
+        
         if ($useDetailId) {
             if (!isset($data['quotation_detail_id'])) {
                 return ['success' => false, 'reason' => 'missing_quotation_detail_id'];
@@ -130,6 +193,19 @@ class QuotationBarangService
 
             if (!$detail) {
                 return ['success' => false, 'reason' => 'quotation_detail_not_found'];
+            }
+        }
+        
+        if ($useSiteId) {
+            if (!isset($data['quotation_site_id'])) {
+                return ['success' => false, 'reason' => 'missing_quotation_site_id'];
+            }
+
+            $quotation_site_id = (int) $data['quotation_site_id'];
+            $site = $quotation->quotationSites->firstWhere('id', $quotation_site_id);
+
+            if (!$site) {
+                return ['success' => false, 'reason' => 'quotation_site_not_found'];
             }
         }
 
@@ -166,6 +242,10 @@ class QuotationBarangService
         if ($useDetailId) {
             $createData['quotation_detail_id'] = $quotation_detail_id;
         }
+        
+        if ($useSiteId) {
+            $createData['quotation_site_id'] = $quotation_site_id;
+        }
 
         // Cari data existing untuk update
         $existingQuery = $modelClass::where('quotation_id', $quotation->id)
@@ -173,6 +253,10 @@ class QuotationBarangService
 
         if ($useDetailId) {
             $existingQuery->where('quotation_detail_id', $quotation_detail_id);
+        }
+        
+        if ($useSiteId) {
+            $existingQuery->where('quotation_site_id', $quotation_site_id);
         }
 
         $existing = $existingQuery->first();
@@ -188,6 +272,7 @@ class QuotationBarangService
             return ['success' => true, 'action' => 'created'];
         }
     }
+
     /**
      * Get model configuration for different barang types
      */
@@ -197,25 +282,29 @@ class QuotationBarangService
             'chemicals' => [
                 'model' => QuotationChemical::class,
                 'jenis_barang_ids' => [13, 14, 15, 16, 18, 19],
-                'use_detail_id' => true,
+                'use_detail_id' => false,   // Tidak menggunakan detail_id
+                'use_site_id' => true,      // Menggunakan site_id
                 'default_masa_pakai' => 12
             ],
             'kaporlap' => [
                 'model' => QuotationKaporlap::class,
                 'jenis_barang_ids' => [1, 2, 3, 4, 5],
-                'use_detail_id' => true,
+                'use_detail_id' => true,    // Tetap menggunakan detail_id
+                'use_site_id' => false,     // Tidak menggunakan site_id
                 'default_masa_pakai' => 12
             ],
             'devices' => [
                 'model' => QuotationDevices::class,
                 'jenis_barang_ids' => [8, 9, 10, 11, 12, 17],
-                'use_detail_id' => true,
+                'use_detail_id' => false,   // Tidak menggunakan detail_id
+                'use_site_id' => true,      // Menggunakan site_id
                 'default_masa_pakai' => 12
             ],
             'ohc' => [
                 'model' => QuotationOhc::class,
                 'jenis_barang_ids' => [6, 7, 8],
-                'use_detail_id' => true,
+                'use_detail_id' => false,   // Tidak menggunakan detail_id
+                'use_site_id' => true,      // Menggunakan site_id
                 'default_masa_pakai' => 12
             ]
         ];
@@ -246,11 +335,13 @@ class QuotationBarangService
 
     /**
      * Process legacy format (dynamic field names) untuk backward compatibility
+     * Diubah untuk mendukung kedua format (detail_id dan site_id)
      */
     public function processLegacyFormat($quotation, Request $request, string $jenisBarang): array
     {
         $modelConfig = $this->getModelConfig($jenisBarang);
         $useDetailId = $modelConfig['use_detail_id'];
+        $useSiteId = $modelConfig['use_site_id'];
 
         $barangData = [];
 
@@ -261,6 +352,7 @@ class QuotationBarangService
 
             $parts = explode('_', $fieldName);
 
+            // Format: jumlah_barangId_detailId (untuk kaporlap)
             if ($useDetailId && count($parts) >= 3) {
                 $barang_id = (int) $parts[1];
                 $quotation_detail_id = (int) $parts[2];
@@ -270,7 +362,20 @@ class QuotationBarangService
                     'quotation_detail_id' => $quotation_detail_id,
                     'jumlah' => (int) $jumlah
                 ];
-            } elseif (!$useDetailId && count($parts) >= 2) {
+            }
+            // Format: jumlah_barangId_siteId (untuk chemicals, devices, ohc)
+            elseif ($useSiteId && count($parts) >= 3) {
+                $barang_id = (int) $parts[1];
+                $quotation_site_id = (int) $parts[2];
+
+                $barangData[] = [
+                    'barang_id' => $barang_id,
+                    'quotation_site_id' => $quotation_site_id,
+                    'jumlah' => (int) $jumlah
+                ];
+            }
+            // Format lama tanpa identifier
+            elseif (count($parts) >= 2) {
                 $barang_id = (int) $parts[1];
 
                 $barangData[] = [
@@ -282,6 +387,7 @@ class QuotationBarangService
 
         return $barangData;
     }
+
     /**
      * Prepare data for display
      */
@@ -289,19 +395,25 @@ class QuotationBarangService
     {
         $modelConfig = $this->getModelConfig($jenisBarang);
         $relationName = $this->getRelationName($jenisBarang);
+        $useDetailId = $modelConfig['use_detail_id'];
+        $useSiteId = $modelConfig['use_site_id'];
 
         $barangData = [];
         $totalAll = 0;
         $jumlah_item = 0;
 
-        // SELALU load quotationDetails untuk semua jenis barang
-        if (!$quotation->relationLoaded('quotationDetails')) {
+        // Load relasi yang diperlukan berdasarkan jenis barang
+        if ($useDetailId && !$quotation->relationLoaded('quotationDetails')) {
             $quotation->load('quotationDetails');
         }
+        
+        if ($useSiteId && !$quotation->relationLoaded('quotationSites')) {
+            $quotation->load('quotationSites');
+        }
 
-        // Buat mapping data dari quotation_details
+        // Buat mapping data berdasarkan kebutuhan
         $quotationDetailsMap = [];
-        if ($quotation->relationLoaded('quotationDetails')) {
+        if ($useDetailId && $quotation->relationLoaded('quotationDetails')) {
             foreach ($quotation->quotationDetails as $detail) {
                 $quotationDetailsMap[$detail->id] = [
                     'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
@@ -309,6 +421,16 @@ class QuotationBarangService
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nama_site' => $detail->nama_site,
                     'position_id' => $detail->position_id
+                ];
+            }
+        }
+        
+        $quotationSitesMap = [];
+        if ($useSiteId && $quotation->relationLoaded('quotationSites')) {
+            foreach ($quotation->quotationSites as $site) {
+                $quotationSitesMap[$site->id] = [
+                    'leads_id' => $site->leads_id,
+                    'nama_site' => $site->nama_site,
                 ];
             }
         }
@@ -343,12 +465,10 @@ class QuotationBarangService
                     'barang_id' => $item->barang_id,
                     'jumlah' => $item->jumlah,
                     'harga' => $item->harga,
-                    'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
                     'masa_pakai' => $item->masa_pakai,
                     'masa_pakai_formatted' => $item->masa_pakai . " Bulan",
                     'jumlah_pertahun' => $jumlah_pertahun,
                     'total_per_item' => $total_per_item,
-                    'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
                     'jenis_barang_id' => $item->jenis_barang_id,
                     'jenis_barang' => $item->jenis_barang,
                     'nama' => $item->nama,
@@ -364,51 +484,69 @@ class QuotationBarangService
                     'barang_id' => $item->barang_id,
                     'jumlah' => $item->jumlah,
                     'harga' => $item->harga,
-                    'harga_formatted' => "Rp " . number_format($item->harga, 0, ",", "."),
                     'jenis_barang_id' => $item->jenis_barang_id,
                     'jenis_barang' => $item->jenis_barang,
                     'nama' => $item->nama,
                     'total_per_item' => $total_per_item,
-                    'total_formatted' => "Rp " . number_format($total_per_item, 0, ",", "."),
                 ];
 
                 $totalAll += $total_per_item;
             }
 
-            // LOGIC BARU: Cek quotation_detail_id tanpa peduli useDetailId
-            if (isset($item->quotation_detail_id) && $item->quotation_detail_id) {
+            // LOGIC untuk KAPORLAP (menggunakan detail_id)
+            if ($useDetailId && isset($item->quotation_detail_id) && $item->quotation_detail_id) {
                 $detailId = $item->quotation_detail_id;
 
                 if (isset($quotationDetailsMap[$detailId])) {
                     $detailData = $quotationDetailsMap[$detailId];
                     $itemData['jabatan_kebutuhan'] = $detailData['jabatan_kebutuhan'];
-                    $itemData['quotation_site_id'] = $detailData['quotation_site_id'];
                     $itemData['jumlah_hc'] = $detailData['jumlah_hc'];
                     $itemData['nama_site'] = $detailData['nama_site'];
                     $itemData['position_id'] = $detailData['position_id'];
                     $itemData['quotation_detail_id'] = $detailId;
+                    
+                    // Jika ada quotation_site_id dari detail, tambahkan info site
+                    if ($detailData['quotation_site_id'] && isset($quotationSitesMap[$detailData['quotation_site_id']])) {
+                        $siteData = $quotationSitesMap[$detailData['quotation_site_id']];
+                        $itemData['leads_id'] = $siteData['leads_id'];
+                        $itemData['nama_site'] = $siteData['nama_site'] ?? $detailData['nama_site'];
+                        $itemData['provinsi'] = $siteData['provinsi'];
+                        $itemData['kota'] = $siteData['kota'];
+                        $itemData['quotation_site_id'] = $detailData['quotation_site_id'];
+                    }
                 } else {
                     $itemData['jabatan_kebutuhan'] = null;
-                    $itemData['quotation_site_id'] = null;
                     $itemData['jumlah_hc'] = null;
                     $itemData['nama_site'] = null;
                     $itemData['position_id'] = null;
                     $itemData['quotation_detail_id'] = $detailId;
                 }
-            } else {
-                // Item tidak punya quotation_detail_id
-                // UNTUK CHEMICALS tanpa detail_id, ambil dari detail pertama (fallback)
-                if ($jenisBarang === 'chemicals' && !empty($quotationDetailsMap)) {
-                    $firstDetail = reset($quotationDetailsMap);
-                    $itemData['jabatan_kebutuhan'] = null;
-                    $itemData['quotation_site_id'] = $firstDetail['quotation_site_id'];
-                    $itemData['jumlah_hc'] = null;
-                    $itemData['nama_site'] = $firstDetail['nama_site'];
-                    $itemData['position_id'] = null;
-                    $itemData['quotation_detail_id'] = null;
+            }
+            // LOGIC untuk CHEMICALS, DEVICES, OHC (menggunakan site_id)
+            elseif ($useSiteId && isset($item->quotation_site_id) && $item->quotation_site_id) {
+                $siteId = $item->quotation_site_id;
+
+                if (isset($quotationSitesMap[$siteId])) {
+                    $siteData = $quotationSitesMap[$siteId];
+                    $itemData['leads_id'] = $siteData['leads_id'];
+                    $itemData['nama_site'] = $siteData['nama_site'];
+                    $itemData['quotation_site_id'] = $siteId;
                 } else {
-                    $itemData['jabatan_kebutuhan'] = null;
+                    $itemData['leads_id'] = null;
+                    $itemData['nama_site'] = null;
+                    $itemData['quotation_site_id'] = $siteId;
+                }
+            }
+            // Tidak ada identifier
+            else {
+                if ($useSiteId) {
+                    $itemData['leads_id'] = null;
+                    $itemData['nama_site'] = null;
                     $itemData['quotation_site_id'] = null;
+                }
+                
+                if ($useDetailId) {
+                    $itemData['jabatan_kebutuhan'] = null;
                     $itemData['jumlah_hc'] = null;
                     $itemData['nama_site'] = null;
                     $itemData['position_id'] = null;
@@ -429,6 +567,7 @@ class QuotationBarangService
             ]
         ];
     }
+
     /**
      * Get relation name for different barang types
      */
