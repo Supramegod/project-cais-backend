@@ -1149,6 +1149,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'training_id' => $trainingId,
                     'quotation_id' => $quotation->id,
                     'nama' => $training->nama,
+                    'harga' => $training->harga,
                     'created_by' => $user
                 ]);
             }
