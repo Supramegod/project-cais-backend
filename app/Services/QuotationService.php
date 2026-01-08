@@ -1178,17 +1178,8 @@ class QuotationService
     /**
      * Calculate item total khusus untuk COSS dengan filter site dan soft delete
      */
-    private function calculateItemTotalForCoss
-    (
-        $model,
-        $quotationId,
-        $detailId,
-        $provisi,
-        $divider = 1,
-        $special = null,
-        $jumlahHc = 1,
-        $siteId = null
-    ) {
+    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
+    {
         \Log::info("=== START calculateItemTotalForCoss ===", [
             'model' => $model,
             'quotation_id' => $quotationId,
@@ -1729,7 +1720,7 @@ class QuotationService
             $baseAmount = $managementFee * (11 / 12); // Faktor 11/12
         } else {
             // "Total Invoice" atau "Lainnya" - gunakan grand total sebelum pajak
-            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"} * (11 / 12); // Faktor 11/12
         }
 
         $summary->{"dpp{$suffix}"} = $baseAmount;
@@ -1740,8 +1731,8 @@ class QuotationService
         }
 
         // ✅ PERBAIKAN: Hitung PPH (2% dari baseAmount setelah faktor 11/12) dengan validasi
-        if ($summary->{"pph{$suffix}"} == 0) {
-            $calculatedPph = round($baseAmount * -0.02, 2); // PPH 2% (negatif karena potongan)
+        if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Management Fee") {
+            $calculatedPph = round($managementFee * -0.02, 2); // PPH 2% (negatif karena potongan)
 
             // Validasi: PPH tidak boleh lebih besar dari 10% base amount
             $maxPph = abs($baseAmount * 0.1);
@@ -1756,6 +1747,25 @@ class QuotationService
             }
 
             $summary->{"pph{$suffix}"} = $calculatedPph;
+        } else if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong != "Total Invoice") {
+            $calculatedPph = round($summary->{"grand_total_sebelum_pajak{$suffix}"} * -0.02, 2); // PPH 2% (negatif karena potongan)
+            $maxPph = abs($baseAmount * 0.1);
+            if (abs($calculatedPph) > $maxPph) {
+                \Log::warning("PPH calculation seems incorrect", [
+                    'calculated_pph' => $calculatedPph,
+                    'base_amount' => $baseAmount,
+                    'max_reasonable' => $maxPph,
+                    'suffix' => $suffix
+                ]);
+                $calculatedPph = -$maxPph;
+            }
+
+            $summary->{"pph{$suffix}"} = $calculatedPph;
+        }else {
+            // Jika PPH sudah ada, pastikan nilainya negatif
+            if ($summary->{"pph{$suffix}"} > 0) {
+                $summary->{"pph{$suffix}"} = -abs($summary->{"pph{$suffix}"});
+            }
         }
 
         \Log::info("Default taxes calculated with 11/12 factor", [
