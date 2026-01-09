@@ -984,7 +984,7 @@ class QuotationService
 
             // Untuk COSS: Cek apakah ada nilai manual yang bukan 0
             $cossManualValue = null;
-            if ($coss && $coss->{$config['coss_field']} !== null ) {
+            if ($coss && $coss->{$config['coss_field']} !== null) {
                 $cossManualValue = (float) $coss->{$config['coss_field']};
                 \Log::info("Found NON-ZERO manual COSS value for {$key}", [
                     'detail_id' => $detail->id,
@@ -1761,7 +1761,7 @@ class QuotationService
             }
 
             $summary->{"pph{$suffix}"} = $calculatedPph;
-        }else {
+        } else {
             // Jika PPH sudah ada, pastikan nilainya negatif
             if ($summary->{"pph{$suffix}"} > 0) {
                 $summary->{"pph{$suffix}"} = -abs($summary->{"pph{$suffix}"});
@@ -1789,7 +1789,8 @@ class QuotationService
             $summary->{"ppn{$suffix}"} + $summary->{"pph{$suffix}"};
         $summary->{"pembulatan{$suffix}"} = ceil($summary->{"total_invoice{$suffix}"} / 1000) * 1000;
 
-        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->total_sebelum_management_fee;
+        // PERBAIKAN: Gunakan total_sebelum_management_fee yang sesuai dengan suffix
+        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->{"total_sebelum_management_fee{$suffix}"};
 
         // FIX: Tambahkan pengecekan untuk menghindari division by zero
         if ($summary->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
@@ -1798,7 +1799,6 @@ class QuotationService
             $summary->{"gpm{$suffix}"} = 0;
         }
     }
-
     // ============================ HELPER METHODS ============================
     private function calculateProvisi($durasiKerjasama)
     {
