@@ -1149,6 +1149,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'training_id' => $trainingId,
                     'quotation_id' => $quotation->id,
                     'nama' => $training->nama,
+                    'harga' => $training->harga,
                     'created_by' => $user
                 ]);
             }
@@ -3634,6 +3635,10 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'kompensasi' => null,
                     'tunjangan_hari_libur_nasional' => null,
                     'lembur' => null,
+                    'provisi_seragam' => null,
+                    'provisi_peralatan' => null,
+                    'provisi_chemical' => null,
+                    'provisi_ohc' => null,
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);
@@ -3647,6 +3652,10 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     'kompensasi' => null,
                     'tunjangan_hari_libur_nasional' => null,
                     'lembur' => null,
+                    // 'provisi_seragam' => null,
+                    // 'provisi_peralatan' => null,
+                    // 'provisi_chemical' => null,
+                    // 'provisi_ohc' => null,
                     'updated_by' => $user,
                     'updated_at' => $currentDateTime
                 ]);

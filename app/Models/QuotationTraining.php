@@ -16,6 +16,7 @@ class QuotationTraining extends Model
         'quotation_id',
         'training_id',
         'nama',
+        'harga',
         'created_by',
         'updated_by',
         'deleted_by'

@@ -824,18 +824,59 @@ class QuotationService
     // ============================ ITEM CALCULATIONS ============================
     private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
-        // **PERBAIKAN: Hitung ulang total jumlah HC untuk HPP dan COSS secara terpisah**
-        $totalJumlahHcHpp = $quotation->quotation_detail->sum('jumlah_hc_hpp');
-        $totalJumlahHcCoss = $quotation->quotation_detail->sum('jumlah_hc_original');
+        // **PERBAIKAN: Hitung total HC per site SEKALI di awal, bukan per detail**
+        static $siteTotalsCalculated = false;
+        static $siteHcHpp = [];
+        static $siteHcCoss = [];
 
-        \Log::info("=== START calculateAllItems (ENHANCED) ===", [
+        // Hitung total HC per site hanya sekali untuk quotation ini
+        if (!$siteTotalsCalculated) {
+            // Reset arrays
+            $siteHcHpp = [];
+            $siteHcCoss = [];
+
+            // Kelompokkan jumlah HC per site dari SEMUA detail
+            foreach ($quotation->quotation_detail as $det) {
+                $siteId = $det->quotation_site_id;
+                if (!isset($siteHcHpp[$siteId])) {
+                    $siteHcHpp[$siteId] = 0;
+                    $siteHcCoss[$siteId] = 0;
+                }
+                // Pastikan properti sudah ada (jika belum di-initialize)
+                if (!isset($det->jumlah_hc_hpp)) {
+                    $det->jumlah_hc_hpp = $det->jumlah_hc;
+                }
+                if (!isset($det->jumlah_hc_original)) {
+                    $det->jumlah_hc_original = $det->jumlah_hc;
+                }
+
+                $siteHcHpp[$siteId] += $det->jumlah_hc_hpp;
+                $siteHcCoss[$siteId] += $det->jumlah_hc_original;
+            }
+
+            $siteTotalsCalculated = true;
+
+            \Log::info("=== SITE HC TOTALS CALCULATED ===", [
+                'quotation_id' => $quotation->id,
+                'site_hc_hpp' => $siteHcHpp,
+                'site_hc_coss' => $siteHcCoss,
+                'total_details' => $quotation->quotation_detail->count()
+            ]);
+        }
+
+        $currentSiteId = $detail->quotation_site_id;
+        $totalJumlahHcHppSite = $siteHcHpp[$currentSiteId] ?? 0;
+        $totalJumlahHcCossSite = $siteHcCoss[$currentSiteId] ?? 0;
+
+        \Log::info("=== START calculateAllItems (FIXED SITE CALCULATION) ===", [
             'detail_id' => $detail->id,
+            'current_site_id' => $currentSiteId,
             'detail_jumlah_hc' => $detail->jumlah_hc_original,
             'hpp_jumlah_hc' => $detail->jumlah_hc_hpp,
-            'total_jumlah_hc_hpp_all_details' => $totalJumlahHcHpp,
-            'total_jumlah_hc_coss_all_details' => $totalJumlahHcCoss,
-            'hpp_exists' => !is_null($hpp),
-            'coss_exists' => !is_null($coss)
+            'total_jumlah_hc_hpp_site' => $totalJumlahHcHppSite,
+            'total_jumlah_hc_coss_site' => $totalJumlahHcCossSite,
+            'all_sites_hpp' => $siteHcHpp,
+            'all_sites_coss' => $siteHcCoss
         ]);
 
         $items = [
@@ -844,34 +885,85 @@ class QuotationService
                 'coss_field' => 'provisi_seragam',
                 'model' => QuotationKaporlap::class,
                 'detail_id' => $detail->id,
-                'is_general' => false  // Kaporlap spesifik per detail
+                'is_general' => false,  // Kaporlap spesifik per detail
+                'site_specific' => false, // Tidak perlu filter site
+                'special' => null
             ],
             'devices' => [
                 'hpp_field' => 'provisi_peralatan',
                 'coss_field' => 'provisi_peralatan',
                 'model' => QuotationDevices::class,
-                'is_general' => true   // Devices dibagi total HC
+                'is_general' => true,   // Devices dibagi total HC per site
+                'site_specific' => true, // Filter berdasarkan site
+                'site_field' => 'quotation_site_id',
+                'special' => null
             ],
             'ohc' => [
                 'hpp_field' => 'provisi_ohc',
                 'coss_field' => 'provisi_ohc',
                 'model' => QuotationOhc::class,
-                'is_general' => true   // OHC dibagi total HC
+                'is_general' => true,   // OHC dibagi total HC per site
+                'site_specific' => true, // Filter berdasarkan site
+                'site_field' => 'quotation_site_id',
+                'special' => null
             ],
             'chemical' => [
                 'hpp_field' => 'provisi_chemical',
                 'coss_field' => 'provisi_chemical',
                 'model' => QuotationChemical::class,
                 'special' => 'chemical',
-                'is_general' => false  // Chemical punya rumus khusus
+                'is_general' => false,  // Chemical punya rumus khusus
+                'site_specific' => true, // Filter berdasarkan site
+                'site_field' => 'quotation_site_id',
+                'detail_id' => null // Chemical tidak terkait langsung dengan detail
             ]
         ];
 
         foreach ($items as $key => $config) {
             \Log::info("Processing item: {$key}", [
                 'detail_id' => $detail->id,
-                'is_general' => $config['is_general'] ?? false,
+                'is_general' => $config['is_general'],
+                'site_specific' => $config['site_specific'],
                 'has_special' => $config['special'] ?? false
+            ]);
+
+            // ============================================
+            // **PERBAIKAN: Tentukan divider berdasarkan konfigurasi**
+            // ============================================
+
+            // Tentukan divider untuk HPP
+            if ($config['is_general'] && $config['site_specific']) {
+                // Item general per site: gunakan total HC di site tersebut
+                $hppDivider = $totalJumlahHcHppSite;
+            } elseif ($config['is_general'] && !$config['site_specific']) {
+                // Item general seluruh quotation: gunakan total semua HC
+                $hppDivider = $quotation->quotation_detail->sum('jumlah_hc_hpp');
+            } else {
+                // Item spesifik per detail
+                $hppDivider = $detail->jumlah_hc_hpp;
+            }
+
+            // Tentukan divider untuk COSS
+            if ($config['is_general'] && $config['site_specific']) {
+                // Item general per site: gunakan total HC di site tersebut
+                $cossDivider = $totalJumlahHcCossSite;
+            } elseif ($config['is_general'] && !$config['site_specific']) {
+                // Item general seluruh quotation: gunakan total semua HC
+                $cossDivider = $quotation->quotation_detail->sum('jumlah_hc_original');
+            } else {
+                // Item spesifik per detail
+                $cossDivider = $detail->jumlah_hc_original;
+            }
+
+            $hppDivider = max($hppDivider, 1);
+            $cossDivider = max($cossDivider, 1);
+
+            \Log::info("Divider calculation for {$key}", [
+                'detail_id' => $detail->id,
+                'hppDivider' => $hppDivider,
+                'cossDivider' => $cossDivider,
+                'hppDivider_type' => gettype($hppDivider),
+                'cossDivider_type' => gettype($cossDivider)
             ]);
 
             // ============================================
@@ -880,7 +972,7 @@ class QuotationService
 
             // Untuk HPP: Cek apakah ada nilai manual yang bukan 0
             $hppManualValue = null;
-            if ($hpp && $hpp->{$config['hpp_field']} !== null && (float) $hpp->{$config['hpp_field']} != 0) {
+            if ($hpp && $hpp->{$config['hpp_field']} !== null) {
                 $hppManualValue = (float) $hpp->{$config['hpp_field']};
                 \Log::info("Found NON-ZERO manual HPP value for {$key}", [
                     'detail_id' => $detail->id,
@@ -892,7 +984,7 @@ class QuotationService
 
             // Untuk COSS: Cek apakah ada nilai manual yang bukan 0
             $cossManualValue = null;
-            if ($coss && $coss->{$config['coss_field']} !== null && (float) $coss->{$config['coss_field']} != 0) {
+            if ($coss && $coss->{$config['coss_field']} !== null) {
                 $cossManualValue = (float) $coss->{$config['coss_field']};
                 \Log::info("Found NON-ZERO manual COSS value for {$key}", [
                     'detail_id' => $detail->id,
@@ -906,15 +998,13 @@ class QuotationService
             // Jika 0 atau null, hitung otomatis
             if ($hppManualValue !== null) {
                 $detail->{"personil_$key"} = $hppManualValue;
-                \Log::info("Using NON-ZERO manual HPP value for {$key}", [
+                \Log::info("Using manual HPP value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $hppManualValue
                 ]);
             } else {
                 // Hitung otomatis untuk HPP
                 if (isset($config['special']) && $config['special'] === 'chemical') {
-                    $hppDivider = $detail->jumlah_hc_hpp;
-                    $hppDivider = max($hppDivider, 1);
                     $hppValue = $this->calculateItemTotalForHpp(
                         $config['model'],
                         $quotation->id,
@@ -922,12 +1012,10 @@ class QuotationService
                         $quotation->provisi,
                         $hppDivider,
                         'chemical',
-                        $detail->jumlah_hc_hpp
+                        $detail->jumlah_hc_hpp,
+                        $config['site_specific'] ? $currentSiteId : null
                     );
                 } else {
-                    // **PERBAIKAN: Untuk item general, gunakan total_jumlah_hc_hpp, untuk item spesifik gunakan jumlah_hc_hpp detail**
-                    $hppDivider = $config['is_general'] ? $totalJumlahHcHpp : $detail->jumlah_hc_hpp;
-                    $hppDivider = max($hppDivider, 1);
                     $hppValue = $this->calculateItemTotalForHpp(
                         $config['model'],
                         $quotation->id,
@@ -935,28 +1023,28 @@ class QuotationService
                         $quotation->provisi,
                         $hppDivider,
                         null,
-                        $detail->jumlah_hc_hpp
+                        $detail->jumlah_hc_hpp,
+                        $config['site_specific'] ? $currentSiteId : null
                     );
                 }
                 $detail->{"personil_$key"} = $hppValue;
                 \Log::info("Calculated HPP value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $hppValue,
-                    'hppDivider' => $hppDivider
+                    'hppDivider' => $hppDivider,
+                    'site_id_filter' => $config['site_specific'] ? $currentSiteId : 'none'
                 ]);
             }
 
             if ($cossManualValue !== null) {
                 $detail->{"personil_{$key}_coss"} = $cossManualValue;
-                \Log::info("Using NON-ZERO manual COSS value for {$key}", [
+                \Log::info("Using manual COSS value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $cossManualValue
                 ]);
             } else {
                 // Hitung otomatis untuk COSS
                 if (isset($config['special']) && $config['special'] === 'chemical') {
-                    $cossDivider = $detail->jumlah_hc_original;
-                    $cossDivider = max($cossDivider, 1);
                     $cossValue = $this->calculateItemTotalForCoss(
                         $config['model'],
                         $quotation->id,
@@ -964,12 +1052,10 @@ class QuotationService
                         $quotation->provisi,
                         $cossDivider,
                         'chemical',
-                        $detail->jumlah_hc_original
+                        $detail->jumlah_hc_original,
+                        $config['site_specific'] ? $currentSiteId : null
                     );
                 } else {
-                    // **PERBAIKAN: Untuk item general, gunakan total_jumlah_hc_coss, untuk item spesifik gunakan jumlah_hc_original detail**
-                    $cossDivider = $config['is_general'] ? $totalJumlahHcCoss : $detail->jumlah_hc_original;
-                    $cossDivider = max($cossDivider, 1);
                     $cossValue = $this->calculateItemTotalForCoss(
                         $config['model'],
                         $quotation->id,
@@ -977,41 +1063,63 @@ class QuotationService
                         $quotation->provisi,
                         $cossDivider,
                         null,
-                        $detail->jumlah_hc_original
+                        $detail->jumlah_hc_original,
+                        $config['site_specific'] ? $currentSiteId : null
                     );
                 }
                 $detail->{"personil_{$key}_coss"} = $cossValue;
                 \Log::info("Calculated COSS value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $cossValue,
-                    'cossDivider' => $cossDivider
+                    'cossDivider' => $cossDivider,
+                    'site_id_filter' => $config['site_specific'] ? $currentSiteId : 'none'
                 ]);
             }
         }
     }
     /**
-     * Calculate item total khusus untuk HPP
+     * Calculate item total khusus untuk HPP dengan filter site dan soft delete
      */
-    private function calculateItemTotalForHpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
+    private function calculateItemTotalForhpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
     {
-        \Log::info("=== START calculateItemTotalForHpp ===", [
+        \Log::info("=== START calculateItemTotalForhpp ===", [
             'model' => $model,
             'quotation_id' => $quotationId,
             'detail_id' => $detailId,
             'provisi' => $provisi,
             'divider' => $divider,
             'special' => $special,
-            'jumlah_hc' => $jumlahHc
+            'jumlah_hc' => $jumlahHc,
+            'site_id' => $siteId
         ]);
 
-        $query = $model::where('quotation_id', $quotationId);
+        // Query dengan filter soft delete
+        $query = $model::where('quotation_id', $quotationId)
+            ->whereNull('deleted_at');
+
+        // Filter berdasarkan detail_id jika ada (untuk kaporlap)
         if ($detailId) {
             $query->where('quotation_detail_id', $detailId);
             \Log::info("Added detail_id filter", ['detail_id' => $detailId]);
         }
 
+        // Filter berdasarkan site_id jika ada (untuk devices, ohc, chemical)
+        if ($siteId !== null) {
+            $query->where('quotation_site_id', $siteId);
+            \Log::info("Added site_id filter", ['site_id' => $siteId]);
+        }
+
         $items = $query->get();
-        \Log::info("Found items count for HPP", ['count' => $items->count()]);
+        \Log::info("Found items count for HPP with site filter and soft delete", [
+            'count' => $items->count(),
+            'site_id' => $siteId,
+            'model' => $model
+        ]);
+
+        if ($items->isEmpty()) {
+            \Log::info("No items found for HPP calculation, returning 0");
+            return 0;
+        }
 
         $total = 0;
         $itemIndex = 0;
@@ -1023,7 +1131,9 @@ class QuotationService
                 'jumlah' => $item->jumlah,
                 'harga' => $item->harga,
                 'masa_pakai' => $item->masa_pakai ?? null,
-                'model_type' => get_class($item)
+                'model_type' => get_class($item),
+                'quotation_site_id' => $item->quotation_site_id ?? 'null',
+                'deleted_at' => $item->deleted_at
             ]);
 
             if ($special === 'chemical') {
@@ -1048,25 +1158,27 @@ class QuotationService
                     'item_id' => $item->id,
                     'formula' => "(({$item->harga} * {$item->jumlah}) / {$provisi}) / max({$divider}, 1)",
                     'item_total' => $itemTotal,
-                    'per_person' => $perPerson
+                    'per_person' => $perPerson,
+                    'divider' => $divider
                 ]);
 
                 $total += $perPerson;
             }
         }
 
-        \Log::info("=== END calculateItemTotalForHpp ===", [
+        \Log::info("=== END calculateItemTotalForhpp ===", [
             'total_result' => $total,
-            'items_processed' => $itemIndex
+            'items_processed' => $itemIndex,
+            'site_id' => $siteId,
+            'model' => $model
         ]);
 
         return $total;
     }
-
     /**
-     * Calculate item total khusus untuk COSS (bisa berbeda rumus dengan HPP)
+     * Calculate item total khusus untuk COSS dengan filter site dan soft delete
      */
-    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1)
+    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
     {
         \Log::info("=== START calculateItemTotalForCoss ===", [
             'model' => $model,
@@ -1075,17 +1187,37 @@ class QuotationService
             'provisi' => $provisi,
             'divider' => $divider,
             'special' => $special,
-            'jumlah_hc' => $jumlahHc
+            'jumlah_hc' => $jumlahHc,
+            'site_id' => $siteId
         ]);
 
-        $query = $model::where('quotation_id', $quotationId);
+        // Query dengan filter soft delete
+        $query = $model::where('quotation_id', $quotationId)
+            ->whereNull('deleted_at');
+
+        // Filter berdasarkan detail_id jika ada (untuk kaporlap)
         if ($detailId) {
             $query->where('quotation_detail_id', $detailId);
             \Log::info("Added detail_id filter for COSS", ['detail_id' => $detailId]);
         }
 
+        // Filter berdasarkan site_id jika ada (untuk devices, ohc, chemical)
+        if ($siteId !== null) {
+            $query->where('quotation_site_id', $siteId);
+            \Log::info("Added site_id filter for COSS", ['site_id' => $siteId]);
+        }
+
         $items = $query->get();
-        \Log::info("Found items count for COSS", ['count' => $items->count()]);
+        \Log::info("Found items count for COSS with site filter and soft delete", [
+            'count' => $items->count(),
+            'site_id' => $siteId,
+            'model' => $model
+        ]);
+
+        if ($items->isEmpty()) {
+            \Log::info("No items found for COSS calculation, returning 0");
+            return 0;
+        }
 
         $total = 0;
         $itemIndex = 0;
@@ -1097,7 +1229,9 @@ class QuotationService
                 'jumlah' => $item->jumlah,
                 'harga' => $item->harga,
                 'masa_pakai' => $item->masa_pakai ?? null,
-                'model_type' => get_class($item)
+                'model_type' => get_class($item),
+                'quotation_site_id' => $item->quotation_site_id ?? 'null',
+                'deleted_at' => $item->deleted_at
             ]);
 
             if ($special === 'chemical') {
@@ -1124,16 +1258,20 @@ class QuotationService
                     'item_id' => $item->id,
                     'formula' => "({$item->harga} * {$item->jumlah}) / max({$divider}, 1)",
                     'item_total' => $itemTotal,
-                    'per_person' => $perPerson
+                    'per_person' => $perPerson,
+                    'divider' => $divider
                 ]);
 
                 $total += $perPerson;
             }
         }
 
-        \Log::info("=== END calculateItemTotalForCoss ===", [
+        \Log::info("=== END calculateItemTotalForCoss
+         ===", [
             'total_result' => $total,
-            'items_processed' => $itemIndex
+            'items_processed' => $itemIndex,
+            'site_id' => $siteId,
+            'model' => $model
         ]);
 
         return $total;
@@ -1281,6 +1419,21 @@ class QuotationService
             ]);
 
             // ============================================
+            // ✅ PERBAIKAN: HITUNG total_base_manpower UNTUK HPP DAN COSS
+            // ============================================
+            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganHpp, 2);
+            $detail->total_base_manpower_coss = round($nominalUpah + $totalTunjanganCoss, 2);
+
+            \Log::info("Base manpower calculated", [
+                'detail_id' => $detail->id,
+                'nominal_upah' => $nominalUpah,
+                'total_tunjangan_hpp' => $totalTunjanganHpp,
+                'total_tunjangan_coss' => $totalTunjanganCoss,
+                'total_base_manpower_hpp' => $detail->total_base_manpower,
+                'total_base_manpower_coss' => $detail->total_base_manpower_coss
+            ]);
+
+            // ============================================
             // HPP CALCULATION (dengan jumlah_hc_hpp)
             // ============================================
             $detail->total_personil = round(
@@ -1307,8 +1460,6 @@ class QuotationService
             // ============================================
             // COSS CALCULATIONS (dengan jumlah_hc_original)
             // ============================================
-            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
-
             $detail->total_exclude_base_manpower = round(
                 $tunjanganHariRayaCoss
                 + $kompensasiCoss
@@ -1325,7 +1476,7 @@ class QuotationService
             );
 
             $detail->total_personil_coss = round(
-                $detail->total_base_manpower
+                $detail->total_base_manpower_coss
                 + $detail->total_exclude_base_manpower
                 + $personilOhcCoss
                 - $potonganBpu,
@@ -1338,6 +1489,8 @@ class QuotationService
                 'detail_id' => $detail->id,
                 'total_personil_hpp' => $detail->total_personil,
                 'sub_total_personil_hpp' => $detail->sub_total_personil,
+                'total_base_manpower_hpp' => $detail->total_base_manpower,
+                'total_base_manpower_coss' => $detail->total_base_manpower_coss,
                 'total_personil_coss' => $detail->total_personil_coss,
                 'sub_total_personil_coss' => $detail->sub_total_personil_coss,
                 'jumlah_hc_hpp_used' => $jumlahHcHpp,
@@ -1426,83 +1579,116 @@ class QuotationService
     {
         $summary = $result->calculation_summary;
 
-        $summary->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
-        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
-        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
+        // Gunakan suffix untuk menentukan field jumlah_hc yang benar
+        $jumlahHcField = ($suffix === '_coss') ? 'jumlah_hc_original' : 'jumlah_hc_hpp';
 
-        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+        // 1. Hitung total sebelum management fee
+        $summary->{"total_sebelum_management_fee{$suffix}"} =
+            $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
 
-        // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
+        // ============================================
+        // ✅ PERBAIKAN KRITIKAL: Gunakan field yang BENAR untuk HPP vs COSS
+        // ============================================
+        // 2. Hitung total base manpower dengan jumlah_hc yang benar
+        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(
+            function ($detail) use ($suffix, $jumlahHcField) {
+                // ✅ UNTUK HPP: gunakan total_base_manpower
+                // ✅ UNTUK COSS: gunakan total_base_manpower_coss
+                $totalBaseManpower = ($suffix === '_coss')
+                    ? ($detail->total_base_manpower_coss ?? 0)
+                    : ($detail->total_base_manpower ?? 0);
+
+                $jumlahHc = $detail->{$jumlahHcField} ?? $detail->jumlah_hc;
+
+                $result = $totalBaseManpower * $jumlahHc;
+
+                \Log::debug("Base manpower calculation{$suffix}", [
+                    'detail_id' => $detail->id,
+                    'total_base_manpower' => $totalBaseManpower,
+                    'jumlah_hc' => $jumlahHc,
+                    'result' => $result,
+                    'field_used' => ($suffix === '_coss') ? 'total_base_manpower_coss' : 'total_base_manpower'
+                ]);
+
+                return $result;
+            }
+        );
+
+        // 3. Hitung upah pokok dengan jumlah_hc yang benar
+        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(
+            fn($detail) => $detail->nominal_upah * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+        );
+
+        // 4. Hitung total BPJS ketenagakerjaan dengan jumlah_hc yang benar
+        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(
+            fn($detail) => ($detail->bpjs_ketenagakerjaan ?? 0) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+        );
+
+        // 5. Hitung total BPJS kesehatan dengan jumlah_hc yang benar
         $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
+            fn($detail) => ($detail->bpjs_kesehatan ?? 0) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
         );
 
-        // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
+        // 6. Hitung total potongan BPU dengan jumlah_hc yang benar
         $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
-            fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
+            fn($detail) => ($detail->penjamin_kesehatan === 'BPU')
+            ? 16800 * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+            : 0
         );
 
-        $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
+        $summary->potongan_bpu_per_orang = 16800;
 
-        // ✅ TAMBAHKAN: Hitung persentase BPJS untuk HPP dan COSS
-        $totalHc = $quotation->quotation_detail->sum('jumlah_hc');
+        // 7. Hitung persentase BPJS rata-rata
+        $totalHc = $quotation->quotation_detail->sum(
+            fn($detail) => $detail->{$jumlahHcField} ?? $detail->jumlah_hc
+        );
 
         if ($totalHc > 0) {
-            $totalPersenBpjsKetenagakerjaan = 0;
-            $totalPersenBpjsKesehatan = 0;
-            $totalPersenBpjsJkk = 0;
-            $totalPersenBpjsJkm = 0;
-            $totalPersenBpjsJht = 0;
-            $totalPersenBpjsJp = 0;
-            $totalPersenBpjsKes = 0;
-
-            foreach ($quotation->quotation_detail as $detail) {
-
-                $persenBpjsKesehatanDetail = $detail->persen_bpjs_kesehatan ?? 0;
-                $persenBpjsJkkDetail = $detail->persen_bpjs_jkk ?? 0;
-                $persenBpjsJkmDetail = $detail->persen_bpjs_jkm ?? 0;
-                $persenBpjsJhtDetail = $detail->persen_bpjs_jht ?? 0;
-                $persenBpjsJpDetail = $detail->persen_bpjs_jp ?? 0;
-                $persenBpjsKesDetail = $detail->persen_bpjs_kes ?? 0;
-                $jumlahHcDetail = $detail->jumlah_hc;
-                $persenBpjsKetenagakerjaanDetail = $detail->persen_bpjs_ketenagakerjaan ?? 0;
-
-            }
-
-            // Set untuk HPP (suffix kosong) dan COSS (suffix '_coss')
-            if ($suffix === '') {
-                // Untuk HPP
-                $summary->persen_bpjs_ketenagakerjaan = $persenBpjsKetenagakerjaanDetail;
-                $summary->persen_bpjs_kesehatan = $persenBpjsKesehatanDetail;
-                $summary->persen_bpjs_jkk = $persenBpjsJkkDetail;
-                $summary->persen_bpjs_jkm = $persenBpjsJkmDetail;
-                $summary->persen_bpjs_jht = $persenBpjsJhtDetail;
-                $summary->persen_bpjs_jp = $persenBpjsJpDetail;
-                $summary->persen_bpjs_kes = $persenBpjsKesDetail;
-            } else if ($suffix === '_coss') {
-                // Untuk COSS (gunakan nilai yang sama karena perhitungannya sama)
-                $summary->persen_bpjs_ketenagakerjaan_coss = $persenBpjsKetenagakerjaanDetail;
-                $summary->persen_bpjs_kesehatan_coss = $persenBpjsKesehatanDetail;
-                $summary->persen_bpjs_jkk_coss = $persenBpjsJkkDetail;
-                $summary->persen_bpjs_jkm_coss = $persenBpjsJkmDetail;
-                $summary->persen_bpjs_jht_coss = $persenBpjsJhtDetail;
-                $summary->persen_bpjs_jp_coss = $persenBpjsJpDetail;
-                $summary->persen_bpjs_kes_coss = $persenBpjsKesDetail;
+            $firstDetail = $quotation->quotation_detail->first();
+            if ($firstDetail) {
+                if ($suffix === '') {
+                    // HPP
+                    $summary->persen_bpjs_ketenagakerjaan = $firstDetail->persen_bpjs_ketenagakerjaan ?? 0;
+                    $summary->persen_bpjs_kesehatan = $firstDetail->persen_bpjs_kesehatan ?? 0;
+                    $summary->persen_bpjs_jkk = $firstDetail->persen_bpjs_jkk ?? 0;
+                    $summary->persen_bpjs_jkm = $firstDetail->persen_bpjs_jkm ?? 0;
+                    $summary->persen_bpjs_jht = $firstDetail->persen_bpjs_jht ?? 0;
+                    $summary->persen_bpjs_jp = $firstDetail->persen_bpjs_jp ?? 0;
+                    $summary->persen_bpjs_kes = $firstDetail->persen_bpjs_kes ?? 0;
+                } else {
+                    // COSS
+                    $summary->persen_bpjs_ketenagakerjaan_coss = $firstDetail->persen_bpjs_ketenagakerjaan ?? 0;
+                    $summary->persen_bpjs_kesehatan_coss = $firstDetail->persen_bpjs_kesehatan ?? 0;
+                    $summary->persen_bpjs_jkk_coss = $firstDetail->persen_bpjs_jkk ?? 0;
+                    $summary->persen_bpjs_jkm_coss = $firstDetail->persen_bpjs_jkm ?? 0;
+                    $summary->persen_bpjs_jht_coss = $firstDetail->persen_bpjs_jht ?? 0;
+                    $summary->persen_bpjs_jp_coss = $firstDetail->persen_bpjs_jp ?? 0;
+                    $summary->persen_bpjs_kes_coss = $firstDetail->persen_bpjs_kes ?? 0;
+                }
             }
         }
 
-        \Log::info("BPU totals calculated", [
+        \Log::info("Base totals calculated for {$suffix}", [
             'quotation_id' => $quotation->id,
+            'total_sebelum_management_fee' => $summary->{"total_sebelum_management_fee{$suffix}"},
+            'total_base_manpower' => $summary->{"total_base_manpower{$suffix}"},
+            'upah_pokok' => $summary->{"upah_pokok{$suffix}"},
+            'total_bpjs' => $summary->{"total_bpjs{$suffix}"},
+            'total_bpjs_kesehatan' => $summary->{"total_bpjs_kesehatan{$suffix}"},
             'total_potongan_bpu' => $summary->total_potongan_bpu,
-            'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
-            'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+            'jumlah_hc_field_used' => $jumlahHcField
         ]);
     }
+
+    // ============================ MANAGEMENT FEE CALCULATIONS ============================
+
+    /**
+     * Calculate management fee untuk HPP dan COSS
+     */
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
 
-        // GUNAKAN DATA DARI QUOTATION, BUKAN DARI WAGE
         $managementFeeCalculations = [
             1 => fn() => $summary->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
             4 => fn() => $summary->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
@@ -1515,6 +1701,15 @@ class QuotationService
         $calculation = $managementFeeCalculations[$quotation->management_fee_id] ?? $managementFeeCalculations[1];
         $summary->{"nominal_management_fee{$suffix}"} = $calculation();
         $summary->{"grand_total_sebelum_pajak{$suffix}"} = $summary->{"total_sebelum_management_fee{$suffix}"} + $summary->{"nominal_management_fee{$suffix}"};
+
+        \Log::info("Management Fee calculated", [
+            'quotation_id' => $quotation->id,
+            'type' => $suffix ? 'COSS' : 'HPP',
+            'management_fee_id' => $quotation->management_fee_id,
+            'persentase' => $quotation->persentase,
+            'nominal_management_fee' => $summary->{"nominal_management_fee{$suffix}"},
+            'grand_total_sebelum_pajak' => $summary->{"grand_total_sebelum_pajak{$suffix}"}
+        ]);
     }
 
     private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
@@ -1582,7 +1777,7 @@ class QuotationService
             $baseAmount = $managementFee * (11 / 12); // Faktor 11/12
         } else {
             // "Total Invoice" atau "Lainnya" - gunakan grand total sebelum pajak
-            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"};
+            $baseAmount = $summary->{"grand_total_sebelum_pajak{$suffix}"} * (11 / 12); // Faktor 11/12
         }
 
         $summary->{"dpp{$suffix}"} = $baseAmount;
@@ -1593,8 +1788,8 @@ class QuotationService
         }
 
         // ✅ PERBAIKAN: Hitung PPH (2% dari baseAmount setelah faktor 11/12) dengan validasi
-        if ($summary->{"pph{$suffix}"} == 0) {
-            $calculatedPph = round($baseAmount * -0.02, 2); // PPH 2% (negatif karena potongan)
+        if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Management Fee") {
+            $calculatedPph = round($managementFee * -0.02, 2); // PPH 2% (negatif karena potongan)
 
             // Validasi: PPH tidak boleh lebih besar dari 10% base amount
             $maxPph = abs($baseAmount * 0.1);
@@ -1609,6 +1804,25 @@ class QuotationService
             }
 
             $summary->{"pph{$suffix}"} = $calculatedPph;
+        } else if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong != "Total Invoice") {
+            $calculatedPph = round($summary->{"grand_total_sebelum_pajak{$suffix}"} * -0.02, 2); // PPH 2% (negatif karena potongan)
+            $maxPph = abs($baseAmount * 0.1);
+            if (abs($calculatedPph) > $maxPph) {
+                \Log::warning("PPH calculation seems incorrect", [
+                    'calculated_pph' => $calculatedPph,
+                    'base_amount' => $baseAmount,
+                    'max_reasonable' => $maxPph,
+                    'suffix' => $suffix
+                ]);
+                $calculatedPph = -$maxPph;
+            }
+
+            $summary->{"pph{$suffix}"} = $calculatedPph;
+        } else {
+            // Jika PPH sudah ada, pastikan nilainya negatif
+            if ($summary->{"pph{$suffix}"} > 0) {
+                $summary->{"pph{$suffix}"} = -abs($summary->{"pph{$suffix}"});
+            }
         }
 
         \Log::info("Default taxes calculated with 11/12 factor", [
@@ -1632,7 +1846,8 @@ class QuotationService
             $summary->{"ppn{$suffix}"} + $summary->{"pph{$suffix}"};
         $summary->{"pembulatan{$suffix}"} = ceil($summary->{"total_invoice{$suffix}"} / 1000) * 1000;
 
-        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->total_sebelum_management_fee;
+        // PERBAIKAN: Gunakan total_sebelum_management_fee yang sesuai dengan suffix
+        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->{"total_sebelum_management_fee{$suffix}"};
 
         // FIX: Tambahkan pengecekan untuk menghindari division by zero
         if ($summary->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
@@ -1641,7 +1856,6 @@ class QuotationService
             $summary->{"gpm{$suffix}"} = 0;
         }
     }
-
     // ============================ HELPER METHODS ============================
     private function calculateProvisi($durasiKerjasama)
     {
