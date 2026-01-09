@@ -48,7 +48,7 @@ class QuotationDuplicationService
             // 4. COPY APPLIKASI PENDUKUNG
             $this->duplicateAplikasiPendukung($newQuotation, $quotationReferensi);
 
-            // 5. COPY BARANG DATA (Kaporlap, Devices, Chemicals, OHC)
+            // 5. COPY BARANG DATA (Kaporlap, Devices, Chemicals, OHC) - DIPERBARUI
             $this->duplicateBarangData($newQuotation, $quotationReferensi);
 
             // 6. COPY TRAINING DATA
@@ -101,7 +101,7 @@ class QuotationDuplicationService
             // ✅ 3. COPY APPLIKASI PENDUKUNG
             $this->duplicateAplikasiPendukung($newQuotation, $quotationReferensi);
 
-            // ✅ 4. COPY BARANG DATA dengan mapping yang baru - PASTIKAN INI DIPANGGIL
+            // ✅ 4. COPY BARANG DATA dengan mapping yang baru - DIPERBARUI
             $this->duplicateBarangDataWithMapping($newQuotation, $quotationReferensi);
 
             // ✅ 5. COPY TRAINING DATA
@@ -160,7 +160,7 @@ class QuotationDuplicationService
             // 4. COPY APPLIKASI PENDUKUNG
             $this->duplicateAplikasiPendukung($newQuotation, $quotationReferensi);
 
-            // 5. COPY BARANG DATA dengan mapping detail yang baru
+            // 5. COPY BARANG DATA dengan mapping detail yang baru - DIPERBARUI
             $this->duplicateBarangDataWithMapping($newQuotation, $quotationReferensi);
 
             // 6. COPY TRAINING DATA
@@ -555,7 +555,7 @@ class QuotationDuplicationService
                 $coss = $detailReferensi->quotationDetailCoss;
                 $newDetail->quotationDetailCoss()->create([
                     'quotation_id' => $newQuotation->id,
-                    'jumlah_hc' => $coss->jumlah_hc,    
+                    'jumlah_hc' => $coss->jumlah_hc,
                     'gaji_pokok' => $coss->gaji_pokok,
                     'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
                     'kompensasi' => $coss->kompensasi,
@@ -612,30 +612,30 @@ class QuotationDuplicationService
 
     /**
      * Duplicate all barang-related data (Kaporlap, Devices, Chemicals, OHC)
-     * ✅ FIX: Gunakan getMappedDetailIdWithMapping bukan getMappedDetailId
+     * ✅ DIPERBARUI: Devices, Chemicals, OHC menggunakan quotation_site_id (barang general)
+     * ✅ Kaporlap tetap menggunakan quotation_detail_id (spesifik per detail)
      */
     private function duplicateBarangData(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
-        \Log::info('Starting duplicateBarangData', [
+        \Log::info('Starting duplicateBarangData (UPDATED)', [
             'new_quotation_id' => $newQuotation->id,
-            'mapping_count' => count($this->detailIdMapping),
+            'detail_mapping_count' => count($this->detailIdMapping),
+            'site_mapping_count' => count($this->siteIdMapping),
             'kaporlap_count' => $quotationReferensi->quotationKaporlaps->count(),
             'devices_count' => $quotationReferensi->quotationDevices->count(),
             'chemicals_count' => $quotationReferensi->quotationChemicals->count(),
             'ohcs_count' => $quotationReferensi->quotationOhcs->count()
         ]);
 
-        // Copy Kaporlap data
+        // ✅ 1. Copy Kaporlap data (tetap menggunakan quotation_detail_id)
         foreach ($quotationReferensi->quotationKaporlaps as $kaporlap) {
-            // ✅ FIX: Gunakan getMappedDetailIdWithMapping untuk mempertahankan mapping 1:1
             $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $kaporlap->quotation_detail_id);
 
-            \Log::info('Creating Kaporlap', [
+            \Log::info('Creating Kaporlap (detail-specific)', [
                 'old_detail_id' => $kaporlap->quotation_detail_id,
                 'new_detail_id' => $newDetailId,
                 'nama' => $kaporlap->nama,
-                'jumlah' => $kaporlap->jumlah,
-                'harga' => $kaporlap->harga
+                'jumlah' => $kaporlap->jumlah
             ]);
 
             $newQuotation->quotationKaporlaps()->create([
@@ -650,21 +650,22 @@ class QuotationDuplicationService
             ]);
         }
 
-        // Copy Devices data
+        // ✅ 2. Copy Devices data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationDevices as $device) {
-            // ✅ FIX: Gunakan getMappedDetailIdWithMapping untuk mempertahankan mapping 1:1
-            $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $device->quotation_detail_id);
+            // Dapatkan site_id lama dari referensi
+            $originalSiteId = $this->getOriginalSiteIdFromDevice($device);
+            $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-            \Log::info('Creating Device', [
-                'old_detail_id' => $device->quotation_detail_id,
-                'new_detail_id' => $newDetailId,
+            \Log::info('Creating Device (site-specific)', [
+                'original_site_id' => $originalSiteId,
+                'new_site_id' => $newSiteId,
                 'nama' => $device->nama,
                 'jumlah' => $device->jumlah
             ]);
 
             $newQuotation->quotationDevices()->create([
+                'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                 'barang_id' => $device->barang_id,
-                'quotation_detail_id' => $newDetailId,
                 'nama' => $device->nama,
                 'jenis_barang_id' => $device->jenis_barang_id,
                 'jenis_barang' => $device->jenis_barang,
@@ -674,20 +675,21 @@ class QuotationDuplicationService
             ]);
         }
 
-        // Copy Chemicals data
+        // ✅ 3. Copy Chemicals data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationChemicals as $chemical) {
-            // ✅ FIX: Gunakan getMappedDetailIdWithMapping untuk mempertahankan mapping 1:1
-            $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $chemical->quotation_detail_id);
+            // Dapatkan site_id lama dari referensi
+            $originalSiteId = $this->getOriginalSiteIdFromChemical($chemical);
+            $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-            \Log::info('Creating Chemical', [
-                'old_detail_id' => $chemical->quotation_detail_id,
-                'new_detail_id' => $newDetailId,
+            \Log::info('Creating Chemical (site-specific)', [
+                'original_site_id' => $originalSiteId,
+                'new_site_id' => $newSiteId,
                 'nama' => $chemical->nama,
                 'masa_pakai' => $chemical->masa_pakai
             ]);
 
             $newQuotation->quotationChemicals()->create([
-                'quotation_detail_id' => $newDetailId,
+                'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                 'barang_id' => $chemical->barang_id,
                 'nama' => $chemical->nama,
                 'jenis_barang_id' => $chemical->jenis_barang_id,
@@ -699,19 +701,20 @@ class QuotationDuplicationService
             ]);
         }
 
-        // Copy OHC data
+        // ✅ 4. Copy OHC data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationOhcs as $ohc) {
-            // ✅ FIX: Gunakan getMappedDetailIdWithMapping untuk mempertahankan mapping 1:1
-            $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $ohc->quotation_detail_id);
+            // Dapatkan site_id lama dari referensi
+            $originalSiteId = $this->getOriginalSiteIdFromOhc($ohc);
+            $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-            \Log::info('Creating OHC', [
-                'old_detail_id' => $ohc->quotation_detail_id,
-                'new_detail_id' => $newDetailId,
+            \Log::info('Creating OHC (site-specific)', [
+                'original_site_id' => $originalSiteId,
+                'new_site_id' => $newSiteId,
                 'nama' => $ohc->nama
             ]);
 
             $newQuotation->quotationOhcs()->create([
-                'quotation_detail_id' => $newDetailId,
+                'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                 'barang_id' => $ohc->barang_id,
                 'nama' => $ohc->nama,
                 'jenis_barang_id' => $ohc->jenis_barang_id,
@@ -725,29 +728,31 @@ class QuotationDuplicationService
 
     /**
      * Duplicate barang data dengan mapping yang sudah ada
+     * ✅ DIPERBARUI: Devices, Chemicals, OHC menggunakan quotation_site_id (barang general)
+     * ✅ Kaporlap tetap menggunakan quotation_detail_id (spesifik per detail)
      */
     private function duplicateBarangDataWithMapping(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
-        \Log::info('Starting duplicateBarangDataWithMapping', [
+        \Log::info('Starting duplicateBarangDataWithMapping (UPDATED)', [
             'new_quotation_id' => $newQuotation->id,
-            'mapping_count' => count($this->detailIdMapping),
+            'detail_mapping_count' => count($this->detailIdMapping),
+            'site_mapping_count' => count($this->siteIdMapping),
             'kaporlap_count' => $quotationReferensi->quotationKaporlaps->count(),
             'devices_count' => $quotationReferensi->quotationDevices->count(),
             'chemicals_count' => $quotationReferensi->quotationChemicals->count(),
             'ohcs_count' => $quotationReferensi->quotationOhcs->count()
         ]);
 
-        // Copy Kaporlap data
+        // ✅ 1. Copy Kaporlap data (tetap menggunakan quotation_detail_id)
         foreach ($quotationReferensi->quotationKaporlaps as $kaporlap) {
             try {
                 $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $kaporlap->quotation_detail_id);
 
-                \Log::info('Creating Kaporlap', [
+                \Log::info('Creating Kaporlap (detail-specific)', [
                     'old_detail_id' => $kaporlap->quotation_detail_id,
                     'new_detail_id' => $newDetailId,
                     'nama' => $kaporlap->nama,
-                    'jumlah' => $kaporlap->jumlah,
-                    'harga' => $kaporlap->harga
+                    'jumlah' => $kaporlap->jumlah
                 ]);
 
                 $newQuotation->quotationKaporlaps()->create([
@@ -768,21 +773,23 @@ class QuotationDuplicationService
             }
         }
 
-        // Copy Devices data
+        // ✅ 2. Copy Devices data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationDevices as $device) {
             try {
-                $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $device->quotation_detail_id);
+                // Dapatkan site_id lama dari referensi
+                $originalSiteId = $this->getOriginalSiteIdFromDevice($device);
+                $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-                \Log::info('Creating Device', [
-                    'old_detail_id' => $device->quotation_detail_id,
-                    'new_detail_id' => $newDetailId,
+                \Log::info('Creating Device (site-specific)', [
+                    'original_site_id' => $originalSiteId,
+                    'new_site_id' => $newSiteId,
                     'nama' => $device->nama,
                     'jumlah' => $device->jumlah
                 ]);
 
                 $newQuotation->quotationDevices()->create([
+                    'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                     'barang_id' => $device->barang_id,
-                    'quotation_detail_id' => $newDetailId,
                     'nama' => $device->nama,
                     'jenis_barang_id' => $device->jenis_barang_id,
                     'jenis_barang' => $device->jenis_barang,
@@ -798,20 +805,22 @@ class QuotationDuplicationService
             }
         }
 
-        // Copy Chemicals data
+        // ✅ 3. Copy Chemicals data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationChemicals as $chemical) {
             try {
-                $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $chemical->quotation_detail_id);
+                // Dapatkan site_id lama dari referensi
+                $originalSiteId = $this->getOriginalSiteIdFromChemical($chemical);
+                $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-                \Log::info('Creating Chemical', [
-                    'old_detail_id' => $chemical->quotation_detail_id,
-                    'new_detail_id' => $newDetailId,
+                \Log::info('Creating Chemical (site-specific)', [
+                    'original_site_id' => $originalSiteId,
+                    'new_site_id' => $newSiteId,
                     'nama' => $chemical->nama,
                     'masa_pakai' => $chemical->masa_pakai
                 ]);
 
                 $newQuotation->quotationChemicals()->create([
-                    'quotation_detail_id' => $newDetailId,
+                    'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                     'barang_id' => $chemical->barang_id,
                     'nama' => $chemical->nama,
                     'jenis_barang_id' => $chemical->jenis_barang_id,
@@ -829,19 +838,21 @@ class QuotationDuplicationService
             }
         }
 
-        // Copy OHC data
+        // ✅ 4. Copy OHC data (menggunakan quotation_site_id - barang general)
         foreach ($quotationReferensi->quotationOhcs as $ohc) {
             try {
-                $newDetailId = $this->getMappedDetailIdWithMapping($newQuotation, $ohc->quotation_detail_id);
+                // Dapatkan site_id lama dari referensi
+                $originalSiteId = $this->getOriginalSiteIdFromOhc($ohc);
+                $newSiteId = $this->getMappedSiteId($newQuotation, $originalSiteId);
 
-                \Log::info('Creating OHC', [
-                    'old_detail_id' => $ohc->quotation_detail_id,
-                    'new_detail_id' => $newDetailId,
+                \Log::info('Creating OHC (site-specific)', [
+                    'original_site_id' => $originalSiteId,
+                    'new_site_id' => $newSiteId,
                     'nama' => $ohc->nama
                 ]);
 
                 $newQuotation->quotationOhcs()->create([
-                    'quotation_detail_id' => $newDetailId,
+                    'quotation_site_id' => $newSiteId, // ✅ Menggunakan quotation_site_id
                     'barang_id' => $ohc->barang_id,
                     'nama' => $ohc->nama,
                     'jenis_barang_id' => $ohc->jenis_barang_id,
@@ -857,6 +868,69 @@ class QuotationDuplicationService
                 ]);
             }
         }
+    }
+
+    /**
+     * ✅ HELPER METHOD: Dapatkan original site_id dari Device
+     */
+    private function getOriginalSiteIdFromDevice($device): int
+    {
+        // Jika sudah ada quotation_site_id di data referensi, gunakan itu
+        if ($device->quotation_site_id) {
+            return $device->quotation_site_id;
+        }
+
+        // Jika tidak, coba dapatkan dari quotation_detail yang terkait
+        if ($device->quotation_detail_id) {
+            $detail = QuotationDetail::find($device->quotation_detail_id);
+            if ($detail && $detail->quotation_site_id) {
+                return $detail->quotation_site_id;
+            }
+        }
+
+        throw new \Exception('Cannot determine original site_id for device: ' . $device->id);
+    }
+
+    /**
+     * ✅ HELPER METHOD: Dapatkan original site_id dari Chemical
+     */
+    private function getOriginalSiteIdFromChemical($chemical): int
+    {
+        // Jika sudah ada quotation_site_id di data referensi, gunakan itu
+        if ($chemical->quotation_site_id) {
+            return $chemical->quotation_site_id;
+        }
+
+        // Jika tidak, coba dapatkan dari quotation_detail yang terkait
+        if ($chemical->quotation_detail_id) {
+            $detail = QuotationDetail::find($chemical->quotation_detail_id);
+            if ($detail && $detail->quotation_site_id) {
+                return $detail->quotation_site_id;
+            }
+        }
+
+        throw new \Exception('Cannot determine original site_id for chemical: ' . $chemical->id);
+    }
+
+    /**
+     * ✅ HELPER METHOD: Dapatkan original site_id dari OHC
+     */
+    private function getOriginalSiteIdFromOhc($ohc): int
+    {
+        // Jika sudah ada quotation_site_id di data referensi, gunakan itu
+        if ($ohc->quotation_site_id) {
+            return $ohc->quotation_site_id;
+        }
+
+        // Jika tidak, coba dapatkan dari quotation_detail yang terkait
+        if ($ohc->quotation_detail_id) {
+            $detail = QuotationDetail::find($ohc->quotation_detail_id);
+            if ($detail && $detail->quotation_site_id) {
+                return $detail->quotation_site_id;
+            }
+        }
+
+        throw new \Exception('Cannot determine original site_id for OHC: ' . $ohc->id);
     }
 
     /**

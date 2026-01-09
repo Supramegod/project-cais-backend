@@ -972,7 +972,7 @@ class QuotationService
 
             // Untuk HPP: Cek apakah ada nilai manual yang bukan 0
             $hppManualValue = null;
-            if ($hpp && $hpp->{$config['hpp_field']} !== null && (float) $hpp->{$config['hpp_field']} != 0) {
+            if ($hpp && $hpp->{$config['hpp_field']} !== null) {
                 $hppManualValue = (float) $hpp->{$config['hpp_field']};
                 \Log::info("Found NON-ZERO manual HPP value for {$key}", [
                     'detail_id' => $detail->id,
@@ -984,7 +984,7 @@ class QuotationService
 
             // Untuk COSS: Cek apakah ada nilai manual yang bukan 0
             $cossManualValue = null;
-            if ($coss && $coss->{$config['coss_field']} !== null && (float) $coss->{$config['coss_field']} != 0) {
+            if ($coss && $coss->{$config['coss_field']} !== null ) {
                 $cossManualValue = (float) $coss->{$config['coss_field']};
                 \Log::info("Found NON-ZERO manual COSS value for {$key}", [
                     'detail_id' => $detail->id,
@@ -998,7 +998,7 @@ class QuotationService
             // Jika 0 atau null, hitung otomatis
             if ($hppManualValue !== null) {
                 $detail->{"personil_$key"} = $hppManualValue;
-                \Log::info("Using NON-ZERO manual HPP value for {$key}", [
+                \Log::info("Using manual HPP value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $hppManualValue
                 ]);
@@ -1038,7 +1038,7 @@ class QuotationService
 
             if ($cossManualValue !== null) {
                 $detail->{"personil_{$key}_coss"} = $cossManualValue;
-                \Log::info("Using NON-ZERO manual COSS value for {$key}", [
+                \Log::info("Using manual COSS value for {$key}", [
                     'detail_id' => $detail->id,
                     'value' => $cossManualValue
                 ]);
