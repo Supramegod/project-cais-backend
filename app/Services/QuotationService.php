@@ -1419,6 +1419,21 @@ class QuotationService
             ]);
 
             // ============================================
+            // ✅ PERBAIKAN: HITUNG total_base_manpower UNTUK HPP DAN COSS
+            // ============================================
+            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganHpp, 2);
+            $detail->total_base_manpower_coss = round($nominalUpah + $totalTunjanganCoss, 2);
+
+            \Log::info("Base manpower calculated", [
+                'detail_id' => $detail->id,
+                'nominal_upah' => $nominalUpah,
+                'total_tunjangan_hpp' => $totalTunjanganHpp,
+                'total_tunjangan_coss' => $totalTunjanganCoss,
+                'total_base_manpower_hpp' => $detail->total_base_manpower,
+                'total_base_manpower_coss' => $detail->total_base_manpower_coss
+            ]);
+
+            // ============================================
             // HPP CALCULATION (dengan jumlah_hc_hpp)
             // ============================================
             $detail->total_personil = round(
@@ -1445,8 +1460,6 @@ class QuotationService
             // ============================================
             // COSS CALCULATIONS (dengan jumlah_hc_original)
             // ============================================
-            $detail->total_base_manpower = round($nominalUpah + $totalTunjanganCoss, 2);
-
             $detail->total_exclude_base_manpower = round(
                 $tunjanganHariRayaCoss
                 + $kompensasiCoss
@@ -1463,7 +1476,7 @@ class QuotationService
             );
 
             $detail->total_personil_coss = round(
-                $detail->total_base_manpower
+                $detail->total_base_manpower_coss
                 + $detail->total_exclude_base_manpower
                 + $personilOhcCoss
                 - $potonganBpu,
@@ -1476,6 +1489,8 @@ class QuotationService
                 'detail_id' => $detail->id,
                 'total_personil_hpp' => $detail->total_personil,
                 'sub_total_personil_hpp' => $detail->sub_total_personil,
+                'total_base_manpower_hpp' => $detail->total_base_manpower,
+                'total_base_manpower_coss' => $detail->total_base_manpower_coss,
                 'total_personil_coss' => $detail->total_personil_coss,
                 'sub_total_personil_coss' => $detail->sub_total_personil_coss,
                 'jumlah_hc_hpp_used' => $jumlahHcHpp,
@@ -1564,83 +1579,116 @@ class QuotationService
     {
         $summary = $result->calculation_summary;
 
-        $summary->{"total_sebelum_management_fee{$suffix}"} = $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
-        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->total_base_manpower * $kbd->jumlah_hc);
-        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->nominal_upah * $kbd->jumlah_hc);
+        // Gunakan suffix untuk menentukan field jumlah_hc yang benar
+        $jumlahHcField = ($suffix === '_coss') ? 'jumlah_hc_original' : 'jumlah_hc_hpp';
 
-        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(fn($kbd) => $kbd->bpjs_ketenagakerjaan * $kbd->jumlah_hc);
+        // 1. Hitung total sebelum management fee
+        $summary->{"total_sebelum_management_fee{$suffix}"} =
+            $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
 
-        // PERBAIKAN: Hindari double counting untuk BPJS Kesehatan
+        // ============================================
+        // ✅ PERBAIKAN KRITIKAL: Gunakan field yang BENAR untuk HPP vs COSS
+        // ============================================
+        // 2. Hitung total base manpower dengan jumlah_hc yang benar
+        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(
+            function ($detail) use ($suffix, $jumlahHcField) {
+                // ✅ UNTUK HPP: gunakan total_base_manpower
+                // ✅ UNTUK COSS: gunakan total_base_manpower_coss
+                $totalBaseManpower = ($suffix === '_coss')
+                    ? ($detail->total_base_manpower_coss ?? 0)
+                    : ($detail->total_base_manpower ?? 0);
+
+                $jumlahHc = $detail->{$jumlahHcField} ?? $detail->jumlah_hc;
+
+                $result = $totalBaseManpower * $jumlahHc;
+
+                \Log::debug("Base manpower calculation{$suffix}", [
+                    'detail_id' => $detail->id,
+                    'total_base_manpower' => $totalBaseManpower,
+                    'jumlah_hc' => $jumlahHc,
+                    'result' => $result,
+                    'field_used' => ($suffix === '_coss') ? 'total_base_manpower_coss' : 'total_base_manpower'
+                ]);
+
+                return $result;
+            }
+        );
+
+        // 3. Hitung upah pokok dengan jumlah_hc yang benar
+        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(
+            fn($detail) => $detail->nominal_upah * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+        );
+
+        // 4. Hitung total BPJS ketenagakerjaan dengan jumlah_hc yang benar
+        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(
+            fn($detail) => ($detail->bpjs_ketenagakerjaan ?? 0) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+        );
+
+        // 5. Hitung total BPJS kesehatan dengan jumlah_hc yang benar
         $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($kbd) => $kbd->bpjs_kesehatan * $kbd->jumlah_hc
+            fn($detail) => ($detail->bpjs_kesehatan ?? 0) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
         );
 
-        // ✅ PERBAIKAN: Hitung total potongan BPU dengan benar
+        // 6. Hitung total potongan BPU dengan jumlah_hc yang benar
         $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
-            fn($kbd) => ($kbd->penjamin_kesehatan === 'BPU') ? 16800 * $kbd->jumlah_hc : 0
+            fn($detail) => ($detail->penjamin_kesehatan === 'BPU')
+            ? 16800 * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+            : 0
         );
 
-        $summary->potongan_bpu_per_orang = 16800; // Fixed amount per person
+        $summary->potongan_bpu_per_orang = 16800;
 
-        // ✅ TAMBAHKAN: Hitung persentase BPJS untuk HPP dan COSS
-        $totalHc = $quotation->quotation_detail->sum('jumlah_hc');
+        // 7. Hitung persentase BPJS rata-rata
+        $totalHc = $quotation->quotation_detail->sum(
+            fn($detail) => $detail->{$jumlahHcField} ?? $detail->jumlah_hc
+        );
 
         if ($totalHc > 0) {
-            $totalPersenBpjsKetenagakerjaan = 0;
-            $totalPersenBpjsKesehatan = 0;
-            $totalPersenBpjsJkk = 0;
-            $totalPersenBpjsJkm = 0;
-            $totalPersenBpjsJht = 0;
-            $totalPersenBpjsJp = 0;
-            $totalPersenBpjsKes = 0;
-
-            foreach ($quotation->quotation_detail as $detail) {
-
-                $persenBpjsKesehatanDetail = $detail->persen_bpjs_kesehatan ?? 0;
-                $persenBpjsJkkDetail = $detail->persen_bpjs_jkk ?? 0;
-                $persenBpjsJkmDetail = $detail->persen_bpjs_jkm ?? 0;
-                $persenBpjsJhtDetail = $detail->persen_bpjs_jht ?? 0;
-                $persenBpjsJpDetail = $detail->persen_bpjs_jp ?? 0;
-                $persenBpjsKesDetail = $detail->persen_bpjs_kes ?? 0;
-                $jumlahHcDetail = $detail->jumlah_hc;
-                $persenBpjsKetenagakerjaanDetail = $detail->persen_bpjs_ketenagakerjaan ?? 0;
-
-            }
-
-            // Set untuk HPP (suffix kosong) dan COSS (suffix '_coss')
-            if ($suffix === '') {
-                // Untuk HPP
-                $summary->persen_bpjs_ketenagakerjaan = $persenBpjsKetenagakerjaanDetail;
-                $summary->persen_bpjs_kesehatan = $persenBpjsKesehatanDetail;
-                $summary->persen_bpjs_jkk = $persenBpjsJkkDetail;
-                $summary->persen_bpjs_jkm = $persenBpjsJkmDetail;
-                $summary->persen_bpjs_jht = $persenBpjsJhtDetail;
-                $summary->persen_bpjs_jp = $persenBpjsJpDetail;
-                $summary->persen_bpjs_kes = $persenBpjsKesDetail;
-            } else if ($suffix === '_coss') {
-                // Untuk COSS (gunakan nilai yang sama karena perhitungannya sama)
-                $summary->persen_bpjs_ketenagakerjaan_coss = $persenBpjsKetenagakerjaanDetail;
-                $summary->persen_bpjs_kesehatan_coss = $persenBpjsKesehatanDetail;
-                $summary->persen_bpjs_jkk_coss = $persenBpjsJkkDetail;
-                $summary->persen_bpjs_jkm_coss = $persenBpjsJkmDetail;
-                $summary->persen_bpjs_jht_coss = $persenBpjsJhtDetail;
-                $summary->persen_bpjs_jp_coss = $persenBpjsJpDetail;
-                $summary->persen_bpjs_kes_coss = $persenBpjsKesDetail;
+            $firstDetail = $quotation->quotation_detail->first();
+            if ($firstDetail) {
+                if ($suffix === '') {
+                    // HPP
+                    $summary->persen_bpjs_ketenagakerjaan = $firstDetail->persen_bpjs_ketenagakerjaan ?? 0;
+                    $summary->persen_bpjs_kesehatan = $firstDetail->persen_bpjs_kesehatan ?? 0;
+                    $summary->persen_bpjs_jkk = $firstDetail->persen_bpjs_jkk ?? 0;
+                    $summary->persen_bpjs_jkm = $firstDetail->persen_bpjs_jkm ?? 0;
+                    $summary->persen_bpjs_jht = $firstDetail->persen_bpjs_jht ?? 0;
+                    $summary->persen_bpjs_jp = $firstDetail->persen_bpjs_jp ?? 0;
+                    $summary->persen_bpjs_kes = $firstDetail->persen_bpjs_kes ?? 0;
+                } else {
+                    // COSS
+                    $summary->persen_bpjs_ketenagakerjaan_coss = $firstDetail->persen_bpjs_ketenagakerjaan ?? 0;
+                    $summary->persen_bpjs_kesehatan_coss = $firstDetail->persen_bpjs_kesehatan ?? 0;
+                    $summary->persen_bpjs_jkk_coss = $firstDetail->persen_bpjs_jkk ?? 0;
+                    $summary->persen_bpjs_jkm_coss = $firstDetail->persen_bpjs_jkm ?? 0;
+                    $summary->persen_bpjs_jht_coss = $firstDetail->persen_bpjs_jht ?? 0;
+                    $summary->persen_bpjs_jp_coss = $firstDetail->persen_bpjs_jp ?? 0;
+                    $summary->persen_bpjs_kes_coss = $firstDetail->persen_bpjs_kes ?? 0;
+                }
             }
         }
 
-        \Log::info("BPU totals calculated", [
+        \Log::info("Base totals calculated for {$suffix}", [
             'quotation_id' => $quotation->id,
+            'total_sebelum_management_fee' => $summary->{"total_sebelum_management_fee{$suffix}"},
+            'total_base_manpower' => $summary->{"total_base_manpower{$suffix}"},
+            'upah_pokok' => $summary->{"upah_pokok{$suffix}"},
+            'total_bpjs' => $summary->{"total_bpjs{$suffix}"},
+            'total_bpjs_kesehatan' => $summary->{"total_bpjs_kesehatan{$suffix}"},
             'total_potongan_bpu' => $summary->total_potongan_bpu,
-            'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang,
-            'total_hc' => $quotation->quotation_detail->sum('jumlah_hc')
+            'jumlah_hc_field_used' => $jumlahHcField
         ]);
     }
+
+    // ============================ MANAGEMENT FEE CALCULATIONS ============================
+
+    /**
+     * Calculate management fee untuk HPP dan COSS
+     */
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
 
-        // GUNAKAN DATA DARI QUOTATION, BUKAN DARI WAGE
         $managementFeeCalculations = [
             1 => fn() => $summary->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
             4 => fn() => $summary->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
@@ -1653,6 +1701,15 @@ class QuotationService
         $calculation = $managementFeeCalculations[$quotation->management_fee_id] ?? $managementFeeCalculations[1];
         $summary->{"nominal_management_fee{$suffix}"} = $calculation();
         $summary->{"grand_total_sebelum_pajak{$suffix}"} = $summary->{"total_sebelum_management_fee{$suffix}"} + $summary->{"nominal_management_fee{$suffix}"};
+
+        \Log::info("Management Fee calculated", [
+            'quotation_id' => $quotation->id,
+            'type' => $suffix ? 'COSS' : 'HPP',
+            'management_fee_id' => $quotation->management_fee_id,
+            'persentase' => $quotation->persentase,
+            'nominal_management_fee' => $summary->{"nominal_management_fee{$suffix}"},
+            'grand_total_sebelum_pajak' => $summary->{"grand_total_sebelum_pajak{$suffix}"}
+        ]);
     }
 
     private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
