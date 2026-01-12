@@ -12958,6 +12958,37 @@
                 ]
             }
         },
+        "/api/leads/customeractivity/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar aktivitas customer berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua aktivitas customer yang terkait dengan leads tertentu",
+                "operationId": "b3d00ca951a3550c851f501bd9f3b7f8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data PKS"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
