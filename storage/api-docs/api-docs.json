@@ -12958,6 +12958,37 @@
                 ]
             }
         },
+        "/api/leads/customeractivity/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar aktivitas customer berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua aktivitas customer yang terkait dengan leads tertentu",
+                "operationId": "4ccecaf0235533bbd823454fec83f5b1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data PKS"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
@@ -19677,6 +19708,164 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Quotation approved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations/{quotation_id}/reset-approval": {
+            "post": {
+                "tags": [
+                    "Quotation Approval"
+                ],
+                "summary": "Reset approval quotation",
+                "description": "Reset status approval quotation kembali ke draft. Hanya user dengan role tertentu yang dapat melakukan reset.",
+                "operationId": "4e2bdcdec255c9b54fca8aabfd45b1ac",
+                "parameters": [
+                    {
+                        "name": "quotation_id",
+                        "in": "path",
+                        "description": "ID Quotation yang akan direset",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Approval berhasil direset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Approval berhasil direset"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 123
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "QT/2025/01/0001"
+                                                },
+                                                "status_quotation_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "is_aktif": {
+                                                    "type": "integer",
+                                                    "example": 0
+                                                },
+                                                "ot1": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                },
+                                                "ot2": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2025-01-12 10:30:00"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin User"
+                                                },
+                                                "status_quotation": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "name": {
+                                                            "type": "string",
+                                                            "example": "Draft"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request - User tidak memiliki akses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Anda tidak memiliki akses untuk reset approval."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Quotation tidak ditemukan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation tidak ditemukan"
                                         }
                                     },
                                     "type": "object"
@@ -27865,6 +28054,10 @@
         {
             "name": "UMP",
             "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
+        },
+        {
+            "name": "Quotation Approval",
+            "description": "Quotation Approval"
         },
         {
             "name": "User Email Config",

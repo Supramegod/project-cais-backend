@@ -164,10 +164,7 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->tgl_quotation,
-                    'createed_by' => $quotation->created_by,
-                    'tgl_quotation_formatted' => $quotation->tgl_quotation
-                        ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y')
-                        : null,
+                    'created_by' => $quotation->created_by,
                     'status_quotation' => $quotation->statusQuotation ? [
                         'id' => $quotation->statusQuotation->id,
                         'nama' => $quotation->statusQuotation->nama
@@ -1044,6 +1041,89 @@ class QuotationController extends Controller
                 'message' => 'Failed to submit quotation for approval',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+    /**
+     * @OA\Post(
+     *     path="/api/quotations/{quotation_id}/reset-approval",
+     *     tags={"Quotation Approval"},
+     *     summary="Reset approval quotation",
+     *     description="Reset status approval quotation kembali ke draft. Hanya user dengan role tertentu yang dapat melakukan reset.",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="quotation_id",
+     *         in="path",
+     *         description="ID Quotation yang akan direset",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=123)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Approval berhasil direset",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Approval berhasil direset"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=123),
+     *                 @OA\Property(property="nomor", type="string", example="QT/2025/01/0001"),
+     *                 @OA\Property(property="status_quotation_id", type="integer", example=1),
+     *                 @OA\Property(property="is_aktif", type="integer", example=0),
+     *                 @OA\Property(property="ot1", type="string", nullable=true, example=null),
+     *                 @OA\Property(property="ot2", type="string", nullable=true, example=null),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2025-01-12 10:30:00"),
+     *                 @OA\Property(property="updated_by", type="string", example="Admin User"),
+     *                 @OA\Property(
+     *                     property="status_quotation",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="name", type="string", example="Draft")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Bad Request - User tidak memiliki akses",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Anda tidak memiliki akses untuk reset approval.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized - Token tidak valid",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Not Found - Quotation tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Quotation tidak ditemukan")
+     *         )
+     *     )
+     * )
+     */
+    public function resetApproval(Request $request, Quotation $quotation)
+    {
+        try {
+            $user = $request->user();
+            $result = $this->quotationService->resetApproval($quotation, $user);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Approval berhasil direset',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
     /**

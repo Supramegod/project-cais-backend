@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -95,6 +96,11 @@ class CustomerActivity extends Model
     public function spk()
     {
         return $this->belongsTo(Spk::class, 'spk_id');
+    }
+    public function scopeByLeadsId(Builder $query, int $leadsId, array $filters = [])
+    {
+        return $query->where('leads_id', $leadsId);
+
     }
 
     public function quotation()
