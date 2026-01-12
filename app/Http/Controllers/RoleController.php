@@ -412,7 +412,7 @@ class RoleController extends Controller
 
     private function updateOrCreatePermission($roleId, $permission): void
     {
-        $record = SysmenuRole::where('cais_role_id', $roleId)
+        $record = SysmenuRole::where('role_id', $roleId)
             ->where('sysmenu_id', $permission['sysmenu_id'])
             ->first();
 
