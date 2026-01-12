@@ -366,6 +366,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/{sourceId}/copy/{targetId}', 'copy');
         Route::post('/{id}/resubmit', 'resubmit');
         Route::post('/{id}/submit-approval', 'submitForApproval');
+        Route::post('/{id}/reset-approval', 'resetApproval');
         Route::get('/{id}/calculate', 'calculate');
         Route::get('/{id}/export-pdf', 'exportPdf');
         Route::get('/{id}/status', 'getStatus');

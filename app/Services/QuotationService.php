@@ -1847,7 +1847,7 @@ class QuotationService
         $summary->{"pembulatan{$suffix}"} = ceil($summary->{"total_invoice{$suffix}"} / 1000) * 1000;
 
         // PERBAIKAN: Gunakan total_sebelum_management_fee yang sesuai dengan suffix
-        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->{"total_sebelum_management_fee{$suffix}"};
+        $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->total_sebelum_management_fee;
 
         // FIX: Tambahkan pengecekan untuk menghindari division by zero
         if ($summary->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
@@ -2368,6 +2368,53 @@ class QuotationService
             throw $e;
         }
     }
+    public function resetApproval(Quotation $quotation, User $user)
+    {
+        DB::beginTransaction();
+        try {
+            $currentDateTime = Carbon::now()->toDateTimeString();
+
+            // 1. Validasi: Hanya user tertentu yang bisa reset (misalnya admin atau role khusus)
+            // Sesuaikan dengan kebutuhan bisnis Anda
+            $allowedRoles = 2; // Contoh: Admin atau Super User
+            if ($user->cais_role_id != $allowedRoles) {
+                throw new \Exception('Anda tidak memiliki akses untuk reset approval.');
+            }
+
+            // 2. Simpan data sebelum reset untuk log
+            $oldStatus = $quotation->status_quotation_id;
+            $oldOt1 = $quotation->ot1;
+            $oldOt2 = $quotation->ot2;
+
+            // 3. Reset data approval ke state awal
+            $updateData = [
+                'status_quotation_id' => 2, // Kembali ke status Draft/Pending
+                'is_aktif' => 0,
+                'ot1' => null,
+                'ot2' => null,
+                'updated_at' => $currentDateTime,
+                'updated_by' => $user->full_name
+            ];
+
+            $quotation->update($updateData);
+
+            DB::commit();
+
+            // Refresh data
+            $quotation->refresh();
+            $quotation->load('statusQuotation');
+
+            \Log::info("Quotation #{$quotation->id} approval reset by user #{$user->id}");
+
+            return $quotation;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in resetApproval: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     // ============================ HELPER METHODS (tambahan jika diperlukan) ============================
 
 
