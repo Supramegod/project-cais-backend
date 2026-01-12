@@ -9,6 +9,7 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\JabatanPic;
 use App\Models\JenisPerusahaan;
+use App\Models\Kebutuhan;
 use App\Models\Leads;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
@@ -315,43 +316,13 @@ class LeadsController extends Controller
             $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
             $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
             $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
-            // Get all activities terkait leads ini (history activity)
-            $activityLeads = CustomerActivity::where('leads_id', $lead->id)
-                ->whereNull('deleted_at')
-                ->orderBy('tgl_activity', 'desc')
-                ->get()
-                ->map(function ($act) {
-                    $baseData = [
-                        'id' => $act->id,
-                        'tipe' => $act->tipe,
-                        'notes' => $act->notes_tipe ?? $act->notes,
-                        'tgl_activity' => $act->tgl_activity
-                    ];
-
-                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
-                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
-                        // Untuk Telepon & Online Meeting
-                        $baseData['start'] = $act->start;
-                        $baseData['end'] = $act->end;
-                        $baseData['durasi'] = $act->durasi;
-                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
-                    } elseif (strtolower($act->tipe) === 'visit') {
-                        // Untuk Visit
-                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
-                        $baseData['jam_realisasi'] = $act->jam_realisasi;
-                        $baseData['jenis_visit'] = $act->jenis_visit;
-                    }
-
-                    return $baseData;
-                });
+           
 
             return response()->json([
                 'success' => true,
                 'message' => 'Detail lead berhasil diambil',
-                'data' => [
-                    'lead' => $lead,
-                    'activities' => $activityLeads
-                ]
+                'data' => $lead,
+                
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
@@ -2334,6 +2305,7 @@ class LeadsController extends Controller
 
             $assignmentResults = [];
             $allAssignedKebutuhan = [];
+            $allAssignedKebutuhanNames = []; // Tambahkan array untuk menyimpan nama kebutuhan
 
             // Process each assignment
             foreach ($request->assignments as $assignment) {
@@ -2359,6 +2331,12 @@ class LeadsController extends Controller
 
                     $assignedKebutuhan[] = $kebutuhan_id;
                     $allAssignedKebutuhan[] = $kebutuhan_id;
+
+                    // Ambil nama kebutuhan
+                    $kebutuhan = Kebutuhan::find($kebutuhan_id);
+                    if ($kebutuhan) {
+                        $allAssignedKebutuhanNames[] = $kebutuhan->nama;
+                    }
                 }
 
                 $assignmentResults[] = [
@@ -2379,7 +2357,7 @@ class LeadsController extends Controller
                 'branch_id' => $lead->branch_id,
                 'tgl_activity' => Carbon::now()->toDateTimeString(),
                 'nomor' => $nomorActivity,
-                'notes' => 'Sales diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhan)),
+                'notes' => $timSalesD->user->full_name . ' diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhanNames)), // Gunakan nama kebutuhan
                 'tipe' => 'Assignment',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
@@ -2636,6 +2614,72 @@ class LeadsController extends Controller
                 'message' => 'Data PKS berhasil diambil',
                 'data' => $pksData,
                 'summary' => Pks::getSummaryByLeadsId($id) // Summary dari model Pks
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/leads/customeractivity/{id}",
+     *     summary="Mendapatkan daftar aktivitas customer berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua aktivitas customer yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data PKS"
+     *     )
+     * )
+     */
+
+    public function getcustomeractivityByLead($id, Request $request)
+    {
+        try {
+            $activities = CustomerActivity::with('leads')
+                ->byLeadsId($id)
+                ->orderBy('tgl_activity', 'desc')
+                ->whereNull('deleted_at')
+                ->get()
+                ->map(function ($act) {
+                    $baseData = [
+                        'id' => $act->id,
+                        'tipe' => $act->tipe,
+                        'notes' => $act->notes_tipe ?? $act->notes,
+                        'tgl_activity' => $act->tgl_activity
+                    ];
+
+                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
+                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
+                        // Untuk Telepon & Online Meeting
+                        $baseData['start'] = $act->start;
+                        $baseData['end'] = $act->end;
+                        $baseData['durasi'] = $act->durasi;
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                    } elseif (strtolower($act->tipe) === 'visit') {
+                        // Untuk Visit
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                        $baseData['jam_realisasi'] = $act->jam_realisasi;
+                        $baseData['jenis_visit'] = $act->jenis_visit;
+                    }
+
+                    return $baseData;
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data aktivitas customer berhasil diambil',
+                'data' => $activities
             ]);
         } catch (\Exception $e) {
             return response()->json([
