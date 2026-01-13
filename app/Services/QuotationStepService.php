@@ -1605,6 +1605,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
             // **PERBAIKAN KRITIKAL: HAPUS NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR SAAT UPDATE STEP 4**
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
             if ($hpp) {
                 $hppUpdateData = [];
 
@@ -1615,7 +1616,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
                 // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
                 if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
-                    $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] * 0.10;
+                    $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
                 }
 
                 // **PERBAIKAN: KOSONGKAN NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR**
@@ -1626,17 +1627,27 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 if (!empty($hppUpdateData)) {
                     $hppUpdateData['updated_by'] = Auth::user()->full_name;
                     $hpp->update($hppUpdateData);
+                }
+                if ($coss) {
+                    $cossUpdateData = [];
+                    // Jika THR di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                    if (in_array(strtolower($wageData['thr']), ['diprovisikan', 'ditagihkan'])) {
+                        $cossUpdateData['tunjangan_hari_raya'] = $upahData['nominal_upah'] / 12;
+                    }
 
-                    \Log::info("Updated HPP and cleared tunjangan_holiday & lembur values", [
-                        'detail_id' => $detail->id,
-                        'hpp_update_data' => $hppUpdateData,
-                        'wage_values' => [
-                            'tunjangan_holiday' => $wageData['tunjangan_holiday'],
-                            'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
-                            'lembur' => $wageData['lembur'],
-                            'nominal_lembur' => $wageData['nominal_lembur']
-                        ]
-                    ]);
+                    // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                    if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
+                        $cossUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
+                    }
+
+                    // **PERBAIKAN: KOSONGKAN NILAI COSS UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR**
+                    $cossUpdateData['tunjangan_hari_libur_nasional'] = null;
+                    $cossUpdateData['lembur'] = null;
+
+                    if (!empty($cossUpdateData)) {
+                        $cossUpdateData['updated_by'] = Auth::user()->full_name;
+                        $coss->update($cossUpdateData);
+                    }
                 }
             }
 
@@ -3735,44 +3746,61 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
      */
     private function syncWageDataForStep11(Quotation $quotation, string $user, Carbon $currentDateTime): void
     {
+        // 1. Eager Load semua relasi sekaligus untuk menghindari N+1 query
+        $quotation->load([
+            'quotationDetails.wage',
+            'quotationDetails.quotationDetailHpp',
+            'quotationDetails.quotationDetailCoss'
+        ]);
+
         foreach ($quotation->quotationDetails as $detail) {
-            $wage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
+            $wage = $detail->wage; // Sudah ter-load di memori
 
-            if ($wage) {
-                // Update HPP dengan data dari wage (step 4)
-                $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            if (!$wage)
+                continue;
 
-                if ($hpp) {
-                    $updateData = [];
+            $nominalUpah = $detail->nominal_upah ?? 0;
 
-                    // Hanya update jika nilai di HPP null atau 0
-                    if (
-                        ($hpp->tunjangan_hari_raya == null || $hpp->tunjangan_hari_raya == 0) &&
-                        $wage->thr && in_array(strtolower($wage->thr), ['diprovisikan', 'ditagihkan'])
-                    ) {
-                        $updateData['tunjangan_hari_raya'] = ($detail->nominal_upah ?? 0) / 12;
-                    }
+            // Cek kondisi THR & Kompensasi sekali saja
+            $isThrEligible = $wage->thr && in_array(strtolower($wage->thr), ['diprovisikan', 'ditagihkan']);
+            $isKompensasiEligible = $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan']);
 
-                    if (
-                        ($hpp->kompensasi == null || $hpp->kompensasi == 0) &&
-                        $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan'])
-                    ) {
-                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) * 0.10;
-                    }
+            // 2. Proses HPP & COSS dengan helper agar tidak DRY (Don't Repeat Yourself)
+            $this->updateFinancialRecord($detail->quotationDetailHpp, $isThrEligible, $isKompensasiEligible, $nominalUpah, $user, $currentDateTime, 'HPP');
+            $this->updateFinancialRecord($detail->quotationDetailCoss, $isThrEligible, $isKompensasiEligible, $nominalUpah, $user, $currentDateTime, 'COSS');
+        }
+    }
 
-                    if (!empty($updateData)) {
-                        $updateData['updated_by'] = $user;
-                        $updateData['updated_at'] = $currentDateTime;
+    /**
+     * Helper function untuk memproses update record finansial
+     */
+    private function updateFinancialRecord($record, $thrEligible, $kompEligible, $nominalUpah, $user, $currentDateTime, $label): void
+    {
+        if (!$record)
+            return;
 
-                        $hpp->update($updateData);
+        $updateData = [];
 
-                        \Log::info("Synced wage data to HPP", [
-                            'detail_id' => $detail->id,
-                            'update_data' => $updateData
-                        ]);
-                    }
-                }
-            }
+        // Logika THR
+        if (($record->tunjangan_hari_raya == null || $record->tunjangan_hari_raya == 0) && $thrEligible) {
+            $updateData['tunjangan_hari_raya'] = $nominalUpah / 12;
+        }
+
+        // Logika Kompensasi
+        if (($record->kompensasi == null || $record->kompensasi == 0) && $kompEligible) {
+            $updateData['kompensasi'] = $nominalUpah * 0.10;
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+
+            $record->update($updateData);
+
+            \Log::info("Synced wage data to {$label}", [
+                'id' => $record->id,
+                'update_data' => $updateData
+            ]);
         }
     }
 
