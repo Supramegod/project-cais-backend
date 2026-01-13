@@ -1605,6 +1605,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
             // **PERBAIKAN KRITIKAL: HAPUS NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR SAAT UPDATE STEP 4**
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
             if ($hpp) {
                 $hppUpdateData = [];
 
@@ -1615,7 +1616,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
                 // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
                 if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
-                    $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] * 0.10;
+                    $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
                 }
 
                 // **PERBAIKAN: KOSONGKAN NILAI HPP UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR**
@@ -1626,17 +1627,27 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 if (!empty($hppUpdateData)) {
                     $hppUpdateData['updated_by'] = Auth::user()->full_name;
                     $hpp->update($hppUpdateData);
+                }
+                if ($coss) {
+                    $cossUpdateData = [];
+                    // Jika THR di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                    if (in_array(strtolower($wageData['thr']), ['diprovisikan', 'ditagihkan'])) {
+                        $cossUpdateData['tunjangan_hari_raya'] = $upahData['nominal_upah'] / 12;
+                    }
 
-                    \Log::info("Updated HPP and cleared tunjangan_holiday & lembur values", [
-                        'detail_id' => $detail->id,
-                        'hpp_update_data' => $hppUpdateData,
-                        'wage_values' => [
-                            'tunjangan_holiday' => $wageData['tunjangan_holiday'],
-                            'nominal_tunjangan_holiday' => $wageData['nominal_tunjangan_holiday'],
-                            'lembur' => $wageData['lembur'],
-                            'nominal_lembur' => $wageData['nominal_lembur']
-                        ]
-                    ]);
+                    // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
+                    if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
+                        $cossUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
+                    }
+
+                    // **PERBAIKAN: KOSONGKAN NILAI COSS UNTUK TUNJANGAN_HOLIDAY DAN LEMBUR**
+                    $cossUpdateData['tunjangan_hari_libur_nasional'] = null;
+                    $cossUpdateData['lembur'] = null;
+
+                    if (!empty($cossUpdateData)) {
+                        $cossUpdateData['updated_by'] = Auth::user()->full_name;
+                        $coss->update($cossUpdateData);
+                    }
                 }
             }
 
