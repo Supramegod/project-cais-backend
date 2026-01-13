@@ -3735,44 +3735,61 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
      */
     private function syncWageDataForStep11(Quotation $quotation, string $user, Carbon $currentDateTime): void
     {
+        // 1. Eager Load semua relasi sekaligus untuk menghindari N+1 query
+        $quotation->load([
+            'quotationDetails.wage',
+            'quotationDetails.quotationDetailHpp',
+            'quotationDetails.quotationDetailCoss'
+        ]);
+
         foreach ($quotation->quotationDetails as $detail) {
-            $wage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
+            $wage = $detail->wage; // Sudah ter-load di memori
 
-            if ($wage) {
-                // Update HPP dengan data dari wage (step 4)
-                $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            if (!$wage)
+                continue;
 
-                if ($hpp) {
-                    $updateData = [];
+            $nominalUpah = $detail->nominal_upah ?? 0;
 
-                    // Hanya update jika nilai di HPP null atau 0
-                    if (
-                        ($hpp->tunjangan_hari_raya == null || $hpp->tunjangan_hari_raya == 0) &&
-                        $wage->thr && in_array(strtolower($wage->thr), ['diprovisikan', 'ditagihkan'])
-                    ) {
-                        $updateData['tunjangan_hari_raya'] = ($detail->nominal_upah ?? 0) / 12;
-                    }
+            // Cek kondisi THR & Kompensasi sekali saja
+            $isThrEligible = $wage->thr && in_array(strtolower($wage->thr), ['diprovisikan', 'ditagihkan']);
+            $isKompensasiEligible = $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan']);
 
-                    if (
-                        ($hpp->kompensasi == null || $hpp->kompensasi == 0) &&
-                        $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan'])
-                    ) {
-                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) * 0.10;
-                    }
+            // 2. Proses HPP & COSS dengan helper agar tidak DRY (Don't Repeat Yourself)
+            $this->updateFinancialRecord($detail->quotationDetailHpp, $isThrEligible, $isKompensasiEligible, $nominalUpah, $user, $currentDateTime, 'HPP');
+            $this->updateFinancialRecord($detail->quotationDetailCoss, $isThrEligible, $isKompensasiEligible, $nominalUpah, $user, $currentDateTime, 'COSS');
+        }
+    }
 
-                    if (!empty($updateData)) {
-                        $updateData['updated_by'] = $user;
-                        $updateData['updated_at'] = $currentDateTime;
+    /**
+     * Helper function untuk memproses update record finansial
+     */
+    private function updateFinancialRecord($record, $thrEligible, $kompEligible, $nominalUpah, $user, $currentDateTime, $label): void
+    {
+        if (!$record)
+            return;
 
-                        $hpp->update($updateData);
+        $updateData = [];
 
-                        \Log::info("Synced wage data to HPP", [
-                            'detail_id' => $detail->id,
-                            'update_data' => $updateData
-                        ]);
-                    }
-                }
-            }
+        // Logika THR
+        if (($record->tunjangan_hari_raya == null || $record->tunjangan_hari_raya == 0) && $thrEligible) {
+            $updateData['tunjangan_hari_raya'] = $nominalUpah / 12;
+        }
+
+        // Logika Kompensasi
+        if (($record->kompensasi == null || $record->kompensasi == 0) && $kompEligible) {
+            $updateData['kompensasi'] = $nominalUpah * 0.10;
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+
+            $record->update($updateData);
+
+            \Log::info("Synced wage data to {$label}", [
+                'id' => $record->id,
+                'update_data' => $updateData
+            ]);
         }
     }
 
