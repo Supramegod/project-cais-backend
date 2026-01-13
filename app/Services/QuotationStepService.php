@@ -3769,7 +3769,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                         ($hpp->kompensasi == null || $hpp->kompensasi == 0) &&
                         $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan'])
                     ) {
-                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) * 0.10;
+                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) / 12;
                     }
 
                     if (!empty($updateData)) {
@@ -3799,7 +3799,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                         ($coss->kompensasi == null || $coss->kompensasi == 0) &&
                         $wage->kompensasi && in_array(strtolower($wage->kompensasi), ['diprovisikan', 'ditagihkan'])
                     ) {
-                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) * 0.10;
+                        $updateData['kompensasi'] = ($detail->nominal_upah ?? 0) / 12;
                     }
 
                     if (!empty($updateData)) {
