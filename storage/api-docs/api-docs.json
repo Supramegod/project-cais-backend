@@ -19723,17 +19723,17 @@
                 ]
             }
         },
-        "/api/quotations/{quotation_id}/reset-approval": {
+        "/api/quotations/{id}/reset-approval": {
             "post": {
                 "tags": [
-                    "Quotation Approval"
+                    "Quotations"
                 ],
                 "summary": "Reset approval quotation",
                 "description": "Reset status approval quotation kembali ke draft. Hanya user dengan role tertentu yang dapat melakukan reset.",
-                "operationId": "4e2bdcdec255c9b54fca8aabfd45b1ac",
+                "operationId": "e1a42081436f7c24218770e644698331",
                 "parameters": [
                     {
-                        "name": "quotation_id",
+                        "name": "id",
                         "in": "path",
                         "description": "ID Quotation yang akan direset",
                         "required": true,
@@ -28054,10 +28054,6 @@
         {
             "name": "UMP",
             "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
-        },
-        {
-            "name": "Quotation Approval",
-            "description": "Quotation Approval"
         },
         {
             "name": "User Email Config",

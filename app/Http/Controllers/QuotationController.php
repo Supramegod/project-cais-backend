@@ -360,6 +360,7 @@ class QuotationController extends Controller
     public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
+        set_time_limit( 0); // Set time limit to 5 minutes
         try {
             $user = Auth::user();
 
@@ -501,55 +502,67 @@ class QuotationController extends Controller
             ]);
 
             // ✅ PERUBAHAN: LOGIC BERDASARKAN ADA/TIDAKNYA REFERENSI DAN STATUS SITE
+// Di dalam try-catch block, setelah $hasNewSiteRequest dan $hasExistingSite dihitung:
+
+            // ✅ LOGIC BERDASARKAN STATUS SITE
             if ($quotationReferensi) {
-                // ✅ KASUS 1: ADA REFERENSI
-                \Log::info('Starting duplication process from reference for ' . $tipe_quotation);
+                \Log::info('Starting duplication process from reference for ' . $tipe_quotation, [
+                    'has_new_site_request' => $hasNewSiteRequest,
+                    'has_existing_site' => $hasExistingSite,
+                    'ref_site_count' => $quotationReferensi->quotationSites->count()
+                ]);
 
                 if (!$hasNewSiteRequest && !$hasExistingSite) {
-                    // ✅ MODE 1: TIDAK ADA SITE BARU DAN TIDAK ADA SITE EXISTING - Copy semua data termasuk sites
+                    // ✅ KASUS 1: TIDAK ADA SITE BARU & TIDAK ADA SITE EXISTING
+                    // Copy semua data termasuk sites dari referensi
                     $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
                     \Log::info('Copied ALL data including sites from reference quotation');
-                } else if ($hasExistingSite && !$hasNewSiteRequest) {
-                    // ✅ MODE 1B: ADA SITE EXISTING TAPI TIDAK ADA SITE BARU - Gunakan site existing
-                    // Untuk kasus ini, kita perlu link ke site yang sudah ada
+
+                } elseif ($hasExistingSite && !$hasNewSiteRequest) {
+                    // ✅ KASUS 2: ADA SITE EXISTING, TIDAK ADA SITE BARU
+                    // Link ke site existing yang sudah ada
                     $this->linkExistingSites($quotation, $request, $user->full_name);
+                    // Copy data lain (tapi JANGAN copy site dari referensi)
                     $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
                     \Log::info('Linked to existing sites and copied other data');
+
                 } else {
-                    // ✅ MODE 2: ADA SITE BARU - Buat site baru, lalu duplikasi data
-                    // Cek apakah jumlah site yang diminta sama dengan referensi
+                    // ✅ KASUS 3: ADA SITE BARU (dengan atau tanpa existing site)
+                    // BUAT SITE BARU SAJA (skip yang existing)
+                    $this->createNewSitesOnly($quotation, $request, $user->full_name);
+
+                    // Tentukan jumlah site
                     $jumlahSiteRequest = 0;
                     if ($request->jumlah_site == "Multi Site") {
                         $jumlahSiteRequest = is_array($request->multisite) ? count($request->multisite) : 0;
                     } else {
-                        $jumlahSiteRequest = 1; // Single Site
+                        $jumlahSiteRequest = 1;
                     }
 
                     $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
 
-                    \Log::info('Site comparison', [
+                    \Log::info('Site comparison for new sites', [
                         'jumlah_site_request' => $jumlahSiteRequest,
-                        'jumlah_site_referensi' => $jumlahSiteReferensi
+                        'jumlah_site_referensi' => $jumlahSiteReferensi,
+                        'has_existing_site' => $hasExistingSite
                     ]);
 
-                    // Buat hanya site baru (yang belum existing)
-                    $this->createNewSitesOnly($quotation, $request, $user->full_name);
-
-                    if ($jumlahSiteRequest === $jumlahSiteReferensi) {
-                        // ✅ JUMLAH SITE SAMA - Mapping per site
+                    // ✅ LOGIC DUPLIKASI DATA KE SITE BARU
+                    if ($jumlahSiteRequest === $jumlahSiteReferensi && !$hasExistingSite) {
+                        // ✅ JUMLAH SITE SAMA & TIDAK ADA EXISTING: Mapping per site
                         $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-                        \Log::info('Copied data with site mapping (same count)');
+                        \Log::info('Copied data with site mapping (same count, no existing)');
                     } else {
-                        // ✅ JUMLAH SITE BERBEDA - Duplikasi semua detail ke semua site
+                        // ✅ JUMLAH SITE BERBEDA ATAU ADA EXISTING: Duplikasi semua detail ke semua site baru
                         $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                        \Log::info('Copied all data to new sites (different count)');
+                        \Log::info('Copied all data to new sites (different count or with existing)');
                     }
                 }
             } else {
-                // ✅ KASUS 2: TIDAK ADA REFERENSI (hanya untuk tipe 'baru')
+                // ✅ KASUS 4: TIDAK ADA REFERENSI (hanya untuk tipe 'baru')
                 \Log::info('Creating quotation WITHOUT reference (brand new)');
 
-                // Validasi: Untuk quotation baru tanpa referensi, wajib ada data site
+                // Validasi: wajib ada data site untuk quotation baru tanpa referensi
                 if (!$hasNewSiteRequest && !$hasExistingSite) {
                     throw new \Exception('Data site wajib diisi untuk quotation baru tanpa referensi');
                 }
@@ -1045,13 +1058,13 @@ class QuotationController extends Controller
     }
     /**
      * @OA\Post(
-     *     path="/api/quotations/{quotation_id}/reset-approval",
-     *     tags={"Quotation Approval"},
+     *     path="/api/quotations/{id}/reset-approval",
+     *     tags={"Quotations"},
      *     summary="Reset approval quotation",
      *     description="Reset status approval quotation kembali ke draft. Hanya user dengan role tertentu yang dapat melakukan reset.",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="quotation_id",
+     *         name="id",
      *         in="path",
      *         description="ID Quotation yang akan direset",
      *         required=true,
