@@ -142,8 +142,6 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
-            $tim = TimSalesDetail::where('user_id', Auth::id())->first();
-
             // ✅ Select hanya kolom yang diperlukan
             $query = Leads::select([
                 'id',
@@ -170,6 +168,9 @@ class LeadsController extends Controller
                     'timSalesD:id,nama'
                 ])
                 ->where('status_leads_id', '!=', 102);
+
+            // ✅ Terapkan filter berdasarkan role user
+            $query->filterByUserRole();
 
             // Filter tanggal
             if ($request->filled('tgl_dari')) {
@@ -203,7 +204,7 @@ class LeadsController extends Controller
             $data = $query->get();
 
             // ✅ Transform ke format yang dibutuhkan frontend
-            $transformedData = $data->map(function ($item) use ($tim) {
+            $transformedData = $data->map(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
@@ -222,8 +223,7 @@ class LeadsController extends Controller
                     'sumber_leads' => $item->platform->nama ?? '-',
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
-                    'notes' => $item->notes,
-                    'can_view' => $this->canViewLead($item, $tim)
+                    'notes' => $item->notes
                 ];
             });
 
@@ -316,13 +316,13 @@ class LeadsController extends Controller
             $lead->stgl_leads = Carbon::parse($lead->tgl_leads)->isoFormat('D MMMM Y');
             $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
             $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
-           
+
 
             return response()->json([
                 'success' => true,
                 'message' => 'Detail lead berhasil diambil',
                 'data' => $lead,
-                
+
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);

@@ -91,11 +91,15 @@ class QuotationStoreRequest extends BaseRequest
             'jumlah_site.required' => 'Jumlah site wajib dipilih',
             'jumlah_site.in' => 'Jumlah site harus Single Site atau Multi Site',
         ];
+        $messages['site_existing_allowed'] = 'Site ini sudah ada di database. Data dari referensi akan disalin ke site ini.';
+        $messages['site_new_required'] = 'Untuk quotation baru tanpa referensi, data site wajib diisi.';
+
 
         // Pesan untuk revisi/rekontrak
         if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
             $messages['quotation_referensi_id.required'] = 'Quotation referensi wajib dipilih untuk revisi/rekontrak';
             $messages['quotation_referensi_id.exists'] = 'Quotation referensi tidak valid';
+            $messages['site_count_mismatch'] = 'Karena jumlah site berbeda dengan referensi, data site baru wajib diisi.';
         }
 
         // Pesan untuk multisite
@@ -168,9 +172,10 @@ class QuotationStoreRequest extends BaseRequest
             $tipe_quotation = $this->tipe_quotation ?? 'baru';
             $jumlah_site = $this->jumlah_site;
             $perusahaan_id = $this->perusahaan_id;
+            $hasReferensi = $this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id);
 
             // Validasi tambahan untuk quotation_referensi_id
-            if ($this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id)) {
+            if ($hasReferensi) {
                 // Cek apakah quotation referensi exist dan tidak dihapus
                 $referensiExists = \App\Models\Quotation::where('id', $this->quotation_referensi_id)
                     ->withoutTrashed()
@@ -182,14 +187,11 @@ class QuotationStoreRequest extends BaseRequest
             }
 
             // Untuk revisi/rekontrak, quotation_referensi_id wajib
-            if (
-                in_array($tipe_quotation, ['revisi', 'rekontrak']) &&
-                (!$this->has('quotation_referensi_id') || empty($this->quotation_referensi_id))
-            ) {
+            if (in_array($tipe_quotation, ['revisi', 'rekontrak']) && !$hasReferensi) {
                 $validator->errors()->add('quotation_referensi_id', 'Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
             }
 
-            // Untuk revisi/rekontrak dengan single site: jika ada salah satu field site, semua harus ada
+            // ✅ SINGLE SITE: Validasi kelengkapan field jika ada
             if ($jumlah_site == 'Single Site') {
                 $hasSiteField = $this->has('nama_site') && !empty($this->nama_site);
                 $hasProvinceField = $this->has('provinsi') && !empty($this->provinsi);
@@ -199,25 +201,17 @@ class QuotationStoreRequest extends BaseRequest
                 $siteFieldsCount = ($hasSiteField ? 1 : 0) + ($hasProvinceField ? 1 : 0) +
                     ($hasCityField ? 1 : 0) + ($hasPenempatanField ? 1 : 0);
 
+                // Jika ada setidaknya satu field site, maka keempatnya harus diisi
                 if ($siteFieldsCount > 0 && $siteFieldsCount < 4) {
-                    $validator->errors()->add('nama_site', 'Untuk membuat site baru pada revisi/rekontrak, semua field site (nama_site, provinsi, kota, penempatan) harus diisi');
+                    $validator->errors()->add('nama_site', 'Untuk membuat/menggunakan site, semua field site (nama_site, provinsi, kota, penempatan) harus diisi lengkap');
                 }
 
-                // ✅ VALIDASI SITE SUDAH ADA: Cek apakah site sudah ada di database
-                if ($hasSiteField && $hasProvinceField && $hasCityField) {
-                    $siteExists = QuotationSite::where('leads_id', $perusahaan_id)
-                        ->where('nama_site', $this->nama_site)
-                        ->where('provinsi_id', $this->provinsi)
-                        ->where('kota_id', $this->kota)
-                        ->exists();
-
-                    if ($siteExists) {
-                        $validator->errors()->add('nama_site', 'Site dengan nama, provinsi, dan kota yang sama sudah ada untuk perusahaan ini. Silakan gunakan site yang berbeda atau pilih site yang sudah ada.');
-                    }
-                }
+                // ✅ PERUBAHAN: HAPUS VALIDASI DUPLIKASI SITE DI SINI
+                // Biarkan controller yang handle apakah site existing atau baru
+                // Karena site existing BOLEH digunakan
             }
 
-            // Untuk revisi/rekontrak dengan multi site: validasi konsistensi array
+            // ✅ MULTI SITE: validasi konsistensi array
             if ($jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
                 $siteCount = count($this->multisite);
                 $provinceCount = count($this->provinsi_multi ?? []);
@@ -228,30 +222,12 @@ class QuotationStoreRequest extends BaseRequest
                     $validator->errors()->add('multisite', 'Jumlah data multisite, provinsi, kota, dan penempatan harus sama');
                 }
 
-                // ✅ VALIDASI SITE SUDAH ADA UNTUK MULTI SITE: Cek setiap site
-                if (!empty($this->multisite) && !empty($this->provinsi_multi) && !empty($this->kota_multi)) {
-                    foreach ($this->multisite as $index => $namaSite) {
-                        $provinsiId = $this->provinsi_multi[$index] ?? null;
-                        $kotaId = $this->kota_multi[$index] ?? null;
-                        $penempatan = $this->penempatan_multi[$index] ?? null;
-
-                        if ($namaSite && $provinsiId && $kotaId) {
-                            $siteExists = QuotationSite::where('leads_id', $perusahaan_id)
-                                ->where('nama_site', $namaSite)
-                                ->where('provinsi_id', $provinsiId)
-                                ->where('kota_id', $kotaId)
-                                ->exists();
-
-                            if ($siteExists) {
-                                $validator->errors()->add("multisite.$index", "Site '{$namaSite}' dengan provinsi dan kota yang sama sudah ada untuk perusahaan ini.");
-                            }
-                        }
-                    }
-                }
+                // ✅ PERUBAHAN: HAPUS VALIDASI DUPLIKASI SITE DI SINI JUGA
+                // Tidak perlu cek duplikasi karena site existing diperbolehkan
             }
 
-            // ✅ VALIDASI TAMBAHAN: Untuk quotation baru tanpa referensi, wajib ada data site
-            if ($tipe_quotation === 'baru' && !$this->has('quotation_referensi_id')) {
+            // ✅ Validasi untuk quotation baru TANPA referensi: wajib ada data site
+            if ($tipe_quotation === 'baru' && !$hasReferensi) {
                 $hasSiteData = false;
 
                 if ($jumlah_site == 'Single Site') {
@@ -262,6 +238,27 @@ class QuotationStoreRequest extends BaseRequest
 
                 if (!$hasSiteData) {
                     $validator->errors()->add('nama_site', 'Data site wajib diisi untuk quotation baru tanpa referensi');
+                }
+            }
+
+            // ✅ TAMBAHKAN: Validasi khusus untuk REVISI/REKONTRAK dengan site
+            if (in_array($tipe_quotation, ['revisi', 'rekontrak']) && $hasReferensi) {
+                // Ambil data referensi
+                $referensi = \App\Models\Quotation::find($this->quotation_referensi_id);
+
+                if ($referensi) {
+                    // Jika jumlah_site berbeda dengan referensi, wajib kirim data site
+                    if ($this->jumlah_site !== $referensi->jumlah_site) {
+                        if ($this->jumlah_site == 'Single Site') {
+                            if (!$this->has('nama_site') || empty($this->nama_site)) {
+                                $validator->errors()->add('nama_site', 'Karena jumlah site berbeda dengan referensi, data site baru wajib diisi');
+                            }
+                        } else if ($this->jumlah_site == 'Multi Site') {
+                            if (!$this->has('multisite') || empty($this->multisite)) {
+                                $validator->errors()->add('multisite', 'Karena jumlah site berbeda dengan referensi, data multisite baru wajib diisi');
+                            }
+                        }
+                    }
                 }
             }
         });

@@ -7,6 +7,7 @@ use App\Models\QuotationDetail;
 use App\Models\QuotationSite;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Log;
 
 class QuotationDuplicationService
 {
@@ -444,28 +445,54 @@ class QuotationDuplicationService
 
     private function duplicateQuotationDetailsForNewSite(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
-        \Log::info('Duplicating quotation details for NEW site', [
+        \Log::info('Duplicating quotation details for ALL sites', [
             'new_quotation_id' => $newQuotation->id,
             'referensi_quotation_id' => $quotationReferensi->id,
             'detail_count' => $quotationReferensi->quotationDetails->count()
         ]);
 
-        // ✅ AMBIL SITE PERTAMA DARI QUOTATION BARU (yang sudah dibuat dari request)
-        $newSite = $newQuotation->quotationSites()->first();
+        // ✅ AMBIL SEMUA SITE dari quotation baru
+        $newSites = $newQuotation->quotationSites;
 
-        if (!$newSite) {
-            throw new \Exception('No site found in new quotation. Sites must be created before details.');
+        if ($newSites->isEmpty()) {
+            throw new \Exception('No sites found in new quotation. Sites must be created before details.');
         }
 
-        \Log::info('Using new site for all details', [
-            'site_id' => $newSite->id,
-            'site_name' => $newSite->nama_site
-        ]);
+        // ✅ BUAT MAPPING: site lama -> site baru (berdasarkan nama atau urutan)
+        $siteMapping = [];
+        $oldSites = $quotationReferensi->quotationSites;
+
+        foreach ($oldSites as $index => $oldSite) {
+            // Cari site baru yang matching (by nama_site)
+            $matchedNewSite = $newSites->firstWhere('nama_site', $oldSite->nama_site);
+
+            // Jika tidak ketemu by nama, pakai index
+            if (!$matchedNewSite && isset($newSites[$index])) {
+                $matchedNewSite = $newSites[$index];
+            }
+
+            if ($matchedNewSite) {
+                $siteMapping[$oldSite->id] = $matchedNewSite->id;
+            }
+        }
+
+        \Log::info('Site mapping created', ['mapping' => $siteMapping]);
 
         foreach ($quotationReferensi->quotationDetails as $detailReferensi) {
+            // ✅ GUNAKAN SITE YANG SESUAI dari mapping
+            $newSiteId = $siteMapping[$detailReferensi->quotation_site_id] ?? null;
+            $newSite = $newSites->firstWhere('id', $newSiteId);
+
+            if (!$newSiteId) {
+                \Log::warning('No matching site found for detail', [
+                    'detail_id' => $detailReferensi->id,
+                    'old_site_id' => $detailReferensi->quotation_site_id
+                ]);
+                continue; // Skip detail ini
+            }
             // Create new detail linked to the NEW site
             $newDetail = $newQuotation->quotationDetails()->create([
-                'quotation_site_id' => $newSite->id,
+                'quotation_site_id' => $newSiteId,
                 'position_id' => $detailReferensi->position_id,
                 'jabatan_kebutuhan' => $detailReferensi->jabatan_kebutuhan,
                 'nama_site' => $newSite->nama_site,
@@ -1110,20 +1137,10 @@ class QuotationDuplicationService
         $newSites = $newQuotation->quotationSites()->orderBy('id')->get();
         $refSites = $quotationReferensi->quotationSites()->orderBy('id')->get();
 
-        \Log::info('Creating site mapping', [
-            'new_sites_count' => $newSites->count(),
-            'ref_sites_count' => $refSites->count()
-        ]);
 
         // Asumsi urutan sama (site pertama ke pertama, kedua ke kedua, dst)
         for ($i = 0; $i < min($newSites->count(), $refSites->count()); $i++) {
             $this->siteIdMapping[$refSites[$i]->id] = $newSites[$i]->id;
-            \Log::info('Site mapped', [
-                'ref_site_id' => $refSites[$i]->id,
-                'ref_site_name' => $refSites[$i]->nama_site,
-                'new_site_id' => $newSites[$i]->id,
-                'new_site_name' => $newSites[$i]->nama_site
-            ]);
         }
 
         // Jika jumlah site berbeda, mapping sisanya ke site pertama
@@ -1143,146 +1160,149 @@ class QuotationDuplicationService
      */
     private function duplicateQuotationDetailsWithSiteMapping(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
-        \Log::info('Duplicating quotation details WITH site mapping');
+        Log::info('Duplicating quotation details for ALL NEW sites', [
+            'new_quotation_id' => $newQuotation->id,
+            'referensi_quotation_id' => $quotationReferensi->id,
+            'detail_count' => $quotationReferensi->quotationDetails->count(),
+            'new_site_count' => $newQuotation->quotationSites->count()
+        ]);
 
+        // ✅ AMBIL SEMUA SITE DARI QUOTATION BARU
+        $newSites = $newQuotation->quotationSites()->get();
+
+        if ($newSites->isEmpty()) {
+            throw new \Exception('No site found in new quotation. Sites must be created before details.');
+        }
+
+        // Untuk setiap detail dari referensi, buat salinan untuk SETIAP site baru
         foreach ($quotationReferensi->quotationDetails as $detailReferensi) {
-            // Dapatkan site_id baru berdasarkan mapping
-            $newSiteId = $this->getMappedSiteId($newQuotation, $detailReferensi->quotation_site_id);
-
-            // Cari site baru untuk mendapatkan nama_site
-            $newSite = $newQuotation->quotationSites()->find($newSiteId);
-
-            if (!$newSite) {
-                throw new \Exception('Mapped site not found in new quotation');
-            }
-
-            // Create new detail dengan site yang sesuai
-            $newDetail = $newQuotation->quotationDetails()->create([
-                'quotation_site_id' => $newSiteId,
-                'position_id' => $detailReferensi->position_id,
-                'jabatan_kebutuhan' => $detailReferensi->jabatan_kebutuhan,
-                'nama_site' => $newSite->nama_site, // Gunakan nama site baru
-                'jumlah_hc' => $detailReferensi->jumlah_hc,
-                'nominal_upah' => $detailReferensi->nominal_upah,
-                'penjamin_kesehatan' => $detailReferensi->penjamin_kesehatan,
-                'is_bpjs_jkk' => $detailReferensi->is_bpjs_jkk,
-                'is_bpjs_jkm' => $detailReferensi->is_bpjs_jkm,
-                'is_bpjs_jht' => $detailReferensi->is_bpjs_jht,
-                'is_bpjs_jp' => $detailReferensi->is_bpjs_jp,
-                'nominal_takaful' => $detailReferensi->nominal_takaful,
-                'biaya_monitoring_kontrol' => $detailReferensi->biaya_monitoring_kontrol,
-                'created_by' => $newQuotation->created_by
-            ]);
-
-            // Simpan mapping detail_id lama -> baru
-            $this->detailIdMapping[$detailReferensi->id] = $newDetail->id;
-
-            \Log::info('Created detail with site mapping', [
-                'old_detail_id' => $detailReferensi->id,
-                'new_detail_id' => $newDetail->id,
-                'old_site_id' => $detailReferensi->quotation_site_id,
-                'old_site_name' => $detailReferensi->nama_site,
-                'new_site_id' => $newSiteId,
-                'new_site_name' => $newSite->nama_site
-            ]);
-
-            // ✅ COPY WAGE DATA
-            if ($detailReferensi->relationLoaded('wage') && $detailReferensi->wage) {
-                $newDetail->wage()->create([
-                    'quotation_id' => $newQuotation->id,
-                    'upah' => $detailReferensi->wage->upah,
-                    'hitungan_upah' => $detailReferensi->wage->hitungan_upah,
-                    'lembur' => $detailReferensi->wage->lembur,
-                    'nominal_lembur' => $detailReferensi->wage->nominal_lembur,
-                    'jenis_bayar_lembur' => $detailReferensi->wage->jenis_bayar_lembur,
-                    'jam_per_bulan_lembur' => $detailReferensi->wage->jam_per_bulan_lembur,
-                    'lembur_ditagihkan' => $detailReferensi->wage->lembur_ditagihkan,
-                    'kompensasi' => $detailReferensi->wage->kompensasi,
-                    'thr' => $detailReferensi->wage->thr,
-                    'tunjangan_holiday' => $detailReferensi->wage->tunjangan_holiday,
-                    'nominal_tunjangan_holiday' => $detailReferensi->wage->nominal_tunjangan_holiday,
-                    'jenis_bayar_tunjangan_holiday' => $detailReferensi->wage->jenis_bayar_tunjangan_holiday,
+            foreach ($newSites as $newSite) {
+                // Create new detail linked to each NEW site
+                $newDetail = $newQuotation->quotationDetails()->create([
+                    'quotation_site_id' => $newSite->id,
+                    'position_id' => $detailReferensi->position_id,
+                    'jabatan_kebutuhan' => $detailReferensi->jabatan_kebutuhan,
+                    'nama_site' => $newSite->nama_site,
+                    'jumlah_hc' => $detailReferensi->jumlah_hc,
+                    'nominal_upah' => $detailReferensi->nominal_upah,
+                    'penjamin_kesehatan' => $detailReferensi->penjamin_kesehatan,
+                    'is_bpjs_jkk' => $detailReferensi->is_bpjs_jkk,
+                    'is_bpjs_jkm' => $detailReferensi->is_bpjs_jkm,
+                    'is_bpjs_jht' => $detailReferensi->is_bpjs_jht,
+                    'is_bpjs_jp' => $detailReferensi->is_bpjs_jp,
+                    'nominal_takaful' => $detailReferensi->nominal_takaful,
+                    'biaya_monitoring_kontrol' => $detailReferensi->biaya_monitoring_kontrol,
                     'created_by' => $newQuotation->created_by
                 ]);
-            }
 
-            // Copy tunjangan
-            foreach ($detailReferensi->quotationDetailTunjangans as $tunjangan) {
-                $newDetail->quotationDetailTunjangans()->create([
-                    'quotation_id' => $newQuotation->id,
-                    'nama_tunjangan' => $tunjangan->nama_tunjangan,
-                    'nominal' => $tunjangan->nominal,
-                    'nominal_coss' => $tunjangan->nominal_coss,
-                    'created_by' => $newQuotation->created_by
-                ]);
-            }
+                // Simpan mapping detail_id lama -> baru
+                $this->detailIdMapping[$detailReferensi->id . '_site_' . $newSite->id] = $newDetail->id;
 
-            // Copy HPP data
-            if ($detailReferensi->quotationDetailHpp) {
-                $hpp = $detailReferensi->quotationDetailHpp;
-                $newDetail->quotationDetailHpp()->create([
-                    'quotation_id' => $newQuotation->id,
-                    'jumlah_hc' => $hpp->jumlah_hc,
-                    'gaji_pokok' => $hpp->gaji_pokok,
-                    'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
-                    'kompensasi' => $hpp->kompensasi,
-                    'tunjangan_hari_libur_nasional' => $hpp->tunjangan_hari_libur_nasional,
-                    'lembur' => $hpp->lembur,
-                    'bpjs_jkk' => $hpp->bpjs_jkk,
-                    'bpjs_jkm' => $hpp->bpjs_jkm,
-                    'bpjs_jht' => $hpp->bpjs_jht,
-                    'bpjs_jp' => $hpp->bpjs_jp,
-                    'bpjs_ks' => $hpp->bpjs_ks,
-                    'takaful' => $hpp->takaful,
-                    'provisi_seragam' => $hpp->provisi_seragam,
-                    'provisi_peralatan' => $hpp->provisi_peralatan,
-                    'provisi_chemical' => $hpp->provisi_chemical,
-                    'provisi_ohc' => $hpp->provisi_ohc,
-                    'bunga_bank' => $hpp->bunga_bank,
-                    'insentif' => $hpp->insentif,
-                    'total_hpp' => $hpp->total_hpp,
-                    'created_by' => $newQuotation->created_by
+                \Log::info('Created detail for new site', [
+                    'old_detail_id' => $detailReferensi->id,
+                    'new_detail_id' => $newDetail->id,
+                    'new_site_id' => $newSite->id,
+                    'new_site_name' => $newSite->nama_site
                 ]);
-            }
 
-            // Copy COSS data
-            if ($detailReferensi->quotationDetailCoss) {
-                $coss = $detailReferensi->quotationDetailCoss;
-                $newDetail->quotationDetailCoss()->create([
-                    'quotation_id' => $newQuotation->id,
-                    'jumlah_hc' => $coss->jumlah_hc,
-                    'gaji_pokok' => $coss->gaji_pokok,
-                    'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
-                    'kompensasi' => $coss->kompensasi,
-                    'tunjangan_hari_libur_nasional' => $coss->tunjangan_hari_libur_nasional,
-                    'lembur' => $coss->lembur,
-                    'bpjs_jkk' => $coss->bpjs_jkk,
-                    'bpjs_jkm' => $coss->bpjs_jkm,
-                    'bpjs_jht' => $coss->bpjs_jht,
-                    'bpjs_jp' => $coss->bpjs_jp,
-                    'bpjs_ks' => $coss->bpjs_ks,
-                    'takaful' => $coss->takaful,
-                    'provisi_seragam' => $coss->provisi_seragam,
-                    'provisi_peralatan' => $coss->provisi_peralatan,
-                    'provisi_chemical' => $coss->provisi_chemical,
-                    'provisi_ohc' => $coss->provisi_ohc,
-                    'bunga_bank' => $coss->bunga_bank,
-                    'insentif' => $coss->insentif,
-                    'management_fee' => $coss->management_fee,
-                    'ppn' => $coss->ppn,
-                    'pph' => $coss->pph,
-                    'total_coss' => $coss->total_coss,
-                    'created_by' => $newQuotation->created_by
-                ]);
-            }
+                // ✅ COPY WAGE DATA
+                if ($detailReferensi->relationLoaded('wage') && $detailReferensi->wage) {
+                    $newDetail->wage()->create([
+                        'quotation_id' => $newQuotation->id,
+                        'upah' => $detailReferensi->wage->upah,
+                        'hitungan_upah' => $detailReferensi->wage->hitungan_upah,
+                        'lembur' => $detailReferensi->wage->lembur,
+                        'nominal_lembur' => $detailReferensi->wage->nominal_lembur,
+                        'jenis_bayar_lembur' => $detailReferensi->wage->jenis_bayar_lembur,
+                        'jam_per_bulan_lembur' => $detailReferensi->wage->jam_per_bulan_lembur,
+                        'lembur_ditagihkan' => $detailReferensi->wage->lembur_ditagihkan,
+                        'kompensasi' => $detailReferensi->wage->kompensasi,
+                        'thr' => $detailReferensi->wage->thr,
+                        'tunjangan_holiday' => $detailReferensi->wage->tunjangan_holiday,
+                        'nominal_tunjangan_holiday' => $detailReferensi->wage->nominal_tunjangan_holiday,
+                        'jenis_bayar_tunjangan_holiday' => $detailReferensi->wage->jenis_bayar_tunjangan_holiday,
+                        'created_by' => $newQuotation->created_by
+                    ]);
+                }
 
-            // Copy requirements
-            foreach ($detailReferensi->quotationDetailRequirements as $requirement) {
-                $newDetail->quotationDetailRequirements()->create([
-                    'quotation_id' => $newQuotation->id,
-                    'requirement' => $requirement->requirement,
-                    'created_by' => $newQuotation->created_by
-                ]);
+                // Copy tunjangan
+                foreach ($detailReferensi->quotationDetailTunjangans as $tunjangan) {
+                    $newDetail->quotationDetailTunjangans()->create([
+                        'quotation_id' => $newQuotation->id,
+                        'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                        'nominal' => $tunjangan->nominal,
+                        'nominal_coss' => $tunjangan->nominal_coss,
+                        'created_by' => $newQuotation->created_by
+                    ]);
+                }
+
+                // Copy HPP data
+                if ($detailReferensi->quotationDetailHpp) {
+                    $hpp = $detailReferensi->quotationDetailHpp;
+                    $newDetail->quotationDetailHpp()->create([
+                        'quotation_id' => $newQuotation->id,
+                        'jumlah_hc' => $hpp->jumlah_hc,
+                        'gaji_pokok' => $hpp->gaji_pokok,
+                        'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
+                        'kompensasi' => $hpp->kompensasi,
+                        'tunjangan_hari_libur_nasional' => $hpp->tunjangan_hari_libur_nasional,
+                        'lembur' => $hpp->lembur,
+                        'bpjs_jkk' => $hpp->bpjs_jkk,
+                        'bpjs_jkm' => $hpp->bpjs_jkm,
+                        'bpjs_jht' => $hpp->bpjs_jht,
+                        'bpjs_jp' => $hpp->bpjs_jp,
+                        'bpjs_ks' => $hpp->bpjs_ks,
+                        'takaful' => $hpp->takaful,
+                        'provisi_seragam' => $hpp->provisi_seragam,
+                        'provisi_peralatan' => $hpp->provisi_peralatan,
+                        'provisi_chemical' => $hpp->provisi_chemical,
+                        'provisi_ohc' => $hpp->provisi_ohc,
+                        'bunga_bank' => $hpp->bunga_bank,
+                        'insentif' => $hpp->insentif,
+                        'total_hpp' => $hpp->total_hpp,
+                        'created_by' => $newQuotation->created_by
+                    ]);
+                }
+
+                // Copy COSS data
+                if ($detailReferensi->quotationDetailCoss) {
+                    $coss = $detailReferensi->quotationDetailCoss;
+                    $newDetail->quotationDetailCoss()->create([
+                        'quotation_id' => $newQuotation->id,
+                        'jumlah_hc' => $coss->jumlah_hc,
+                        'gaji_pokok' => $coss->gaji_pokok,
+                        'tunjangan_hari_raya' => $coss->tunjangan_hari_raya,
+                        'kompensasi' => $coss->kompensasi,
+                        'tunjangan_hari_libur_nasional' => $coss->tunjangan_hari_libur_nasional,
+                        'lembur' => $coss->lembur,
+                        'bpjs_jkk' => $coss->bpjs_jkk,
+                        'bpjs_jkm' => $coss->bpjs_jkm,
+                        'bpjs_jht' => $coss->bpjs_jht,
+                        'bpjs_jp' => $coss->bpjs_jp,
+                        'bpjs_ks' => $coss->bpjs_ks,
+                        'takaful' => $coss->takaful,
+                        'provisi_seragam' => $coss->provisi_seragam,
+                        'provisi_peralatan' => $coss->provisi_peralatan,
+                        'provisi_chemical' => $coss->provisi_chemical,
+                        'provisi_ohc' => $coss->provisi_ohc,
+                        'bunga_bank' => $coss->bunga_bank,
+                        'insentif' => $coss->insentif,
+                        'management_fee' => $coss->management_fee,
+                        'ppn' => $coss->ppn,
+                        'pph' => $coss->pph,
+                        'total_coss' => $coss->total_coss,
+                        'created_by' => $newQuotation->created_by
+                    ]);
+                }
+
+                // Copy requirements
+                foreach ($detailReferensi->quotationDetailRequirements as $requirement) {
+                    $newDetail->quotationDetailRequirements()->create([
+                        'quotation_id' => $newQuotation->id,
+                        'requirement' => $requirement->requirement,
+                        'created_by' => $newQuotation->created_by
+                    ]);
+                }
             }
         }
     }
