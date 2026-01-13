@@ -381,7 +381,6 @@ class Quotation extends Model
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
                     $memberSales = TimSalesDetail::byTeam($tim->tim_sales_id)
-                        ->where('is_active', 1) // hanya yang aktif
                         ->pluck('user_id');
                     $query->whereHas('leads.timSalesD', function ($q) use ($memberSales) {
                         $q->whereIn('user_id', $memberSales);
