@@ -319,10 +319,10 @@ class Quotation extends Model
     }
 
     // Method untuk mengecek apakah quotation aktif
-    public function isActive()
-    {
-        return $this->is_aktif == 1;
-    }
+    // public function isActive()
+    // {
+    //     return $this->is_aktif == 1;
+    // }
 
     // Scope untuk quotation aktif
     public function scopeActive($query)
@@ -381,7 +381,7 @@ class Quotation extends Model
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
                     $memberSales = TimSalesDetail::byTeam($tim->tim_sales_id)
-                        ->active() // hanya yang aktif
+                        ->where('is_active', 1) // hanya yang aktif
                         ->pluck('user_id');
                     $query->whereHas('leads.timSalesD', function ($q) use ($memberSales) {
                         $q->whereIn('user_id', $memberSales);
