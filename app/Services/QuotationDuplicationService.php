@@ -11,6 +11,15 @@ use Log;
 
 class QuotationDuplicationService
 {
+    private $quotationBusinessService;
+
+    public function __construct(
+
+        QuotationBusinessService $quotationBusinessService,
+
+    ) {
+        $this->quotationBusinessService = $quotationBusinessService;
+    }
     /**
      * Mapping untuk detail_id dari referensi ke quotation baru
      */
@@ -1137,21 +1146,58 @@ class QuotationDuplicationService
         $newSites = $newQuotation->quotationSites()->orderBy('id')->get();
         $refSites = $quotationReferensi->quotationSites()->orderBy('id')->get();
 
+        $unmatchedRefSites = collect();
 
-        // Asumsi urutan sama (site pertama ke pertama, kedua ke kedua, dst)
-        for ($i = 0; $i < min($newSites->count(), $refSites->count()); $i++) {
-            $this->siteIdMapping[$refSites[$i]->id] = $newSites[$i]->id;
-        }
+        // STEP 1: Cari yang MATCH berdasarkan nama
+        foreach ($refSites as $refSite) {
+            $matchedSite = $newSites->firstWhere('nama_site', $refSite->nama_site);
 
-        // Jika jumlah site berbeda, mapping sisanya ke site pertama
-        if ($newSites->count() < $refSites->count()) {
-            for ($i = $newSites->count(); $i < $refSites->count(); $i++) {
-                $this->siteIdMapping[$refSites[$i]->id] = $newSites->first()->id;
-                \Log::warning('Fallback mapping: ref site to first new site', [
-                    'ref_site_id' => $refSites[$i]->id,
-                    'new_site_id' => $newSites->first()->id
+            if ($matchedSite) {
+                // ✅ ADA PASANGAN - Pakai site yang sudah ada
+                $this->siteIdMapping[$refSite->id] = $matchedSite->id;
+
+                \Log::info('Site MATCHED - using existing site', [
+                    'ref_site_id' => $refSite->id,
+                    'ref_site_name' => $refSite->nama_site,
+                    'new_site_id' => $matchedSite->id,
+                    'action' => 'USE_EXISTING'
+                ]);
+            } else {
+                // ❌ TIDAK ADA PASANGAN - Tandai untuk dibuat
+                $unmatchedRefSites->push($refSite);
+
+                \Log::info('Site UNMATCHED - will create new', [
+                    'ref_site_id' => $refSite->id,
+                    'ref_site_name' => $refSite->nama_site,
+                    'action' => 'CREATE_NEW'
                 ]);
             }
+        }
+
+        // STEP 2: Buat site BARU untuk yang unmatched
+        foreach ($unmatchedRefSites as $refSite) {
+            // ✅ BUAT SITE BARU menggunakan data dari refSite
+            // Tapi dengan UMK/UMP yang TERBARU
+            $createdSite = $this->quotationBusinessService->createQuotationSiteFromReference(
+                $newQuotation,
+                $refSite,  // ← Pakai data dari ref (nama, provinsi, kota)
+                $newQuotation->created_by
+            );
+
+            // Mapping ref site ke site yang baru dibuat
+            $this->siteIdMapping[$refSite->id] = $createdSite->id;
+
+            // Tambahkan ke collection (biar kalau ada ref site lain dengan nama sama, bisa matched)
+            $newSites->push($createdSite);
+
+            \Log::info('Created NEW site from reference', [
+                'ref_site_id' => $refSite->id,
+                'ref_site_name' => $refSite->nama_site,
+                'new_site_id' => $createdSite->id,
+                'new_umk' => $createdSite->umk,  // ← UMK TERBARU
+                'ref_umk' => $refSite->umk,      // ← UMK LAMA (untuk perbandingan)
+                'action' => 'CREATED_NEW'
+            ]);
         }
     }
 

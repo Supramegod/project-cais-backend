@@ -782,7 +782,7 @@ class LeadsController extends Controller
             $bidangPerusahaan = BidangPerusahaan::find($request->bidang_perusahaan);
 
             $lead->update([
-                'nama_perusahaan' => $request->nama_perusahaan,
+                'nama_perusahaan' => $request->nama_perusahaan || $lead->nama_perusahaan,
                 'telp_perusahaan' => $request->telp_perusahaan,
                 'jenis_perusahaan_id' => $request->jenis_perusahaan,
                 'jenis_perusahaan' => $jenisPerusahaan ? $jenisPerusahaan->nama : null,
