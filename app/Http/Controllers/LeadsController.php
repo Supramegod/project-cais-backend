@@ -755,7 +755,7 @@ class LeadsController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
+                'nama_perusahaan' => ['sometimes', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
                 'pic' => 'required',
                 'branch' => 'required',
                 'kebutuhan' => 'required|array|min:1',
