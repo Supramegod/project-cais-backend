@@ -1138,7 +1138,7 @@ class QuotationService
 
             if ($special === 'chemical') {
                 // Untuk chemical: total dibagi jumlah HC detail ini
-                $itemTotal = (($item->jumlah * $item->harga) / $item->masa_pakai);
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
                 $perPerson = $itemTotal / max($jumlahHc, 1);
 
                 \Log::info("Chemical calculation for HPP", [
@@ -1237,7 +1237,7 @@ class QuotationService
             if ($special === 'chemical') {
                 // **CONTOH PERUBAHAN: Untuk COSS, chemical bisa dihitung berbeda**
                 // Misalnya: untuk COSS, chemical tidak dibagi provisi
-                $itemTotal = ($item->jumlah * $item->harga) / $item->masa_pakai;
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
                 $perPerson = $itemTotal / max($jumlahHc, 1);
 
                 \Log::info("Chemical calculation for COSS (different formula)", [
@@ -1251,7 +1251,7 @@ class QuotationService
             } else {
                 // **CONTOH PERUBAHAN: Untuk COSS, bisa menggunakan rumus berbeda**
                 // Misalnya: untuk COSS, tidak dibagi provisi
-                $itemTotal = ($item->harga * $item->jumlah);
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
                 $perPerson = $itemTotal / max($divider, 1);
 
                 \Log::info("Non-chemical calculation for COSS (different formula)", [
