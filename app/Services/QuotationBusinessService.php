@@ -93,6 +93,35 @@ class QuotationBusinessService
             'created_by' => $createdBy
         ]);
     }
+    // Di QuotationBusinessService
+    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy)
+    {
+        // Ambil UMP & UMK berdasarkan provinsi & kota dari refSite
+        $province = Province::findOrFail($refSite->provinsi_id);
+        $city = City::findOrFail($refSite->kota_id);
+
+        $ump = Ump::where('province_id', $province->id)
+            ->active()
+            ->first();
+
+        $umk = Umk::where('city_id', $city->id)
+            ->active()
+            ->first();
+
+        return QuotationSite::create([
+            'quotation_id' => $quotation->id,
+            'leads_id' => $quotation->leads_id,
+            'nama_site' => $refSite->nama_site,
+            'provinsi_id' => $refSite->provinsi_id,
+            'provinsi' => $province->nama,
+            'kota_id' => $refSite->kota_id,
+            'kota' => $city->name,
+            'ump' => $ump ? $ump->ump : 0,
+            'umk' => $umk ? $umk->umk : 0, // ✅ UMK TERBARU
+            'penempatan' => $refSite->penempatan,
+            'created_by' => $createdBy
+        ]);
+    }
 
     /**
      * Create initial PIC for quotation
