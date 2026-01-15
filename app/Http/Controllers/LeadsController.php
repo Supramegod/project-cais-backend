@@ -755,7 +755,7 @@ class LeadsController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
+                'nama_perusahaan' => ['sometimes', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
                 'pic' => 'required',
                 'branch' => 'required',
                 'kebutuhan' => 'required|array|min:1',
@@ -782,7 +782,7 @@ class LeadsController extends Controller
             $bidangPerusahaan = BidangPerusahaan::find($request->bidang_perusahaan);
 
             $lead->update([
-                'nama_perusahaan' => $request->nama_perusahaan,
+                'nama_perusahaan' => $request->nama_perusahaan ?? $lead->nama_perusahaan,
                 'telp_perusahaan' => $request->telp_perusahaan,
                 'jenis_perusahaan_id' => $request->jenis_perusahaan,
                 'jenis_perusahaan' => $jenisPerusahaan ? $jenisPerusahaan->nama : null,
@@ -2648,7 +2648,7 @@ class LeadsController extends Controller
         try {
             $activities = CustomerActivity::with('leads')
                 ->byLeadsId($id)
-                ->orderBy('tgl_activity', 'desc')
+                ->orderBy('created_at', 'desc')
                 ->whereNull('deleted_at')
                 ->get()
                 ->map(function ($act) {
@@ -2656,7 +2656,8 @@ class LeadsController extends Controller
                         'id' => $act->id,
                         'tipe' => $act->tipe,
                         'notes' => $act->notes_tipe ?? $act->notes,
-                        'tgl_activity' => $act->tgl_activity
+                        'tgl_activity' => $act->tgl_activity,
+                        'created_by' => $act->created_by
                     ];
 
                     // Conditional fields berdasarkan tipe (HARUS di dalam map)

@@ -360,7 +360,7 @@ class QuotationController extends Controller
     public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
-        set_time_limit( 0); // Set time limit to 5 minutes
+        set_time_limit(0); // Set time limit to 5 minutes
         try {
             $user = Auth::user();
 
@@ -441,12 +441,6 @@ class QuotationController extends Controller
             ]);
 
             // ✅ PERUBAHAN 3: Cek apakah ada request site baru
-            $hasNewSiteRequest = false;
-            if ($request->jumlah_site == "Multi Site") {
-                $hasNewSiteRequest = $request->has('multisite') && !empty($request->multisite);
-            } else {
-                $hasNewSiteRequest = $request->has('nama_site') && !empty($request->nama_site);
-            }
             $hasNewSiteRequest = false;
             $hasExistingSite = false;
 
@@ -1777,14 +1771,15 @@ class QuotationController extends Controller
         }
     }
     /**
-     * Check if site already exists for this leads
+     * Check if site already exists for this leads (optimized)
      */
     private function checkSiteExists($leadsId, $namaSite, $provinsiId, $kotaId): bool
     {
         return QuotationSite::where('leads_id', $leadsId)
-            ->where('nama_site', $namaSite)
+            ->whereRaw('LOWER(TRIM(nama_site)) = ?', [strtolower(trim($namaSite))])
             ->where('provinsi_id', $provinsiId)
             ->where('kota_id', $kotaId)
+            ->whereNull('deleted_at')
             ->exists();
     }
 

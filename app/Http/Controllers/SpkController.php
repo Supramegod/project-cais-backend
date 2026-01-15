@@ -777,7 +777,7 @@ class SpkController extends Controller
     public function uploadSpk(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
         ]);
 
         if ($validator->fails()) {
@@ -804,13 +804,16 @@ class SpkController extends Controller
             // Upload file baru
             $fileName = $this->storeSpkFile($request->file('file'));
 
-            // ✅ Generate URL yang benar
-            $fileUrl = url('spk/' . $fileName);
+            // ✅ Generate URL menggunakan Storage facade
+            // $fileUrl = Storage::disk('spk')->url($fileName);
+
+            // ATAU jika mau manual:
+            $fileUrl = url('document/spk/' . $fileName);
+
             \Log::info('Generated URL: ' . $fileUrl);
             \Log::info('Filename: ' . $fileName);
-            \Log::info('File path: ' . public_path('spk/' . $fileName));
-            \Log::info('File exists: ' . (file_exists(public_path('spk/' . $fileName)) ? 'Yes' : 'No'));
-
+            \Log::info('File path: ' . Storage::disk('spk')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('spk')->exists($fileName) ? 'Yes' : 'No'));
 
             $spk->update([
                 'status_spk_id' => 2,
@@ -824,7 +827,6 @@ class SpkController extends Controller
             DB::commit();
 
             $spk->load(['statusSpk']);
-
 
             return $this->successResponse('SPK file uploaded successfully', [
                 'id' => $spk->id,
@@ -1464,6 +1466,7 @@ class SpkController extends Controller
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
 
+        // ✅ Simpan file ke disk 'spk' yang sudah dikonfigurasi
         Storage::disk('spk')->put($fileName, file_get_contents($file));
 
         return $fileName;

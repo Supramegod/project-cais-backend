@@ -670,16 +670,171 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
     }
     public function updateStep6(Quotation $quotation, Request $request): void
     {
-        $currentDateTime = Carbon::now();
+        DB::beginTransaction();
+        try {
+            $currentDateTime = Carbon::now();
+            $user = Auth::user()->full_name;
 
-        // Update aplikasi pendukung
-        if ($request->has('aplikasi_pendukung')) {
-            $this->updateAplikasiPendukung($quotation, $request->aplikasi_pendukung, $currentDateTime);
-        } else {
-            QuotationAplikasi::where('quotation_id', $quotation->id)->update([
-                'deleted_at' => $currentDateTime,
-                'deleted_by' => Auth::user()->full_name
+            \Log::info("Starting updateStep6", [
+                'quotation_id' => $quotation->id,
+                'aplikasi_pendukung' => $request->aplikasi_pendukung ?? []
             ]);
+
+            // Update aplikasi pendukung
+            if ($request->has('aplikasi_pendukung') && is_array($request->aplikasi_pendukung)) {
+                $this->updateAplikasiPendukung($quotation, $request->aplikasi_pendukung, $currentDateTime);
+
+                // Dapatkan semua quotation details untuk menghitung jumlah HC per site
+                $quotationDetails = QuotationDetail::where('quotation_id', $quotation->id)
+                    ->whereNull('deleted_at')
+                    ->get();
+
+                // Kelompokkan detail berdasarkan site_id untuk menghitung jumlah HC per site
+                $siteHcMap = [];
+                foreach ($quotationDetails as $detail) {
+                    $siteId = $detail->quotation_site_id;
+                    if (!isset($siteHcMap[$siteId])) {
+                        $siteHcMap[$siteId] = 0;
+                    }
+                    $siteHcMap[$siteId] += $detail->jumlah_hc;
+                }
+
+                // Hapus devices yang terkait dengan aplikasi pendukung (soft delete)
+                QuotationDevices::where('quotation_id', $quotation->id)
+                    ->whereNotNull('quotation_aplikasi_id')
+                    ->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user
+                    ]);
+
+                // Insert device baru untuk setiap aplikasi pendukung per site
+                foreach ($request->aplikasi_pendukung as $aplikasiId) {
+                    // Dapatkan data aplikasi pendukung
+                    $appdukung = AplikasiPendukung::where('id', $aplikasiId)->first();
+
+                    if (!$appdukung) {
+                        \Log::warning("Aplikasi pendukung not found", ['aplikasi_id' => $aplikasiId]);
+                        continue;
+                    }
+
+                    // Dapatkan quotation aplikasi yang sudah dibuat
+                    $quotationAplikasi = QuotationAplikasi::where('quotation_id', $quotation->id)
+                        ->where('aplikasi_pendukung_id', $aplikasiId)
+                        ->whereNull('deleted_at')
+                        ->first();
+
+                    if (!$quotationAplikasi) {
+                        \Log::warning("Quotation aplikasi not found", [
+                            'quotation_id' => $quotation->id,
+                            'aplikasi_id' => $aplikasiId
+                        ]);
+                        continue;
+                    }
+
+                    // Insert device untuk setiap site dengan jumlah HC sesuai site
+                    foreach ($siteHcMap as $siteId => $jumlahHc) {
+                        if ($jumlahHc <= 0) {
+                            continue;
+                        }
+
+                        // Cek apakah barang_id valid untuk devices
+                        if (!$appdukung->barang_id) {
+                            \Log::warning("Barang ID not found for aplikasi", [
+                                'aplikasi_id' => $aplikasiId,
+                                'aplikasi_nama' => $appdukung->nama
+                            ]);
+                            continue;
+                        }
+
+                        // Cek apakah sudah ada data untuk kombinasi ini
+                        $existingDevice = QuotationDevices::where('quotation_id', $quotation->id)
+                            ->where('quotation_aplikasi_id', $quotationAplikasi->id)
+                            ->where('quotation_site_id', $siteId)
+                            ->where('barang_id', $appdukung->barang_id)
+                            ->whereNull('deleted_at')
+                            ->first();
+
+                        if ($existingDevice) {
+                            // Update existing
+                            $existingDevice->update([
+                                'jumlah' => $jumlahHc,
+                                'harga' => $appdukung->harga,
+                                'updated_at' => $currentDateTime,
+                                'updated_by' => $user
+                            ]);
+
+                            \Log::info("Updated existing device for aplikasi", [
+                                'quotation_id' => $quotation->id,
+                                'site_id' => $siteId,
+                                'aplikasi_id' => $aplikasiId,
+                                'jumlah_hc' => $jumlahHc
+                            ]);
+                        } else {
+                            // Create new
+                            QuotationDevices::create([
+                                'quotation_id' => $quotation->id,
+                                'quotation_aplikasi_id' => $quotationAplikasi->id,
+                                'quotation_site_id' => $siteId,
+                                'barang_id' => $appdukung->barang_id,
+                                'jumlah' => $jumlahHc,
+                                'harga' => $appdukung->harga,
+                                'nama' => $appdukung->nama,
+                                'jenis_barang' => 'Aplikasi Pendukung',
+                                'jenis_barang_id' => 8, // ID untuk Aplikasi Pendukung
+                                'created_at' => $currentDateTime,
+                                'created_by' => $user
+                            ]);
+
+                            \Log::info("Created new device for aplikasi", [
+                                'quotation_id' => $quotation->id,
+                                'site_id' => $siteId,
+                                'aplikasi_id' => $aplikasiId,
+                                'jumlah_hc' => $jumlahHc
+                            ]);
+                        }
+                    }
+                }
+            } else {
+                // Jika tidak ada aplikasi pendukung yang dipilih, hapus semua data
+                QuotationAplikasi::where('quotation_id', $quotation->id)->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+
+                // Hapus devices yang terkait dengan aplikasi pendukung
+                QuotationDevices::where('quotation_id', $quotation->id)
+                    ->whereNotNull('quotation_aplikasi_id')
+                    ->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user
+                    ]);
+
+                \Log::info("No aplikasi pendukung selected, deleted all related data", [
+                    'quotation_id' => $quotation->id
+                ]);
+            }
+
+            // Update quotation timestamp
+            $quotation->update([
+                'updated_by' => $user,
+                'updated_at' => $currentDateTime
+            ]);
+
+            DB::commit();
+
+            \Log::info("Step 6 updated successfully", [
+                'quotation_id' => $quotation->id,
+                'aplikasi_count' => $request->has('aplikasi_pendukung') ? count($request->aplikasi_pendukung) : 0
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error("Error in updateStep6", [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
     public function updateStep7(Quotation $quotation, Request $request): void
@@ -1073,22 +1228,31 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
         return $isAktif;
     }
 
-    private function updateAplikasiPendukung(Quotation $quotation, array $aplikasiPendukung, Carbon $currentDateTime): void
+    private function updateAplikasiPendukung(Quotation $quotation, array $aplikasiPendukung, Carbon $currentDateTime): array
     {
-        // Hapus aplikasi yang tidak dipilih
+        $user = Auth::user()->full_name;
+        $createdIds = [];
+
+        \Log::info("Updating aplikasi pendukung", [
+            'quotation_id' => $quotation->id,
+            'aplikasi_count' => count($aplikasiPendukung)
+        ]);
+
+        // Hapus aplikasi yang tidak dipilih (soft delete)
         QuotationAplikasi::where('quotation_id', $quotation->id)
             ->whereNotIn('aplikasi_pendukung_id', $aplikasiPendukung)
+            ->whereNull('deleted_at')
             ->update([
                 'deleted_at' => $currentDateTime,
-                'deleted_by' => Auth::user()->full_name
+                'deleted_by' => $user
             ]);
 
         // Tambah/Tambah aplikasi yang dipilih
         foreach ($aplikasiPendukung as $aplikasiId) {
-            $aplikasi = DB::table('m_aplikasi_pendukung')->where('id', $aplikasiId)->first();
+            $aplikasi = AplikasiPendukung::where('id', $aplikasiId)->first();
 
             if ($aplikasi) {
-                QuotationAplikasi::updateOrCreate(
+                $quotationAplikasi = QuotationAplikasi::updateOrCreate(
                     [
                         'quotation_id' => $quotation->id,
                         'aplikasi_pendukung_id' => $aplikasiId
@@ -1096,12 +1260,22 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                     [
                         'aplikasi_pendukung' => $aplikasi->nama,
                         'harga' => $aplikasi->harga,
-                        'updated_by' => Auth::user()->full_name,
+                        'updated_by' => $user,
                         'deleted_at' => null
                     ]
                 );
+
+                $createdIds[$aplikasiId] = $quotationAplikasi->id;
+
+                \Log::info("Created/Updated quotation aplikasi", [
+                    'quotation_id' => $quotation->id,
+                    'aplikasi_id' => $aplikasiId,
+                    'quotation_aplikasi_id' => $quotationAplikasi->id
+                ]);
             }
         }
+
+        return $createdIds;
     }
 
     /**
