@@ -355,6 +355,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/available-leads', 'getAvailableLeads');
         Route::get('/available-sites/{leadsId}', 'getAvailableSites');
         Route::post('/{id}/submit-checklist', 'submitChecklist');
+        Route::post('/upload/{id}', 'uploadPks');
         // });
     });
     // Quotation Management

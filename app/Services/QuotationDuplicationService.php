@@ -7,7 +7,6 @@ use App\Models\QuotationDetail;
 use App\Models\QuotationSite;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Log;
 
 class QuotationDuplicationService
 {
@@ -1206,7 +1205,7 @@ class QuotationDuplicationService
      */
     private function duplicateQuotationDetailsWithSiteMapping(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
-        Log::info('Duplicating quotation details for ALL NEW sites', [
+        \Log::info('Duplicating quotation details for ALL NEW sites', [
             'new_quotation_id' => $newQuotation->id,
             'referensi_quotation_id' => $quotationReferensi->id,
             'detail_count' => $quotationReferensi->quotationDetails->count(),
