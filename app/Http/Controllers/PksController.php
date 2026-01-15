@@ -32,6 +32,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 /**
@@ -1405,6 +1406,158 @@ class PksController extends Controller
             ], 500);
         }
     }
+    /**
+     * @OA\Post(
+     *     path="/api/pks/upload/{id}",
+     *     summary="Upload dokumen PKS yang sudah disetujui",
+     *     description="Endpoint untuk mengupload file PKS yang sudah disetujui dan mengubah status PKS menjadi approved.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID PKS",
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 @OA\Property(
+     *                     property="file",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="File PKS (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="File berhasil diupload",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="PKS file uploaded successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nomor", type="string", example="PKS/COMP001/LEAD001-012024-00001"),
+     *                 @OA\Property(property="status_pks_id", type="integer", example=7),
+     *                 @OA\Property(property="link_pks_disetujui", type="string", example="http://example.com/document/pks/file.pdf")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="File tidak valid",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="PKS not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error uploading PKS file")
+     *         )
+     *     )
+     * )
+     */
+    public function uploadPks(Request $request, $id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $pks = Pks::find($id);
+
+            if (!$pks) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PKS not found'
+                ], 404);
+            }
+
+            // Hapus file lama jika ada
+            if ($pks->link_pks_disetujui) {
+                $oldFileName = basename($pks->link_pks_disetujui);
+                if (Storage::disk('pks')->exists($oldFileName)) {
+                    Storage::disk('pks')->delete($oldFileName);
+                }
+            }
+
+            // Upload file baru
+            $fileName = $this->storePksFile($request->file('file'));
+
+            // Generate URL yang benar
+            $fileUrl = url('document/pks/' . $fileName);
+
+            \Log::info('Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . Storage::disk('pks')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('pks')->exists($fileName) ? 'Yes' : 'No'));
+
+            $pks->update([
+                'status_pks_id' => 6, // Status Approved/Active
+                'link_pks_disetujui' => $fileUrl,
+                'updated_at' => now(),
+                'updated_by' => Auth::user()->full_name
+            ]);
+
+            // Catat aktivitas
+            $this->createUploadPksActivity($pks);
+
+            DB::commit();
+
+            $pks->load(['statusPks']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'PKS file uploaded successfully',
+                'data' => [
+                    'id' => $pks->id,
+                    'nomor' => $pks->nomor,
+                    'status_pks_id' => $pks->status_pks_id,
+                    'status' => $pks->statusPks->nama ?? null,
+                    'link_pks_disetujui' => $pks->link_pks_disetujui
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            if (isset($fileName) && Storage::disk('pks')->exists($fileName)) {
+                Storage::disk('pks')->delete($fileName);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     // ======================================================================
     // PRIVATE METHODS - Business Logic
@@ -2422,6 +2575,48 @@ class PksController extends Controller
             \Log::error('Failed to add detail PIC: ' . $e->getMessage());
             throw $e;
         }
+    }
+    /**
+     * Store PKS file to storage
+     * 
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
+     */
+    private function storePksFile($file): string
+    {
+        $fileExtension = $file->getClientOriginalExtension();
+        $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+
+        // Simpan file ke disk 'pks' yang sudah dikonfigurasi
+        Storage::disk('pks')->put($fileName, file_get_contents($file));
+
+        return $fileName;
+    }
+
+    /**
+     * Create upload activity log for PKS
+     * 
+     * @param Pks $pks
+     * @return void
+     */
+    private function createUploadPksActivity($pks): void
+    {
+        $leads = Leads::find($pks->leads_id);
+        $nomorActivity = $this->generateNomorActivity($leads->id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'pks_id' => $pks->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $nomorActivity,
+            'tipe' => 'PKS',
+            'notes' => 'PKS dengan nomor : ' . $pks->nomor . ' telah diupload dan disetujui',
+            'is_activity' => 0,
+            'user_id' => Auth::id(),
+            'created_by' => Auth::user()->full_name
+        ]);
     }
 
 

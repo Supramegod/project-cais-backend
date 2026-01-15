@@ -49,15 +49,15 @@ return [
         // config/filesystems.php
         'spk' => [
             'driver' => 'local',
-            'root' => public_path('/spk'),
-            'url' => env('APP_URL') . '/spk', // ✅ Tetap pakai /public/
+            'root' => public_path('document/spk'),
+            'url' => env('APP_URL') . '/document/spk', // ✅ Tetap pakai /public/
             'visibility' => 'public',
             'throw' => false,
         ],
         'pks' => [
             'driver' => 'local',
-            'root' => public_path() . '/pks',
-            'url' => env('APP_URL') . '/public/pks',
+            'root' => public_path('document/pks'),
+            'url' => env('APP_URL') . '/document/pks',
             'visibility' => 'public',
             'throw' => false,
         ],
