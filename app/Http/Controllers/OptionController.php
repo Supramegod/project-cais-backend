@@ -8,6 +8,7 @@ use App\Models\City;
 use App\Models\Company;
 use App\Models\District;
 use App\Models\JabatanPic;
+use App\Models\JenisVisit;
 use App\Models\KategoriSesuaiHc;
 use App\Models\Loyalty;
 use App\Models\Negara;
@@ -1459,6 +1460,121 @@ class OptionController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/list-user",
+     *     tags={"Option"},
+     *     summary="Mendapatkan daftar user untuk filter customer activity",
+     *     description="Mengambil daftar user yang dapat digunakan untuk filter di customer activity list",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil daftar user",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Daftar user berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="full_name", type="string", example="John Doe"),
+     *                     @OA\Property(property="username", type="string", example="john.doe"),
+     *                     @OA\Property(property="email", type="string", example="john@example.com")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan saat mengambil data user")
+     *         )
+     *     )
+     * )
+     */
+    public function getListUser()
+    {
+        try {
+            $users = User::where('is_active', 1)
+                ->whereIn('cais_role_id', [4, 5, 29, 30, 31, 54])
+                ->select('id', 'full_name', 'username', 'email')
+                ->orderBy('full_name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar user berhasil diambil',
+                'data' => $users
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data user',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/options/list-jenis-visit",
+     *     tags={"Option"},
+     *     summary="Mendapatkan daftar jenis visit",
+     *     description="Mengambil daftar jenis visit untuk dropdown options",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil daftar jenis visit",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Daftar jenis visit berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Survey")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan saat mengambil data jenis visit")
+     *         )
+     *     )
+     * )
+     */
+    public function getListJenisVisit()
+    {
+        try {
+            $jenisVisit = JenisVisit::whereNull('deleted_at')
+                ->select('id', 'nama')
+                ->orderBy('nama', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Daftar jenis visit berhasil diambil',
+                'data' => $jenisVisit
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat mengambil data jenis visit',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

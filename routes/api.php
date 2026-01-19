@@ -386,6 +386,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('options')->controller(OptionController::class)->group(function () {
         Route::get('/branches', 'getBranches');
         Route::get('/users', 'getUsers');
+        Route::get('/list-user', 'getListUser');
+        Route::get('/list-jenis-visit', 'getListJenisVisit');
         Route::get('/platforms', 'getPlatforms');
         Route::get('/status-leads', 'getStatusLeads');
         Route::get('/benua', 'getBenua');

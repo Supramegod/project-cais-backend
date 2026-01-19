@@ -227,15 +227,7 @@ class QuotationResource extends JsonResource
             'alamat_penagihan_invoice' => $this->alamat_penagihan_invoice,
             'catatan_site' => $this->catatan_site,
 
-            'status_serikat' => $this->whenLoaded('status_serikat', function () {
-                $statusSerikat = $this->status_serikat;
-                if ($this->ada_serikat === "Tidak Ada") {
-                    $statusSerikat = "Tidak Ada";
-                }
-                return [
-                    'status_serikat' => $statusSerikat,
-                ];
-            }),
+            'status_serikat' => $this->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $this->status_serikat,
 
             // Contract details
             'jenis_kontrak' => $this->jenis_kontrak,

@@ -74,12 +74,13 @@ return [
             'throw' => false,
             'report' => false,
         ],
-        'bukti-activity' => [
+        // ✅ TAMBAHKAN INI
+        'customer-activity' => [
             'driver' => 'local',
-            // Menggunakan public_path() agar langsung dapat diakses tanpa storage:link
-            'root' => public_path('uploads/customer-activity'),
-            'url' => env('APP_URL') . '/uploads/customer-activity',
+            'root' => public_path('document/customer-activity'),
+            'url' => env('APP_URL') . '/document/customer-activity',
             'visibility' => 'public',
+            'throw' => false,
         ],
 
     ],

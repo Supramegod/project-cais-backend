@@ -428,7 +428,7 @@ class CustomerActivityController extends Controller
      *         required=true,
      *         description="Data aktivitas customer baru",
      *         @OA\MediaType(
-     *             mediaType="application/json",
+     *             mediaType="multipart/form-data",
      *             @OA\Schema(
      *                 required={"leads_id", "tgl_activity", "tipe"},
      *                 type="object",
@@ -452,15 +452,12 @@ class CustomerActivityController extends Controller
      *                 @OA\Property(property="penerima", type="string", example="John Doe", description="Penerima email/telepon"),
      *                 @OA\Property(property="link_bukti_foto", type="string", example="https://example.com/foto.jpg", description="Link bukti foto"),
      *                 @OA\Property(
-     *                     property="files",
+     *                     property="files[]",
      *                     type="array",
-     *                     description="Array file yang akan diupload",
+     *                     description="File yang akan diupload (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB per file",
      *                     @OA\Items(
-     *                         type="object",
-     *                         required={"nama_file", "file_content"},
-     *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
-     *                         @OA\Property(property="file_content", type="string", example="base64EncodedFileContent", description="File content dalam format base64"),
-     *                         @OA\Property(property="extension", type="string", example="pdf", description="Ekstensi file (pdf, jpg, png, dll)")
+     *                         type="string",
+     *                         format="binary"
      *                     )
      *                 )
      *             )
@@ -497,10 +494,18 @@ class CustomerActivityController extends Controller
      *                         type="object",
      *                         @OA\Property(property="id", type="integer", example=1),
      *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
-     *                         @OA\Property(property="url_file", type="string", example="http://example.com/uploads/customer-activity/file.pdf")
+     *                         @OA\Property(property="url_file", type="string", example="http://example.com/document/customer-activity/NotulenMeeting20240701103000012345.pdf")
      *                     )
      *                 )
      *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="File tidak valid",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
      *     ),
      *     @OA\Response(
@@ -533,10 +538,19 @@ class CustomerActivityController extends Controller
         try {
             DB::beginTransaction();
 
+            // Ekstrak file jika ada (untuk multipart/form-data)
+            $requestData = $request->all();
+
             // Validate request menggunakan rules untuk ADD
             $validator = Validator::make(
-                $request->all(),
-                $this->getValidationRules(false), // isUpdate = false
+                $requestData,
+                array_merge(
+                    $this->getValidationRules(false), // isUpdate = false
+                    [
+                        'files' => 'nullable|array',
+                        'files.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:1024' // 10MB
+                    ]
+                ),
                 $this->getValidationMessages()
             );
 
@@ -548,10 +562,7 @@ class CustomerActivityController extends Controller
             }
 
             // Check if leads exists and not deleted
-            // Mengganti Leads::whereNull('deleted_at')->find($request->leads_id);
-            // karena sudah divalidasi dengan 'exists:sl_leads,id'
             $leads = Leads::find($request->leads_id);
-            // Perlu menambahkan check deleted_at jika 'exists' tidak mengeceknya
             if (!$leads || $leads->deleted_at) {
                 return response()->json([
                     'success' => false,
@@ -559,8 +570,7 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
-
-            $nomor = $this->generateNomor($request->leads_id); // Asumsi method ini ada
+            $nomor = $this->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
             // Prepare activity data using allowed fields
@@ -573,10 +583,12 @@ class CustomerActivityController extends Controller
 
             $activity = CustomerActivity::create($activityData);
 
-            // Handle file uploads
-            if ($request->has('files') && is_array($request->files)) {
-                foreach ($request->files as $fileData) {
-                    $this->saveActivityFile($activity->id, $fileData); // Asumsi method ini ada
+            // Handle file uploads dari multipart/form-data
+            if ($request->hasFile('files')) {
+                $uploadedFiles = $request->file('files');
+
+                foreach ($uploadedFiles as $file) {
+                    $this->storeActivityFile($activity->id, $file);
                 }
             }
 
@@ -592,7 +604,7 @@ class CustomerActivityController extends Controller
             DB::commit();
 
             // Return with complete data
-            $activity->load(['leads', 'files', 'statusLeads']); // Asumsi relasi ini ada
+            $activity->load(['leads', 'files', 'statusLeads']);
 
             return response()->json([
                 'success' => true,
@@ -1502,8 +1514,8 @@ class CustomerActivityController extends Controller
 
             // Handle file uploads jika ada
             if ($request->has('files')) {
-                foreach ($request->files as $fileData) {
-                    $this->saveActivityFile($activity->id, $fileData);
+                foreach ($request->files as $file) {
+                    $this->storeActivityFile($activity->id, $file);
                 }
             }
 
@@ -2190,9 +2202,10 @@ class CustomerActivityController extends Controller
 
             // File validation
             'files.array' => 'Format files harus berupa array.',
-            'files.*.nama_file.required_with' => 'Nama file wajib diisi.',
-            'files.*.nama_file.max' => 'Nama file maksimal 255 karakter.',
-            'files.*.file_content.required_with' => 'Konten file wajib diisi.',
+            'files.*.file' => 'File yang diupload harus berupa file.',
+            'files.*.mimes' => 'File harus berformat: pdf, doc, docx, jpg, jpeg, atau png.',
+            'files.*.max' => 'Ukuran file maksimal 1MB.',
+
         ];
     }
 
@@ -2266,46 +2279,44 @@ class CustomerActivityController extends Controller
 
         return $prefix . $month . $year . "-" . $sequence;
     }
-
     /**
-     * Save activity file
+     * Store activity file - Konsisten dengan storeSpkFile di SpkController
+     * 
+     * @param int $activityId
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
      */
-    private function saveActivityFile($activityId, $fileData): void
+    private function storeActivityFile($activityId, $file)
     {
         try {
-            if (isset($fileData['file_content']) && isset($fileData['nama_file'])) {
-                // Decode base64
-                $fileContent = base64_decode($fileData['file_content']);
+            $fileExtension = $file->getClientOriginalExtension();
+            $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
 
-                // Validate decoded content
-                if ($fileContent === false) {
-                    throw new \Exception('Gagal decode file content. Pastikan file dalam format base64.');
-                }
+            // ✅ Simpan file ke disk 'customer-activity' yang sudah dikonfigurasi
+            Storage::disk('customer-activity')->put($fileName, file_get_contents($file));
 
-                // Generate unique filename
-                $extension = $fileData['extension'] ?? 'pdf'; // Asumsi extension bisa dikirim
-                $fileName = Str::slug($fileData['nama_file']) . '_' . time() . '_' . uniqid() . '.' . $extension;
+            // ✅ Generate URL manual (konsisten dengan uploadSpk)
+            $fileUrl = url('document/customer-activity/' . $fileName);
 
-                // Use Storage facade properly
-                // Pastikan 'bukti-activity' adalah disk yang dikonfigurasi di config/filesystems.php
-                Storage::disk('bukti-activity')->put($fileName, $fileContent);
+            \Log::info('Customer Activity File Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . Storage::disk('customer-activity')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('customer-activity')->exists($fileName) ? 'Yes' : 'No'));
 
-                // Build URL properly
-                // Sesuaikan dengan konfigurasi URL untuk disk 'bukti-activity' Anda
-                // Contoh: Storage::disk('bukti-activity')->url($fileName);
-                $fileUrl = url('public/uploads/customer-activity/' . $fileName);
+            // Simpan ke database
+            CustomerActivityFile::create([
+                'customer_activity_id' => $activityId,
+                'nama_file' => $file->getClientOriginalName(),
+                'url_file' => $fileUrl,
+                'created_by' => Auth::user()->full_name,
+                'created_at' => Carbon::now()
+            ]);
 
-                CustomerActivityFile::create([
-                    'customer_activity_id' => $activityId,
-                    'nama_file' => $fileData['nama_file'],
-                    'url_file' => $fileUrl,
-                    'created_by' => Auth::user()->full_name,
-                    'created_at' => Carbon::now()
-                ]);
-            }
+            return $fileName;
+
         } catch (\Exception $e) {
-            Log::error('Error saving activity file: ' . $e->getMessage());
-            // Lemparkan exception untuk memicu DB::rollBack() di metode pemanggil (add)
+            Log::error('Error storing activity file: ' . $e->getMessage());
             throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
     }
