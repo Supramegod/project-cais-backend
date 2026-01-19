@@ -263,9 +263,9 @@ class QuotationStepResource extends JsonResource
                 }
 
                 return [
-                    'jenis_perusahaan_id' => $quotation->leads->jenis_perusahaan_id || null,
-                    'bidang_perusahaan_id' => $quotation->leads->bidang_perusahaan_id || null,
-                    'resiko' => $quotation->leads->jenisperusahaan->resiko || null,
+                    'jenis_perusahaan_id' => $quotation->jenis_perusahaan_id ?? $quotation->leads->jenis_perusahaan_id,
+                    'bidang_perusahaan_id' => $quotation->bidang_perusahaan_id ?? $quotation->leads->bidang_perusahaan_id,
+                    'resiko' => $quotation->jenisPerusahaan->resiko ?? $quotation->leads->jenisperusahaan->resiko ?? null,
                     'program_bpjs' => $quotation->program_bpjs,
                     'bpjs_per_position' => $bpjsPerPosition,
                 ];
