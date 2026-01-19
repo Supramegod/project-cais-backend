@@ -38,6 +38,13 @@ class HrisSite extends Model
         'contract_value',
         'contract_start',
         'contract_end',
+        'contract_terminated',
+        'note_terminated',
+        'contract_status',
+        'health_insurance_status',
+        'labor_insurance_status',
+        'vacation',
+        'attendance_machine',
         'is_active',
         'created_by',
         'updated_by'
