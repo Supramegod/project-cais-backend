@@ -291,6 +291,7 @@ class PksController extends Controller
             $pks_mapped = [
                 'id' => $pks->id,
                 'nomor' => $pks->nomor ?? null,
+                'link_pks_disetujui' => $pks->link_pks_disetujui ?? null,
                 'activities' => $pks->activities->map(function ($activity) {
                     return [
                         'id' => $activity->id,
