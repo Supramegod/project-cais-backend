@@ -249,6 +249,8 @@ class QuotationResource extends JsonResource
             'persentase' => $this->persentase,
             'is_ppn' => $this->is_ppn,
             'ppn_pph_dipotong' => $this->ppn_pph_dipotong,
+            'jumlah_hari_invoice' => $this->jumlah_hari_invoice,
+            'tipe_hari_invoice' => $this->tipe_hari_invoice,
 
             // Allowance details
             'thr' => $this->thr,

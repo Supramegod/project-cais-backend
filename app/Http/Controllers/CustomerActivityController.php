@@ -343,12 +343,8 @@ class CustomerActivityController extends Controller
     public function view($id): JsonResponse
     {
         try {
-            $activity = CustomerActivity::with([
-                'leads.branch',
-                'leads.kebutuhan',
-                'leads.timSales',
-                'leads.timSalesD'
-            ])->whereNull('deleted_at')
+            $activity = CustomerActivity::with(['files'])
+                ->whereNull('deleted_at')
                 ->find($id);
 
             if (!$activity) {
@@ -358,55 +354,37 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
-            // Map data sesuai form "1. Informasi Leads" di gambar
-            $informasiLeads = [
-                'leads_customer' => $activity->leads?->nama_perusahaan,
-                'tanggal_activity' => $activity->tgl_activity,
-                'wilayah' => $activity->leads?->branch?->name,
-                'kebutuhan' => $activity->leads?->kebutuhan->first()?->nama,
-                'tim_sales' => $activity->leads?->timSales?->nama,
-                'sales' => $activity->leads?->timSalesD?->nama,
-                'crm' => $activity->crm,
-                'ro' => $activity->ro,
-                'notes' => $activity->notes
+            // Get current activity data only
+            $activityData = [
+                'id' => $activity->id,
+                'tipe' => $activity->tipe,
+                'notes' => $activity->notes_tipe ?? $activity->notes,
+                'tgl_activity' => $activity->tgl_activity,
+                'activity_files' => $activity->files->map(function ($file) {
+                    return [
+                        'id' => $file->id,
+                        'nama_file' => $file->nama_file,
+                        'url_file' => $file->url_file,
+                        'created_at' => $file->created_at
+                    ];
+                }),
             ];
 
-            // Get all activities terkait leads ini (history activity)
-            $activityLeads = CustomerActivity::where('leads_id', $activity->leads_id)
-                ->whereNull('deleted_at')
-                ->orderBy('tgl_activity', 'desc')
-                ->get()
-                ->map(function ($act) {
-                    $baseData = [
-                        'id' => $act->id,
-                        'tipe' => $act->tipe,
-                        'notes' => $act->notes_tipe ?? $act->notes,
-                        'tgl_activity' => $act->tgl_activity
-                    ];
-
-                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
-                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
-                        // Untuk Telepon & Online Meeting
-                        $baseData['start'] = $act->start;
-                        $baseData['end'] = $act->end;
-                        $baseData['durasi'] = $act->durasi;
-                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
-                    } elseif (strtolower($act->tipe) === 'visit') {
-                        // Untuk Visit
-                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
-                        $baseData['jam_realisasi'] = $act->jam_realisasi;
-                        $baseData['jenis_visit'] = $act->jenis_visit;
-                    }
-
-                    return $baseData;
-                });
+            // Conditional fields berdasarkan tipe
+            if (in_array(strtolower($activity->tipe), ['telepon', 'online meeting'])) {
+                $activityData['start'] = $activity->start;
+                $activityData['end'] = $activity->end;
+                $activityData['durasi'] = $activity->durasi;
+                $activityData['tgl_realisasi'] = $activity->tgl_realisasi;
+            } elseif (strtolower($activity->tipe) === 'visit') {
+                $activityData['tgl_realisasi'] = $activity->tgl_realisasi;
+                $activityData['jam_realisasi'] = $activity->jam_realisasi;
+                $activityData['jenis_visit'] = $activity->jenis_visit;
+            }
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'informasi_leads' => $informasiLeads,
-                    'activity_leads' => $activityLeads
-                ]
+                'data' => $activityData
             ]);
 
         } catch (\Exception $e) {

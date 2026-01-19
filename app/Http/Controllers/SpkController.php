@@ -494,6 +494,7 @@ class SpkController extends Controller
             $spkInfo = [
                 'nomor_spk' => $spk->nomor,
                 'tanggal_spk' => $spk->tgl_spk,
+                'link_spk_disetujui' => $spk->link_spk_disetujui ?? null,
             ];
             // 2. Informasi Leads
             $leadsInfo = [
