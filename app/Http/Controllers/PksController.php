@@ -1057,7 +1057,7 @@ class PksController extends Controller
             $this->createCustomerActivityLog($pks, $leads, $current_date_time);
 
             // Step 5: Handle Customer Creation/Update
-            $this->handleCustomerStatus($pks, $leads, $current_date_time);
+            // $this->handleCustomerStatus($pks, $leads, $current_date_time);
 
             DB::commit();
             DB::connection('mysqlhris')->commit();
@@ -2231,8 +2231,7 @@ class PksController extends Controller
     private function syncCustomerToHris($leads, $current_date_time)
     {
         // Check if client exists in HRIS
-        $client = Client::whereNull('deleted_at')
-            ->where('customer_id', $leads->id)
+        $client = Client::where('customer_id', $leads->id)
             ->where('is_active', 1)
             ->first();
 
