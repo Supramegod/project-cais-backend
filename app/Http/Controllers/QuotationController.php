@@ -569,8 +569,16 @@ class QuotationController extends Controller
             }
 
 
-            // Create initial activity untuk semua tipe
-            $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id);
+            // Create initial activity berdasarkan tipe quotation
+            if ($tipe_quotation === 'revisi') {
+                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'revisi', $quotationReferensi);
+            } elseif ($tipe_quotation === 'rekontrak') {
+                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'rekontrak', $quotationReferensi);
+            } elseif ($tipe_quotation === 'baru' && $quotationReferensi) {
+                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'baru_dengan_referensi', $quotationReferensi);
+            } else {
+                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'baru');
+            }
 
             DB::commit();
 

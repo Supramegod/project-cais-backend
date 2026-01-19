@@ -145,10 +145,13 @@ class QuotationBusinessService
     /**
      * Create initial customer activity
      */
-    public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId): void
+    public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
         $nomorActivity = $this->generateActivityNomor($quotation->leads_id);
+
+        // Buat notes berdasarkan tipe quotation
+        $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
 
         CustomerActivity::create([
             'leads_id' => $quotation->leads_id,
@@ -156,12 +159,52 @@ class QuotationBusinessService
             'branch_id' => $leads->branch_id,
             'tgl_activity' => Carbon::now(),
             'nomor' => $nomorActivity,
-            'tipe' => 'Quotation',
-            'notes' => 'Quotation dengan nomor :' . $quotation->nomor . ' terbentuk',
+            'tipe' => $this->getActivityType($tipe),
+            'notes' => $notes,
             'is_activity' => 0,
             'user_id' => $userId,
             'created_by' => $createdBy
         ]);
+    }
+
+    /**
+     * Generate activity notes based on quotation type
+     */
+    private function generateActivityNotes(Quotation $quotation, string $tipe, ?Quotation $quotationReferensi): string
+    {
+        switch ($tipe) {
+            case 'revisi':
+                return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
+            
+            case 'rekontrak':
+                return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
+            
+            case 'baru_dengan_referensi':
+                return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
+            
+            default: // 'baru'
+                return "Quotation baru {$quotation->nomor} dibuat dari awal";
+        }
+    }
+
+    /**
+     * Get activity type based on quotation type
+     */
+    private function getActivityType(string $tipe): string
+    {
+        switch ($tipe) {
+            case 'revisi':
+                return 'Quotation Revisi';
+            
+            case 'rekontrak':
+                return 'Quotation Rekontrak';
+            
+            case 'baru_dengan_referensi':
+                return 'Quotation copy';
+            
+            default: // 'baru'
+                return 'Quotation';
+        }
     }
 
     /**

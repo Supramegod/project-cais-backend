@@ -4848,7 +4848,7 @@
                     "description": "Data aktivitas customer baru",
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "leads_id",
@@ -4954,31 +4954,12 @@
                                         "type": "string",
                                         "example": "https://example.com/foto.jpg"
                                     },
-                                    "files": {
-                                        "description": "Array file yang akan diupload",
+                                    "files[]": {
+                                        "description": "File yang akan diupload (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB per file",
                                         "type": "array",
                                         "items": {
-                                            "required": [
-                                                "nama_file",
-                                                "file_content"
-                                            ],
-                                            "properties": {
-                                                "nama_file": {
-                                                    "type": "string",
-                                                    "example": "Notulen Meeting"
-                                                },
-                                                "file_content": {
-                                                    "description": "File content dalam format base64",
-                                                    "type": "string",
-                                                    "example": "base64EncodedFileContent"
-                                                },
-                                                "extension": {
-                                                    "description": "Ekstensi file (pdf, jpg, png, dll)",
-                                                    "type": "string",
-                                                    "example": "pdf"
-                                                }
-                                            },
-                                            "type": "object"
+                                            "type": "string",
+                                            "format": "binary"
                                         }
                                     }
                                 },
@@ -5069,7 +5050,7 @@
                                                             },
                                                             "url_file": {
                                                                 "type": "string",
-                                                                "example": "http://example.com/uploads/customer-activity/file.pdf"
+                                                                "example": "http://example.com/document/customer-activity/NotulenMeeting20240701103000012345.pdf"
                                                             }
                                                         },
                                                         "type": "object"
@@ -5077,6 +5058,26 @@
                                                 }
                                             },
                                             "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "File tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
                                         }
                                     },
                                     "type": "object"
@@ -16033,6 +16034,160 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Terjadi kesalahan: Database connection failed"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/list-user": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar user untuk filter customer activity",
+                "description": "Mengambil daftar user yang dapat digunakan untuk filter di customer activity list",
+                "operationId": "a78db42d56f5a0576a8360f0473e7a40",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Daftar user berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "full_name": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "username": {
+                                                        "type": "string",
+                                                        "example": "john.doe"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "john@example.com"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan saat mengambil data user"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/options/list-jenis-visit": {
+            "get": {
+                "tags": [
+                    "Option"
+                ],
+                "summary": "Mendapatkan daftar jenis visit",
+                "description": "Mengambil daftar jenis visit untuk dropdown options",
+                "operationId": "6647aa04ff9a0272064afbca8a346f61",
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil daftar jenis visit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Daftar jenis visit berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Survey"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan saat mengambil data jenis visit"
                                         }
                                     },
                                     "type": "object"
