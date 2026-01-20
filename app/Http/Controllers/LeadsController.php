@@ -165,7 +165,8 @@ class LeadsController extends Controller
                     'statusLeads:id,nama',
                     'branch:id,name',
                     'platform:id,nama',
-                    'timSalesD:id,nama'
+                    'timSalesD:id,nama',
+                    'kebutuhan'
                 ])
                 ->where('status_leads_id', '!=', 102);
 
@@ -223,7 +224,16 @@ class LeadsController extends Controller
                     'sumber_leads' => $item->platform->nama ?? '-',
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
-                    'notes' => $item->notes
+                    'notes' => $item->notes,
+                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                        return [
+                            'id' => $kebutuhan->id,
+                            'nama' => $kebutuhan->nama,
+                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
+                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
+                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                        ];
+                    })->toArray()
                 ];
             });
 
@@ -2655,7 +2665,7 @@ class LeadsController extends Controller
                     $baseData = [
                         'id' => $act->id,
                         'tipe' => $act->tipe,
-                        'notes' => $act->notes_tipe ?? $act->notes,
+                        'notes' => $act->notes_tipe ?? $act->notes ?? $act->notulen,
                         'tgl_activity' => $act->tgl_activity,
                         'created_by' => $act->created_by
                     ];

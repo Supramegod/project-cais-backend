@@ -737,7 +737,7 @@ class QuotationResource extends JsonResource
                             'personil_chemical_coss' => $detail->personil_chemical_coss ?? 0,
                             'total_personil' => $detail->total_personil_coss ?? 0,
                             'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
-                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
+                            'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
                             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
 
                         ],
