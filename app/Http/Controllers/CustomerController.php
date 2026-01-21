@@ -186,6 +186,7 @@ class CustomerController extends Controller
                 'platform:id,nama',
                 'timSalesD:id,nama'
             ])
+                ->filterByUserRole()
                 ->whereNull('customer_id')
                 ->where('status_leads_id', 102);
 
@@ -226,7 +227,15 @@ class CustomerController extends Controller
 
                     // Data tambahan untuk UI
                     'pic' => $item->pic ?? '-',
-                    'sales' => $item->timSalesD->nama ?? '-',
+                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                        return [
+                            'id' => $kebutuhan->id,
+                            'nama' => $kebutuhan->nama,
+                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
+                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
+                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                        ];
+                    })->toArray()
                 ];
             });
 

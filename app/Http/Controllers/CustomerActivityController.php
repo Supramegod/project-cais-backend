@@ -217,7 +217,7 @@ class CustomerActivityController extends Controller
                     'status_leads_id' => $activity->status_leads_id,
                     'created_at' => $activity->created_at,
                     'nama_perusahaan' => $activity->leads?->nama_perusahaan,
-                    'kebutuhan' => $activity->leads?->kebutuhan->first()?->nama,
+                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray(),
                     'branch' => $activity->leads?->branch?->name,
                     'sales' => $activity->timSalesDetail?->nama,
                     'leads_id' => $activity->leads_id,
