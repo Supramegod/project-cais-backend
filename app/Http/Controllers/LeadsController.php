@@ -2669,7 +2669,7 @@ class LeadsController extends Controller
                         'notes' => $act->notes_tipe ?? $act->notes ?? $act->notulen,
                         'tgl_activity' => $act->tgl_activity,
                         'created_by' => $act->created_by,
-                        'created_at' => $act->created_at // Untuk sorting
+                        'created_at' => $act->getRawOriginal('created_at')  // Untuk sorting
                     ];
 
                     // Conditional fields berdasarkan tipe
@@ -2699,7 +2699,7 @@ class LeadsController extends Controller
                         'notes' => $act->notulen,
                         'tgl_activity' => $act->tgl_activity,
                         'created_by' => $act->created_by,
-                        'created_at' => $act->created_at, // Untuk sorting
+                        'created_at' => $act->getRawOriginal('created_at'), // Untuk sorting
                         'kebutuhan' => $act->leadsKebutuhan && $act->leadsKebutuhan->kebutuhan
                             ? $act->leadsKebutuhan->kebutuhan->nama
                             : null
