@@ -251,7 +251,8 @@ class MenuController extends Controller
      *             required={"nama","url"},
      *             @OA\Property(property="nama", type="string", example="Dashboard Updated", maxLength=100),
      *             @OA\Property(property="url", type="string", example="/dashboard-new", maxLength=255),
-     *             @OA\Property(property="icon", type="string", example="mdi mdi-home-outline", maxLength=100, nullable=true)
+     *             @OA\Property(property="icon", type="string", example="mdi mdi-home-outline", maxLength=100, nullable=true),
+     *             @OA\Property(property="status", type="string", enum={"alpha", "beta"}, example="alpha", nullable=true)
      *         )
      *     ),
      *     @OA\Response(
@@ -283,6 +284,7 @@ class MenuController extends Controller
             'nama' => 'required|string|max:100',
             'url' => 'required|string|max:255',
             'icon' => 'nullable|string|max:100',
+            'status' => 'nullable|in:alpha,beta',
         ]);
 
         if ($validator->fails()) {
@@ -298,6 +300,7 @@ class MenuController extends Controller
                 'nama' => $request->nama,
                 'url' => $request->url,
                 'icon' => $request->icon,
+                'status' => $request->filled('status') ? $request->status : null,
                 'updated_at' => Carbon::now()->toDateTimeString(),
                 'updated_by' => Auth::user()->full_name,
             ]);

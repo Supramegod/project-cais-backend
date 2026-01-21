@@ -163,6 +163,12 @@ class Leads extends Model
     {
         return $this->hasMany(LeadsKebutuhan::class, 'leads_id');
     }
+    // Tambahkan di dalam class Leads di file App\Models\Leads.php
+
+    public function salesActivities()
+    {
+        return $this->hasMany(SalesActivity::class, 'leads_id');
+    }
 
     /**
      * Relasi untuk mendapatkan tim sales details melalui leads_kebutuhan

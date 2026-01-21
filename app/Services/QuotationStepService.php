@@ -3644,7 +3644,6 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                             $resetData[$hppField] = null;
                         }
                     }
-
                     if (!empty($resetData)) {
                         $resetData['updated_by'] = $user;
                         $resetData['updated_at'] = $currentDateTime;

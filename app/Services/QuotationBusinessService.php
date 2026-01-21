@@ -1,9 +1,11 @@
 <?php
 
 namespace App\Services;
+use App\Models\LeadsKebutuhan;
 use App\Models\Pks;
 use App\Models\Province;
 use App\Models\City;
+use App\Models\SalesActivity;
 use App\Models\Ump;
 use App\Models\Umk;
 use App\Models\Company;
@@ -13,6 +15,7 @@ use App\Models\Leads;
 use App\Models\QuotationSite;
 use App\Models\QuotationPic;
 use App\Models\CustomerActivity;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -142,9 +145,6 @@ class QuotationBusinessService
         ]);
     }
 
-    /**
-     * Create initial customer activity
-     */
     public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
@@ -153,6 +153,7 @@ class QuotationBusinessService
         // Buat notes berdasarkan tipe quotation
         $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
 
+        // ✅ SELALU buat CustomerActivity untuk semua user
         CustomerActivity::create([
             'leads_id' => $quotation->leads_id,
             'quotation_id' => $quotation->id,
@@ -165,6 +166,35 @@ class QuotationBusinessService
             'user_id' => $userId,
             'created_by' => $createdBy
         ]);
+
+        // ✅ Jika Sales (role 29), TAMBAHAN buat SalesActivity juga
+        $user = Auth::user();
+        if ($user && $user->cais_role_id == 29) {
+            $this->createSalesActivity($quotation, $createdBy);
+        }
+    }
+
+    /**
+     * Create sales activity for quotation
+     */
+    private function createSalesActivity(Quotation $quotation, string $createdBy): void
+    {
+        $user = Auth::user();
+
+        // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari quotation
+        $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+            ->first();
+
+        SalesActivity::create([
+            'leads_id' => $quotation->leads_id,
+            'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
+            'tgl_activity' => Carbon::now(),
+            'jenis_activity' => 'Quotation',
+            'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
+            'created_by' => $createdBy
+        ]);
     }
 
     /**
@@ -175,13 +205,13 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
-            
+
             case 'rekontrak':
                 return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
-            
+
             case 'baru_dengan_referensi':
                 return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
-            
+
             default: // 'baru'
                 return "Quotation baru {$quotation->nomor} dibuat dari awal";
         }
@@ -195,13 +225,13 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return 'Quotation Revisi';
-            
+
             case 'rekontrak':
                 return 'Quotation Rekontrak';
-            
+
             case 'baru_dengan_referensi':
                 return 'Quotation copy';
-            
+
             default: // 'baru'
                 return 'Quotation';
         }
