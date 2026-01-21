@@ -172,7 +172,10 @@ class CustomerActivityController extends Controller
                 'leads.branch:id,name',
                 'leads.kebutuhan:m_kebutuhan.id,m_kebutuhan.nama',
                 'timSalesDetail:id,nama'
-            ])->whereNull('deleted_at');
+            ])->whereNull('deleted_at')
+            ->whereHas('leads', function ($q) {
+                $q->filterByUserRole();
+            });
 
             if ($request->tgl_dari || $request->tgl_sampai) {
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
@@ -196,11 +199,6 @@ class CustomerActivityController extends Controller
 
             if ($request->filled('user')) {
                 $query->where('user_id', $request->user);
-            }
-
-            $user = Auth::user();
-            if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-                $query->where('user_id', $user->id);
             }
 
             $activities = $query->orderBy('tgl_activity', 'desc')
