@@ -82,6 +82,13 @@ return [
             'visibility' => 'public',
             'throw' => false,
         ],
+        'sales-activity' => [
+            'driver' => 'local',
+            'root' => public_path('document/sales-activity'),
+            'url' => env('APP_URL') . '/document/sales-activity',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
 
     ],
 

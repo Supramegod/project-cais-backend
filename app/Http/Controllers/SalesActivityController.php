@@ -5,10 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
+use App\Models\SalesActivityFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 /**
  * @OA\Tag(
@@ -125,7 +129,9 @@ class SalesActivityController extends Controller
                     $this->applyKebutuhanFilterByUser($q, $user);
                 });
             }
-            $leads = $query;
+
+            $perPage = $request->input('per_page', 20);
+            $leads = $query->paginate($perPage);
 
             // Format response
             $formattedLeads = $leads->map(function ($lead) {
@@ -141,7 +147,15 @@ class SalesActivityController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $formattedLeads,
+                'data' => [
+                    'leads' => $formattedLeads,
+                    'pagination' => [
+                        'total' => $leads->total(),
+                        'per_page' => $leads->perPage(),
+                        'current_page' => $leads->currentPage(),
+                        'last_page' => $leads->lastPage(),
+                    ]
+                ],
                 'message' => 'Data leads berhasil diambil'
             ]);
 
@@ -207,6 +221,10 @@ class SalesActivityController extends Controller
                                 $q2->select('id', 'nama');
                             }
                         ]);
+                },
+                'files',
+                'creator' => function ($q) {
+                    $q->select('id', 'full_name', 'email');
                 }
             ]);
 
@@ -231,7 +249,9 @@ class SalesActivityController extends Controller
             // Sorting dan pagination
             $query->orderBy('tgl_activity', 'desc')
                 ->orderBy('created_at', 'desc');
-            $activities = $query;
+
+            $perPage = $request->input('per_page', 15);
+            $activities = $query->paginate($perPage);
 
             return response()->json([
                 'success' => true,
@@ -251,19 +271,33 @@ class SalesActivityController extends Controller
     /**
      * @OA\Post(
      *     path="/api/sales-activity/add",
-     *     summary="Create new sales activity",
-     *     description="Menyimpan data sales activity baru",
+     *     summary="Create new sales activity with file upload",
+     *     description="Menyimpan data sales activity baru dengan opsi upload file",
      *     tags={"Sales Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
-     *             required={"leads_id", "leads_kebutuhan_id", "tgl_activity", "jenis_activity", "notulen"},
-     *             @OA\Property(property="leads_id", type="integer", example=1),
-     *             @OA\Property(property="leads_kebutuhan_id", type="integer", example=1),
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-01-15"),
-     *             @OA\Property(property="jenis_activity", type="string", example="Meeting"),
-     *             @OA\Property(property="notulen", type="string", example="Diskusi kebutuhan security")
+     *         description="Data aktivitas sales baru",
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"leads_id", "leads_kebutuhan_id", "tgl_activity", "jenis_activity", "notulen"},
+     *                 type="object",
+     *                 @OA\Property(property="leads_id", type="integer", example=1),
+     *                 @OA\Property(property="leads_kebutuhan_id", type="integer", example=1),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-01-15"),
+     *                 @OA\Property(property="jenis_activity", type="string", example="Meeting"),
+     *                 @OA\Property(property="notulen", type="string", example="Diskusi kebutuhan security"),
+     *                 @OA\Property(
+     *                     property="files[]",
+     *                     type="array",
+     *                     description="File yang akan diupload (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB per file",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="binary"
+     *                     )
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -272,7 +306,27 @@ class SalesActivityController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Sales activity berhasil ditambahkan"),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="leads_id", type="integer", example=1),
+     *                 @OA\Property(property="leads_kebutuhan_id", type="integer", example=1),
+     *                 @OA\Property(property="tgl_activity", type="string", example="2024-01-15"),
+     *                 @OA\Property(property="jenis_activity", type="string", example="Meeting"),
+     *                 @OA\Property(property="notulen", type="string", example="Diskusi kebutuhan security"),
+     *                 @OA\Property(property="created_by", type="string", example="John Doe"),
+     *                 @OA\Property(
+     *                     property="files",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama_file", type="string", example="document.pdf"),
+     *                         @OA\Property(property="url_file", type="string", example="http://example.com/storage/sales-activity/document.pdf")
+     *                     )
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -297,12 +351,20 @@ class SalesActivityController extends Controller
     public function store(Request $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
+            DB::beginTransaction();
+
+            // Ekstrak file jika ada (untuk multipart/form-data)
+            $requestData = $request->all();
+
+            // Validasi
+            $validator = Validator::make($requestData, [
                 'leads_id' => 'required|exists:sl_leads,id',
                 'leads_kebutuhan_id' => 'required|exists:sl_leads_kebutuhan,id',
                 'tgl_activity' => 'required|date',
                 'jenis_activity' => 'required|string|max:255',
                 'notulen' => 'required|string',
+                'files' => 'nullable|array',
+                'files.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
             ], [
                 'leads_id.required' => 'Leads ID wajib diisi',
                 'leads_id.exists' => 'Leads tidak ditemukan',
@@ -312,6 +374,9 @@ class SalesActivityController extends Controller
                 'tgl_activity.date' => 'Format tanggal tidak valid',
                 'jenis_activity.required' => 'Jenis activity wajib diisi',
                 'notulen.required' => 'Notulen wajib diisi',
+                'files.*.file' => 'File yang diupload harus berupa file',
+                'files.*.mimes' => 'File harus berformat: pdf, doc, docx, jpg, jpeg, atau png',
+                'files.*.max' => 'Ukuran file maksimal 10MB',
             ]);
 
             if ($validator->fails()) {
@@ -347,15 +412,26 @@ class SalesActivityController extends Controller
                 }
             }
 
-            // Simpan data
+            // Simpan data activity
             $salesActivity = SalesActivity::create([
                 'leads_id' => $request->leads_id,
                 'leads_kebutuhan_id' => $request->leads_kebutuhan_id,
                 'tgl_activity' => $request->tgl_activity,
                 'jenis_activity' => $request->jenis_activity,
                 'notulen' => $request->notulen,
-                'created_by' => Auth::user()->full_name,
+                'created_by' => $user ? $user->full_name : 'System',
             ]);
+
+            // Handle file uploads dari multipart/form-data
+            if ($request->hasFile('files')) {
+                $uploadedFiles = $request->file('files');
+
+                foreach ($uploadedFiles as $file) {
+                    $this->storeSalesActivityFile($salesActivity->id, $file);
+                }
+            }
+
+            DB::commit();
 
             // Load relasi untuk response
             $salesActivity->load([
@@ -363,6 +439,7 @@ class SalesActivityController extends Controller
                     $q->select('id', 'nama_perusahaan', 'pic');
                 },
                 'leadsKebutuhan.kebutuhan',
+                'files',
                 'creator'
             ]);
 
@@ -373,6 +450,8 @@ class SalesActivityController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error in SalesActivityController@store: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan sales activity',
@@ -385,7 +464,7 @@ class SalesActivityController extends Controller
      * @OA\Get(
      *     path="/api/sales-activity/view/{id}",
      *     summary="Get sales activity detail",
-     *     description="Menampilkan detail sales activity",
+     *     description="Menampilkan detail sales activity dengan format mirip Customer Activity",
      *     tags={"Sales Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -400,7 +479,42 @@ class SalesActivityController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Detail sales activity berhasil diambil"),
-     *             @OA\Property(property="data", type="object")
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-01-15"),
+     *                 @OA\Property(property="jenis_activity", type="string", example="Meeting"),
+     *                 @OA\Property(property="notulen", type="string", example="Diskusi kebutuhan security"),
+     *                 @OA\Property(property="created_at", type="string", format="date-time"),
+     *                 @OA\Property(
+     *                     property="lead",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Perusahaan"),
+     *                     @OA\Property(property="pic", type="string", example="John Doe"),
+     *                     @OA\Property(property="telp_perusahaan", type="string", example="021-12345678"),
+     *                     @OA\Property(property="email", type="string", example="info@contoh.com")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="kebutuhan",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="Security Guard")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="files",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
+     *                         @OA\Property(property="url_file", type="string", example="http://example.com/storage/sales-activity/file.pdf"),
+     *                         @OA\Property(property="created_at", type="string", format="date-time")
+     *                     )
+     *                 ),
+     *                 @OA\Property(property="creator", type="string", example="John Doe")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -429,7 +543,7 @@ class SalesActivityController extends Controller
                     $q->select('id', 'nama_perusahaan', 'pic', 'telp_perusahaan', 'email');
                 },
                 'leadsKebutuhan' => function ($q) {
-                    $q->select('id', 'kebutuhan_id', 'tim_sales_id', 'tim_sales_d_id')
+                    $q->select('id', 'kebutuhan_id', 'tim_sales_d_id')
                         ->with([
                             'kebutuhan' => function ($q2) {
                                 $q2->select('id', 'nama');
@@ -441,12 +555,16 @@ class SalesActivityController extends Controller
                                 $q2->select('id', 'user_id')
                                     ->with([
                                         'user' => function ($q3) {
-                                            $q3->select('id', 'name', 'email');
+                                            $q3->select('id', 'full_name', 'email');
                                         }
                                     ]);
                             }
                         ]);
                 },
+                'files',
+                'creator' => function ($q) {
+                    $q->select('id', 'full_name', 'email');
+                }
             ])->find($id);
 
             if (!$salesActivity) {
@@ -477,13 +595,32 @@ class SalesActivityController extends Controller
                 }
             }
 
+            // Format response seperti CustomerActivityController::view
+            $activityData = [
+                'id' => $salesActivity->id,
+                'jenis_activity' => $salesActivity->jenis_activity,
+                'notulen' => $salesActivity->notulen,
+                'tgl_activity' => Carbon::parse($salesActivity->tgl_activity)->format('Y-m-d'),
+                'created_at' => $salesActivity->created_at,
+                'created_by' => $salesActivity->created_by,
+                'files' => $salesActivity->files->map(function ($file) {
+                    return [
+                        'id' => $file->id,
+                        'nama_file' => $file->nama_file,
+                        'url_file' => $file->url_file,
+                        'created_at' => Carbon::parse($file->created_at)->format('Y-m-d H:i:s')
+                    ];
+                }),
+            ];
+
             return response()->json([
                 'success' => true,
-                'data' => $salesActivity,
+                'data' => $activityData,
                 'message' => 'Detail sales activity berhasil diambil'
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Error in SalesActivityController@show: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil detail sales activity',
@@ -491,208 +628,6 @@ class SalesActivityController extends Controller
             ], 500);
         }
     }
-
-    /**
-     * @OA\Put(
-     *     path="/api/sales-activity/update/{id}",
-     *     summary="Update sales activity",
-     *     description="Mengupdate data sales activity",
-     *     tags={"Sales Activity"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-01-15"),
-     *             @OA\Property(property="jenis_activity", type="string", example="Meeting"),
-     *             @OA\Property(property="notulen", type="string", example="Updated notulen")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Success",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sales activity berhasil diupdate"),
-     *             @OA\Property(property="data", type="object")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Not Found"
-     *     ),
-     *     @OA\Response(
-     *         response=403,
-     *         description="Forbidden"
-     *     ),
-     *     @OA\Response(
-     *         response=422,
-     *         description="Validation Error"
-     *     )
-     * )
-     */
-    // public function update(Request $request, $id)
-    // {
-    //     try {
-    //         $salesActivity = SalesActivity::find($id);
-
-    //         if (!$salesActivity) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Sales activity tidak ditemukan'
-    //             ], 404);
-    //         }
-
-    //         // Validasi hak akses terhadap KEBUTUHAN
-    //         $user = Auth::user();
-    //         if ($user) {
-    //             $leadsKebutuhan = LeadsKebutuhan::find($salesActivity->leads_kebutuhan_id);
-    //             if (!$leadsKebutuhan) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Data kebutuhan tidak ditemukan'
-    //                 ], 404);
-    //             }
-
-    //             $hasAccess = $this->checkUserAccessToKebutuhan($user, $leadsKebutuhan);
-
-    //             if (!$hasAccess) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Anda tidak memiliki akses untuk mengupdate activity ini'
-    //                 ], 403);
-    //             }
-    //         }
-
-    //         $validator = Validator::make($request->all(), [
-    //             'tgl_activity' => 'sometimes|date',
-    //             'jenis_activity' => 'sometimes|string|max:255',
-    //             'notulen' => 'sometimes|string',
-    //         ], [
-    //             'tgl_activity.date' => 'Format tanggal tidak valid',
-    //             'jenis_activity.max' => 'Jenis activity maksimal 255 karakter',
-    //         ]);
-
-    //         if ($validator->fails()) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Validasi gagal',
-    //                 'errors' => $validator->errors()
-    //             ], 422);
-    //         }
-
-    //         // Update data
-    //         $salesActivity->update($request->only(['tgl_activity', 'jenis_activity', 'notulen']));
-
-    //         // Load ulang relasi
-    //         $salesActivity->load([
-    //             'lead' => function ($q) {
-    //                 $q->select('id', 'nama_perusahaan', 'pic');
-    //             },
-    //             'leadsKebutuhan.kebutuhan',
-    //             'creator'
-    //         ]);
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'data' => $salesActivity,
-    //             'message' => 'Sales activity berhasil diupdate'
-    //         ]);
-
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Gagal mengupdate sales activity',
-    //             'error' => $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
-
-    /**
-     * @OA\Delete(
-     *     path="/api/sales-activity/delete/{id}",
-     *     summary="Delete sales activity",
-     *     description="Menghapus sales activity",
-     *     tags={"Sales Activity"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="integer")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Success",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Sales activity berhasil dihapus")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Not Found"
-     *     ),
-     *     @OA\Response(
-     *         response=403,
-     *         description="Forbidden"
-     *     )
-     * )
-     */
-    // public function destroy($id)
-    // {
-    //     try {
-    //         $salesActivity = SalesActivity::find($id);
-
-    //         if (!$salesActivity) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Sales activity tidak ditemukan'
-    //             ], 404);
-    //         }
-
-    //         // Validasi hak akses terhadap KEBUTUHAN
-    //         $user = Auth::user();
-    //         if ($user) {
-    //             $leadsKebutuhan = LeadsKebutuhan::find($salesActivity->leads_kebutuhan_id);
-    //             if (!$leadsKebutuhan) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Data kebutuhan tidak ditemukan'
-    //                 ], 404);
-    //             }
-
-    //             $hasAccess = $this->checkUserAccessToKebutuhan($user, $leadsKebutuhan);
-
-    //             if (!$hasAccess) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Anda tidak memiliki akses untuk menghapus activity ini'
-    //                 ], 403);
-    //             }
-    //         }
-
-    //         $salesActivity->delete();
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Sales activity berhasil dihapus'
-    //         ]);
-
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Gagal menghapus sales activity',
-    //             'error' => $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
-
     /**
      * @OA\Get(
      *     path="/api/sales-activity/kebutuhan/{leadsId}",
@@ -905,6 +840,46 @@ class SalesActivityController extends Controller
                 'message' => 'Gagal mengambil statistik',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Helper method untuk menyimpan file sales activity
+     *
+     * @param int $activityId
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
+     */
+    private function storeSalesActivityFile($activityId, $file)
+    {
+        try {
+            $fileExtension = $file->getClientOriginalExtension();
+            $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+
+            // Simpan file ke disk 'sales-activity' (harus dikonfigurasi di filesystems.php)
+            Storage::disk('sales-activity')->put($fileName, file_get_contents($file));
+
+            // Generate URL manual
+            $fileUrl = url('document/sales-activity/' . $fileName);
+
+            Log::info('Sales Activity File Generated URL: ' . $fileUrl);
+            Log::info('Filename: ' . $fileName);
+
+            // Simpan ke database
+            SalesActivityFile::create([
+                'activity_sales_id' => $activityId,
+                'nama_file' => $file->getClientOriginalName(),
+                'url_file' => $fileUrl,
+                'created_by' => Auth::user()->full_name,
+                'created_at' => Carbon::now()
+            ]);
+
+            return $fileName;
+
+        } catch (\Exception $e) {
+            Log::error('Error storing sales activity file: ' . $e->getMessage());
+            throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
     }
 

@@ -40,6 +40,12 @@ class SalesActivity extends Model
     {
         return $this->belongsTo(LeadsKebutuhan::class, 'leads_kebutuhan_id');
     }
+    // app/Models/SalesActivity.php
+
+    public function files()
+    {
+        return $this->hasMany(SalesActivityFile::class, 'activity_sales_id');
+    }
 
     /**
      * Jika created_by menyimpan ID User, kamu bisa tambahkan relasi ke User
@@ -49,7 +55,7 @@ class SalesActivity extends Model
         // Sesuaikan dengan model User kamu, biasanya App\Models\User
         return $this->belongsTo(User::class, 'created_by');
     }
-       public function getCreatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         // Menggunakan 'd-m-Y H:i:s' untuk menyertakan jam (24-jam), menit, dan detik.
         return Carbon::parse($value)->format('d-m-Y H:i:s');
