@@ -22342,13 +22342,14 @@
                 "tags": [
                     "Sales Activity"
                 ],
-                "summary": "Create new sales activity",
-                "description": "Menyimpan data sales activity baru",
+                "summary": "Create new sales activity with file upload",
+                "description": "Menyimpan data sales activity baru dengan opsi upload file",
                 "operationId": "ff3536f541c69c2dce506af9f80d465e",
                 "requestBody": {
+                    "description": "Data aktivitas sales baru",
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "leads_id",
@@ -22378,6 +22379,14 @@
                                     "notulen": {
                                         "type": "string",
                                         "example": "Diskusi kebutuhan security"
+                                    },
+                                    "files[]": {
+                                        "description": "File yang akan diupload (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB per file",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
                                     }
                                 },
                                 "type": "object"
@@ -22401,6 +22410,56 @@
                                             "example": "Sales activity berhasil ditambahkan"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_kebutuhan_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "string",
+                                                    "example": "2024-01-15"
+                                                },
+                                                "jenis_activity": {
+                                                    "type": "string",
+                                                    "example": "Meeting"
+                                                },
+                                                "notulen": {
+                                                    "type": "string",
+                                                    "example": "Diskusi kebutuhan security"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "files": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_file": {
+                                                                "type": "string",
+                                                                "example": "document.pdf"
+                                                            },
+                                                            "url_file": {
+                                                                "type": "string",
+                                                                "example": "http://example.com/storage/sales-activity/document.pdf"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -22466,7 +22525,7 @@
                     "Sales Activity"
                 ],
                 "summary": "Get sales activity detail",
-                "description": "Menampilkan detail sales activity",
+                "description": "Menampilkan detail sales activity dengan format mirip Customer Activity",
                 "operationId": "d2752380b791c01e10348e223b5383e8",
                 "parameters": [
                     {
@@ -22494,6 +22553,95 @@
                                             "example": "Detail sales activity berhasil diambil"
                                         },
                                         "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tgl_activity": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2024-01-15"
+                                                },
+                                                "jenis_activity": {
+                                                    "type": "string",
+                                                    "example": "Meeting"
+                                                },
+                                                "notulen": {
+                                                    "type": "string",
+                                                    "example": "Diskusi kebutuhan security"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "lead": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "PT. Contoh Perusahaan"
+                                                        },
+                                                        "pic": {
+                                                            "type": "string",
+                                                            "example": "John Doe"
+                                                        },
+                                                        "telp_perusahaan": {
+                                                            "type": "string",
+                                                            "example": "021-12345678"
+                                                        },
+                                                        "email": {
+                                                            "type": "string",
+                                                            "example": "info@contoh.com"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "kebutuhan": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "nama": {
+                                                            "type": "string",
+                                                            "example": "Security Guard"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "files": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "nama_file": {
+                                                                "type": "string",
+                                                                "example": "Notulen Meeting"
+                                                            },
+                                                            "url_file": {
+                                                                "type": "string",
+                                                                "example": "http://example.com/storage/sales-activity/file.pdf"
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "creator": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
