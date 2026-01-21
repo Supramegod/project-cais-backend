@@ -43,6 +43,12 @@ class LeadsKebutuhan extends Model
     {
         return $this->belongsTo(Leads::class, 'leads_id');
     }
+    // Tambahkan di dalam class LeadsKebutuhan di file App\Models\LeadsKebutuhan.php
+
+    public function salesActivities()
+    {
+        return $this->hasMany(SalesActivity::class, 'leads_kebutuhan_id');
+    }
 
 }
 

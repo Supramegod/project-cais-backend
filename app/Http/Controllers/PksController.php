@@ -2085,15 +2085,7 @@ class PksController extends Controller
 
     private function getAvailableLeadsData()
     {
-        $user = Auth::user();
-
-        return Leads::with(['timSalesD.user'])
-            // Jika cais_role_id BUKAN 2 (Bukan Superadmin), maka filter berdasarkan user_id login
-            ->when($user->cais_role_id != 2, function ($query) use ($user) {
-                $query->whereHas('timSalesD', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
-            })
+        return Leads::filterByuserRole()
             ->whereHas('spkSites', function ($query) {
                 $query->whereNull('sl_spk_site.deleted_at')
                     ->whereHas('spk', function ($subQuery) {
@@ -2103,6 +2095,7 @@ class PksController extends Controller
             })
             ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
             ->distinct()
+            ->orderBy('id', 'desc')
             ->get();
     }
     private function getAvailableSitesData($leadsId)

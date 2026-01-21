@@ -107,12 +107,12 @@ class CustomerActivity extends Model
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+    
     public function getCreatedAtAttribute($value)
     {
         // Menggunakan 'd-m-Y H:i:s' untuk menyertakan jam (24-jam), menit, dan detik.
         return Carbon::parse($value)->format('d-m-Y H:i:s');
     }
-
 
     public function getUpdatedAtAttribute($value)
     {
