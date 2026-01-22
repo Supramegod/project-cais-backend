@@ -201,8 +201,7 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            $activities = $query->orderBy('tgl_activity', 'desc')
-                ->orderBy('created_at', 'desc')
+            $activities = $query->orderBy('created_at', 'desc')
                 ->get();
 
             $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
@@ -213,7 +212,7 @@ class CustomerActivityController extends Controller
                     'tipe' => $activity->tipe,
                     'notes' => $activity->notes,
                     'status_leads_id' => $activity->status_leads_id,
-                    'created_at' => $activity->created_at,
+                    'created_at' => $activity->getRawOriginal('created_at'),
                     'nama_perusahaan' => $activity->leads?->nama_perusahaan,
                     'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray(),
                     'branch' => $activity->leads?->branch?->name,
@@ -224,7 +223,7 @@ class CustomerActivityController extends Controller
                     'pks_id' => $activity->pks_id
                 ];
             });
-
+            
             return response()->json([
                 'success' => true,
                 'data' => $mappedActivities,
