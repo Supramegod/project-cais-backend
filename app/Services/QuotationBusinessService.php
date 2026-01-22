@@ -153,24 +153,26 @@ class QuotationBusinessService
         // Buat notes berdasarkan tipe quotation
         $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
 
-        // ✅ SELALU buat CustomerActivity untuk semua user
-        CustomerActivity::create([
-            'leads_id' => $quotation->leads_id,
-            'quotation_id' => $quotation->id,
-            'branch_id' => $leads->branch_id,
-            'tgl_activity' => Carbon::now(),
-            'nomor' => $nomorActivity,
-            'tipe' => $this->getActivityType($tipe),
-            'notes' => $notes,
-            'is_activity' => 0,
-            'user_id' => $userId,
-            'created_by' => $createdBy
-        ]);
-
-        // ✅ Jika Sales (role 29), TAMBAHAN buat SalesActivity juga
+        // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
         $user = Auth::user();
+
         if ($user && $user->cais_role_id == 29) {
+            // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
             $this->createSalesActivity($quotation, $createdBy);
+        } else {
+            // Untuk role lain, buat CustomerActivity seperti biasa
+            CustomerActivity::create([
+                'leads_id' => $quotation->leads_id,
+                'quotation_id' => $quotation->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => Carbon::now(),
+                'nomor' => $nomorActivity,
+                'tipe' => $this->getActivityType($tipe),
+                'notes' => $notes,
+                'is_activity' => 0,
+                'user_id' => $userId,
+                'created_by' => $createdBy
+            ]);
         }
     }
 
