@@ -382,8 +382,7 @@ class SalesActivityController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
