@@ -22884,6 +22884,512 @@
                 ]
             }
         },
+        "/api/sales-revenue/list": {
+            "get": {
+                "tags": [
+                    "Sales Revenue"
+                ],
+                "summary": "Get monthly revenue data without pagination",
+                "description": "Calculate accumulated invoice values for sales (Role ID: 29-33) grouped by user and month. Returns array without pagination.",
+                "operationId": "getMonthlyRevenue",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Year filter (e.g., 2024)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 2100,
+                            "minimum": 2000,
+                            "example": 2024
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Month filter (1-12)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "example": 6
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "Filter by specific user ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "start_date",
+                        "in": "query",
+                        "description": "Start date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2024-01-01"
+                        }
+                    },
+                    {
+                        "name": "end_date",
+                        "in": "query",
+                        "description": "End date (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2024-12-31"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Monthly revenue data retrieved successfully"
+                                        },
+                                        "timestamp": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "user_name": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "user_role": {
+                                                        "type": "integer",
+                                                        "example": 29
+                                                    },
+                                                    "month": {
+                                                        "type": "string",
+                                                        "example": "2024-06"
+                                                    },
+                                                    "month_name": {
+                                                        "type": "string",
+                                                        "example": "June 2024"
+                                                    },
+                                                    "revenue": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 10000000
+                                                    },
+                                                    "revenue_formatted": {
+                                                        "type": "string",
+                                                        "example": "Rp 10.000.000"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "summary": {
+                                            "properties": {
+                                                "total_revenue": {
+                                                    "type": "number",
+                                                    "example": 120000000
+                                                },
+                                                "total_revenue_formatted": {
+                                                    "type": "string",
+                                                    "example": "Rp 120.000.000"
+                                                },
+                                                "user_count": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "month_count": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                },
+                                                "average_per_user": {
+                                                    "type": "number",
+                                                    "example": 24000000
+                                                },
+                                                "average_per_month": {
+                                                    "type": "number",
+                                                    "example": 10000000
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "metadata": {
+                                            "properties": {
+                                                "total_records": {
+                                                    "type": "integer",
+                                                    "example": 50
+                                                },
+                                                "generated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "filters_applied": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Server error occurred"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-revenue/summary": {
+            "get": {
+                "tags": [
+                    "Sales Revenue"
+                ],
+                "summary": "Get revenue summary by user",
+                "description": "Get aggregated revenue summary grouped by sales user",
+                "operationId": "getRevenueSummary",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Year filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2024
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Month filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 6
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "description": "Filter by user ID",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Revenue summary retrieved successfully"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "user_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "user_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "user_role": {
+                                                        "type": "integer"
+                                                    },
+                                                    "total_revenue": {
+                                                        "type": "number"
+                                                    },
+                                                    "total_revenue_formatted": {
+                                                        "type": "string"
+                                                    },
+                                                    "month_count": {
+                                                        "type": "integer"
+                                                    },
+                                                    "average_monthly": {
+                                                        "type": "number"
+                                                    },
+                                                    "average_monthly_formatted": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "grand_total": {
+                                            "type": "number"
+                                        },
+                                        "grand_total_formatted": {
+                                            "type": "string"
+                                        },
+                                        "total_users": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-revenue/by-user": {
+            "get": {
+                "tags": [
+                    "Sales Revenue"
+                ],
+                "summary": "Get revenue grouped by user",
+                "description": "Get revenue data grouped by user with monthly breakdown",
+                "operationId": "getRevenueByUser",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Year filter",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "user_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "user_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "user_role": {
+                                                        "type": "integer"
+                                                    },
+                                                    "total_revenue": {
+                                                        "type": "number"
+                                                    },
+                                                    "total_revenue_formatted": {
+                                                        "type": "string"
+                                                    },
+                                                    "monthly_breakdown": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "month": {
+                                                                    "type": "string"
+                                                                },
+                                                                "month_name": {
+                                                                    "type": "string"
+                                                                },
+                                                                "revenue": {
+                                                                    "type": "number"
+                                                                },
+                                                                "revenue_formatted": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-revenue/by-month": {
+            "get": {
+                "tags": [
+                    "Sales Revenue"
+                ],
+                "summary": "Get revenue grouped by month",
+                "description": "Get revenue data grouped by month with user breakdown",
+                "operationId": "getRevenueByMonth",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Year filter",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "month": {
+                                                        "type": "string"
+                                                    },
+                                                    "month_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "total_revenue": {
+                                                        "type": "number"
+                                                    },
+                                                    "total_revenue_formatted": {
+                                                        "type": "string"
+                                                    },
+                                                    "user_breakdown": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "user_id": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "user_name": {
+                                                                    "type": "string"
+                                                                },
+                                                                "revenue": {
+                                                                    "type": "number"
+                                                                },
+                                                                "revenue_formatted": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/site/list": {
             "get": {
                 "tags": [
@@ -25303,6 +25809,314 @@
                     },
                     "404": {
                         "description": "Supplier not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/targets/list": {
+            "get": {
+                "tags": [
+                    "Target"
+                ],
+                "summary": "Mendapatkan daftar target",
+                "description": "Endpoint untuk mengambil daftar target dengan filter tahun opsional",
+                "operationId": "e7bbe62537e3b82b6069b29463bc9b40",
+                "parameters": [
+                    {
+                        "name": "tahun",
+                        "in": "query",
+                        "description": "Filter berdasarkan tahun (format: YYYY)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2024
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data target",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "tahun": {
+                                                        "type": "integer",
+                                                        "example": 2024
+                                                    },
+                                                    "branch_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "target": {
+                                                        "type": "number",
+                                                        "example": 1000000
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "cais_role_id": {
+                                                        "type": "integer",
+                                                        "example": 29
+                                                    },
+                                                    "user": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "full_name": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "branch": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Jakarta"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/targets/add": {
+            "post": {
+                "tags": [
+                    "Target"
+                ],
+                "summary": "Membuat atau mengupdate target",
+                "description": "Endpoint untuk membuat target baru atau mengupdate target yang sudah ada berdasarkan user_id dan tahun",
+                "operationId": "9f8d95001c759e351eb1be490735aa83",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "user_id",
+                                    "tahun",
+                                    "branch_id",
+                                    "target",
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "user_id": {
+                                        "description": "ID user yang akan diberi target",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "tahun": {
+                                        "description": "Tahun target (format: YYYY)",
+                                        "type": "integer",
+                                        "example": 2024
+                                    },
+                                    "branch_id": {
+                                        "description": "ID branch/cabang",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "target": {
+                                        "description": "Nilai target",
+                                        "type": "number",
+                                        "example": 1000000
+                                    },
+                                    "nama": {
+                                        "description": "Nama user",
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "cais_role_id": {
+                                        "description": "ID role user (opsional)",
+                                        "type": "integer",
+                                        "example": 29
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Target berhasil dibuat atau diupdate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Target baru tahun 2024 berhasil dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tahun": {
+                                                    "type": "integer",
+                                                    "example": 2024
+                                                },
+                                                "branch_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "target": {
+                                                    "type": "number",
+                                                    "example": 1000000
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "cais_role_id": {
+                                                    "type": "integer",
+                                                    "example": 29
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin User"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin User"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "user_id": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The user id field is required."
+                                                    }
+                                                },
+                                                "tahun": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The tahun must be 4 digits."
+                                                    }
+                                                },
+                                                "target": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The target must be a number."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -29069,6 +29883,10 @@
             "description": "API untuk manajemen Sales Activity"
         },
         {
+            "name": "Sales Revenue",
+            "description": "API untuk menghitung akumulasi total nilai invoice sales berdasarkan PKS"
+        },
+        {
             "name": "Site",
             "description": "API Endpoints untuk mengelola Site"
         },
@@ -29079,6 +29897,10 @@
         {
             "name": "Supplier",
             "description": "API Endpoints untuk Management Supplier"
+        },
+        {
+            "name": "Target",
+            "description": "API untuk manajemen target sales/user"
         },
         {
             "name": "Tim Sales",

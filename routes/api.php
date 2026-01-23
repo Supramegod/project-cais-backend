@@ -33,7 +33,9 @@ use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -433,6 +435,20 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::delete('/delete/{id}', 'destroy');
         Route::get('/kebutuhan/{leadsId}', 'getKebutuhanByLeads');
         Route::get('/stats', 'getStats');
+    });
+
+    // Sales Revenue Management
+    Route::prefix('sales-revenue')->controller(SalesRevenueController::class)->group(function () {
+        Route::get('/list', 'getMonthlyRevenue');
+        Route::get('/summary', 'getRevenueSummary');
+        Route::get('/by-user', 'getRevenueByUser');
+        Route::get('/by-month', 'getRevenueByMonth');
+    });
+
+    // Target Management
+    Route::prefix('targets')->controller(TargetController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::post('/add', 'storeOrUpdate');
     });
 
     // Admin Panel Routes - untuk update step quotation secara khusus
