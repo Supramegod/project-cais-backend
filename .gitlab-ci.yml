@@ -67,9 +67,9 @@ deploy:
         set -euo pipefail
         cd /home/data/beta/project-cais-backend
 
-        git fetch origin develop
-        git checkout develop
-        git reset --hard origin/develop
+        git fetch origin development
+        git checkout development
+        git reset --hard origin/development
 
         mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
         sudo chown -R www-data:www-data storage
