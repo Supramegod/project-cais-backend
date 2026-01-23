@@ -350,7 +350,7 @@ class QuotationStepRequest extends BaseRequest
             // Validasi custom untuk step 2
             if ($step == 2) {
                 // Daftar role_id yang boleh melewati validasi (CRM)
-                $excludedRoles = [53, 54, 55, 56,2];
+                $excludedRoles = [53, 54, 55, 56,2 ];
 
                 // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
                 if (!in_array($this->cais_role_id, $excludedRoles)) {

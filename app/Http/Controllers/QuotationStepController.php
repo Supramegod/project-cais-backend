@@ -233,7 +233,7 @@ class QuotationStepController extends Controller
             }
             $this->quotationStepService->$updateMethod($quotation, $request);
             // Update step progress
-            if (!$request->has('edit') || !$request->edit) {
+            if ($quotation->step < 12) {
                 $quotation->update([
                     'step' => max($quotation->step, $step + 1),
                     'updated_by' => Auth::user()->full_name
