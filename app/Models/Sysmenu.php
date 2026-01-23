@@ -20,6 +20,7 @@ class Sysmenu extends Model
         'parent_id',
         'url',
         'icon',
+        'status',
         'created_by',
         'updated_by',
         'deleted_by'
@@ -94,6 +95,7 @@ class Sysmenu extends Model
             'sysmenu.id',
             'sysmenu.nama',
             'sysmenu.icon',
+            'sysmenu.status',
             'sysmenu.url',
             'sysmenu.parent_id',
             'sysmenu.group_id',

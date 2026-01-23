@@ -16,6 +16,7 @@ use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
 use App\Models\Pks;
 use App\Models\Province;
+use App\Models\SalesActivity;
 use App\Models\Spk;
 use App\Models\StatusLeads;
 use App\Models\Platform;
@@ -165,7 +166,8 @@ class LeadsController extends Controller
                     'statusLeads:id,nama',
                     'branch:id,name',
                     'platform:id,nama',
-                    'timSalesD:id,nama'
+                    'timSalesD:id,nama',
+                    'kebutuhan'
                 ])
                 ->where('status_leads_id', '!=', 102);
 
@@ -223,7 +225,16 @@ class LeadsController extends Controller
                     'sumber_leads' => $item->platform->nama ?? '-',
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
-                    'notes' => $item->notes
+                    'notes' => $item->notes,
+                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                        return [
+                            'id' => $kebutuhan->id,
+                            'nama' => $kebutuhan->nama,
+                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
+                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
+                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                        ];
+                    })->toArray()
                 ];
             });
 
@@ -2625,8 +2636,8 @@ class LeadsController extends Controller
     /**
      * @OA\Get(
      *     path="/api/leads/customeractivity/{id}",
-     *     summary="Mendapatkan daftar aktivitas customer berdasarkan leads_id",
-     *     description="Endpoint ini digunakan untuk mengambil semua aktivitas customer yang terkait dengan leads tertentu",
+     *     summary="Mendapatkan daftar aktivitas customer dan sales berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua aktivitas customer dan sales activity yang terkait dengan leads tertentu, diurutkan berdasarkan tanggal dan waktu",
      *     tags={"Leads"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -2638,37 +2649,36 @@ class LeadsController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Berhasil mengambil data PKS"
+     *         description="Berhasil mengambil data aktivitas"
      *     )
      * )
      */
-
     public function getcustomeractivityByLead($id, Request $request)
     {
         try {
-            $activities = CustomerActivity::with('leads')
+            // Ambil Customer Activity
+            $customerActivities = CustomerActivity::with('leads')
                 ->byLeadsId($id)
-                ->orderBy('created_at', 'desc')
                 ->whereNull('deleted_at')
                 ->get()
                 ->map(function ($act) {
                     $baseData = [
                         'id' => $act->id,
+                        'source' => 'Customer Activity', // Menandai sumber data
                         'tipe' => $act->tipe,
-                        'notes' => $act->notes_tipe ?? $act->notes,
+                        'notes' => $act->notes_tipe ?? $act->notes ?? $act->notulen,
                         'tgl_activity' => $act->tgl_activity,
-                        'created_by' => $act->created_by
+                        'created_by' => $act->created_by,
+                        'created_at' => $act->getRawOriginal('created_at')  // Untuk sorting
                     ];
 
-                    // Conditional fields berdasarkan tipe (HARUS di dalam map)
+                    // Conditional fields berdasarkan tipe
                     if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
-                        // Untuk Telepon & Online Meeting
                         $baseData['start'] = $act->start;
                         $baseData['end'] = $act->end;
                         $baseData['durasi'] = $act->durasi;
                         $baseData['tgl_realisasi'] = $act->tgl_realisasi;
                     } elseif (strtolower($act->tipe) === 'visit') {
-                        // Untuk Visit
                         $baseData['tgl_realisasi'] = $act->tgl_realisasi;
                         $baseData['jam_realisasi'] = $act->jam_realisasi;
                         $baseData['jenis_visit'] = $act->jenis_visit;
@@ -2677,10 +2687,37 @@ class LeadsController extends Controller
                     return $baseData;
                 });
 
+            // Ambil Sales Activity
+            $salesActivities = SalesActivity::with(['lead', 'leadsKebutuhan.kebutuhan'])
+                ->where('leads_id', $id)
+                ->get()
+                ->map(function ($act) {
+                    return [
+                        'id' => $act->id,
+                        'source' => 'Sales Activity', // Menandai sumber data
+                        'tipe' => $act->jenis_activity,
+                        'notes' => $act->notulen,
+                        'tgl_activity' => $act->tgl_activity,
+                        'created_by' => $act->created_by,
+                        'created_at' => $act->getRawOriginal('created_at'), // Untuk sorting
+                        'kebutuhan' => $act->leadsKebutuhan && $act->leadsKebutuhan->kebutuhan
+                            ? $act->leadsKebutuhan->kebutuhan->nama
+                            : null
+                    ];
+                });
+
+            // Gabungkan kedua collection
+            $allActivities = $customerActivities->merge($salesActivities);
+
+            // Urutkan berdasarkan created_at (datetime) secara descending
+            $allActivities = $allActivities->sortByDesc(function ($activity) {
+                return Carbon::parse($activity['created_at']);
+            })->values(); // Reset array keys
+
             return response()->json([
                 'success' => true,
-                'message' => 'Data aktivitas customer berhasil diambil',
-                'data' => $activities
+                'message' => 'Data aktivitas berhasil diambil',
+                'data' => $allActivities
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -2689,8 +2726,6 @@ class LeadsController extends Controller
             ], 500);
         }
     }
-
-
 
     //==============================================================================//
     private function hitungBerakhirKontrak($tanggalBerakhir)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\LeadsKebutuhan;
 use App\Models\QuotationAplikasi;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDetail;
@@ -16,6 +17,7 @@ use App\Models\QuotationKerjasama;
 use App\Models\QuotationOhc;
 use App\Models\QuotationPic;
 use App\Models\QuotationTraining;
+use App\Models\SalesActivity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -260,29 +262,21 @@ class SpkController extends Controller
     public function availableLeads(Request $request)
     {
         try {
-            $user = Auth::user();
-
-            $query = Leads::whereHas('quotations.quotationSites', function ($query) {
-                $query->whereNull('deleted_at')
-                    ->whereDoesntHave('spkSite', function ($q) {
-                        $q->whereNull('deleted_at');
-                    });
-            })
+            $query = Leads::filterByuserRole()
+                ->whereHas('quotations.quotationSites', function ($query) {
+                    $query->whereNull('deleted_at')
+                        ->whereDoesntHave('spkSite', function ($q) {
+                            $q->whereNull('deleted_at');
+                        });
+                })
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
                         ->where('is_aktif', 1);
                 });
 
-            // Role 2 (Superadmin) bisa lihat semua data
-            // Role lainnya hanya bisa lihat data tim sales mereka
-            if ($user->cais_role_id != 2) {
-                $query->whereHas('timSalesD', function ($query) use ($user) {
-                    $query->where('user_id', $user->id);
-                });
-            }
-
             $data = $query->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
                 ->distinct()
+                ->orderBy('id', 'desc')
                 ->get();
 
             return $this->successResponse('Available leads retrieved successfully', $data);
@@ -494,6 +488,7 @@ class SpkController extends Controller
             $spkInfo = [
                 'nomor_spk' => $spk->nomor,
                 'tanggal_spk' => $spk->tgl_spk,
+                'link_spk_disetujui' => $spk->link_spk_disetujui ?? null,
             ];
             // 2. Informasi Leads
             $leadsInfo = [
@@ -1445,19 +1440,55 @@ class SpkController extends Controller
     private function createCustomerActivity($leads, $spk, $spkNomor): void
     {
         $nomorActivity = $this->generateActivityNomor($leads->id);
+        $user = Auth::user();
 
-        CustomerActivity::create([
-            'leads_id' => $leads->id,
-            'spk_id' => $spk->id,
-            'branch_id' => $leads->branch_id,
-            'tgl_activity' => now(),
-            'nomor' => $nomorActivity,
-            'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
-            'is_activity' => 0,
-            'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
-        ]);
+        if ($user && $user->cais_role_id == 29) {
+            // Untuk Sales, buat SalesActivity
+            $this->createSalesActivity($spk, $leads);
+        } else {
+            // Untuk non-Sales, buat CustomerActivity
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'spk_id' => $spk->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $nomorActivity,
+                'tipe' => 'SPK',
+                'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
+                'is_activity' => 0,
+                'user_id' => Auth::user()->id,
+                'created_by' => Auth::user()->full_name
+            ]);
+        }
+    }
+
+    private function createSalesActivity($spk, $leads): void
+    {
+        $user = Auth::user();
+
+        // Ambil semua kebutuhan yang diassign ke sales ini dari leads_kebutuhan
+        $leadsKebutuhanList = LeadsKebutuhan::where('leads_id', $spk->leads_id)
+            ->whereNotNull('tim_sales_d_id')
+            ->get();
+
+        // Buat SalesActivity untuk setiap kebutuhan yang diassign ke sales ini
+        foreach ($leadsKebutuhanList as $leadsKebutuhan) {
+            // Cek apakah kebutuhan ini ada di SPK sites
+            $spkSiteExists = SpkSite::where('spk_id', $spk->id)
+                ->where('kebutuhan_id', $leadsKebutuhan->kebutuhan_id)
+                ->exists();
+
+            if ($spkSiteExists) {
+                SalesActivity::create([
+                    'leads_id' => $spk->leads_id,
+                    'leads_kebutuhan_id' => $leadsKebutuhan->id,
+                    'tgl_activity' => Carbon::now(),
+                    'jenis_activity' => 'spk',
+                    'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
+                    'created_by' => $user->full_name
+                ]);
+            }
+        }
     }
 
     private function storeSpkFile($file)

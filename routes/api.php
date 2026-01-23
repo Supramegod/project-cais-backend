@@ -12,6 +12,7 @@ use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SalesActivityController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -386,6 +387,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('options')->controller(OptionController::class)->group(function () {
         Route::get('/branches', 'getBranches');
         Route::get('/users', 'getUsers');
+        Route::get('/list-user', 'getListUser');
+        Route::get('/list-jenis-visit', 'getListJenisVisit');
         Route::get('/platforms', 'getPlatforms');
         Route::get('/status-leads', 'getStatusLeads');
         Route::get('/benua', 'getBenua');
@@ -418,6 +421,18 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
     Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
         Route::get('/list', 'getListDashboardApprovalData');
+    });
+
+    // Sales Activity Routes
+    Route::prefix('sales-activity')->controller(SalesActivityController::class)->group(function () {
+        Route::get('/available-leads', 'getAvailableLeads');
+        Route::get('/list', 'index');
+        Route::post('/add', 'store');
+        Route::get('/view/{id}', 'show');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'destroy');
+        Route::get('/kebutuhan/{leadsId}', 'getKebutuhanByLeads');
+        Route::get('/stats', 'getStats');
     });
 
     // Admin Panel Routes - untuk update step quotation secara khusus
