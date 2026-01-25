@@ -156,7 +156,7 @@ class QuotationBusinessService
         // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
         $user = Auth::user();
 
-        if ($user && $user->cais_role_id == 29) {
+        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
             // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
             $this->createSalesActivity($quotation, $createdBy);
         } else {

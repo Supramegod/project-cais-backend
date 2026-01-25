@@ -481,6 +481,7 @@ class RoleController extends Controller
                     'nama' => $menu->nama,
                     'icon' => $menu->icon,
                     'url' => $menu->url,
+                    'status' => $menu->status,
                     'parent_id' => $menu->parent_id,
                     'group_id' => $currentGroupId,
                     'group_name' => $currentGroupName,

@@ -1442,7 +1442,7 @@ class SpkController extends Controller
         $nomorActivity = $this->generateActivityNomor($leads->id);
         $user = Auth::user();
 
-        if ($user && $user->cais_role_id == 29) {
+        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
             // Untuk Sales, buat SalesActivity
             $this->createSalesActivity($spk, $leads);
         } else {
