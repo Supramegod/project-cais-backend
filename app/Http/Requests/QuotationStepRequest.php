@@ -29,9 +29,18 @@ class QuotationStepRequest extends BaseRequest
                 $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
                 break;
             case 2:
-                $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
-                $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
-                $rules['tgl_penempatan'] = 'required|date';
+                $excludedRoles = [53, 54, 55, 56, 2];
+
+                // Ambil role dari user yang sedang login
+                $userRole = auth()->user()->cais_role_id ?? null;
+
+                // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
+                if (!in_array($userRole, $excludedRoles)) {
+                    $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
+                    $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
+
+                    $rules['tgl_penempatan'] = 'required|date';
+                }
                 $rules['top'] = 'required|in:Non TOP,Kurang Dari 7 Hari,Lebih Dari 7 Hari';
                 $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
                 $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|integer|min:1';
@@ -369,6 +378,7 @@ class QuotationStepRequest extends BaseRequest
                         }
                     }
                 }
+
 
                 // Validasi khusus: gaji_saat_cuti hanya wajib jika ada Cuti Melahirkan
                 if (
