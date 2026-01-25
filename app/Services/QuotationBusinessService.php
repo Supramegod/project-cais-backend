@@ -395,7 +395,7 @@ class QuotationBusinessService
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5])
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5,8])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -404,7 +404,7 @@ class QuotationBusinessService
                 break;
 
             case 'revisi':
-                $query->whereIn('status_quotation_id', [1, 2, 4, 5]);
+                $query->whereIn('status_quotation_id', [1, 2, 4, 5,8]);
                 break;
 
             case 'rekontrak':
