@@ -350,10 +350,13 @@ class QuotationStepRequest extends BaseRequest
             // Validasi custom untuk step 2
             if ($step == 2) {
                 // Daftar role_id yang boleh melewati validasi (CRM)
-                $excludedRoles = [53, 54, 55, 56,2 ];
+                $excludedRoles = [53, 54, 55, 56, 2];
+
+                // Ambil role dari user yang sedang login
+                $userRole = auth()->user()->cais_role_id ?? null;
 
                 // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
-                if (!in_array($this->cais_role_id, $excludedRoles)) {
+                if (!in_array($userRole, $excludedRoles)) {
                     if ($this->mulai_kontrak && $this->kontrak_selesai) {
                         if ($this->mulai_kontrak > $this->kontrak_selesai) {
                             $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
