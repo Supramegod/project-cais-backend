@@ -1378,7 +1378,7 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
 
     private function calculateFinalStatus(Quotation $quotation): array
     {
-        // 1. Cek BPJS (Jika ada salah satu item bernilai 0/false)
+        // 1. Cek BPJS
         $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
             $query->where('is_bpjs_jkk', 0)
                 ->orWhere('is_bpjs_jkm', 0)
@@ -1386,19 +1386,16 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 ->orWhere('is_bpjs_jp', 0);
         })->exists();
 
-        // 2. Cek Kompensasi & THR (Jika salah satu saja "Tidak Ada")
+        // 2. Cek Kompensasi & THR
         $hasNoCompensation = $quotation->quotationDetails()->whereHas('wage', function ($query) {
-            $query->where(function ($q) {
-                $q->where('kompensasi', 'Tidak Ada')
-                    ->orWhere('thr', 'Tidak Ada');
-            });
+            $query->where('kompensasi', 'Tidak Ada')
+                ->orWhere('thr', 'Tidak Ada');
         })->exists();
 
         // 3. Cek Upah Custom < 85% UMK
         $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
-
             if (!$wage || !$site || $wage->upah !== 'Custom')
                 return false;
 
@@ -1406,20 +1403,19 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
             if (!$umkData)
                 return false;
 
-            $nominalUpah = (float) $wage->nominal_upah;
-            $batasMinimal = (float) $umkData->umk * 0.85;
-
-            return $nominalUpah < $batasMinimal;
+            return (float) $wage->nominal_upah < ((float) $umkData->umk * 0.85);
         });
+
+        // 4. Cek Persentase (Dinamis)
         $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
-        $isLowPercentage = $quotation->persentase < $thresholdPersentase;
-        // 4. Evaluasi Akhir
+        $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
+
+        // 5. Evaluasi Akhir (Bersih)
         $needsApprovalLevel2 = (
             $hasMissingBpjs ||
             $hasNoCompensation ||
             $isUnderMinimumWage ||
             $isLowPercentage ||
-            $quotation->persentase < 7 ||
             $quotation->company_id == 17
         );
 

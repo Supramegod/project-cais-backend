@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
+use App\Mail\CustomerActivityEmail;
 use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -1197,14 +1198,14 @@ class CustomerActivityController extends Controller
             // === PREPARE EMAIL CONTENT ===
             $fullBody = $request->body;
 
-            // Tambahkan info activity ke body email
-            $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
-            $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
-            $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
-            $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
-            $activityInfo .= "Tipe: " . $activity->tipe . "\n";
+            // // Tambahkan info activity ke body email
+            // $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
+            // $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
+            // $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
+            // $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
+            // $activityInfo .= "Tipe: " . $activity->tipe . "\n";
 
-            $fullBody .= $activityInfo;
+            // $fullBody .= $activityInfo;
 
             // === SEND EMAILS ===
             $sentCount = 0;
@@ -1218,7 +1219,7 @@ class CustomerActivityController extends Controller
 
                 try {
                     // Buat email instance
-                    $email = new \App\Mail\CustomerActivityEmail(
+                    $email = new CustomerActivityEmail(
                         subject: $request->subject,
                         body: $fullBody,
                         fromAddress: $fromConfig['address'],

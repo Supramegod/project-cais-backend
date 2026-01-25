@@ -21,6 +21,7 @@ use App\Models\QuotationMargin;
 use App\Models\QuotationPic;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
+use App\Models\SalesActivity;
 use App\Models\Site;
 use App\Models\PksPerjanjian;
 use App\Models\CustomerActivity;
@@ -1573,12 +1574,14 @@ class PksController extends Controller
         $ruleThr = RuleThr::find($request->rule_thr);
         $salaryRule = SalaryRule::find($request->salary_rule);
         $company = Company::find($request->entitas);
+        // $spkSite = SpkSite::where('id', $request->site_ids)->first();
 
         $pksNomor = $this->generateNomor($leads->id, $request->entitas);
 
         // Create PKS
         $pks = Pks::create([
             'leads_id' => $leads->id,
+            // 'spk_id' => $spkSite->spk_id,
             'branch_id' => $leads->branch_id,
             'nomor' => $pksNomor,
             'tgl_pks' => $request->tanggal_pks,
@@ -1694,6 +1697,11 @@ class PksController extends Controller
     private function createInitialActivity($pks, $leads, $pksNomor)
     {
         $nomorActivity = $this->generateNomorActivity($leads->id);
+        $user = Auth::user();
+        // if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+        //     // Untuk Sales, buat SalesActivity
+        //     $this->createSalesActivity($pks, $leads);
+        // } else {
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -1707,7 +1715,27 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name
         ]);
+        // }
     }
+    // private function createSalesActivity(Quotation $pks, string $createdBy): void
+    // {
+    //     $user = Auth::user();
+
+    //     // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari pks$pks
+    //     $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
+    //         ->where('kebutuhan_id', $pks->k)
+    //         ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+    //         ->first();
+
+    //     SalesActivity::create([
+    //         'leads_id' => $pks->leads_id,
+    //         'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
+    //         'tgl_activity' => Carbon::now(),
+    //         'jenis_activity' => 'PKS',
+    //         'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$pks->kebutuhan}",
+    //         'created_by' => $createdBy
+    //     ]);
+    // }
 
     private function approvePks($pks, $otLevel)
     {

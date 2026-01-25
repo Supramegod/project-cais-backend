@@ -156,7 +156,7 @@ class QuotationBusinessService
         // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
         $user = Auth::user();
 
-        if ($user && $user->cais_role_id == 29) {
+        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
             // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
             $this->createSalesActivity($quotation, $createdBy);
         } else {
@@ -395,7 +395,7 @@ class QuotationBusinessService
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5])
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5,8])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -404,7 +404,7 @@ class QuotationBusinessService
                 break;
 
             case 'revisi':
-                $query->whereIn('status_quotation_id', [1, 2, 4, 5]);
+                $query->whereIn('status_quotation_id', [1, 2, 4, 5,8]);
                 break;
 
             case 'rekontrak':

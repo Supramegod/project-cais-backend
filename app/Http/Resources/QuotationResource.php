@@ -322,6 +322,8 @@ class QuotationResource extends JsonResource
                     'nomor' => $this->leads->nomor,
                     'nama_perusahaan' => $this->leads->nama_perusahaan,
                     'pic' => $this->leads->pic,
+                    'provinsi' => $this->leads->provinsi,
+                    'kota' => $this->leads->kota,
                     'jabatan' => $this->leads->jabatan,
                     'no_telp' => $this->leads->no_telp,
                     'email' => $this->leads->email,
