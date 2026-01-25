@@ -452,6 +452,7 @@ class RoleController extends Controller
                     'id' => $menu->id,
                     'nama' => $menu->nama,
                     'url' => $menu->url,
+                    'status' => $menu->status,
                     'parent_id' => $menu->parent_id,
                     'is_view' => (bool) $menu->is_view,
                     'is_add' => (bool) $menu->is_add,
