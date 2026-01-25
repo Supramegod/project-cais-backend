@@ -2344,7 +2344,7 @@ class QuotationService
                     // Reject Level 1
                     $updateData['status_quotation_id'] = 8; // Rejected
                     $updateData['is_aktif'] = 0;
-                    $updateData['ot1'] = "Ditolak oleh " . $user->full_name;
+                    // $updateData['ot1'] = "Ditolak oleh " . $user->full_name;
                 }
 
             } elseif (in_array($user->cais_role_id, [97])) {
@@ -2367,7 +2367,7 @@ class QuotationService
                     // Reject Level 2
                     $updateData['status_quotation_id'] = 8; // Rejected
                     $updateData['is_aktif'] = 0;
-                    $updateData['ot2'] = "Ditolak oleh " . $user->full_name;
+                    // $updateData['ot2'] = "Ditolak oleh " . $user->full_name;
                 }
 
             } else {

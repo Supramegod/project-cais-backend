@@ -1482,7 +1482,6 @@ class SpkController extends Controller
                 SalesActivity::create([
                     'leads_id' => $spk->leads_id,
                     'leads_kebutuhan_id' => $leadsKebutuhan->id,
-                    
                     'tgl_activity' => Carbon::now(),
                     'jenis_activity' => 'spk',
                     'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
