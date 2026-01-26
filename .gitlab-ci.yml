@@ -102,8 +102,9 @@ deploy-dev:
         sleep 10
 
         docker exec cais-v2-backend-dev php artisan storage:link || true
+        docker exec cais-v2-backend-dev php artisan migrate --force || true
         docker exec cais-v2-backend-dev php artisan l5-swagger:generate || true
-        docker exec cais-v2-backend-dev php artisan optimize:clear
+        docker exec cais-v2-backend-dev php artisan optimize:clear || true
 
         docker image prune -f
       EOF
@@ -151,8 +152,9 @@ deploy-prod:
         sleep 10
 
         docker exec cais-v2-backend-prod php artisan storage:link || true
+        docker exec cais-v2-backend-prod php artisan migrate --force || true
         docker exec cais-v2-backend-prod php artisan l5-swagger:generate || true
-        docker exec cais-v2-backend-prod php artisan optimize:clear
+        docker exec cais-v2-backend-prod php artisan optimize:clear || true
 
         docker image prune -f
       EOF
