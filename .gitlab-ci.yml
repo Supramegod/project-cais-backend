@@ -26,14 +26,14 @@ variables:
   - apk add --no-cache openssh-client
   - eval $(ssh-agent -s)
   - |
-    if [ -f "$SSH_PRIVATE_KEY_PROD" ]; then
-      chmod 400 "$SSH_PRIVATE_KEY_PROD"
-      ssh-add "$SSH_PRIVATE_KEY_PROD"
+    if [ -f "$SSH_PRIVATE_KEY" ]; then
+      chmod 400 "$SSH_PRIVATE_KEY"
+      ssh-add "$SSH_PRIVATE_KEY"
     else
-      echo "$SSH_PRIVATE_KEY_PROD" | tr -d '\r' | ssh-add -
+      echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     fi
   - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-  - ssh-keyscan $SSH_HOST_PROD >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+  - ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
 
 workflow:
   rules:
@@ -126,11 +126,11 @@ deploy-prod:
   before_script: *ssh_setup_prod
   script:
     - echo "$ENV_FILE_PROD" > .env
-    - scp .env $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/.env
-    - scp docker-compose-prod.yml $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/docker-compose-prod.yml
-    - scp Dockerfile-prod $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/Dockerfile-prod
+    - scp .env $SSH_USER@$SSH_HOST:$DEPLOY_PATH_PROD/.env
+    - scp docker-compose-prod.yml $SSH_USER@$SSH_HOST:$DEPLOY_PATH_PROD/docker-compose-prod.yml
+    - scp Dockerfile-prod $SSH_USER@$SSH_HOST:$DEPLOY_PATH_PROD/Dockerfile-prod
     - |
-      ssh -T $SSH_USER_PROD@$SSH_HOST_PROD bash << 'EOF'
+      ssh -T $SSH_USER@$SSH_HOST bash << 'EOF'
         set -euo pipefail
         cd /home/data/beta/project-cais-backend
 
