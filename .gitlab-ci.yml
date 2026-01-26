@@ -76,7 +76,7 @@ deploy-dev:
     - test
   before_script: *ssh_setup_dev
   script:
-    - echo "$ENV_FILE" > .env
+    - echo "$ENV_FILE_DEV" > .env
     - scp .env $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/.env
     - scp docker-compose-dev.yml $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/docker-compose-dev.yml
     - scp Dockerfile-dev $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/Dockerfile-dev
