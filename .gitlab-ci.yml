@@ -44,6 +44,8 @@ workflow:
 
 test:
   stage: test
+  tags:
+    - docker
   image: php:8.2-cli
   before_script:
     - apt-get update && apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev libzip-dev git unzip
@@ -67,6 +69,8 @@ test:
 
 deploy-dev:
   stage: deploy
+  tags:
+    - docker
   image: alpine:latest
   needs:
     - test
@@ -114,6 +118,8 @@ deploy-dev:
 
 deploy-prod:
   stage: deploy
+  tags:
+    - docker
   image: alpine:latest
   needs:
     - test
