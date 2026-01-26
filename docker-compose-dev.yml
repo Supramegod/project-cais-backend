@@ -1,0 +1,32 @@
+services:
+  cais-v2-be-dev:
+    build:
+      context: /home/data/development/project-cais-backend
+      dockerfile: Dockerfile-dev
+    init: true
+    container_name: cais-v2-backend-dev
+    expose:
+      - "9000"
+    working_dir: /var/www/laravel
+    volumes:
+      - /home/data/development/project-cais-backend/.env:/var/www/laravel/.env:ro
+      - /home/data/development/project-cais-backend/storage:/var/www/laravel/storage
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    external:
+      name: shelter-network

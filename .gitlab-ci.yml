@@ -1,0 +1,166 @@
+stages:
+  - test
+  - deploy
+
+default:
+  interruptible: true
+
+variables:
+  DEPLOY_PATH_DEV: /home/data/development/project-cais-backend
+  DEPLOY_PATH_PROD: /home/data/beta/project-cais-backend
+
+.ssh_setup_dev: &ssh_setup_dev
+  - apk add --no-cache openssh-client
+  - eval $(ssh-agent -s)
+  - |
+    if [ -f "$SSH_PRIVATE_KEY" ]; then
+      chmod 400 "$SSH_PRIVATE_KEY"
+      ssh-add "$SSH_PRIVATE_KEY"
+    else
+      echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    fi
+  - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  - ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+
+.ssh_setup_prod: &ssh_setup_prod
+  - apk add --no-cache openssh-client
+  - eval $(ssh-agent -s)
+  - |
+    if [ -f "$SSH_PRIVATE_KEY_PROD" ]; then
+      chmod 400 "$SSH_PRIVATE_KEY_PROD"
+      ssh-add "$SSH_PRIVATE_KEY_PROD"
+    else
+      echo "$SSH_PRIVATE_KEY_PROD" | tr -d '\r' | ssh-add -
+    fi
+  - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  - ssh-keyscan $SSH_HOST_PROD >> ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+test:
+  stage: test
+  tags:
+    - docker
+  image: php:8.2-cli
+  before_script:
+    - apt-get update && apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev libzip-dev git unzip
+    - docker-php-ext-configure gd --with-freetype --with-jpeg
+    - docker-php-ext-install gd pdo pdo_mysql zip
+    - pecl install mongodb && docker-php-ext-enable mongodb
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - cp .env.example .env
+    - composer install --no-interaction --prefer-dist
+  script:
+    - php artisan key:generate
+    - php artisan config:clear
+    - php artisan test
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-composer
+    paths:
+      - vendor/
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'development'
+    - if: $CI_COMMIT_BRANCH == 'prod'
+
+deploy-dev:
+  stage: deploy
+  tags:
+    - docker
+  image: alpine:latest
+  needs:
+    - test
+  before_script: *ssh_setup_dev
+  script:
+    - echo "$ENV_FILE_DEV" > .env
+    - scp .env $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/.env
+    - scp docker-compose-dev.yml $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/docker-compose-dev.yml
+    - scp Dockerfile-dev $SSH_USER@$SSH_HOST:$DEPLOY_PATH_DEV/Dockerfile-dev
+    - |
+      ssh -T $SSH_USER@$SSH_HOST bash << 'EOF'
+        set -euo pipefail
+        cd /home/data/development/project-cais-backend
+
+        git fetch origin development
+        git checkout development
+        git reset --hard origin/development
+
+        mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
+        sudo chown -R www-data:www-data storage
+        sudo chmod -R 775 storage
+
+        docker compose -f docker-compose-dev.yml build --no-cache cais-v2-be-dev
+
+        echo "Deploying backend..."
+        docker compose -f docker-compose-dev.yml up -d --force-recreate cais-v2-be-dev
+
+        echo "Waiting for backend to be ready..."
+        sleep 10
+
+        docker exec cais-v2-backend-dev php artisan storage:link || true
+        docker exec cais-v2-backend-dev php artisan l5-swagger:generate || true
+        docker exec cais-v2-backend-dev php artisan optimize:clear
+
+        docker image prune -f
+      EOF
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'development'
+  environment:
+    name: development
+    url: https://api-dev-cais.shelterapp2.co.id
+  retry:
+    max: 1
+    when: script_failure
+
+deploy-prod:
+  stage: deploy
+  tags:
+    - docker
+  image: alpine:latest
+  needs:
+    - test
+  before_script: *ssh_setup_prod
+  script:
+    - echo "$ENV_FILE_PROD" > .env
+    - scp .env $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/.env
+    - scp docker-compose-prod.yml $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/docker-compose-prod.yml
+    - scp Dockerfile-prod $SSH_USER_PROD@$SSH_HOST_PROD:$DEPLOY_PATH_PROD/Dockerfile-prod
+    - |
+      ssh -T $SSH_USER_PROD@$SSH_HOST_PROD bash << 'EOF'
+        set -euo pipefail
+        cd /home/data/beta/project-cais-backend
+
+        git fetch origin prod
+        git checkout prod
+        git reset --hard origin/prod
+
+        mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
+        sudo chown -R www-data:www-data storage
+        sudo chmod -R 775 storage
+
+        docker compose -f docker-compose-prod.yml build --no-cache cais-v2-be-prod
+
+        echo "Deploying backend..."
+        docker compose -f docker-compose-prod.yml up -d --force-recreate cais-v2-be-prod
+
+        echo "Waiting for backend to be ready..."
+        sleep 10
+
+        docker exec cais-v2-backend-prod php artisan storage:link || true
+        docker exec cais-v2-backend-prod php artisan l5-swagger:generate || true
+        docker exec cais-v2-backend-prod php artisan optimize:clear
+
+        docker image prune -f
+      EOF
+  rules:
+    - if: $CI_COMMIT_BRANCH == 'prod'
+  environment:
+    name: production
+    url: https://api-beta-cais.shelterapp2.co.id
+  retry:
+    max: 1
+    when: script_failure
