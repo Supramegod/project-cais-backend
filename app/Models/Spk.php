@@ -59,6 +59,10 @@ class Spk extends Model
     {
         return $this->hasMany(pks::class, 'spk_id');
     }
+    public function sites()
+    {
+        return $this->hasMany(Site::class, 'spk_id');
+    }
 
     public function spkSites()
     {

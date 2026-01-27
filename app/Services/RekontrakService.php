@@ -67,7 +67,7 @@ class RekontrakService
             // 2. Cari SpkSite yang pakai quot lama
             $oldSpkSites = SpkSite::where('quotation_id', $oldQuot->id)
                 ->whereNull('deleted_at')
-                ->with(['spk.pks', 'leads'])
+                ->with(['spk.sites', 'leads'])
                 ->get();
             
             Log::info('SpkSite search result', [
@@ -88,7 +88,7 @@ class RekontrakService
                 $alternativeSpkSites = SpkSite::whereHas('spk', function($query) use ($oldQuot) {
                     $query->where('quotation_id', $oldQuot->id);
                 })->whereNull('deleted_at')
-                ->with(['spk.pks', 'leads'])
+                ->with(['spk.sites', 'leads'])
                 ->get();
                 
                 Log::info('Alternative SpkSite search', [
@@ -206,15 +206,26 @@ class RekontrakService
                 'spk_site_id' => $spkSite->id,
                 'spk_id' => $spk->id,
                 'spk_nomor' => $spk->nomor,
-                'pks_relation_count' => $spk->pks ? $spk->pks->count() : 0
+                'pks_relation_count' => $spk->sites ? $spk->sites->count() : 0
             ]);
             
-            // Ambil PKS pertama dari SPK
-            $pks = $spk->pks ? $spk->pks->first() : null;
-            if (!$pks) {
-                Log::warning('SPK tanpa PKS', [
+            // Ambil PKS dari Site yang terkait dengan SPK
+            $site = $spk->sites ? $spk->sites->first() : null;
+            if (!$site) {
+                Log::warning('SPK tanpa Site', [
                     'spk_id' => $spk->id,
                     'spk_nomor' => $spk->nomor,
+                    'spk_site_id' => $spkSite->id
+                ]);
+                continue;
+            }
+            
+            $pks = $site->pks;
+            if (!$pks) {
+                Log::warning('Site tanpa PKS', [
+                    'spk_id' => $spk->id,
+                    'spk_nomor' => $spk->nomor,
+                    'site_id' => $site->id,
                     'spk_site_id' => $spkSite->id
                 ]);
                 continue;
