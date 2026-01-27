@@ -2296,172 +2296,89 @@ class QuotationService
         }
     }
 
-    /**
-     * Submit quotation untuk approval dengan logika role-based yang diperbaiki
-     */
     public function submitForApproval(Quotation $quotation, array $data, User $user)
     {
-        DB::beginTransaction();
-        try {
-            $currentDateTime = Carbon::now()->toDateTimeString();
-
-            // 1. Validasi data input
-            $approve = $data['is_approved'] ?? false;
-            $notes = $data['notes'] ?? null;
-
-            if (is_string($approve)) {
-                $approve = filter_var($approve, FILTER_VALIDATE_BOOLEAN);
-            }
-
-            $tingkat = 0;
-            $isApproved = (bool) $approve;
+        $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        
+        if ($user->cais_role_id == 96) {
             $updateData = [
-                'updated_at' => $currentDateTime,
+                'ot1' => $user->full_name,
+                'updated_at' => Carbon::now()->toDateTimeString(),
                 'updated_by' => $user->full_name
             ];
-
-            // 2. Role-based approval logic
-            if (in_array($user->cais_role_id, [96])) {
-                // ====== LEVEL 1 APPROVAL (OT1) ======
-                $tingkat = 1;
-
-                if ($isApproved) {
-                    $updateData['ot1'] = $user->full_name;
-
-                    // Tentukan apakah butuh Level 2 atau langsung Finish
-                    $needsLevel2 = ($quotation->top == "Lebih Dari 7 Hari");
-
-                    if ($needsLevel2) {
-                        $updateData['status_quotation_id'] = 2; // Pending Level 2
-                        $updateData['is_aktif'] = 0;
-                        \Log::info("L1 Approved, waiting for L2 due to TOP > 7 days");
-                    } else {
-                        $updateData['status_quotation_id'] = 3; // Approved
-                        $updateData['is_aktif'] = 1;
-                        \Log::info("L1 Approved, auto-finish (no L2 needed)");
-                    }
-                } else {
-                    // Reject Level 1
-                    $updateData['status_quotation_id'] = 8; // Rejected
-                    $updateData['is_aktif'] = 0;
-                    // $updateData['ot1'] = "Ditolak oleh " . $user->full_name;
-                }
-
-            } elseif (in_array($user->cais_role_id, [97])) {
-                // ====== LEVEL 2 APPROVAL (OT2) ======
-                $tingkat = 2;
-
-                // Validasi: Level 2 hanya bisa approve jika Level 1 sudah approve (Status harus 2)
-                if ($quotation->status_quotation_id != 2 && empty($quotation->ot1)) {
-                    throw new \Exception('Quotation belum disetujui di Level 1 atau status tidak sesuai.');
-                }
-
-                if ($isApproved) {
-                    // ✅ LEVEL 2 ADALAH FINAL: Paksa ke status 3 dan Aktif 1
-                    $updateData['ot2'] = $user->full_name;
-                    $updateData['status_quotation_id'] = 3; // Approved
-                    $updateData['is_aktif'] = 1;
-
-                    \Log::info("L2 Approved, quotation fully activated.");
-                } else {
-                    // Reject Level 2
-                    $updateData['status_quotation_id'] = 8; // Rejected
-                    $updateData['is_aktif'] = 0;
-                    // $updateData['ot2'] = "Ditolak oleh " . $user->full_name;
-                }
-
+            
+            if ($isApproved) {
+                $needsLevel2 = ($quotation->top == "Lebih Dari 7 Hari");
+                $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
+                $updateData['is_aktif'] = $needsLevel2 ? 0 : 1;
             } else {
-                throw new \Exception('User tidak memiliki akses approval. Role ID: ' . $user->cais_role_id);
+                $updateData['status_quotation_id'] = 8;
+                $updateData['is_aktif'] = 0;
             }
-
-            // 3. Eksekusi Update ke Database
-            $quotation->update($updateData);
-
-            // 4. Log ke Tabel Approval
-            LogApproval::create([
-                'tabel' => 'sl_quotation',
-                'doc_id' => $quotation->id,
-                'tingkat' => $tingkat,
-                'is_approve' => $isApproved,
-                'note' => $notes,
-                'user_id' => $user->id,
-                'approval_date' => $currentDateTime,
-                'created_at' => $currentDateTime,
-                'created_by' => $user->full_name
-            ]);
-
-            // 5. Kirim Notifikasi ke Sales
-            if ($quotation->leads && $quotation->leads->timSalesDetail) {
-                $salesUserId = $quotation->leads->timSalesDetail->user_id;
-                LogNotification::createQuotationApprovalNotification(
-                    $salesUserId,
-                    $quotation->id,
-                    $quotation->nomor,
-                    $user->full_name,
-                    $isApproved,
-                    $notes
-                );
+        } elseif ($user->cais_role_id == 97) {
+            if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
+                return ['success' => false, 'message' => 'Quotation belum disetujui di Level 1.'];
             }
-
-            DB::commit();
-
-            // Refresh data untuk memastikan state terbaru dikirim balik
-            $quotation->refresh();
-            $quotation->load('statusQuotation');
-
-            return $quotation;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error("Error in submitForApproval: " . $e->getMessage());
-            throw $e;
+            
+            $updateData = [
+                'ot2' => $user->full_name,
+                'status_quotation_id' => $isApproved ? 3 : 8,
+                'is_aktif' => $isApproved ? 1 : 0,
+                'updated_at' => Carbon::now()->toDateTimeString(),
+                'updated_by' => $user->full_name
+            ];
+        } else {
+            return ['success' => false, 'message' => 'User tidak memiliki akses approval.'];
         }
+
+        $quotation->update($updateData);
+
+        if ($isApproved && 
+            $quotation->tipe_quotation === 'rekontrak' && 
+            $updateData['status_quotation_id'] == 3 &&
+            $quotation->quotation_referensi_id) {
+            
+            $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
+            if ($oldQuotation) {
+                app(RekontrakService::class)->process($quotation, $oldQuotation);
+            }
+        }
+
+        return ['success' => true, 'data' => $quotation->fresh()];
+
     }
     public function resetApproval(Quotation $quotation, User $user)
     {
-        DB::beginTransaction();
-        try {
-            $currentDateTime = Carbon::now()->toDateTimeString();
-
-            // 1. Validasi: Hanya user tertentu yang bisa reset (misalnya admin atau role khusus)
-            // Sesuaikan dengan kebutuhan bisnis Anda
-            $allowedRoles = 2; // Contoh: Admin atau Super User
-            if ($user->cais_role_id != $allowedRoles) {
-                throw new \Exception('Anda tidak memiliki akses untuk reset approval.');
-            }
-
-            // 2. Simpan data sebelum reset untuk log
-            $oldStatus = $quotation->status_quotation_id;
-            $oldOt1 = $quotation->ot1;
-            $oldOt2 = $quotation->ot2;
-
-            // 3. Reset data approval ke state awal
-            $updateData = [
-                'status_quotation_id' => 2, // Kembali ke status Draft/Pending
-                'is_aktif' => 0,
-                'ot1' => null,
-                'ot2' => null,
-                'updated_at' => $currentDateTime,
-                'updated_by' => $user->full_name
-            ];
-
-            $quotation->update($updateData);
-
-            DB::commit();
-
-            // Refresh data
-            $quotation->refresh();
-            $quotation->load('statusQuotation');
-
-            \Log::info("Quotation #{$quotation->id} approval reset by user #{$user->id}");
-
-            return $quotation;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error("Error in resetApproval: " . $e->getMessage());
-            throw $e;
+        \Log::info('Reset approval attempt', [
+            'user_id' => $user->id,
+            'user_role' => $user->cais_role_id,
+            'quotation_id' => $quotation->id,
+            'current_status' => $quotation->status_quotation_id,
+            'current_ot1' => $quotation->ot1,
+            'current_ot2' => $quotation->ot2
+        ]);
+        
+        // Cek role - tambahkan role lain yang boleh reset
+        $allowedRoles = [2, 96, 97]; // Admin, OT1, OT2
+        if (!in_array($user->cais_role_id, $allowedRoles)) {
+            return ['success' => false, 'message' => 'Anda tidak memiliki akses untuk reset approval. Role: ' . $user->cais_role_id];
         }
+
+        $quotation->update([
+            'status_quotation_id' => 1,
+            'is_aktif' => 0,
+            'ot1' => null,
+            'ot2' => null,
+            'updated_at' => Carbon::now()->toDateTimeString(),
+            'updated_by' => $user->full_name
+        ]);
+        
+        \Log::info('Reset approval success', [
+            'quotation_id' => $quotation->id,
+            'reset_by' => $user->full_name
+        ]);
+
+        return ['success' => true, 'data' => $quotation->fresh()];
     }
 
     // ============================ HELPER METHODS (tambahan jika diperlukan) ============================

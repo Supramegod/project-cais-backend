@@ -18,6 +18,10 @@ class SalesActivity extends Model
         'leads_id',
         'leads_kebutuhan_id',
         'tgl_activity',
+        'start',
+        'end',
+        'durasi',
+        'penerima',
         'jenis_activity',
         'notulen',
         'created_by'

@@ -309,7 +309,7 @@ class QuotationDuplicationService
             'note_harga_jual' => $quotationReferensi->note_harga_jual,
 
             // Status (kecuali approval status yang harus reset)
-            'is_aktif' => 1,
+            'is_aktif' => 0,
             'revisi' => 0,
             'alasan_revisi' => null,
             'step' => 1,
@@ -1376,4 +1376,6 @@ class QuotationDuplicationService
 
         return $query->get()->toArray();
     }
+
+
 }

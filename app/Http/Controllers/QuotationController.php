@@ -8,9 +8,11 @@ use App\Models\QuotationDetailHpp;
 use App\Models\QuotationSite;
 use App\Models\TimSalesDetail;
 use App\Services\QuotationDuplicationService;
+use App\Services\RekontrakService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -939,7 +941,7 @@ class QuotationController extends Controller
                 'jumlah_site' => $originalQuotation->jumlah_site,
                 'step' => 1,
                 'status_quotation_id' => 1, // Reset to draft
-                'is_aktif' => 1,
+                'is_aktif' => 0,
                 'alasan_resubmit' => $request->alasan,
                 'quotation_sebelumnya_id' => $originalQuotation->id,
                 'created_by' => $user->full_name
@@ -1123,23 +1125,21 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function resetApproval(Request $request, Quotation $quotation)
+    public function resetApproval(Request $request, $id)
     {
-        try {
-            $user = $request->user();
-            $result = $this->quotationService->resetApproval($quotation, $user);
+        $quotation = Quotation::notDeleted()->findOrFail($id);
+        $user = $request->user();
+        $result = $this->quotationService->resetApproval($quotation, $user);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Approval berhasil direset',
-                'data' => $result
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+        if (!$result['success']) {
+            return response()->json($result, 400);
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Approval berhasil direset',
+            'data' => $result['data']
+        ]);
     }
     /**
      * @OA\Get(
