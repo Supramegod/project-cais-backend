@@ -1211,7 +1211,7 @@ class SpkController extends Controller
             $sites = QuotationSite::with(['quotation'])
                 ->where('leads_id', $leadsId)
                 ->whereNull('deleted_at')
-                // ->whereDoesntHave('spkSite')
+                ->whereDoesntHave('spkSite')
                 ->get()
                 ->map(function ($site) {
                     return [
