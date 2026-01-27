@@ -2377,7 +2377,7 @@ class QuotationService
         }
 
         $quotation->update([
-            'status_quotation_id' => 1,
+            'status_quotation_id' => 2,
             'is_aktif' => 0,
             'ot1' => null,
             'ot2' => null,
