@@ -1780,12 +1780,12 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 $hppUpdateData = [];
 
                 // Jika THR di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
-                if (in_array(strtolower($wageData['thr']), ['diprovisikan', 'ditagihkan'])) {
+                if (in_array(strtolower($wageData['thr']), ['diprovisikan'])) {
                     $hppUpdateData['tunjangan_hari_raya'] = $upahData['nominal_upah'] / 12;
                 }
 
                 // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
-                if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
+                if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan'])) {
                     $hppUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
                 }
 
@@ -1801,12 +1801,12 @@ BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year .
                 if ($coss) {
                     $cossUpdateData = [];
                     // Jika THR di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
-                    if (in_array(strtolower($wageData['thr']), ['diprovisikan', 'ditagihkan'])) {
+                    if (in_array(strtolower($wageData['thr']), ['diprovisikan'])) {
                         $cossUpdateData['tunjangan_hari_raya'] = $upahData['nominal_upah'] / 12;
                     }
 
                     // Jika Kompensasi di wage adalah "Diprovisikan" atau "Ditagihkan", hitung nilai
-                    if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan', 'ditagihkan'])) {
+                    if (in_array(strtolower($wageData['kompensasi']), ['diprovisikan'])) {
                         $cossUpdateData['kompensasi'] = $upahData['nominal_upah'] / 12;
                     }
 

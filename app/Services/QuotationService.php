@@ -2345,16 +2345,16 @@ class QuotationService
 
         $quotation->update($updateData);
 
-        if ($isApproved && 
-            $quotation->tipe_quotation === 'rekontrak' && 
-            $updateData['status_quotation_id'] == 3 &&
-            $quotation->quotation_referensi_id) {
+        // if ($isApproved && 
+        //     $quotation->tipe_quotation === 'rekontrak' && 
+        //     $updateData['status_quotation_id'] == 3 &&
+        //     $quotation->quotation_referensi_id) {
             
-            $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
-            if ($oldQuotation) {
-                app(RekontrakService::class)->process($quotation, $oldQuotation);
-            }
-        }
+        //     $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
+        //     if ($oldQuotation) {
+        //         app(RekontrakService::class)->process($quotation, $oldQuotation);
+        //     }
+        // }
 
         return ['success' => true, 'data' => $quotation->fresh()];
 
@@ -2377,7 +2377,7 @@ class QuotationService
         }
 
         $quotation->update([
-            'status_quotation_id' => 1,
+            'status_quotation_id' => 2,
             'is_aktif' => 0,
             'ot1' => null,
             'ot2' => null,
