@@ -158,6 +158,10 @@ class QuotationService
 
         $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
         $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
+        
+        // **PERBAIKAN: Recalculate HPP dan COSS setelah bunga bank di-update**
+        $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
+        $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
     }
 
     // ============================ DETAIL PROCESSING ============================
@@ -455,7 +459,7 @@ class QuotationService
         $detail->persen_bpjs_kes = 0;
 
         // Potong 16 ribu dari nominal upah
-        $detail->nominal_upah = $detail->nominal_upah - 16800;
+        // $detail->nominal_upah = $detail->nominal_upah - 16800;
 
         $this->updateQuotationBpjs($detail, $quotation);
         return;
@@ -612,8 +616,8 @@ class QuotationService
 
             // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
-                $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak'));
-                if (in_array($thrWageValue, ['diprovisikan', 'ditagihkan', 'ya'])) {
+                $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
+                if (in_array($thrWageValue, ['diprovisikan'])) {
                     // Hitung THR berdasarkan upah bulanan (1/12 dari gaji)
                     $tunjanganHariRayaHpp = ($detail->nominal_upah ?? 0) / 12;
                     $tunjanganHariRayaCoss = ($detail->nominal_upah ?? 0) / 12;
@@ -625,7 +629,7 @@ class QuotationService
                         'calculated_thr_hpp' => $tunjanganHariRayaHpp,
                         'calculated_thr_coss' => $tunjanganHariRayaCoss
                     ]);
-                } else if ($thrWageValue == 'tidak' || $thrWageValue == 'tidak ada') {
+                } else if ($thrWageValue == 'ditagihkan' || $thrWageValue == 'diberikan langsung'|| $thrWageValue == 'tidak ada') {
                     $tunjanganHariRayaHpp = 0;
                     $tunjanganHariRayaCoss = 0;
                 }
@@ -637,10 +641,10 @@ class QuotationService
 
             // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
-                $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak'));
-                if (in_array($kompensasiWageValue, ['diprovisikan', 'ditagihkan', 'ya'])) {
+                $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak Ada'));
+                if (in_array($kompensasiWageValue, ['diprovisikan'])) {
                     // Tentukan nilai kompensasi default (10% dari gaji)
-                    $kompensasiDefault = ($detail->nominal_upah ?? 0) * 0.10;
+                    $kompensasiDefault = ($detail->nominal_upah ?? 0) /12;
                     $kompensasiHpp = $kompensasiDefault;
                     $kompensasiCoss = $kompensasiDefault;
 
@@ -651,7 +655,7 @@ class QuotationService
                         'calculated_kompensasi_hpp' => $kompensasiHpp,
                         'calculated_kompensasi_coss' => $kompensasiCoss
                     ]);
-                } else if ($kompensasiWageValue == 'tidak' || $kompensasiWageValue == 'tidak ada') {
+                } else if ($kompensasiWageValue == 'ditagihkan' || $kompensasiWageValue == 'tidak ada') {
                     $kompensasiHpp = 0;
                     $kompensasiCoss = 0;
                 }
@@ -662,7 +666,7 @@ class QuotationService
 
             // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
             if ($wage && isset($wage->tunjangan_holiday)) {
-                $tunjanganHolidayValue = strtolower(trim($wage->tunjangan_holiday ?? 'Tidak'));
+                $tunjanganHolidayValue = strtolower(trim($wage->tunjangan_holiday ?? 'Tidak Ada'));
 
                 if (str_contains($tunjanganHolidayValue, 'flat')) {
                     $tunjanganHoliday = $this->calculateTunjanganHolidayFromWage($wage);
@@ -674,7 +678,7 @@ class QuotationService
                         'calculated_tunjangan_holiday' => $tunjanganHoliday,
                         'hpp_value' => $hpp ? $hpp->tunjangan_hari_libur_nasional : 'null'
                     ]);
-                } else if ($tunjanganHolidayValue == 'tidak' || $tunjanganHolidayValue == 'tidak ada') {
+                } else if ($tunjanganHolidayValue == 'normatif' || $tunjanganHolidayValue == 'tidak ada') {
                     $tunjanganHoliday = 0;
                 }
             } else {
@@ -691,7 +695,8 @@ class QuotationService
 
             // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
             if ($wage && isset($wage->lembur)) {
-                $lemburValue = strtolower(trim($wage->lembur ?? 'Tidak'));
+                $lemburValue = strtolower(trim($wage->lembur ?? 'Tidak Ada'));
+                $lemburditagihkanValue = strtolower(trim($wage->lembur_ditagihkan ?? null));
 
                 if (str_contains($lemburValue, 'flat')) {
                     $lembur = $this->calculateLemburFromWage($wage);
@@ -704,7 +709,7 @@ class QuotationService
                         'calculated_lembur' => $lembur,
                         'hpp_value' => $hpp ? $hpp->lembur : 'null'
                     ]);
-                } else if ($lemburValue == 'tidak' || $lemburValue == 'tidak ada') {
+                } else if ($lemburditagihkanValue == 'ditagihkan terpisah' || $lemburValue == 'tidak ada') {
                     $lembur = 0;
                 }
             } else {
@@ -1467,7 +1472,7 @@ class QuotationService
                 + $personilOhc
                 + $bungaBank
                 + $insentif
-                - $potonganBpu,
+                + $potonganBpu,
                 2
             );
 
@@ -1495,7 +1500,7 @@ class QuotationService
                 $detail->total_base_manpower_coss
                 + $detail->total_exclude_base_manpower
                 + $personilOhcCoss
-                - $potonganBpu,
+                + $potonganBpu,
                 2
             );
 
@@ -1548,7 +1553,7 @@ class QuotationService
             'detail_count' => $quotation->quotation_detail->count()
         ]);
 
-        $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary) {
+        $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan) {
             $detail->bunga_bank = $summary->bunga_bank_total;
             $detail->insentif = $summary->insentif_total;
 
@@ -1557,9 +1562,18 @@ class QuotationService
                 'bunga_bank_set' => $detail->bunga_bank,
                 'insentif_set' => $detail->insentif
             ]);
-        });
 
-        // ... rest of the method
+            // **PERBAIKAN: Recalculate total_personil setelah bunga_bank di-update**
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+            
+            $totalTunjanganResult = [
+                'total' => $detail->total_tunjangan ?? 0,
+                'total_coss' => $detail->total_tunjangan_coss ?? 0
+            ];
+            
+            $this->calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss);
+        });
     }
 
     // ============================ HPP & COSS CALCULATIONS ============================
@@ -1645,7 +1659,7 @@ class QuotationService
             fn($detail) => ($detail->bpjs_kesehatan ?? 0) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
         );
 
-        // 6. Hitung total potongan BPU dengan jumlah_hc yang benar
+        // 6. Hitung total potongan BPU untuk informasi (sudah termasuk di total_personil)
         $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
             fn($detail) => ($detail->penjamin_kesehatan === 'BPU')
             ? 16800 * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
