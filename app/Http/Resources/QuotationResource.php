@@ -561,6 +561,7 @@ class QuotationResource extends JsonResource
                     $potonganBpu = $detail->potongan_bpu ?? 0;
                     $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
                     $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+                    $site = $detail->quotationSite ?? null;
 
                     $bpjsJkk = $detail->bpjs_jkk ?? 0;
                     $bpjsJkm = $detail->bpjs_jkm ?? 0;
@@ -672,6 +673,7 @@ class QuotationResource extends JsonResource
                         'jumlah_hc_coss' => $coss->jumlah_hc ?? $detail->jumlah_hc ?? 0,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
+                        'kota'=> $site ? $site->kota : null,
                         'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                         'tunjangan_data' => $tunjanganData,
                         'upah' => $wage ? $wage->upah : 0,

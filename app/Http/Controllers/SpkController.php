@@ -380,7 +380,7 @@ class SpkController extends Controller
             // Buat SPK
             $spk = Spk::create([
                 'leads_id' => $leads->id,
-                'quotation_id' => $quotationId,
+                // 'quotation_id' => $quotationId,
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,

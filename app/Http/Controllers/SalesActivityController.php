@@ -419,6 +419,10 @@ class SalesActivityController extends Controller
                 'jenis_activity' => $request->jenis_activity,
                 'notulen' => $request->notulen,
                 'created_by' => $user ? $user->full_name : 'System',
+                'start' => $request->start,
+                'end' => $request->end,
+                'durasi' => $request->durasi,
+                'penerima' => $request->penerima
             ]);
 
             // Handle file uploads dari multipart/form-data
@@ -611,6 +615,13 @@ class SalesActivityController extends Controller
                     ];
                 }),
             ];
+            if ($activityData['jenis_activity'] == 'Appointment') {
+                $activityData['start'] = $salesActivity->start;
+                $activityData['end'] = $salesActivity->end;
+                $activityData['durasi'] = $salesActivity->durasi;
+            } elseif ($activityData['jenis_activity'] == 'Kirim Proposal') {
+                $activityData['penerima'] = $salesActivity->penerima;
+            }
 
             return response()->json([
                 'success' => true,
