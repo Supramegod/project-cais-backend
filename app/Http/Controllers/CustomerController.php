@@ -188,7 +188,8 @@ class CustomerController extends Controller
             ])
                 ->filterByUserRole()
                 ->whereNull('customer_id')
-                ->where('status_leads_id', 102);
+                ->where('status_leads_id', 102)
+                ->orderBy('id', 'desc');
 
             // Apply filters
             if ($request->branch) {
