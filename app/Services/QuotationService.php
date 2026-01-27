@@ -324,7 +324,7 @@ class QuotationService
             'provisi_ohc' => $detail->personil_ohc ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
-            'potongan_bpu' => $potonganBpu,
+            'potongan_bpu' => $potonganBpu ?? 0,
             'total_biaya_per_personil' => $detail->total_personil ?? 0,
             'total_biaya_all_personil' => $detail->sub_total_personil ?? 0,
         ];
@@ -359,7 +359,7 @@ class QuotationService
             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
-            'potongan_bpu' => $potonganBpu,
+            'potongan_bpu' => $potonganBp ?? 0,
         ];
 
         \Log::info("Populate Detail Calculation - Jumlah HC separated", [
@@ -1490,9 +1490,7 @@ class QuotationService
                 + $bpjsKetenagakerjaanCoss
                 + $personilKaporlapCoss
                 + $personilDevicesCoss
-                + $personilChemicalCoss
-                + $insentif
-                + $bungaBank,
+                + $personilChemicalCoss,
                 2
             );
 

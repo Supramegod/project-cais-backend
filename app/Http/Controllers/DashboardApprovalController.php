@@ -121,6 +121,7 @@ class DashboardApprovalController extends Controller
             ->whereHas('leads', function ($q) {
                 $q->whereNull('deleted_at');
             })
+            ->orderBy('id', 'desc')
             ->byUserRole($user);
 
         // Filter berdasarkan tipe dengan kondisi di database (lebih optimal)
