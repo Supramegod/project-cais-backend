@@ -515,6 +515,37 @@ class SpkController extends Controller
             }
 
             foreach ($uniqueQuotations as $quotation) {
+                // Calculate quotation using service
+                $calculatedQuotation = null;
+                try {
+                    $quotationService = new \App\Services\QuotationService();
+                    $calculatedQuotation = $quotationService->calculateQuotation($quotation);
+                } catch (\Exception $e) {
+                    \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
+                }
+
+                // Get BPJS percentages from calculation summary
+                $persenBpjsBreakdown = [];
+                if ($calculatedQuotation && isset($calculatedQuotation->calculation_summary)) {
+                    $summary = $calculatedQuotation->calculation_summary;
+                    $persenBpjsBreakdown = [
+                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk ?? 0,
+                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm ?? 0,
+                        'persen_bpjs_jht' => $summary->persen_bpjs_jht ?? 0,
+                        'persen_bpjs_jp' => $summary->persen_bpjs_jp ?? 0,
+                        'persen_bpjs_kesehatan' => $summary->persen_bpjs_kesehatan ?? 0,
+                    ];
+                } else {
+                    // Fallback to first detail if calculation fails
+                    $firstDetail = $quotation->quotationDetails->first();
+                    $persenBpjsBreakdown = [
+                        'persen_bpjs_jkk' => $firstDetail->persen_bpjs_jkk ?? 0,
+                        'persen_bpjs_jkm' => $firstDetail->persen_bpjs_jkm ?? 0,
+                        'persen_bpjs_jht' => $firstDetail->persen_bpjs_jht ?? 0,
+                        'persen_bpjs_jp' => $firstDetail->persen_bpjs_jp ?? 0,
+                        'persen_bpjs_kesehatan' => $firstDetail->persen_bpjs_kesehatan ?? 0,
+                    ];
+                }
                 // Cari PIC utama (is_kuasa = 1)
                 // fallback: ambil Company via relation() jika properti ->company bukan model
                 $companyModel = null;
@@ -528,6 +559,9 @@ class SpkController extends Controller
                 $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
                 // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
 
+                // Get first detail for BPJS percentages
+                $firstDetail = $quotation->quotationDetails->first();
+                
                 $quotationsInfo[] = [
                     'id' => $quotation->id,
                     'nomor_quotation' => $quotation->nomor ?? null,
@@ -539,7 +573,7 @@ class SpkController extends Controller
                     'company_address' => $companyModel ? ($companyModel->address ?? null) : null,
                     'tanggal_quotation' => $quotation->tgl_quotation ?? null,
                     'npwp' => $quotation->npwp ?? null,
-                    'matrai' => $quotation->materai ?? null,
+                    'materai' => $quotation->materai ?? null,
                     'total_hc' => $totalHc,
                     'alamat_npwp' => $quotation->alamat_npwp ?? null,
                     'durasi_kerjasama' => $quotation->durasi_kerjasama ?? null,
@@ -551,10 +585,26 @@ class SpkController extends Controller
                     'hari_kerja' => $quotation->hari_kerja ?? null,
                     'jam_kerja' => $quotation->jam_kerja ?? null,
                     'shift_kerja' => $quotation->shift_kerja ?? null,
-                    'kunjungan_oprasional' => $quotation->kunjungan_operasional ?? null,
-                    'kunjunga_tim_crm' => $quotation->kunjungan_tim_crm ?? null,
+                    'kunjungan_operasional' => $quotation->kunjungan_operasional ?? null,
+                    'kunjungan_tim_crm' => $quotation->kunjungan_tim_crm ?? null,
                     'keterangan_kunjungan_tim_crm' => $quotation->keterangan_kunjungan_tim_crm ?? null,
-                    'keterangan_kunjungan_oprasional' => $quotation->keterangan_kunjungan_operasional ?? null,
+                    'keterangan_kunjungan_operasional' => $quotation->keterangan_kunjungan_operasional ?? null,
+                    'persen_bpjs_jkk' => $persenBpjsBreakdown['persen_bpjs_jkk'],
+                    'persen_bpjs_jkm' => $persenBpjsBreakdown['persen_bpjs_jkm'],
+                    'persen_bpjs_jht' => $persenBpjsBreakdown['persen_bpjs_jht'],
+                    'persen_bpjs_jp' => $persenBpjsBreakdown['persen_bpjs_jp'],
+                    'persen_bpjs_kesehatan' => $persenBpjsBreakdown['persen_bpjs_kesehatan'],
+                    'kompensasi' => $quotation->kompensasi ?? null,
+                    'joker_reliever' => $quotation->joker_reliever ?? null,
+                    'syarat_invoice' => $quotation->syarat_invoice ?? null,
+                    'top' => $quotation->top ?? null,
+                    'jumlah_hari_invoice' => $quotation->jumlah_hari_invoice ?? null,
+                    'tipe_hari_invoice' => $quotation->tipe_hari_invoice ?? null,
+                    'salary_rule_id' => $quotation->salary_rule_id ?? null,
+                    'alamat_penagihan_invoice' => $quotation->alamat_penagihan_invoice ?? null,
+                    'catatan_site' => $quotation->catatan_site ?? null,
+                    'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
+                    'ada_serikat' => $quotation->ada_serikat ?? null,
                     'rulethr' => $quotation->ruleThr ? [
                         'id' => $quotation->ruleThr->id,
                         'nama' => $quotation->ruleThr->nama,
