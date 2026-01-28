@@ -561,6 +561,7 @@ class SpkController extends Controller
 
                 // Get first detail for BPJS percentages
                 $firstDetail = $quotation->quotationDetails->first();
+                $adatserikat = $quotation->status_serikat ? "ada" : "tidak ada";
                 
                 $quotationsInfo[] = [
                     'id' => $quotation->id,
@@ -581,7 +582,7 @@ class SpkController extends Controller
                     'evaluasi_kontrak' => $quotation->evaluasi_kontrak ?? null,
                     'evaluasi_karyawan' => $quotation->evaluasi_karyawan ?? null,
                     'mulai_kontrak' => $quotation->mulai_kontrak ?? null,
-                    'kontak_selesai' => $quotation->kontak_selesai ?? null,
+                    'kontrak_selesai' => $quotation->kontrak_selesai ?? null,
                     'hari_kerja' => $quotation->hari_kerja ?? null,
                     'jam_kerja' => $quotation->jam_kerja ?? null,
                     'shift_kerja' => $quotation->shift_kerja ?? null,
