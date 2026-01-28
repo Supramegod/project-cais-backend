@@ -600,11 +600,19 @@ class SpkController extends Controller
                     'top' => $quotation->top ?? null,
                     'jumlah_hari_invoice' => $quotation->jumlah_hari_invoice ?? null,
                     'tipe_hari_invoice' => $quotation->tipe_hari_invoice ?? null,
-                    'salary_rule_id' => $quotation->salary_rule_id ?? null,
                     'alamat_penagihan_invoice' => $quotation->alamat_penagihan_invoice ?? null,
                     'catatan_site' => $quotation->catatan_site ?? null,
                     'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
                     'ada_serikat' => $quotation->ada_serikat ?? null,
+                    'salary_rule' => $quotation->salaryRule ? [
+                        'id' => $quotation->salaryRule->id,
+                        'nama' => $quotation->salaryRule->nama_salary_rule,
+                        'cutoff' => $quotation->salaryRule->cutoff,
+                        'crosscheck' => $quotation->salaryRule->crosscheck_absen,
+                        'pengiriman_invoice' => $quotation->salaryRule->pengiriman_invoice,
+                        'perkiraan_invoice_diterima' => $quotation->salaryRule->perkiraan_invoice_diterima,
+                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll
+                    ] : null,
                     'rulethr' => $quotation->ruleThr ? [
                         'id' => $quotation->ruleThr->id,
                         'nama' => $quotation->ruleThr->nama,
@@ -622,10 +630,10 @@ class SpkController extends Controller
                     'quotation_pics' => $quotation->quotationPics->map(function ($pic) {
                         return [
                             'id' => $pic->id,
-                            'nama_pic' => $pic->nama_pic,
-                            'jabatan' => $pic->jabatan ? $pic->jabatan->nama_jabatan : null,
-                            'telepon_pic' => $pic->telepon_pic,
-                            'email_pic' => $pic->email_pic,
+                            'nama' => $pic->nama,
+                            'jabatan' => $pic->jabatan ? $pic->jabatan->nama : null,
+                            'no_telp' => $pic->no_telp,
+                            'email' => $pic->email,
                             'is_kuasa' => $pic->is_kuasa
                         ];
                     })
