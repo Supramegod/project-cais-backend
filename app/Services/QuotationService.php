@@ -908,7 +908,7 @@ class QuotationService
                 'detail_id' => $detail->id,
                 'is_general' => false,  // Kaporlap spesifik per detail
                 'site_specific' => false, // Tidak perlu filter site
-                'special' => null
+                'special' => 'kaporlap' // Kaporlap punya rumus khusus (dikali HC)
             ],
             'devices' => [
                 'hpp_field' => 'provisi_peralatan',
@@ -1036,6 +1036,18 @@ class QuotationService
                         $detail->jumlah_hc_hpp,
                         $config['site_specific'] ? $currentSiteId : null
                     );
+                } elseif (isset($config['special']) && $config['special'] === 'kaporlap') {
+                    // Kaporlap: dikali dengan HC, bukan dibagi
+                    $hppValue = $this->calculateItemTotalForHpp(
+                        $config['model'],
+                        $quotation->id,
+                        $config['detail_id'] ?? null,
+                        $quotation->provisi,
+                        1, // Tidak dibagi, langsung dikali HC
+                        'kaporlap',
+                        $detail->jumlah_hc_hpp,
+                        $config['site_specific'] ? $currentSiteId : null
+                    );
                 } else {
                     $hppValue = $this->calculateItemTotalForHpp(
                         $config['model'],
@@ -1073,6 +1085,18 @@ class QuotationService
                         $quotation->provisi,
                         $cossDivider,
                         'chemical',
+                        $detail->jumlah_hc_original,
+                        $config['site_specific'] ? $currentSiteId : null
+                    );
+                } elseif (isset($config['special']) && $config['special'] === 'kaporlap') {
+                    // Kaporlap: dikali dengan HC, bukan dibagi
+                    $cossValue = $this->calculateItemTotalForCoss(
+                        $config['model'],
+                        $quotation->id,
+                        $config['detail_id'] ?? null,
+                        $quotation->provisi,
+                        1, // Tidak dibagi, langsung dikali HC
+                        'kaporlap',
                         $detail->jumlah_hc_original,
                         $config['site_specific'] ? $currentSiteId : null
                     );
@@ -1167,6 +1191,20 @@ class QuotationService
                     'formula' => "(({$item->jumlah} * {$item->harga}) / {$item->masa_pakai}) / max({$jumlahHc}, 1)",
                     'item_total' => $itemTotal,
                     'per_person' => $perPerson
+                ]);
+
+                $total += $perPerson;
+            } elseif ($special === 'kaporlap') {
+                // Untuk kaporlap: dikali dengan HC, bukan dibagi
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+                $perPerson = $itemTotal ; // DIKALI, bukan dibagi
+
+                \Log::info("Kaporlap calculation for HPP (multiply by HC)", [
+                    'item_id' => $item->id,
+                    'formula' => "(({$item->harga} * {$item->jumlah}) / {$provisi}) * max({$jumlahHc}, 1)",
+                    'item_total' => $itemTotal,
+                    'per_person' => $perPerson,
+                    'jumlah_hc' => $jumlahHc
                 ]);
 
                 $total += $perPerson;
@@ -1266,6 +1304,20 @@ class QuotationService
                     'formula' => "({$item->jumlah} * {$item->harga}) / {$item->masa_pakai} / max({$jumlahHc}, 1)",
                     'item_total' => $itemTotal,
                     'per_person' => $perPerson
+                ]);
+
+                $total += $perPerson;
+            } elseif ($special === 'kaporlap') {
+                // Untuk kaporlap: dikali dengan HC, bukan dibagi
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+                $perPerson = $itemTotal * max($jumlahHc, 1); // DIKALI, bukan dibagi
+
+                \Log::info("Kaporlap calculation for COSS (multiply by HC)", [
+                    'item_id' => $item->id,
+                    'formula' => "(({$item->harga} * {$item->jumlah}) / {$provisi}) * max({$jumlahHc}, 1)",
+                    'item_total' => $itemTotal,
+                    'per_person' => $perPerson,
+                    'jumlah_hc' => $jumlahHc
                 ]);
 
                 $total += $perPerson;
