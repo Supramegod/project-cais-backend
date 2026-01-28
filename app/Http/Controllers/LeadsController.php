@@ -478,6 +478,27 @@ class LeadsController extends Controller
             set_time_limit(0);
             DB::beginTransaction();
 
+            // // Debug: Test if UniqueCompanyStrict class exists
+            // if (!class_exists(UniqueCompanyStrict::class)) {
+            //     \Log::error('UniqueCompanyStrict class not found');
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'UniqueCompanyStrict class not found'
+            //     ], 500);
+            // }
+
+            // // Debug: Test instantiation
+            // try {
+            //     $testRule = new UniqueCompanyStrict();
+            //     \Log::info('UniqueCompanyStrict instantiated successfully');
+            // } catch (\Exception $e) {
+            //     \Log::error('Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage());
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage()
+            //     ], 500);
+            // }
+
             $validator = Validator::make($request->all(), [
                 'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
                 'pic' => 'required',
@@ -493,13 +514,19 @@ class LeadsController extends Controller
                 'kebutuhan.array' => 'Kebutuhan harus berupa array',
                 'kebutuhan.min' => 'Kebutuhan harus dipilih minimal 1',
             ]);
-
             if ($validator->fails()) {
+                \Log::info('Validation failed', [
+                    'errors' => $validator->errors()->toArray()
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => $validator->errors()->toArray()
                 ], 400);
             }
+
+            // \Log::info('Validation passed', [
+            //     'nama_perusahaan' => $request->nama_perusahaan
+            // ]);
             $current_date_time = Carbon::now()->toDateTimeString();
 
             // Get related data using models
