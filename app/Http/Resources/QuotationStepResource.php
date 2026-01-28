@@ -318,8 +318,10 @@ class QuotationStepResource extends JsonResource
                     $bulanTahunKunjunganTimCrm = $parts[1] ?? '';
                 }
 
-                // Untuk ada_training, kita bisa infer dari field training
-                $adaTraining = !empty($quotation->training) ? 'Ada' : 'Tidak Ada';
+                // Untuk ada_training, cek dari quotationTrainings relationship
+                $quotationTrainings = $quotation->relationLoaded('quotationTrainings') ?
+                    $quotation->quotationTrainings->pluck('training_id')->toArray() : [];
+                $adaTraining = !empty($quotationTrainings) ? 'Ada' : 'Tidak Ada';
 
                 // Dapatkan data OHC dari service
                 $ohcData = $this->barangService->prepareBarangData($quotation, 'ohc');
@@ -347,8 +349,7 @@ class QuotationStepResource extends JsonResource
                     'ohc_total' => $ohcData['total'],
 
                     // Data training (untuk checkbox)
-                    'quotation_trainings' => $quotation->relationLoaded('quotationTrainings') ?
-                        $quotation->quotationTrainings->pluck('training_id')->toArray() : [],
+                    'quotation_trainings' => $quotationTrainings,
                 ];
             // Di method getStepSpecificData - case 11:
 // Di method getStepSpecificData - case 11:

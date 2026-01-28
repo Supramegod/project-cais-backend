@@ -632,28 +632,28 @@ class QuotationStepService
         ], $companyData);
 
         // Jika note_harga_jual masih null, tambahkan note default
-        if (is_null($quotation->note_harga_jual)) {
-            $note = '
-              <b>Upah pokok base on Umk ' . Carbon::now()->year . ' </b> <br>
-Tunjangan overtime flat total 75 jam. <span class="text-danger">*jika system jam kerja 12 jam </span> <br>
-Tunjangan hari raya ditagihkan provisi setiap bulan. (upah/12) <br>
-BPJS Ketenagakerjaan 4 Program (JKK, JKM, JHT, JP).
-<span class="text-danger">Pengalian base on upah</span>		<br>
-BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year . '</span> <br>
-<br>
-<span class="text-danger">*prosentase Bpjs Tk J. Kecelakaan Kerja disesuaikan dengan tingkat resiko sesuai ketentuan.</span>';
+//         if (is_null($quotation->note_harga_jual)) {
+//             $note = '
+//               <b>Upah pokok base on Umk ' . Carbon::now()->year . ' </b> <br>
+// Tunjangan overtime flat total 75 jam. <span class="text-danger">*jika system jam kerja 12 jam </span> <br>
+// Tunjangan hari raya ditagihkan provisi setiap bulan. (upah/12) <br>
+// BPJS Ketenagakerjaan 4 Program (JKK, JKM, JHT, JP).
+// <span class="text-danger">Pengalian base on upah</span>		<br>
+// BPJS Kesehatan. <span class="text-danger">*base on Umk ' . Carbon::now()->year . '</span> <br>
+// <br>
+// <span class="text-danger">*prosentase Bpjs Tk J. Kecelakaan Kerja disesuaikan dengan tingkat resiko sesuai ketentuan.</span>';
 
-            $quotationUpdateData['note_harga_jual'] = $note;
+//             $quotationUpdateData['note_harga_jual'] = $note;
 
-            \Log::info("Adding note_harga_jual to quotation", [
-                'quotation_id' => $quotation->id,
-                'year' => Carbon::now()->year
-            ]);
-        } else {
-            \Log::info("note_harga_jual already exists for quotation", [
-                'quotation_id' => $quotation->id
-            ]);
-        }
+//             \Log::info("Adding note_harga_jual to quotation", [
+//                 'quotation_id' => $quotation->id,
+//                 'year' => Carbon::now()->year
+//             ]);
+//         } else {
+//             \Log::info("note_harga_jual already exists for quotation", [
+//                 'quotation_id' => $quotation->id
+//             ]);
+//         }
 
         $quotation->update($quotationUpdateData);
 

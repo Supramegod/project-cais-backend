@@ -116,9 +116,9 @@ class UniqueCompanyStrict implements Rule
                 $similarityReasons[] = "mengandung nama yang sama";
             }
 
-            // 3. Cek kemiripan menggunakan similar_text dengan threshold yang lebih longgar
+            // 3. Cek kemiripan menggunakan similar_text dengan threshold wajar
             similar_text($input, $normalized, $percent);
-            if ($percent > 90) { // Naik dari 80 ke 90
+            if ($percent > 80) { // Kembali ke 80
                 $similarityReasons[] = "tingkat kemiripan {$percent}%";
             }
 
@@ -133,7 +133,7 @@ class UniqueCompanyStrict implements Rule
             if ($maxLength > 0) {
                 $similarity = (1 - $distance / $maxLength) * 100;
                 
-                if ($similarity > 92) { // Naik dari 85 ke 92
+                if ($similarity > 85) { // Kembali ke 85
                     $similarityReasons[] = "tingkat kemiripan {$similarity}% berdasarkan edit distance";
                 }
             }
@@ -230,13 +230,13 @@ class UniqueCompanyStrict implements Rule
 
     private function hasCommonKeywords($text1, $text2)
     {
-        // Filter kata yang panjangnya lebih dari 4 karakter (lebih spesifik)
+        // Filter kata yang panjangnya lebih dari 3 karakter
         $words1 = array_filter(explode(' ', $text1), function($word) {
-            return strlen($word) > 4; // Naik dari 3 ke 4
+            return strlen($word) > 3; // Turun dari 4 ke 3
         });
         
         $words2 = array_filter(explode(' ', $text2), function($word) {
-            return strlen($word) > 4; // Naik dari 3 ke 4
+            return strlen($word) > 3; // Turun dari 4 ke 3
         });
 
         if (empty($words1) || empty($words2)) {
@@ -246,7 +246,7 @@ class UniqueCompanyStrict implements Rule
         // Cari kata yang sama di kedua teks
         $commonWords = array_intersect($words1, $words2);
         
-        // Perlu ada minimal 2 kata kunci yang sama DAN panjang
+        // Perlu ada minimal 2 kata kunci yang sama
         // ATAU 1 kata yang sangat panjang (lebih dari 8 karakter)
         if (count($commonWords) >= 2) {
             return true;
@@ -254,7 +254,7 @@ class UniqueCompanyStrict implements Rule
         
         // Cek apakah ada 1 kata yang sangat spesifik (panjang)
         foreach ($commonWords as $word) {
-            if (strlen($word) > 8) {
+            if (strlen($word) > 8) { // Kembali ke 8
                 return true;
             }
         }

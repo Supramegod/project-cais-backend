@@ -256,6 +256,15 @@ class QuotationResource extends JsonResource
 
             // Allowance details
             'thr' => $this->thr,
+            'rule_thr' => $this->whenLoaded('ruleThr', function () {
+                return [
+                    'id' => $this->ruleThr->id,
+                    'nama' => $this->ruleThr->nama,
+                    'hari_rilis_thr' => $this->ruleThr->hari_rilis_thr,
+                    'hari_pembayaran_invoice' => $this->ruleThr->hari_pembayaran_invoice,
+                    'hari_penagihan_invoice' => $this->ruleThr->hari_penagihan_invoice
+                ];
+            }),
             'kompensasi' => $this->kompensasi,
             'lembur' => $this->lembur,
             'nominal_lembur' => $this->nominal_lembur,
@@ -392,6 +401,7 @@ class QuotationResource extends JsonResource
                             'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday,
                         ];
                     }
+
 
                     // Ambil data HPP dan COSS dari relasi yang sudah diload
                     $hpp = $detail->relationLoaded('quotationDetailHpps') ? $detail->quotationDetailHpps->first() : null;
@@ -673,7 +683,7 @@ class QuotationResource extends JsonResource
                         'jumlah_hc_coss' => $coss->jumlah_hc ?? $detail->jumlah_hc ?? 0,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
-                        'kota'=> $site ? $site->kota : null,
+                        'kota' => $site ? $site->kota : null,
                         'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                         'tunjangan_data' => $tunjanganData,
                         'upah' => $wage ? $wage->upah : 0,
@@ -805,7 +815,7 @@ class QuotationResource extends JsonResource
                     $site = $this->quotationSites->firstWhere('id', $siteId);
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
-                    
+
                     return [
                         'quotation_site_id' => $siteId,
                         'nama_site' => $site->nama_site ?? null,
@@ -832,7 +842,7 @@ class QuotationResource extends JsonResource
                     $site = $this->quotationSites->firstWhere('id', $siteId);
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
-                    
+
                     return [
                         'quotation_site_id' => $siteId,
                         'nama_site' => $site->nama_site ?? null,
@@ -860,7 +870,7 @@ class QuotationResource extends JsonResource
                     $site = $this->quotationSites->firstWhere('id', $siteId);
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
-                    
+
                     return [
                         'quotation_site_id' => $siteId,
                         'nama_site' => $site->nama_site ?? null,
