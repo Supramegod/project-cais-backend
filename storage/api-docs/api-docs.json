@@ -17152,275 +17152,6 @@
                 ]
             }
         },
-        "/api/pks/{id}/submit-checklist": {
-            "post": {
-                "tags": [
-                    "PKS"
-                ],
-                "summary": "Submit quotation checklist",
-                "description": "Submits checklist data for quotation including NPWP, invoice, and other administrative details",
-                "operationId": "0b38b7fb5df305220892e30ec6e4829f",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "description": "Checklist data",
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "npwp",
-                                    "alamat_npwp",
-                                    "pic_invoice",
-                                    "telp_pic_invoice",
-                                    "email_pic_invoice",
-                                    "materai",
-                                    "joker_reliever",
-                                    "syarat_invoice",
-                                    "alamat_penagihan_invoice",
-                                    "status_serikat"
-                                ],
-                                "properties": {
-                                    "npwp": {
-                                        "description": "NPWP number",
-                                        "type": "string",
-                                        "example": "123456789012345"
-                                    },
-                                    "alamat_npwp": {
-                                        "description": "NPWP address",
-                                        "type": "string",
-                                        "example": "Jl. Sudirman No. 123, Jakarta"
-                                    },
-                                    "pic_invoice": {
-                                        "description": "PIC for invoice",
-                                        "type": "string",
-                                        "example": "John Doe"
-                                    },
-                                    "telp_pic_invoice": {
-                                        "description": "Phone number of PIC",
-                                        "type": "string",
-                                        "example": "081234567890"
-                                    },
-                                    "email_pic_invoice": {
-                                        "description": "Email of PIC",
-                                        "type": "string",
-                                        "format": "email",
-                                        "example": "john@example.com"
-                                    },
-                                    "materai": {
-                                        "description": "Stamp duty amount",
-                                        "type": "string",
-                                        "example": "10000"
-                                    },
-                                    "joker_reliever": {
-                                        "description": "Joker/Reliever availability",
-                                        "type": "string",
-                                        "example": "Tersedia"
-                                    },
-                                    "syarat_invoice": {
-                                        "description": "Invoice terms",
-                                        "type": "string",
-                                        "example": "Net 30 days"
-                                    },
-                                    "alamat_penagihan_invoice": {
-                                        "description": "Invoice billing address",
-                                        "type": "string",
-                                        "example": "Jl. Thamrin No. 456, Jakarta"
-                                    },
-                                    "catatan_site": {
-                                        "description": "Site notes",
-                                        "type": "string",
-                                        "example": "Catatan penting untuk site"
-                                    },
-                                    "status_serikat": {
-                                        "description": "Union status",
-                                        "type": "string",
-                                        "example": "Tidak Ada"
-                                    },
-                                    "pks_id": {
-                                        "description": "PKS ID if exists",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "ro": {
-                                        "description": "RO user ID",
-                                        "type": "integer",
-                                        "example": 10
-                                    },
-                                    "crm": {
-                                        "description": "CRM user ID",
-                                        "type": "integer",
-                                        "example": 11
-                                    },
-                                    "ada_serikat": {
-                                        "description": "Union existence",
-                                        "type": "string",
-                                        "example": "Tidak Ada"
-                                    },
-                                    "pics": {
-                                        "description": "Array of PIC data",
-                                        "type": "array",
-                                        "items": {
-                                            "required": [
-                                                "nama",
-                                                "jabatan",
-                                                "no_telp",
-                                                "email"
-                                            ],
-                                            "properties": {
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Jane Doe"
-                                                },
-                                                "jabatan": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "no_telp": {
-                                                    "type": "string",
-                                                    "example": "081234567890"
-                                                },
-                                                "email": {
-                                                    "type": "string",
-                                                    "example": "jane@example.com"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Checklist submitted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Checklist submitted successfully"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "npwp": {
-                                                    "type": "string",
-                                                    "example": "123456789012345"
-                                                },
-                                                "pic_invoice": {
-                                                    "type": "string",
-                                                    "example": "John Doe"
-                                                },
-                                                "pics_added": {
-                                                    "type": "integer",
-                                                    "example": 2
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Quotation not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation error"
-                                        },
-                                        "errors": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to submit checklist"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/pks/upload/{id}": {
             "post": {
                 "tags": [
@@ -25431,6 +25162,260 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Error deleting SPK site"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/spk/{id}/submit-checklist": {
+            "post": {
+                "tags": [
+                    "SPK"
+                ],
+                "summary": "Submit SPK checklist",
+                "description": "Submits checklist data for SPK including NPWP, invoice, and other administrative details",
+                "operationId": "38d5dcaca1017ffa5773d2e665c2bea1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Quotation ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Checklist data",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "npwp",
+                                    "alamat_npwp",
+                                    "pic_invoice",
+                                    "telp_pic_invoice",
+                                    "email_pic_invoice",
+                                    "materai",
+                                    "joker_reliever",
+                                    "syarat_invoice",
+                                    "alamat_penagihan_invoice",
+                                    "status_serikat"
+                                ],
+                                "properties": {
+                                    "npwp": {
+                                        "description": "NPWP number",
+                                        "type": "string",
+                                        "example": "123456789012345"
+                                    },
+                                    "alamat_npwp": {
+                                        "description": "NPWP address",
+                                        "type": "string",
+                                        "example": "Jl. Sudirman No. 123, Jakarta"
+                                    },
+                                    "pic_invoice": {
+                                        "description": "PIC for invoice",
+                                        "type": "string",
+                                        "example": "John Doe"
+                                    },
+                                    "telp_pic_invoice": {
+                                        "description": "Phone number of PIC",
+                                        "type": "string",
+                                        "example": "081234567890"
+                                    },
+                                    "email_pic_invoice": {
+                                        "description": "Email of PIC",
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "john@example.com"
+                                    },
+                                    "materai": {
+                                        "description": "Stamp duty amount",
+                                        "type": "string",
+                                        "example": "10000"
+                                    },
+                                    "joker_reliever": {
+                                        "description": "Joker/Reliever availability",
+                                        "type": "string",
+                                        "example": "Tersedia"
+                                    },
+                                    "syarat_invoice": {
+                                        "description": "Invoice terms",
+                                        "type": "string",
+                                        "example": "Net 30 days"
+                                    },
+                                    "alamat_penagihan_invoice": {
+                                        "description": "Invoice billing address",
+                                        "type": "string",
+                                        "example": "Jl. Thamrin No. 456, Jakarta"
+                                    },
+                                    "catatan_site": {
+                                        "description": "Site notes",
+                                        "type": "string",
+                                        "example": "Catatan penting untuk site"
+                                    },
+                                    "status_serikat": {
+                                        "description": "Union status",
+                                        "type": "string",
+                                        "example": "Tidak Ada"
+                                    },
+                                    "ada_serikat": {
+                                        "description": "Union existence",
+                                        "type": "string",
+                                        "example": "Tidak Ada"
+                                    },
+                                    "pics": {
+                                        "description": "Array of PIC data",
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "nama",
+                                                "jabatan",
+                                                "no_telp",
+                                                "email"
+                                            ],
+                                            "properties": {
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Jane Doe"
+                                                },
+                                                "jabatan": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "no_telp": {
+                                                    "type": "string",
+                                                    "example": "081234567890"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "example": "jane@example.com"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Checklist submitted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Checklist submitted successfully"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "npwp": {
+                                                    "type": "string",
+                                                    "example": "123456789012345"
+                                                },
+                                                "pic_invoice": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "pics_added": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Quotation not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation error"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to submit checklist"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
                                         }
                                     },
                                     "type": "object"

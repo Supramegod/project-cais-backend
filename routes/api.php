@@ -330,6 +330,9 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
         Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
+        
+        // Submit Checklist
+        Route::post('/{id}/submit-checklist', 'submitChecklist');
     });
     // Role Management
     Route::prefix('roles')->controller(RoleController::class)->group(function () {
