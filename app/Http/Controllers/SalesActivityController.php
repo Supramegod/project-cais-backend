@@ -422,7 +422,8 @@ class SalesActivityController extends Controller
                 'start' => $request->start,
                 'end' => $request->end,
                 'durasi' => $request->durasi,
-                'penerima' => $request->penerima
+                'penerima' => $request->penerima,
+                'jenis_visit'=> $request->jenis_visit,
             ]);
 
             // Handle file uploads dari multipart/form-data
@@ -606,7 +607,7 @@ class SalesActivityController extends Controller
                 'tgl_activity' => Carbon::parse($salesActivity->tgl_activity)->format('Y-m-d'),
                 'created_at' => $salesActivity->created_at,
                 'created_by' => $salesActivity->created_by,
-                'files' => $salesActivity->files->map(function ($file) {
+                'activity_files' => $salesActivity->files->map(function ($file) {
                     return [
                         'id' => $file->id,
                         'nama_file' => $file->nama_file,
@@ -615,12 +616,18 @@ class SalesActivityController extends Controller
                     ];
                 }),
             ];
-            if ($activityData['jenis_activity'] == 'Appointment') {
-                $activityData['start'] = $salesActivity->start;
-                $activityData['end'] = $salesActivity->end;
-                $activityData['durasi'] = $salesActivity->durasi;
-            } elseif ($activityData['jenis_activity'] == 'Kirim Proposal') {
-                $activityData['penerima'] = $salesActivity->penerima;
+            switch ($activityData['jenis_activity']) {
+                case 'Appointment':
+                    $activityData['start'] = $salesActivity->start;
+                    $activityData['end'] = $salesActivity->end;
+                    $activityData['durasi'] = $salesActivity->durasi;
+                    break;
+                case 'Kirim Berkas':
+                    $activityData['penerima'] = $salesActivity->penerima;
+                    break;
+                case 'Visit':
+                    $activityData['jenis_visit'] = $salesActivity->jenis_visit;
+                    break;
             }
 
             return response()->json([

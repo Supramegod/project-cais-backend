@@ -22,6 +22,7 @@ class SalesActivity extends Model
         'end',
         'durasi',
         'penerima',
+        'jenis_visit',
         'jenis_activity',
         'notulen',
         'created_by'
