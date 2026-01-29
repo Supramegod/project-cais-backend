@@ -2523,10 +2523,8 @@ class QuotationService
 
         $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
 
-        // LOGIKA PERBAIKAN TOP (POINT 4)
-        $labelMaksimal = ($quotation->top === 'Non TOP') ? "" : " maksimal 30 hari kalender";
 
-        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian adalah <b>TOP/talangan</b>" . $labelMaksimal . " dengan skema sebagai berikut: <br>" . $tableSalary;
+        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian dengan skema sebagai berikut: <br>" . $tableSalary;
 
         $catatanKaki = "<i><br>*Rilis gaji adalah talangan.";
 
