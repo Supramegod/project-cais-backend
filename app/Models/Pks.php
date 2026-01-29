@@ -71,6 +71,7 @@ class Pks extends Model
         'ohc',
         'thr_provisi',
         'thr_ditagihkan',
+        'rule_thr_id',
         'penagihan_selisih_thr',
         'kaporlap',
         'device',

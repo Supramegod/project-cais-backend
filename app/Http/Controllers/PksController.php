@@ -311,13 +311,13 @@ class PksController extends Controller
                         'created_by' => $perjanjian->created_by
                     ];
                 })->toArray(),
-                'rule_thr' => $pks->ruleThr ? [
-                    'id' => $pks->ruleThr->id,
-                    'nama' => $pks->ruleThr->nama,
-                    'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr,
-                    'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
-                    'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice
-                ] : null
+                // 'rule_thr' => $pks->ruleThr ? [
+                //     'id' => $pks->ruleThr->id,
+                //     'nama' => $pks->ruleThr->nama,
+                //     'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr,
+                //     'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
+                //     'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice
+                // ] : null
             ];
 
             // QUOTATION DATA
@@ -1318,96 +1318,96 @@ class PksController extends Controller
      *     )
      * )
      */
-    public function submitChecklist(Request $request, string $id): JsonResponse
-    {
-        DB::beginTransaction();
-        try {
-            $user = Auth::user();
-            $current_date_time = Carbon::now()->toDateTimeString();
+    // public function submitChecklist(Request $request, string $id): JsonResponse
+    // {
+    //     DB::beginTransaction();
+    //     try {
+    //         $user = Auth::user();
+    //         $current_date_time = Carbon::now()->toDateTimeString();
 
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'npwp' => 'required|string|max:50',
-                'alamat_npwp' => 'required|string|max:255',
-                'materai' => 'required|string|max:50',
-                'joker_reliever' => 'required|string|max:50',
-                'syarat_invoice' => 'required|string|max:255',
-                'alamat_penagihan_invoice' => 'required|string|max:255',
-                'catatan_site' => 'nullable|string',
-                'ada_serikat' => 'nullable|string',
-                // Validasi untuk PICs
-                'pics' => 'nullable|array',
-                'pics.*.nama' => 'required|string|max:100',
-                'pics.*.jabatan' => 'required|integer|exists:m_jabatan_pic,id',
-                'pics.*.no_telp' => 'required|string|max:20',
-                'pics.*.email' => 'required|email|max:100'
-            ]);
+    //         // Validasi input
+    //         $validator = Validator::make($request->all(), [
+    //             'npwp' => 'required|string|max:50',
+    //             'alamat_npwp' => 'required|string|max:255',
+    //             'materai' => 'required|string|max:50',
+    //             'joker_reliever' => 'required|string|max:50',
+    //             'syarat_invoice' => 'required|string|max:255',
+    //             'alamat_penagihan_invoice' => 'required|string|max:255',
+    //             'catatan_site' => 'nullable|string',
+    //             'ada_serikat' => 'nullable|string',
+    //             // Validasi untuk PICs
+    //             'pics' => 'nullable|array',
+    //             'pics.*.nama' => 'required|string|max:100',
+    //             'pics.*.jabatan' => 'required|integer|exists:m_jabatan_pic,id',
+    //             'pics.*.no_telp' => 'required|string|max:20',
+    //             'pics.*.email' => 'required|email|max:100'
+    //         ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
-            }
+    //         if ($validator->fails()) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => $validator->errors()
+    //             ], 422);
+    //         }
 
-            // Cari quotation
-            $quotation = Quotation::notDeleted()->findOrFail($id);
+    //         // Cari quotation
+    //         $quotation = Quotation::notDeleted()->findOrFail($id);
 
-            // Logika untuk status serikat
-            $statusSerikat = $request->status_serikat;
-            if ($request->ada_serikat === "Tidak Ada") {
-                $statusSerikat = "Tidak Ada";
-            }
+    //         // Logika untuk status serikat
+    //         $statusSerikat = $request->status_serikat;
+    //         if ($request->ada_serikat === "Tidak Ada") {
+    //             $statusSerikat = "Tidak Ada";
+    //         }
 
-            // Update quotation data
-            $quotation->update([
-                'npwp' => $request->npwp,
-                'alamat_npwp' => $request->alamat_npwp,
-                'pic_invoice' => $request->pic_invoice,
-                'telp_pic_invoice' => $request->telp_pic_invoice,
-                'email_pic_invoice' => $request->email_pic_invoice,
-                'materai' => $request->materai,
-                'joker_reliever' => $request->joker_reliever,
-                'syarat_invoice' => $request->syarat_invoice,
-                'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
-                'catatan_site' => $request->catatan_site,
-                'status_serikat' => $statusSerikat,
-                'updated_at' => $current_date_time,
-                'updated_by' => $user->full_name
-            ]);
+    //         // Update quotation data
+    //         $quotation->update([
+    //             'npwp' => $request->npwp,
+    //             'alamat_npwp' => $request->alamat_npwp,
+    //             'pic_invoice' => $request->pic_invoice,
+    //             'telp_pic_invoice' => $request->telp_pic_invoice,
+    //             'email_pic_invoice' => $request->email_pic_invoice,
+    //             'materai' => $request->materai,
+    //             'joker_reliever' => $request->joker_reliever,
+    //             'syarat_invoice' => $request->syarat_invoice,
+    //             'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
+    //             'catatan_site' => $request->catatan_site,
+    //             'status_serikat' => $statusSerikat,
+    //             'updated_at' => $current_date_time,
+    //             'updated_by' => $user->full_name
+    //         ]);
 
-            // Tambah PICs jika ada
-            $picsAdded = 0;
-            if ($request->has('pics') && is_array($request->pics)) {
-                foreach ($request->pics as $picData) {
-                    $this->addDetailPic($quotation, $picData, $current_date_time);
-                    $picsAdded++;
-                }
-            }
+    //         // Tambah PICs jika ada
+    //         $picsAdded = 0;
+    //         if ($request->has('pics') && is_array($request->pics)) {
+    //             foreach ($request->pics as $picData) {
+    //                 $this->addDetailPic($quotation, $picData, $current_date_time);
+    //                 $picsAdded++;
+    //             }
+    //         }
 
-            DB::commit();
+    //         DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Checklist submitted successfully',
-                'data' => [
-                    'id' => $quotation->id,
-                    'npwp' => $quotation->npwp,
-                    'pic_invoice' => $quotation->pic_invoice,
-                    'pics_added' => $picsAdded
-                ]
-            ]);
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Checklist submitted successfully',
+    //             'data' => [
+    //                 'id' => $quotation->id,
+    //                 'npwp' => $quotation->npwp,
+    //                 'pic_invoice' => $quotation->pic_invoice,
+    //                 'pics_added' => $picsAdded
+    //             ]
+    //         ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Failed to submit checklist: ' . $e->getMessage());
+    //     } catch (\Exception $e) {
+    //         DB::rollBack();
+    //         \Log::error('Failed to submit checklist: ' . $e->getMessage());
 
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
     /**
      * @OA\Post(
      *     path="/api/pks/upload/{id}",
@@ -1574,6 +1574,7 @@ class PksController extends Controller
         $ruleThr = RuleThr::find($request->rule_thr);
         $salaryRule = SalaryRule::find($request->salary_rule);
         $company = Company::find($request->entitas);
+        $quotation = Quotation::where('leads_id', $leads->id)->first();
         // $spkSite = SpkSite::where('id', $request->site_ids)->first();
 
         $pksNomor = $this->generateNomor($leads->id, $request->entitas);
@@ -1600,7 +1601,7 @@ class PksController extends Controller
             'sales_id' => Auth::id(),
             'company_id' => $request->entitas,
             'salary_rule_id' => $request->salary_rule,
-            'rule_thr_id' => $request->rule_thr,
+            'rule_thr_id' => $quotation->rule_thr_id,
             'kategori_sesuai_hc_id' => $request->kategoriHC,
             'kategori_sesuai_hc' => $kategoriHC->nama ?? null,
             'loyalty_id' => $request->loyalty,

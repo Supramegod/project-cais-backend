@@ -93,6 +93,9 @@ deploy-dev:
         sudo chown -R www-data:www-data storage
         sudo chmod -R 775 storage
 
+        # Create storage symlink on host
+        ln -sfn ../storage/app/public public/storage
+
         docker compose -f docker-compose-dev.yml build --no-cache cais-v2-be-dev
 
         echo "Deploying backend..."
@@ -142,6 +145,9 @@ deploy-prod:
         mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
         sudo chown -R www-data:www-data storage
         sudo chmod -R 775 storage
+
+        # Create storage symlink on host
+        ln -sfn ../storage/app/public public/storage
 
         docker compose -f docker-compose-prod.yml build --no-cache cais-v2-be-prod
 
