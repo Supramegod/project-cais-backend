@@ -7657,6 +7657,337 @@
                 ]
             }
         },
+        "/api/dashboard-approval/notifications": {
+            "get": {
+                "tags": [
+                    "Dashboard Approval"
+                ],
+                "summary": "Get notifications for dashboard approval",
+                "description": "Mengambil notifikasi approval quotation untuk user yang sedang login",
+                "operationId": "bf1172697e18bdd95bb3f3f684445553",
+                "parameters": [
+                    {
+                        "name": "is_read",
+                        "in": "query",
+                        "description": "Filter berdasarkan status baca (0=unread, 1=read)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "enum": [
+                                0,
+                                1
+                            ]
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Jumlah notifikasi yang ditampilkan",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "description": "Offset untuk pagination",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 0
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "notifications": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "tabel": {
+                                                                "type": "string",
+                                                                "example": "sl_quotation"
+                                                            },
+                                                            "doc_id": {
+                                                                "type": "integer",
+                                                                "example": 123
+                                                            },
+                                                            "transaksi": {
+                                                                "type": "string",
+                                                                "example": "Quotation"
+                                                            },
+                                                            "pesan": {
+                                                                "type": "string",
+                                                                "example": "Quotation dengan nomor: QUO/2023/001 di approve oleh John Doe"
+                                                            },
+                                                            "is_read": {
+                                                                "type": "boolean",
+                                                                "example": false
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "example": "2023-01-01T10:00:00.000000Z"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "time_ago": {
+                                                                "type": "string",
+                                                                "example": "2 jam yang lalu"
+                                                            },
+                                                            "quotation": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer",
+                                                                        "example": 123
+                                                                    },
+                                                                    "nomor": {
+                                                                        "type": "string",
+                                                                        "example": "QUO/2023/001"
+                                                                    },
+                                                                    "nama_perusahaan": {
+                                                                        "type": "string",
+                                                                        "example": "PT ABC Indonesia"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "unread_count": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 25
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-approval/notifications/{id}/read": {
+            "put": {
+                "tags": [
+                    "Dashboard Approval"
+                ],
+                "summary": "Mark notification as read",
+                "description": "Menandai notifikasi sebagai sudah dibaca",
+                "operationId": "8d1345de77c8fa0e5a73a45267c784b8",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID notifikasi",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Notification marked as read"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "is_read": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Notification not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-approval/notifications/read-all": {
+            "put": {
+                "tags": [
+                    "Dashboard Approval"
+                ],
+                "summary": "Mark all notifications as read",
+                "description": "Menandai semua notifikasi sebagai sudah dibaca",
+                "operationId": "1696f82f0296cc659dee71b37ea01cb9",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "All notifications marked as read"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "updated_count": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-approval/notifications/unread-count": {
+            "get": {
+                "tags": [
+                    "Dashboard Approval"
+                ],
+                "summary": "Get unread notifications count",
+                "description": "Mengambil jumlah notifikasi yang belum dibaca",
+                "operationId": "cee4c935be12bef5a77243ef5db3f825",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "unread_count": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/devices/list": {
             "get": {
                 "tags": [
@@ -10116,6 +10447,36 @@
                             "type": "integer",
                             "example": 1
                         }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Pencarian berdasarkan nama perusahaan. Jika ada parameter search, filter tanggal akan diabaikan untuk mencari di semua data",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman untuk pagination (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman untuk pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
                     }
                 ],
                 "responses": {
@@ -10209,6 +10570,35 @@
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "from": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "to": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"

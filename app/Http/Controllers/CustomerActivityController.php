@@ -358,6 +358,8 @@ class CustomerActivityController extends Controller
                 'tipe' => $activity->tipe,
                 'notes' => $activity->notes_tipe ?? $activity->notes,
                 'tgl_activity' => $activity->tgl_activity,
+                'created_at' => $activity->getRawOriginal('created_at'),
+                'created_by' => $activity->created_by,
                 'activity_files' => $activity->files->map(function ($file) {
                     return [
                         'id' => $file->id,
