@@ -1586,9 +1586,6 @@ class SpkController extends Controller
             $validator = Validator::make($request->all(), [
                 'npwp' => 'required|string|max:50',
                 'alamat_npwp' => 'required|string|max:255',
-                'pic_invoice' => 'required|string|max:100',
-                'telp_pic_invoice' => 'required|string|max:20',
-                'email_pic_invoice' => 'required|email|max:100',
                 'materai' => 'required|string|max:50',
                 'joker_reliever' => 'required|string|max:50',
                 'syarat_invoice' => 'required|string|max:255',
@@ -1598,17 +1595,16 @@ class SpkController extends Controller
                 'ada_serikat' => 'nullable|string',
                 // Validasi untuk PICs
                 'pics' => 'nullable|array',
-                'pics.*.nama' => 'required|string|max:100',
-                'pics.*.jabatan' => 'required|integer|exists:m_jabatan_pic,id',
-                'pics.*.no_telp' => 'required|string|max:20',
-                'pics.*.email' => 'required|email|max:100'
+                'pics.*.nama' => 'required_if:pics,!=,null|string|max:100',
+                'pics.*.jabatan' => 'required_if:pics,!=,null|integer|exists:m_jabatan_pic,id',
+                'pics.*.no_telp' => 'required_if:pics,!=,null|string|max:20',
+                'pics.*.email' => 'required_if:pics,!=,null|email|max:100'
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
