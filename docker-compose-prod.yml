@@ -11,6 +11,7 @@ services:
     volumes:
       - /home/data/beta/project-cais-backend/.env:/var/www/laravel/.env:ro
       - /home/data/beta/project-cais-backend/storage:/var/www/laravel/storage
+      - /home/data/beta/project-cais-backend/public/document:/var/www/laravel/public/document
     restart: unless-stopped
     deploy:
       resources:
