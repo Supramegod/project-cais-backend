@@ -90,10 +90,12 @@ deploy-dev:
         git reset --hard origin/development
 
         mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
-        sudo chown -R www-data:www-data storage
-        sudo chmod -R 775 storage
+        mkdir -p public/document
 
-        # Create storage symlink on host
+        sudo chown -R www-data:www-data storage public/document
+        sudo chmod -R 775 storage public/document
+
+        # Connect storage public for other files if needed (optional)
         ln -sfn ../storage/app/public public/storage
 
         docker compose -f docker-compose-dev.yml build --no-cache cais-v2-be-dev
@@ -143,10 +145,12 @@ deploy-prod:
         git reset --hard origin/prod
 
         mkdir -p storage/{app/public,framework/{cache,sessions,views},logs}
-        sudo chown -R www-data:www-data storage
-        sudo chmod -R 775 storage
+        mkdir -p public/document
 
-        # Create storage symlink on host
+        sudo chown -R www-data:www-data storage public/document
+        sudo chmod -R 775 storage public/document
+
+        # Connect storage public for other files if needed (optional)
         ln -sfn ../storage/app/public public/storage
 
         docker compose -f docker-compose-prod.yml build --no-cache cais-v2-be-prod
