@@ -2161,10 +2161,11 @@ class SpkController extends Controller
 
         QuotationPic::create([
             'quotation_id' => $quotation->id,
-            'nama_pic' => $picData['nama'],
+            'nama' => $picData['nama'],
             'jabatan_id' => $picData['jabatan'],
-            'telepon_pic' => $picData['no_telp'],
-            'email_pic' => $picData['email'],
+            'no_telp' => $picData['no_telp'],
+            'email' => $picData['email'],
+            'leads_id' => $quotation->leads_id,
             'is_kuasa' => 0, // Default tidak kuasa
             'created_at' => $currentDateTime,
             'created_by' => $user->full_name

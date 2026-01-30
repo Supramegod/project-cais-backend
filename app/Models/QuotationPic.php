@@ -14,6 +14,7 @@ class QuotationPic extends Model
 
     protected $fillable = [
         'quotation_id',
+        'leads_id',
         'nama',
         'jabatan_id',
         'no_telp',
