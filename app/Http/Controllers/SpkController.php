@@ -18,6 +18,7 @@ use App\Models\QuotationOhc;
 use App\Models\QuotationPic;
 use App\Models\QuotationTraining;
 use App\Models\SalesActivity;
+use App\Services\QuotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -466,6 +467,8 @@ class SpkController extends Controller
                 'spkSites.quotation.quotationPics.jabatan', // Relasi ke PIC dengan jabatan
                 'spkSites.quotation.company', // Relasi ke company untuk alamat
                 'spkSites.quotation.quotationDetails', // Relasi ke details untuk HC
+                'spkSites.quotation.quotationDetailCosses', // Relasi ke details untuk HC
+                'spkSites.quotation.quotationTrainings', // Relasi ke training
                 'spkSites' // Relasi ke site
             ])->find($id);
 
@@ -518,7 +521,7 @@ class SpkController extends Controller
                 // Calculate quotation using service
                 $calculatedQuotation = null;
                 try {
-                    $quotationService = new \App\Services\QuotationService();
+                    $quotationService = new QuotationService();
                     $calculatedQuotation = $quotationService->calculateQuotation($quotation);
                 } catch (\Exception $e) {
                     \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
@@ -537,7 +540,7 @@ class SpkController extends Controller
                     ];
                 } else {
                     // Fallback to first detail if calculation fails
-                    $firstDetail = $quotation->quotationDetails->first();
+                    $firstDetail = $quotation->quotationDetailCosses->first();
                     $persenBpjsBreakdown = [
                         'persen_bpjs_jkk' => $firstDetail->persen_bpjs_jkk ?? 0,
                         'persen_bpjs_jkm' => $firstDetail->persen_bpjs_jkm ?? 0,
@@ -558,11 +561,12 @@ class SpkController extends Controller
                 // $picKuasa = $quotation->quotationPics->where('is_kuasa', 1)->first();
                 $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
                 // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
+                $cossdata = $quotation->quotationDetailCosses->first();
 
                 // Get first detail for BPJS percentages
                 $firstDetail = $quotation->quotationDetails->first();
                 $adatserikat = $quotation->status_serikat ? "Ada" : "Tidak Ada";
-                
+
                 $quotationsInfo[] = [
                     'id' => $quotation->id,
                     'nomor_quotation' => $quotation->nomor ?? null,
@@ -595,7 +599,9 @@ class SpkController extends Controller
                     'persen_bpjs_jht' => $persenBpjsBreakdown['persen_bpjs_jht'],
                     'persen_bpjs_jp' => $persenBpjsBreakdown['persen_bpjs_jp'],
                     'persen_bpjs_kesehatan' => $persenBpjsBreakdown['persen_bpjs_kesehatan'],
-                    'kompensasi' => $quotation->kompensasi ?? null,
+                    'kompensasi' => $cossdata ? $cossdata->kompensasi ?? null : null,
+                    'lembur' => $cossdata ? $cossdata->lembur ?? null : null,
+                    'thr' => $cossdata ? $cossdata->tunjangan_hari_raya ?? null : null,
                     'joker_reliever' => $quotation->joker_reliever ?? null,
                     'syarat_invoice' => $quotation->syarat_invoice ?? null,
                     'top' => $quotation->top ?? null,
@@ -603,6 +609,9 @@ class SpkController extends Controller
                     'tipe_hari_invoice' => $quotation->tipe_hari_invoice ?? null,
                     'alamat_penagihan_invoice' => $quotation->alamat_penagihan_invoice ?? null,
                     'catatan_site' => $quotation->catatan_site ?? null,
+                    'cuti' => $quotation->cuti ?? null,
+                    'gaji_saat_cuti' => $quotation->gaji_saat_cuti ?? null,
+                    'prorate' => $quotation->prorate ?? null,
                     'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
                     'ada_serikat' => $adatserikat,
                     'salary_rule' => $quotation->salaryRule ? [
@@ -636,6 +645,13 @@ class SpkController extends Controller
                             'no_telp' => $pic->no_telp,
                             'email' => $pic->email,
                             'is_kuasa' => $pic->is_kuasa
+                        ];
+                    }),
+                    'quotation_trainings' => $quotation->quotationTrainings->map(function ($training) {
+                        return [
+                            'id' => $training->id,
+                            'training_id' => $training->training_id,
+                            'nama' => $training->nama,
                         ];
                     })
                 ];
@@ -1596,9 +1612,9 @@ class SpkController extends Controller
                 // Validasi untuk PICs
                 'pics' => 'nullable|array',
                 'pics.*.nama' => 'required_if:pics,!=,null|string|max:100',
-                'pics.*.jabatan' => 'required_if:pics,!=,null|integer|exists:m_jabatan_pic,id',
-                'pics.*.no_telp' => 'required_if:pics,!=,null|string|max:20',
-                'pics.*.email' => 'required_if:pics,!=,null|email|max:100'
+                'pics.*.jabatan' => 'nullable:pics,!=,null|integer|exists:m_jabatan_pic,id',
+                'pics.*.no_telp' => 'nullable:pics,!=,null|string|max:20',
+                'pics.*.email' => 'nullable:pics,!=,null|email|max:100'
             ]);
 
             if ($validator->fails()) {
