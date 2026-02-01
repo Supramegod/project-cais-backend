@@ -426,6 +426,10 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
     Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
         Route::get('/list', 'getListDashboardApprovalData');
+        Route::get('/notifications', 'getNotifications');
+        Route::put('/notifications/{id}/read', 'markAsRead');
+        Route::put('/notifications/read-all', 'markAllAsRead');
+        Route::get('/notifications/unread-count', 'getUnreadCount');
     });
 
     // Sales Activity Routes

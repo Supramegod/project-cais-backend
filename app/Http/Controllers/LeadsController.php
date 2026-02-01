@@ -82,6 +82,27 @@ class LeadsController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Pencarian berdasarkan nama perusahaan. Jika ada parameter search, filter tanggal akan diabaikan untuk mencari di semua data",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman untuk pagination (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman untuk pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil data leads",
@@ -120,6 +141,16 @@ class LeadsController extends Controller
      *                         @OA\Property(property="nama", type="string")
      *                     )
      *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="pagination",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=75),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="to", type="integer", example=15)
      *             )
      *         )
      *     ),
@@ -143,7 +174,6 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
-            // ✅ Select hanya kolom yang diperlukan
             $query = Leads::select([
                 'id',
                 'nomor',
@@ -167,46 +197,36 @@ class LeadsController extends Controller
                     'branch:id,name',
                     'platform:id,nama',
                     'timSalesD:id,nama',
-                    'kebutuhan'
+                    'kebutuhan' => function ($q) {
+                        $q->select('m_kebutuhan.id', 'm_kebutuhan.nama'); // sesuaikan nama tabel kebutuhan
+                    },
+                    'leadsKebutuhan.timSalesD:id,nama'
                 ])
                 ->where('status_leads_id', '!=', 102);
 
-            // ✅ Terapkan filter berdasarkan role user
+            // ✅ Gunakan scope yang sudah ada di model Leads.php
             $query->filterByUserRole();
 
-            // Filter tanggal
-            if ($request->filled('tgl_dari')) {
-                $query->where('tgl_leads', '>=', $request->tgl_dari);
+            // ✅ Optimasi Search dengan Fulltext
+            if ($request->filled('search')) {
+                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$request->search . '*']);
             } else {
-                $query->whereDate('tgl_leads', Carbon::today());
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
 
-            if ($request->filled('tgl_sampai')) {
-                $query->where('tgl_leads', '<=', $request->tgl_sampai);
-            } else {
-                $query->whereDate('tgl_leads', Carbon::today());
-            }
-
-            // Filter lainnya
-            if ($request->filled('branch')) {
+            // Filter tambahan
+            if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
-            }
-
-            if ($request->filled('platform')) {
+            if ($request->filled('platform'))
                 $query->where('platform_id', $request->platform);
-            }
-
-            if ($request->filled('status')) {
+            if ($request->filled('status'))
                 $query->where('status_leads_id', $request->status);
-            }
 
-            // Order by created_at desc
-            $query->orderBy('created_at', 'desc');
+            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
-            $data = $query->get();
-
-            // ✅ Transform ke format yang dibutuhkan frontend
-            $transformedData = $data->map(function ($item) {
+            $transformedData = $data->getCollection()->map(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
@@ -226,32 +246,33 @@ class LeadsController extends Controller
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
                     'notes' => $item->notes,
-                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
                         return [
-                            'id' => $kebutuhan->id,
-                            'nama' => $kebutuhan->nama,
-                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
-                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
-                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                            'id' => $lk->kebutuhan_id,
+                            'nama' => $lk->kebutuhan->nama ?? '-',
+                            'tim_sales_d_id' => $lk->tim_sales_d_id,
+                            'sales_name' => $lk->timSalesD->nama ?? '-'
                         ];
-                    })->toArray()
+                    })
                 ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads berhasil diambil',
-                'data' => $transformedData
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ]
             ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
 
     private function canViewLead($lead, $tim)
     {
@@ -545,7 +566,7 @@ class LeadsController extends Controller
             $lead = Leads::create([
                 'nomor' => $nomor,
                 'tgl_leads' => $current_date_time,
-                'nama_perusahaan' => $request->nama_perusahaan,
+                'nama_perusahaan' => strtoupper($request->nama_perusahaan),
                 'telp_perusahaan' => $request->telp_perusahaan,
                 'jenis_perusahaan_id' => $request->jenis_perusahaan,
                 'jenis_perusahaan' => $jenisPerusahaan ? $jenisPerusahaan->nama : null,
