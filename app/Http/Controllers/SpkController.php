@@ -616,19 +616,19 @@ class SpkController extends Controller
                     'ada_serikat' => $adatserikat,
                     'salary_rule' => $quotation->salaryRule ? [
                         'id' => $quotation->salaryRule->id,
-                        'nama' => $quotation->salaryRule->nama_salary_rule,
-                        'cutoff' => $quotation->salaryRule->cutoff,
-                        'crosscheck' => $quotation->salaryRule->crosscheck_absen,
-                        'pengiriman_invoice' => $quotation->salaryRule->pengiriman_invoice,
-                        'perkiraan_invoice_diterima' => $quotation->salaryRule->perkiraan_invoice_diterima,
-                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll
+                        'nama' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->nama_salary_rule ?? null) : null,
+                        'cutoff' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->cutoff ?? null) : null,
+                        'crosscheck' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->crosscheck_absen ?? null) : null,
+                        'pengiriman_invoice' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->pengiriman_invoice ?? null) : null,
+                        'perkiraan_invoice_diterima' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->perkiraan_invoice_diterima ?? null) : null,
+                        'rilis_payroll' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->rilis_payroll ?? null) : null
                     ] : null,
                     'rulethr' => $quotation->ruleThr ? [
                         'id' => $quotation->ruleThr->id,
-                        'nama' => $quotation->ruleThr->nama,
-                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr,
-                        'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice,
-                        'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice
+                        'nama' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->nama ?? null) : null,
+                        'hari_rilis_thr' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_rilis_thr ?? null) : null,
+                        'hari_pembayaran_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_pembayaran_invoice ?? null) : null,
+                        'hari_penagihan_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_penagihan_invoice ?? null) : null
                     ] : null,
                     'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
                         return [
@@ -641,7 +641,7 @@ class SpkController extends Controller
                         return [
                             'id' => $pic->id,
                             'nama' => $pic->nama,
-                            'jabatan' => $pic->jabatan ? $pic->jabatan->nama : null,
+                            'jabatan' => is_object($pic->jabatan) ? ($pic->jabatan->nama ?? null) : null,
                             'no_telp' => $pic->no_telp,
                             'email' => $pic->email,
                             'is_kuasa' => $pic->is_kuasa
@@ -1329,7 +1329,7 @@ class SpkController extends Controller
                         'nama_site' => $site->nama_site,
                         'provinsi' => $site->provinsi,
                         'kota' => $site->kota,
-                        'quotation' => $site->quotation->nomor,
+                        'quotation' => is_object($site->quotation) ? $site->quotation->nomor : $site->quotation,
                         'ump' => $site->ump,
                         'umk' => $site->umk,
                         'nominal_upah' => $site->nominal_upah,
