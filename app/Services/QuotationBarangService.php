@@ -33,7 +33,12 @@ class QuotationBarangService
             // 1. FIRST, collect all incoming keys (barang_id + identifier)
             $incomingKeys = collect($barangData)
                 ->map(function ($data) use ($useDetailId, $useSiteId) {
-                    $key = (string)$data['barang_id'];
+                    // Untuk custom barang tanpa barang_id, gunakan nama sebagai identifier
+                    if (isset($data['is_custom']) && $data['is_custom'] && !isset($data['barang_id'])) {
+                        $key = 'custom_' . md5($data['nama'] ?? 'unknown');
+                    } else {
+                        $key = (string)($data['barang_id'] ?? 'unknown');
+                    }
                     
                     if ($useDetailId && isset($data['quotation_detail_id'])) {
                         $key .= '_detail_' . (int)$data['quotation_detail_id'];
@@ -53,47 +58,28 @@ class QuotationBarangService
 
             // Jika ada data incoming, soft delete yang tidak ada
             if (!empty($incomingKeys)) {
-                $deleteQuery->where(function($query) use ($incomingKeys, $useDetailId, $useSiteId) {
-                    // Build condition untuk mengecualikan item yang ada di incomingKeys
-                    $firstCondition = true;
+                // Collect existing items to compare
+                $existingItems = $modelClass::where('quotation_id', $quotation->id)->get();
+                $itemsToDelete = [];
+                
+                foreach ($existingItems as $existing) {
+                    $existingKey = $this->generateItemKey($existing, $useDetailId, $useSiteId);
                     
-                    foreach ($incomingKeys as $key) {
-                        $parts = explode('_', $key);
-                        $barang_id = $parts[0];
-                        
-                        $conditions = [];
-                        $conditions[] = "barang_id = {$barang_id}";
-                        
-                        if (in_array('detail', $parts)) {
-                            $detailIndex = array_search('detail', $parts) + 1;
-                            if (isset($parts[$detailIndex])) {
-                                $detail_id = $parts[$detailIndex];
-                                $conditions[] = "quotation_detail_id = {$detail_id}";
-                            }
-                        }
-                        
-                        if (in_array('site', $parts)) {
-                            $siteIndex = array_search('site', $parts) + 1;
-                            if (isset($parts[$siteIndex])) {
-                                $site_id = $parts[$siteIndex];
-                                $conditions[] = "quotation_site_id = {$site_id}";
-                            }
-                        }
-                        
-                        if ($firstCondition) {
-                            $query->whereRaw("NOT (" . implode(' AND ', $conditions) . ")");
-                            $firstCondition = false;
-                        } else {
-                            $query->orWhereRaw("NOT (" . implode(' AND ', $conditions) . ")");
-                        }
+                    if (!in_array($existingKey, $incomingKeys)) {
+                        $itemsToDelete[] = $existing->id;
                     }
-                });
+                }
+                
+                if (!empty($itemsToDelete)) {
+                    $modelClass::whereIn('id', $itemsToDelete)
+                        ->update([
+                            'deleted_at' => now(),
+                            'deleted_by' => Auth::user()->full_name
+                        ]);
+                }
             }
 
-            $deleteQuery->update([
-                'deleted_at' => now(),
-                'deleted_by' => Auth::user()->full_name
-            ]);
+
 
             $createdCount = 0;
             $updatedCount = 0;
@@ -153,16 +139,38 @@ class QuotationBarangService
     }
 
     /**
+     * Generate key for existing item to match with incoming keys
+     */
+    private function generateItemKey($item, bool $useDetailId, bool $useSiteId): string
+    {
+        // Untuk custom barang tanpa barang_id
+        if (is_null($item->barang_id)) {
+            $key = 'custom_' . md5($item->nama ?? 'unknown');
+        } else {
+            $key = (string)$item->barang_id;
+        }
+        
+        if ($useDetailId && $item->quotation_detail_id) {
+            $key .= '_detail_' . $item->quotation_detail_id;
+        }
+        
+        if ($useSiteId && $item->quotation_site_id) {
+            $key .= '_site_' . $item->quotation_site_id;
+        }
+        
+        return $key;
+    }
+
+    /**
      * Process individual barang item
      */
     private function processBarangItem($quotation, string $jenisBarang, array $data, string $modelClass, array $jenisBarangIds, bool $useDetailId, bool $useSiteId): array
     {
         // Validasi data minimal
-        if (!isset($data['barang_id']) || !isset($data['jumlah'])) {
+        if (!isset($data['jumlah'])) {
             return ['success' => false, 'reason' => 'missing_required_fields'];
         }
 
-        $barang_id = (int) $data['barang_id'];
         $jumlah = (int) $data['jumlah'];
 
         // Skip jika jumlah 0 atau negatif
@@ -170,13 +178,55 @@ class QuotationBarangService
             return ['success' => false, 'reason' => 'zero_quantity'];
         }
 
-        // Cari barang
-        $barang = Barang::where('id', $barang_id)
-            ->whereIn('jenis_barang_id', $jenisBarangIds)
-            ->first();
+        // CASE 1: Barang custom
+        if (isset($data['is_custom']) && $data['is_custom']) {
+            // Validasi field yang diperlukan untuk barang custom
+            if (!isset($data['nama']) || !isset($data['harga'])) {
+                return ['success' => false, 'reason' => 'missing_custom_barang_fields'];
+            }
 
-        if (!$barang) {
-            return ['success' => false, 'reason' => 'barang_not_found'];
+            // Jika ada barang_id dari FE, gunakan itu. Jika tidak, set null
+            $barang_id = isset($data['barang_id']) ? (int) $data['barang_id'] : null;
+            $nama = $data['nama'];
+            $jenis_barang_id = $data['jenis_barang_id'] ?? null;
+            $jenis_barang = $data['jenis_barang'] ?? 'Custom';
+            
+            $harga = $data['harga'];
+            if (is_string($harga)) {
+                $harga = (float) str_replace(['.', ','], ['', '.'], $harga);
+            } else {
+                $harga = (float) $harga;
+            }
+        }
+        // CASE 2: Barang dari tabel barang (existing logic)
+        else {
+            if (!isset($data['barang_id'])) {
+                return ['success' => false, 'reason' => 'missing_barang_id'];
+            }
+
+            $barang_id = (int) $data['barang_id'];
+            
+            // Cari barang
+            $barang = Barang::where('id', $barang_id)
+                ->whereIn('jenis_barang_id', $jenisBarangIds)
+                ->first();
+
+            if (!$barang) {
+                return ['success' => false, 'reason' => 'barang_not_found'];
+            }
+
+            $nama = $barang->nama;
+            $jenis_barang_id = $barang->jenis_barang_id;
+            $jenis_barang = $barang->jenis_barang;
+            
+            $harga = $barang->harga;
+            if (isset($data['harga'])) {
+                if (is_string($data['harga'])) {
+                    $harga = (float) str_replace(['.', ','], ['', '.'], $data['harga']);
+                } else {
+                    $harga = (float) $data['harga'];
+                }
+            }
         }
 
         // Validasi identifier berdasarkan jenis barang
@@ -212,29 +262,20 @@ class QuotationBarangService
         // Handle masa pakai - hanya untuk chemical
         $masa_pakai = 1;
         if ($jenisBarang === 'chemicals') {
-            $masa_pakai = isset($data['masa_pakai']) ? (int) $data['masa_pakai'] : ($barang->masa_pakai ?? 12);
+            $masa_pakai = isset($data['masa_pakai']) ? (int) $data['masa_pakai'] : 12;
             if ($masa_pakai <= 0) {
                 $masa_pakai = 12;
             }
         }
 
-        $harga = $barang->harga;
-        if (isset($data['harga'])) {
-            if (is_string($data['harga'])) {
-                $harga = (float) str_replace(['.', ','], ['', '.'], $data['harga']);
-            } else {
-                $harga = (float) $data['harga'];
-            }
-        }
-
         $createData = [
             'quotation_id' => $quotation->id,            
-            'barang_id' => $barang_id,
+            'barang_id' => $barang_id, // null untuk custom barang
             'jumlah' => $jumlah,
             'harga' => $harga,
-            'nama' => $barang->nama,
-            'jenis_barang_id' => $barang->jenis_barang_id,
-            'jenis_barang' => $barang->jenis_barang,
+            'nama' => $nama,
+            'jenis_barang_id' => $jenis_barang_id,
+            'jenis_barang' => $jenis_barang,
             'masa_pakai' => $masa_pakai,
             'updated_by' => Auth::user()->full_name
         ];
@@ -248,8 +289,18 @@ class QuotationBarangService
         }
 
         // Cari data existing untuk update
-        $existingQuery = $modelClass::where('quotation_id', $quotation->id)
-            ->where('barang_id', $barang_id);
+        $existingQuery = $modelClass::where('quotation_id', $quotation->id);
+        
+        // Untuk custom barang, cari berdasarkan barang_id (jika ada) atau nama
+        if (isset($data['is_custom']) && $data['is_custom']) {
+            if ($barang_id !== null) {
+                $existingQuery->where('barang_id', $barang_id);
+            } else {
+                $existingQuery->where('nama', $nama)->whereNull('barang_id');
+            }
+        } else {
+            $existingQuery->where('barang_id', $barang_id);
+        }
 
         if ($useDetailId) {
             $existingQuery->where('quotation_detail_id', $quotation_detail_id);
