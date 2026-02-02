@@ -2504,6 +2504,30 @@ class QuotationStepService
                 'detail_count' => count($tunjanganData)
             ]);
 
+            // Get all existing details for this quotation
+            $allDetails = QuotationDetail::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->pluck('id')
+                ->toArray();
+
+            // Track which details are processed
+            $processedDetailIds = array_keys($tunjanganData);
+            
+            // Delete tunjangan for details not in request
+            $detailsToDeleteTunjangan = array_diff($allDetails, $processedDetailIds);
+            if (!empty($detailsToDeleteTunjangan)) {
+                QuotationDetailTunjangan::whereIn('quotation_detail_id', $detailsToDeleteTunjangan)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user
+                    ]);
+                
+                \Log::debug("Deleted tunjangan for details not in request", [
+                    'detail_ids' => $detailsToDeleteTunjangan
+                ]);
+            }
+
             foreach ($tunjanganData as $detailId => $tunjangans) {
                 // Verify detail belongs to this quotation
                 $detail = QuotationDetail::where('id', $detailId)
@@ -2528,8 +2552,25 @@ class QuotationStepService
                 // Track which tunjangan to keep
                 $processedTunjanganNames = [];
 
+                // If tunjangans is null or empty, delete all existing tunjangan for this detail
+                if (is_null($tunjangans) || empty($tunjangans)) {
+                    if ($existingTunjangan->isNotEmpty()) {
+                        QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
+                            ->whereNull('deleted_at')
+                            ->update([
+                                'deleted_at' => $currentDateTime,
+                                'deleted_by' => $user
+                            ]);
+                        
+                        \Log::debug("Deleted all tunjangan for detail (null/empty data)", [
+                            'detail_id' => $detailId
+                        ]);
+                    }
+                    continue;
+                }
+
                 // Process incoming tunjangan data
-                if (is_array($tunjangans) && !empty($tunjangans)) {
+                if (is_array($tunjangans)) {
                     foreach ($tunjangans as $tunjanganData) {
                         $namaTunjangan = trim($tunjanganData['nama_tunjangan'] ?? '');
                         $nominal = $tunjanganData['nominal'] ?? 0;
@@ -2540,32 +2581,14 @@ class QuotationStepService
                             continue;
                         }
 
-                        // ============================================
-                        // PERBAIKAN: Konversi ke FLOAT (bukan int)
-                        // ============================================
-
                         // Convert string nominal to float if needed
                         if (is_string($nominal)) {
-                            // Hapus karakter pemisah ribuan dan ubah ke float
                             $nominal = (float) str_replace(['.', ','], ['', '.'], $nominal);
-                            \Log::debug("Converted nominal from string to float", [
-                                'detail_id' => $detailId,
-                                'nama_tunjangan' => $namaTunjangan,
-                                'original' => $tunjanganData['nominal'],
-                                'converted' => $nominal
-                            ]);
                         }
 
                         // Convert string nominal_coss to float if needed
                         if (is_string($nominalCoss)) {
-                            // Hapus karakter pemisah ribuan dan ubah ke float
                             $nominalCoss = (float) str_replace(['.', ','], ['', '.'], $nominalCoss);
-                            \Log::debug("Converted nominal_coss from string to float", [
-                                'detail_id' => $detailId,
-                                'nama_tunjangan' => $namaTunjangan,
-                                'original' => $tunjanganData['nominal_coss'] ?? 'null',
-                                'converted' => $nominalCoss
-                            ]);
                         }
 
                         // Pastikan nilai numerik
@@ -2584,15 +2607,6 @@ class QuotationStepService
                                 'updated_at' => $currentDateTime,
                                 'updated_by' => $user
                             ]);
-
-                            \Log::debug("Updated tunjangan with FLOAT values", [
-                                'detail_id' => $detailId,
-                                'nama_tunjangan' => $namaTunjangan,
-                                'nominal' => $nominal,
-                                'nominal_type' => gettype($nominal),
-                                'nominal_coss' => $nominalCoss,
-                                'nominal_coss_type' => gettype($nominalCoss)
-                            ]);
                         } else {
                             // Create new
                             QuotationDetailTunjangan::create([
@@ -2603,15 +2617,6 @@ class QuotationStepService
                                 'nominal_coss' => $nominalCoss,
                                 'created_at' => $currentDateTime,
                                 'created_by' => $user
-                            ]);
-
-                            \Log::debug("Created tunjangan with FLOAT values", [
-                                'detail_id' => $detailId,
-                                'nama_tunjangan' => $namaTunjangan,
-                                'nominal' => $nominal,
-                                'nominal_type' => gettype($nominal),
-                                'nominal_coss' => $nominalCoss,
-                                'nominal_coss_type' => gettype($nominalCoss)
                             ]);
                         }
                     }
@@ -2635,7 +2640,7 @@ class QuotationStepService
                 }
             }
 
-            \Log::info("Tunjangan data sync completed with FLOAT conversion", [
+            \Log::info("Tunjangan data sync completed", [
                 'quotation_id' => $quotation->id
             ]);
 
