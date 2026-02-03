@@ -921,12 +921,14 @@ class QuotationResource extends JsonResource
             // Calculated fields
             'approval_highlights' => $this->approvalHighlights,
 
-            'approval_notes' => $this->relationLoaded('logNotifications') 
-                ? $this->logNotifications->pluck('pesan')->toArray()
-                : [],
+            // 'approval_notes' => $this->relationLoaded('logNotifications')
+            //     ? $this->logNotifications->pluck('pesan')->toArray()
+            //     : [],
 
-            'alasan_reject' => $this->relationLoaded('logNotifications') 
-                ? $this->logNotifications->where('pesan', 'like', '%reject%')->pluck('pesan')->filter()->last()
+            'alasan_reject' => $this->relationLoaded('logNotifications')
+                ? $this->logNotifications->filter(function ($notif) {
+                    return stripos($notif->pesan, 'reject') !== false;
+                })->pluck('pesan')->last()
                 : null,
 
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
