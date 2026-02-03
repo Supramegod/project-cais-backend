@@ -2701,9 +2701,9 @@ class QuotationStepService
 
 
             // D. Process BPJS persentase
-            if ($request->has('bpjs_persentase_data') && is_array($request->bpjs_persentase_data)) {
-                $this->updateBpjsPersentaseFromRequest($quotation, $request->bpjs_persentase_data, $user, $currentDateTime);
-            }
+            // if ($request->has('bpjs_persentase_data') && is_array($request->bpjs_persentase_data)) {
+            //     $this->updateBpjsPersentaseFromRequest($quotation, $request->bpjs_persentase_data, $user, $currentDateTime);
+            // }
 
             // E. Process tunjangan data
             if ($request->has('tunjangan_data') && is_array($request->tunjangan_data)) {
@@ -3028,10 +3028,10 @@ class QuotationStepService
                         'bpjs_jp' => null,
                         'bpjs_ks' => null,
                         // **PERBAIKAN 2: CLEAR NILAI KOMPENSASI, THR, LEMBUR JIKA ADA PERUBAHAN DI STEP 4**
-                        'tunjangan_hari_raya' => null,
-                        'kompensasi' => null,
-                        'tunjangan_hari_libur_nasional' => null,
-                        'lembur' => null,
+                        // 'tunjangan_hari_raya' => null,
+                        // 'kompensasi' => null,
+                        // 'tunjangan_hari_libur_nasional' => null,
+                        // 'lembur' => null,
                         'updated_by' => $user,
                         'updated_at' => $currentDateTime
                     ]);

@@ -1974,7 +1974,7 @@ class QuotationService
         return $result;
     }
 
-    private function getJkkPercentage($resiko)
+    private function    getJkkPercentage($resiko)
     {
         $percentages = [
             "Sangat Rendah" => 0.24,
