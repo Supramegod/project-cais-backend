@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\JabatanPic;
 use App\Models\JenisBarang;
 use App\Models\JenisPerusahaan;
+use App\Models\LeadsKebutuhan;
 use App\Models\LogNotification;
 use App\Models\ManagementFee;
 use App\Models\Position;
@@ -1459,12 +1460,16 @@ class QuotationStepService
         if (empty($recipientUserIds)) {
             return;
         }
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
 
         // Buat pesan notifikasi
         $quotationNumber = $quotation->nomor;
-        $creatorName = $user->full_name;
+        $creatorName = $leadsKebutuhan->timSalesD->nama;
 
-        $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName}dan membutuhkan persetujuan lebih lanjut.";
+        $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
 
         // Kirim notifikasi ke setiap recipient
         foreach ($recipientUserIds as $userId) {
