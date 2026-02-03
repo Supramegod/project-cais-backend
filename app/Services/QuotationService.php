@@ -19,6 +19,8 @@ use App\Models\{
     QuotationDevices,
     QuotationDetailWage,
     SalaryRule,
+    LeadsKebutuhan,
+    CustomerActivity,
     User
 };
 use App\DTO\QuotationCalculationResult;
@@ -158,7 +160,7 @@ class QuotationService
 
         $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
         $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
-        
+
         // **PERBAIKAN: Recalculate HPP dan COSS setelah bunga bank di-update**
         $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
         $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
@@ -422,190 +424,192 @@ class QuotationService
         ];
     }
     private function calculateBpjs($detail, $quotation, $hpp)
-{
-    \Log::info("=== START CALCULATE BPJS ===", [
-        'detail_id' => $detail->id,
-        'program_bpjs' => $quotation->program_bpjs,
-        'penjamin_kesehatan' => $detail->penjamin_kesehatan,
-        'nominal_upah' => $detail->nominal_upah,
-        'umk' => $detail->umk,
-        'ump' => $detail->ump,
-        'nominal_takaful' => $detail->nominal_takaful,
-        'hpp_exists' => !is_null($hpp)
-    ]);
+    {
+        \Log::info("=== START CALCULATE BPJS ===", [
+            'detail_id' => $detail->id,
+            'program_bpjs' => $quotation->program_bpjs,
+            'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+            'nominal_upah' => $detail->nominal_upah,
+            'umk' => $detail->umk,
+            'ump' => $detail->ump,
+            'nominal_takaful' => $detail->nominal_takaful,
+            'hpp_exists' => !is_null($hpp)
+        ]);
 
-    // Debug: Tampilkan semua field opt-out
-    \Log::info("BPJS Opt-Out Flags", [
-        'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? 'null',
-        'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? 'null',
-        'is_bpjs_jht' => $detail->is_bpjs_jht ?? 'null',
-        'is_bpjs_jp' => $detail->is_bpjs_jp ?? 'null',
-        'is_bpjs_kes' => $detail->is_bpjs_kes ?? 'null'
-    ]);
+        // Debug: Tampilkan semua field opt-out
+        \Log::info("BPJS Opt-Out Flags", [
+            'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? 'null',
+            'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? 'null',
+            'is_bpjs_jht' => $detail->is_bpjs_jht ?? 'null',
+            'is_bpjs_jp' => $detail->is_bpjs_jp ?? 'null',
+            'is_bpjs_kes' => $detail->is_bpjs_kes ?? 'null'
+        ]);
 
-    // Jika BPU, langsung return dengan setting ke 0
-    if ($detail->penjamin_kesehatan === 'BPU') {
-        \Log::info("BPU mode detected, BPJS will be 0");
-        $detail->bpjs_jkk = 0;
-        $detail->bpjs_jkm = 0;
-        $detail->bpjs_jht = 0;
-        $detail->bpjs_jp = 0;
-        $detail->bpjs_kes = 0;
+        // Jika BPU, langsung return dengan setting ke 0
+        if ($detail->penjamin_kesehatan === 'BPU') {
+            \Log::info("BPU mode detected, BPJS will be 0");
+            $detail->bpjs_jkk = 0;
+            $detail->bpjs_jkm = 0;
+            $detail->bpjs_jht = 0;
+            $detail->bpjs_jp = 0;
+            $detail->bpjs_kes = 0;
 
-        $detail->persen_bpjs_jkk = 0;
-        $detail->persen_bpjs_jkm = 0;
-        $detail->persen_bpjs_jht = 0;
-        $detail->persen_bpjs_jp = 0;
-        $detail->persen_bpjs_kes = 0;
+            $detail->persen_bpjs_jkk = 0;
+            $detail->persen_bpjs_jkm = 0;
+            $detail->persen_bpjs_jht = 0;
+            $detail->persen_bpjs_jp = 0;
+            $detail->persen_bpjs_kes = 0;
 
-        // Potong 16 ribu dari nominal upah
-        // $detail->nominal_upah = $detail->nominal_upah - 16800;
+            // Potong 16 ribu dari nominal upah
+            // $detail->nominal_upah = $detail->nominal_upah - 16800;
 
-        $this->updateQuotationBpjs($detail, $quotation);
-        return;
-    }
-
-    // PERBAIKAN: Gunakan kondisi yang lebih akurat
-    $programBpjs = $quotation->program_bpjs ?? '';
-    $isBpjsProgram = (stripos($programBpjs, 'BPJS') !== false) 
-                     || ($programBpjs == 'Ya') 
-                     || ($programBpjs == '1') 
-                     || ($programBpjs == true);
-
-    if ($isBpjsProgram) {
-        \Log::info("BPJS program is ACTIVE", ['program' => $programBpjs]);
-        
-        $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
-        \Log::info("Upah BPJS calculated", ['upah_bpjs' => $upahBpjs]);
-
-        // Konfigurasi BPJS dengan nilai default
-        $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
-            'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30],
-            'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70],
-            'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00],
-            'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $upahBpjs]
-        ];
-
-        foreach ($bpjsConfig as $key => $config) {
-            // Tentukan persentase dengan logika PRIORITAS YANG DIPERBAIKI
-            
-            $persentase = 0;
-            $base = $config['base'] ?? $upahBpjs;
-            
-            // **PERBAIKAN KRITIS: JIKA NILAI DARI HPP ADALAH 0, GUNAKAN DEFAULT**
-            
-            // 1. Cek apakah ada nilai di detail object (langsung dari form)
-            if (isset($detail->{$config['percent']}) && $detail->{$config['percent']} !== null) {
-                $persentase = (float) $detail->{$config['percent']};
-                \Log::info("Using persentase from DETAIL object", [
-                    'type' => $key, 
-                    'value' => $persentase,
-                    'source' => 'detail_object'
-                ]);
-            }
-            // 2. Cek di HPP table (Step 11) - ABGAIKAN JIKA 0
-            else if ($hpp && isset($hpp->{$config['percent']}) && $hpp->{$config['percent']} !== null) {
-                $hppValue = (float) $hpp->{$config['percent']};
-                
-                // **PERUBAHAN PENTING: Jika nilai HPP adalah 0, gunakan default**
-                if ($hppValue == 0) {
-                    $persentase = $config['default'];
-                    \Log::info("HPP value is 0, using DEFAULT instead", [
-                        'type' => $key, 
-                        'hpp_value' => $hppValue,
-                        'default_used' => $persentase,
-                        'source' => 'default_because_hpp_zero'
-                    ]);
-                } else {
-                    $persentase = $hppValue;
-                    \Log::info("Using persentase from HPP table", [
-                        'type' => $key, 
-                        'value' => $persentase,
-                        'source' => 'hpp_table'
-                    ]);
-                }
-            }
-            // 3. Gunakan default jika semua sumber null
-            else {
-                $persentase = $config['default'];
-                \Log::info("Using DEFAULT persentase", [
-                    'type' => $key, 
-                    'value' => $persentase,
-                    'source' => 'default_no_data'
-                ]);
-            }
-
-            // **PERHITUNGAN NOMINAL**
-            
-            // Cek apakah BPJS ini di-opt-out
-            $optOutField = 'is_bpjs_' . $key;
-            $isOptOut = false;
-            
-            if (isset($detail->{$optOutField})) {
-                $optValue = $detail->{$optOutField};
-                
-                // Jika nilai adalah string "tidak" atau boolean/numeric false/0
-                if ($optValue === "0" || $optValue === 0 || $optValue === false || 
-                    (is_string($optValue) && strtolower(trim($optValue)) === 'tidak')) {
-                    $isOptOut = true;
-                }
-            }
-
-            if ($isOptOut) {
-                // Jika di-opt-out, set ke 0
-                $detail->{$config['field']} = 0;
-                $detail->{$config['percent']} = 0;
-                \Log::info("BPJS {$key} is OPTED OUT", [
-                    'detail_id' => $detail->id,
-                    'opt_field' => $optOutField,
-                    'opt_value' => $detail->{$optOutField} ?? 'null'
-                ]);
-            } else {
-                // Jika tidak di-opt-out, hitung normal
-                if ($key === 'kes' && in_array($detail->penjamin_kesehatan, ["Asuransi Swasta", "Takaful"])) {
-                    // Gunakan takaful untuk kesehatan
-                    $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
-                    $detail->{$config['percent']} = 0;
-                    \Log::info("Using Takaful for health insurance", [
-                        'detail_id' => $detail->id,
-                        'nominal_takaful' => $detail->{$config['field']}
-                    ]);
-                } else {
-                    // Hitung berdasarkan persentase
-                    $detail->{$config['field']} = $base * $persentase / 100;
-                    $detail->{$config['percent']} = $persentase;
-                    \Log::info("BPJS {$key} calculated", [
-                        'persentase' => $persentase,
-                        'base' => $base,
-                        'nominal' => $detail->{$config['field']},
-                        'is_opt_out' => $isOptOut
-                    ]);
-                }
-            }
+            $this->updateQuotationBpjs($detail, $quotation);
+            return;
         }
 
-        // Apply BPJS opt-out (sebagai backup)
-        $this->applyBpjsOptOut($detail);
-        $this->updateQuotationBpjs($detail, $quotation);
+        // PERBAIKAN: Gunakan kondisi yang lebih akurat
+        $programBpjs = $quotation->program_bpjs ?? '';
+        $isBpjsProgram = (stripos($programBpjs, 'BPJS') !== false)
+            || ($programBpjs == 'Ya')
+            || ($programBpjs == '1')
+            || ($programBpjs == true);
 
-    } else {
-        \Log::warning("BPJS program is NOT ACTIVE", ['program' => $programBpjs]);
-        // Set semua BPJS ke 0
-        $detail->bpjs_jkk = 0;
-        $detail->bpjs_jkm = 0;
-        $detail->bpjs_jht = 0;
-        $detail->bpjs_jp = 0;
-        $detail->bpjs_kes = 0;
-        $detail->persen_bpjs_jkk = 0;
-        $detail->persen_bpjs_jkm = 0;
-        $detail->persen_bpjs_jht = 0;
-        $detail->persen_bpjs_jp = 0;
-        $detail->persen_bpjs_kes = 0;
-        
-        $this->updateQuotationBpjs($detail, $quotation);
+        if ($isBpjsProgram) {
+            \Log::info("BPJS program is ACTIVE", ['program' => $programBpjs]);
+
+            $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
+            \Log::info("Upah BPJS calculated", ['upah_bpjs' => $upahBpjs]);
+
+            // Konfigurasi BPJS dengan nilai default
+            $bpjsConfig = [
+                'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
+                'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30],
+                'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70],
+                'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00],
+                'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $upahBpjs]
+            ];
+
+            foreach ($bpjsConfig as $key => $config) {
+                // Tentukan persentase dengan logika PRIORITAS YANG DIPERBAIKI
+
+                $persentase = 0;
+                $base = $config['base'] ?? $upahBpjs;
+
+                // **PERBAIKAN KRITIS: JIKA NILAI DARI HPP ADALAH 0, GUNAKAN DEFAULT**
+
+                // 1. Cek apakah ada nilai di detail object (langsung dari form)
+                if (isset($detail->{$config['percent']}) && $detail->{$config['percent']} !== null) {
+                    $persentase = (float) $detail->{$config['percent']};
+                    \Log::info("Using persentase from DETAIL object", [
+                        'type' => $key,
+                        'value' => $persentase,
+                        'source' => 'detail_object'
+                    ]);
+                }
+                // 2. Cek di HPP table (Step 11) - ABGAIKAN JIKA 0
+                else if ($hpp && isset($hpp->{$config['percent']}) && $hpp->{$config['percent']} !== null) {
+                    $hppValue = (float) $hpp->{$config['percent']};
+
+                    // **PERUBAHAN PENTING: Jika nilai HPP adalah 0, gunakan default**
+                    if ($hppValue == 0) {
+                        $persentase = $config['default'];
+                        \Log::info("HPP value is 0, using DEFAULT instead", [
+                            'type' => $key,
+                            'hpp_value' => $hppValue,
+                            'default_used' => $persentase,
+                            'source' => 'default_because_hpp_zero'
+                        ]);
+                    } else {
+                        $persentase = $hppValue;
+                        \Log::info("Using persentase from HPP table", [
+                            'type' => $key,
+                            'value' => $persentase,
+                            'source' => 'hpp_table'
+                        ]);
+                    }
+                }
+                // 3. Gunakan default jika semua sumber null
+                else {
+                    $persentase = $config['default'];
+                    \Log::info("Using DEFAULT persentase", [
+                        'type' => $key,
+                        'value' => $persentase,
+                        'source' => 'default_no_data'
+                    ]);
+                }
+
+                // **PERHITUNGAN NOMINAL**
+
+                // Cek apakah BPJS ini di-opt-out
+                $optOutField = 'is_bpjs_' . $key;
+                $isOptOut = false;
+
+                if (isset($detail->{$optOutField})) {
+                    $optValue = $detail->{$optOutField};
+
+                    // Jika nilai adalah string "tidak" atau boolean/numeric false/0
+                    if (
+                        $optValue === "0" || $optValue === 0 || $optValue === false ||
+                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak')
+                    ) {
+                        $isOptOut = true;
+                    }
+                }
+
+                if ($isOptOut) {
+                    // Jika di-opt-out, set ke 0
+                    $detail->{$config['field']} = 0;
+                    $detail->{$config['percent']} = 0;
+                    \Log::info("BPJS {$key} is OPTED OUT", [
+                        'detail_id' => $detail->id,
+                        'opt_field' => $optOutField,
+                        'opt_value' => $detail->{$optOutField} ?? 'null'
+                    ]);
+                } else {
+                    // Jika tidak di-opt-out, hitung normal
+                    if ($key === 'kes' && in_array($detail->penjamin_kesehatan, ["Asuransi Swasta", "Takaful"])) {
+                        // Gunakan takaful untuk kesehatan
+                        $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
+                        $detail->{$config['percent']} = 0;
+                        \Log::info("Using Takaful for health insurance", [
+                            'detail_id' => $detail->id,
+                            'nominal_takaful' => $detail->{$config['field']}
+                        ]);
+                    } else {
+                        // Hitung berdasarkan persentase
+                        $detail->{$config['field']} = $base * $persentase / 100;
+                        $detail->{$config['percent']} = $persentase;
+                        \Log::info("BPJS {$key} calculated", [
+                            'persentase' => $persentase,
+                            'base' => $base,
+                            'nominal' => $detail->{$config['field']},
+                            'is_opt_out' => $isOptOut
+                        ]);
+                    }
+                }
+            }
+
+            // Apply BPJS opt-out (sebagai backup)
+            $this->applyBpjsOptOut($detail);
+            $this->updateQuotationBpjs($detail, $quotation);
+
+        } else {
+            \Log::warning("BPJS program is NOT ACTIVE", ['program' => $programBpjs]);
+            // Set semua BPJS ke 0
+            $detail->bpjs_jkk = 0;
+            $detail->bpjs_jkm = 0;
+            $detail->bpjs_jht = 0;
+            $detail->bpjs_jp = 0;
+            $detail->bpjs_kes = 0;
+            $detail->persen_bpjs_jkk = 0;
+            $detail->persen_bpjs_jkm = 0;
+            $detail->persen_bpjs_jht = 0;
+            $detail->persen_bpjs_jp = 0;
+            $detail->persen_bpjs_kes = 0;
+
+            $this->updateQuotationBpjs($detail, $quotation);
+        }
     }
-}
     // PERBAIKAN 1: Pastikan nilai THR dihitung dengan bena
     private function calculateExtras($detail, $quotation, $hpp, $coss, $wage): void
     {
@@ -629,7 +633,7 @@ class QuotationService
                         'calculated_thr_hpp' => $tunjanganHariRayaHpp,
                         'calculated_thr_coss' => $tunjanganHariRayaCoss
                     ]);
-                } else if ($thrWageValue == 'ditagihkan' || $thrWageValue == 'diberikan langsung'|| $thrWageValue == 'tidak ada') {
+                } else if ($thrWageValue == 'ditagihkan' || $thrWageValue == 'diberikan langsung' || $thrWageValue == 'tidak ada') {
                     $tunjanganHariRayaHpp = 0;
                     $tunjanganHariRayaCoss = 0;
                 }
@@ -644,7 +648,7 @@ class QuotationService
                 $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak Ada'));
                 if (in_array($kompensasiWageValue, ['diprovisikan'])) {
                     // Tentukan nilai kompensasi default (10% dari gaji)
-                    $kompensasiDefault = ($detail->nominal_upah ?? 0) /12;
+                    $kompensasiDefault = ($detail->nominal_upah ?? 0) / 12;
                     $kompensasiHpp = $kompensasiDefault;
                     $kompensasiCoss = $kompensasiDefault;
 
@@ -1197,7 +1201,7 @@ class QuotationService
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
                 $itemTotal = (($item->harga * $item->jumlah) / $provisi);
-                $perPerson = $itemTotal ; // DIKALI, bukan dibagi
+                $perPerson = $itemTotal; // DIKALI, bukan dibagi
 
                 \Log::info("Kaporlap calculation for HPP (multiply by HC)", [
                     'item_id' => $item->id,
@@ -1616,12 +1620,12 @@ class QuotationService
             // **PERBAIKAN: Recalculate total_personil setelah bunga_bank di-update**
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
             $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
-            
+
             $totalTunjanganResult = [
                 'total' => $detail->total_tunjangan ?? 0,
                 'total_coss' => $detail->total_tunjangan_coss ?? 0
             ];
-            
+
             $this->calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss);
         });
     }
@@ -1970,7 +1974,7 @@ class QuotationService
         return $result;
     }
 
-    private function getJkkPercentage($resiko)
+    private function    getJkkPercentage($resiko)
     {
         $percentages = [
             "Sangat Rendah" => 0.24,
@@ -2363,14 +2367,16 @@ class QuotationService
     public function submitForApproval(Quotation $quotation, array $data, User $user)
     {
         $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        
+        $currentDateTime = Carbon::now();
+        $tingkat = 1;
+
         if ($user->cais_role_id == 96) {
             $updateData = [
                 'ot1' => $user->full_name,
-                'updated_at' => Carbon::now()->toDateTimeString(),
+                'updated_at' => $currentDateTime->toDateTimeString(),
                 'updated_by' => $user->full_name
             ];
-            
+
             if ($isApproved) {
                 $needsLevel2 = ($quotation->top == "Lebih Dari 7 Hari");
                 $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
@@ -2379,38 +2385,104 @@ class QuotationService
                 $updateData['status_quotation_id'] = 8;
                 $updateData['is_aktif'] = 0;
             }
+            $tingkat = 1;
         } elseif ($user->cais_role_id == 97) {
             if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
                 return ['success' => false, 'message' => 'Quotation belum disetujui di Level 1.'];
             }
-            
+
             $updateData = [
                 'ot2' => $user->full_name,
                 'status_quotation_id' => $isApproved ? 3 : 8,
                 'is_aktif' => $isApproved ? 1 : 0,
-                'updated_at' => Carbon::now()->toDateTimeString(),
+                'updated_at' => $currentDateTime->toDateTimeString(),
                 'updated_by' => $user->full_name
             ];
+            $tingkat = 2;
         } else {
             return ['success' => false, 'message' => 'User tidak memiliki akses approval.'];
         }
 
         $quotation->update($updateData);
 
-        // if ($isApproved && 
-        //     $quotation->tipe_quotation === 'rekontrak' && 
-        //     $updateData['status_quotation_id'] == 3 &&
-        //     $quotation->quotation_referensi_id) {
-            
-        //     $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
-        //     if ($oldQuotation) {
-        //         app(RekontrakService::class)->process($quotation, $oldQuotation);
-        //     }
-        // }
+        // Log approval
+        LogApproval::create([
+            'tabel' => 'sl_quotation',
+            'doc_id' => $quotation->id,
+            'tingkat' => $tingkat,
+            'is_approve' => $isApproved,
+            'note' => $data['alasan'] ?? null,
+            'user_id' => $user->id,
+            'approval_date' => $currentDateTime,
+            'created_at' => $currentDateTime,
+            'created_by' => $user->full_name
+        ]);
+
+        // Log notification untuk sales dari leads kebutuhan
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        if ($leadsKebutuhan && $leadsKebutuhan->timSalesD) {
+            $quotationNumber = $quotation->nomor;
+            $approverName = $user->full_name;
+            $reason = $data['alasan'] ?? null;
+
+            $msg = $isApproved
+                ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
+                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" .
+                ($reason ? " dengan alasan: {$reason}" : "");
+
+            LogNotification::create([
+                'user_id' => $leadsKebutuhan->timSalesD->user_id,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $user->full_name
+            ]);
+        }
+
+        // Log customer activity
+        // $leads = $quotation->leads;
+        // $nomorActivity = $this->generateActivityNomor($quotation->leads_id);
+        // $reason = $data['alasan'] ?? null;
+
+        // CustomerActivity::create([
+        //     'leads_id' => $quotation->leads_id,
+        //     'quotation_id' => $quotation->id,
+        //     'branch_id' => $leads->branch_id,
+        //     'tgl_activity' => $currentDateTime,
+        //     'nomor' => $nomorActivity,
+        //     'tipe' => $isApproved ? 'Quotation Approved' : 'Quotation Rejected',
+        //     'notes' => $isApproved 
+        //         ? "Quotation {$quotation->nomor} telah disetujui oleh {$user->full_name}"
+        //         : "Quotation {$quotation->nomor} ditolak oleh {$user->full_name}" . ($reason ? " dengan alasan: {$reason}" : ""),
+        //     'is_activity' => 0,
+        //     'user_id' => $user->id,
+        //     'created_by' => $user->full_name
+        // ]);
 
         return ['success' => true, 'data' => $quotation->fresh()];
-
     }
+
+    /**
+     * Generate activity nomor
+     */
+    private function generateActivityNomor($leadsId): string
+    {
+        $now = Carbon::now();
+        $count = DB::table('customer_activities')
+            ->where('leads_id', $leadsId)
+            ->whereYear('tgl_activity', $now->year)
+            ->count();
+
+        return 'ACT/' . $leadsId . '/' . $now->year . '/' . sprintf('%04d', $count + 1);
+    }
+
     public function resetApproval(Quotation $quotation, User $user)
     {
         \Log::info('Reset approval attempt', [
@@ -2421,7 +2493,7 @@ class QuotationService
             'current_ot1' => $quotation->ot1,
             'current_ot2' => $quotation->ot2
         ]);
-        
+
         // Cek role - tambahkan role lain yang boleh reset
         $allowedRoles = [2, 96, 97]; // Admin, OT1, OT2
         if (!in_array($user->cais_role_id, $allowedRoles)) {
@@ -2436,7 +2508,7 @@ class QuotationService
             'updated_at' => Carbon::now()->toDateTimeString(),
             'updated_by' => $user->full_name
         ]);
-        
+
         \Log::info('Reset approval success', [
             'quotation_id' => $quotation->id,
             'reset_by' => $user->full_name

@@ -1015,7 +1015,7 @@ class QuotationController extends Controller
      *         @OA\JsonContent(
      *             required={"is_approved"},
      *             @OA\Property(property="is_approved", type="boolean", example=true),
-     *             @OA\Property(property="notes", type="string", example="Approval notes")
+     *             @OA\Property(property="alasan", type="string", example="Quotation sudah sesuai dengan requirement")
      *         )
      *     ),
      *     @OA\Response(
@@ -1035,7 +1035,7 @@ class QuotationController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
-                'notes' => 'nullable|string'
+                'alasan' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {

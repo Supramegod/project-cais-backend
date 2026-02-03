@@ -20115,9 +20115,9 @@
                                         "type": "boolean",
                                         "example": true
                                     },
-                                    "notes": {
+                                    "alasan": {
                                         "type": "string",
-                                        "example": "Approval notes"
+                                        "example": "Quotation sudah sesuai dengan requirement"
                                     }
                                 },
                                 "type": "object"
