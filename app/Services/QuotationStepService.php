@@ -1465,9 +1465,11 @@ class QuotationStepService
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
+
+
         // Buat pesan notifikasi
         $quotationNumber = $quotation->nomor;
-        $creatorName = $leadsKebutuhan->timSalesD->nama;
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
 
         $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
 
