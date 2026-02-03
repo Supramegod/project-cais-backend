@@ -209,7 +209,15 @@ class LeadsController extends Controller
 
             // ✅ Optimasi Search dengan Fulltext
             if ($request->filled('search')) {
-                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$request->search . '*']);
+                $searchTerm = $request->search;
+                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
+                if (str_contains($searchTerm, ' ')) {
+                    $searchTerm = '"' . $searchTerm . '"';
+                } else {
+                    $searchTerm = $searchTerm . '*';
+                }
+
+                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
             } else {
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());

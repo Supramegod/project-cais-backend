@@ -184,7 +184,7 @@ class QuotationResource extends JsonResource
             $hasNoCompensation ||
             !empty($underMinimumWageDetails) ||
             $this->resource->top == "Lebih Dari 7 Hari" ||
-            $this->resource->persentase < 7 ||
+            $isLowPercentage ||
             $this->resource->company_id == 17
         );
 
@@ -920,6 +920,14 @@ class QuotationResource extends JsonResource
             // ...
             // Calculated fields
             'approval_highlights' => $this->approvalHighlights,
+
+            'approval_notes' => $this->relationLoaded('logNotifications') 
+                ? $this->logNotifications->pluck('pesan')->toArray()
+                : [],
+
+            'alasan_reject' => $this->relationLoaded('logNotifications') 
+                ? $this->logNotifications->where('pesan', 'like', '%reject%')->pluck('pesan')->filter()->last()
+                : null,
 
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
                 return $this->quotationDetails->sum('jumlah_hc');

@@ -674,7 +674,9 @@ class QuotationController extends Controller
                 'quotationChemicals',
                 'quotationOhcs',
                 'quotationTrainings',
-                'quotationKerjasamas'
+                'quotationKerjasamas',
+                'logNotifications',
+                'logApprovals',
             ])->findOrFail($id);
 
             // ✅ BENAR: Melewatkan model Quotation ke Resource

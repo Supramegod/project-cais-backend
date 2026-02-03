@@ -2431,8 +2431,7 @@ class QuotationService
 
             $msg = $isApproved
                 ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
-                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" .
-                ($reason ? " dengan alasan: {$reason}" : "");
+                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" . ($reason ? " dengan alasan: {$reason}" : "");
 
             LogNotification::create([
                 'user_id' => $leadsKebutuhan->timSalesD->user_id,

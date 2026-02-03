@@ -454,4 +454,13 @@ class Quotation extends Model
     {
         return $this->hasOne(QuotationDetailWage::class);
     }
+
+    public function logApprovals()
+    {
+        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'sl_quotation');
+    }
+    public function logNotifications()
+    {
+        return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
+    }
 }
