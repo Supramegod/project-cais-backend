@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
+use App\Mail\CustomerActivityEmail;
+use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
@@ -16,15 +19,22 @@ use App\Models\CustomerActivity;
 use App\Models\CustomerActivityFile;
 use App\Models\Leads;
 use App\Models\Pks;
+use Illuminate\Support\Str;
 
 /**
  * @OA\Tag(
  *     name="Customer Activity",
- *     description="Endpoints untuk manajemen aktivitas customer (BELUM JADI)"
+ *     description="Endpoints untuk manajemen aktivitas customer"
  * )
  */
 class CustomerActivityController extends Controller
 {
+    private $dynamicMailerService;
+
+    public function __construct(DynamicMailerService $dynamicMailerService)
+    {
+        $this->dynamicMailerService = $dynamicMailerService;
+    }
     /**
      * @OA\Get(
      *     path="/api/customer-activities/list",
@@ -146,11 +156,9 @@ class CustomerActivityController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
-            // Set default tanggal jika tidak ada parameter
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi tanggal hanya jika kedua parameter ada
             if ($request->tgl_dari && $request->tgl_sampai) {
                 if (Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
                     return response()->json([
@@ -160,19 +168,20 @@ class CustomerActivityController extends Controller
                 }
             }
 
-            // Query dasar dengan eager loading
             $query = CustomerActivity::with([
-                'leads.branch',
-                'leads.kebutuhan',
-                'timSalesDetail'
-            ])->whereNull('deleted_at');
+                'leads:id,nama_perusahaan,branch_id',
+                'leads.branch:id,name',
+                'leads.kebutuhan:m_kebutuhan.id,m_kebutuhan.nama',
+                'timSalesDetail:id,nama'
+            ])->whereNull('deleted_at')
+            ->whereHas('leads', function ($q) {
+                $q->filterByUserRole();
+            });
 
-            // Filter tanggal - hanya diterapkan jika ada parameter tanggal
             if ($request->tgl_dari || $request->tgl_sampai) {
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
-            // Apply filters - hanya jika parameter ada dan tidak null/empty
             if ($request->filled('branch')) {
                 $query->whereHas('leads', function ($q) use ($request) {
                     $q->where('branch_id', $request->branch);
@@ -180,8 +189,8 @@ class CustomerActivityController extends Controller
             }
 
             if ($request->filled('kebutuhan')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('kebutuhan_id', $request->kebutuhan);
+                $query->whereHas('leads.kebutuhan', function ($q) use ($request) {
+                    $q->where('m_kebutuhan.id', $request->kebutuhan);
                 });
             }
 
@@ -193,23 +202,34 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            // Filter berdasarkan role user - FIXED: Menambahkan logika yang benar
-            $user = Auth::user();
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                // Logic filter untuk divisi sales - menampilkan hanya aktivitas user tersebut
-                $query->where('user_id', $user->id);
-            }
-
-            // Order dan get data
-            $activities = $query->orderBy('tgl_activity', 'desc')
-                ->orderBy('created_at', 'desc')
+            $activities = $query->orderBy('created_at', 'desc')
                 ->get();
 
+            $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
+                return [
+                    'id' => $activity->id,
+                    'nomor' => $activity->nomor,
+                    'tgl_activity' => $activity->tgl_activity,
+                    'tipe' => $activity->tipe,
+                    'notes' => $activity->notes,
+                    'status_leads_id' => $activity->status_leads_id,
+                    'created_at' => $activity->getRawOriginal('created_at'),
+                    'nama_perusahaan' => $activity->leads?->nama_perusahaan,
+                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray(),
+                    'branch' => $activity->leads?->branch?->name,
+                    'sales' => $activity->timSalesDetail?->nama,
+                    'leads_id' => $activity->leads_id,
+                    'quotation_id' => $activity->quotation_id,
+                    'spk_id' => $activity->spk_id,
+                    'pks_id' => $activity->pks_id
+                ];
+            });
+            
             return response()->json([
                 'success' => true,
-                'data' => $activities,
+                'data' => $mappedActivities,
                 'meta' => [
-                    'total' => $activities->count(),
+                    'total' => $mappedActivities->count(),
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
                     'filters_applied' => [
@@ -229,6 +249,7 @@ class CustomerActivityController extends Controller
             ], 500);
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/customer-activities/view/{id}",
@@ -320,7 +341,7 @@ class CustomerActivityController extends Controller
     public function view($id): JsonResponse
     {
         try {
-            $activity = CustomerActivity::with(['leads', 'files', 'statusLeads'])
+            $activity = CustomerActivity::with(['files'])
                 ->whereNull('deleted_at')
                 ->find($id);
 
@@ -331,19 +352,49 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
+            // Get current activity data only
+            $activityData = [
+                'id' => $activity->id,
+                'tipe' => $activity->tipe,
+                'notes' => $activity->notes_tipe ?? $activity->notes,
+                'tgl_activity' => $activity->tgl_activity,
+                'created_at' => $activity->getRawOriginal('created_at'),
+                'created_by' => $activity->created_by,
+                'activity_files' => $activity->files->map(function ($file) {
+                    return [
+                        'id' => $file->id,
+                        'nama_file' => $file->nama_file,
+                        'url_file' => $file->url_file,
+                        'created_at' => $file->created_at
+                    ];
+                }),
+            ];
+
+            // Conditional fields berdasarkan tipe
+            if (in_array(strtolower($activity->tipe), ['telepon', 'online meeting'])) {
+                $activityData['start'] = $activity->start;
+                $activityData['end'] = $activity->end;
+                $activityData['durasi'] = $activity->durasi;
+                $activityData['tgl_realisasi'] = $activity->tgl_realisasi;
+            } elseif (strtolower($activity->tipe) === 'visit') {
+                $activityData['tgl_realisasi'] = $activity->tgl_realisasi;
+                $activityData['jam_realisasi'] = $activity->jam_realisasi;
+                $activityData['jenis_visit'] = $activity->jenis_visit;
+            }
+
             return response()->json([
                 'success' => true,
-                'data' => $activity
+                'data' => $activityData
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error in CustomerActivityController@view: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/customer-activities/add",
@@ -354,31 +405,38 @@ class CustomerActivityController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         description="Data aktivitas customer baru",
-     *         @OA\JsonContent(
-     *             required={"leads_id", "tgl_activity", "tipe"},
-     *             @OA\Property(property="leads_id", type="integer", example=1, description="ID leads yang terkait"),
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01", description="Tanggal aktivitas"),
-     *             @OA\Property(property="tipe", type="string", example="Telepon", description="Tipe aktivitas: Telepon, Email, Meeting, Visit"),
-     *             @OA\Property(property="notes", type="string", example="Catatan aktivitas", description="Catatan atau keterangan aktivitas"),
-     *             @OA\Property(property="tim_sales_id", type="integer", example=1, description="ID tim sales"),
-     *             @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID detail tim sales"),
-     *             @OA\Property(property="status_leads_id", type="integer", example=1, description="ID status leads yang akan diupdate"),
-     *             @OA\Property(property="start", type="string", example="09:00", description="Jam mulai aktivitas"),
-     *             @OA\Property(property="end", type="string", example="10:00", description="Jam selesai aktivitas"),
-     *             @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
-     *             @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-01", description="Tanggal realisasi"),
-     *             @OA\Property(property="jam_realisasi", type="string", example="09:30", description="Jam realisasi"),
-     *             @OA\Property(property="jenis_visit_id", type="integer", example=1, description="ID jenis visit (jika tipe = Visit)"),
-     *             @OA\Property(property="notulen", type="string", example="Notulen meeting", description="Notulen atau hasil meeting"),
-     *             @OA\Property(property="email", type="string", format="email", example="email@example.com", description="Email customer"),
-     *             @OA\Property(
-     *                 property="files",
-     *                 type="array",
-     *                 description="Array file yang akan diupload",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
-     *                     @OA\Property(property="file_content", type="string", example="base64EncodedFileContent", description="File content dalam format base64")
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"leads_id", "tgl_activity", "tipe"},
+     *                 type="object",
+     *                 @OA\Property(property="leads_id", type="integer", example=1, description="ID leads yang terkait"),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01", description="Tanggal aktivitas"),
+     *                 @OA\Property(property="tipe", type="string", example="Telepon", description="Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting"),
+     *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas", description="Catatan atau keterangan aktivitas"),
+     *                 @OA\Property(property="notes_tipe", type="string", example="Catatan spesifik tipe", description="Catatan berdasarkan tipe aktivitas"),
+     *                 @OA\Property(property="tim_sales_id", type="integer", example=1, description="ID tim sales"),
+     *                 @OA\Property(property="tim_sales_d_id", type="integer", example=1, description="ID detail tim sales"),
+     *                 @OA\Property(property="status_leads_id", type="integer", example=1, description="ID status leads yang akan diupdate"),
+     *                 @OA\Property(property="start", type="string", example="09:00", description="Jam mulai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="end", type="string", example="10:00", description="Jam selesai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
+     *                 @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-01", description="Tanggal realisasi"),
+     *                 @OA\Property(property="jam_realisasi", type="string", example="09:30", description="Jam realisasi (format: HH:mm)"),
+     *                 @OA\Property(property="jenis_visit_id", type="integer", example=1, description="ID jenis visit (jika tipe = Visit)"),
+     *                 @OA\Property(property="jenis_visit", type="string", example="Survey", description="Jenis visit"),
+     *                 @OA\Property(property="notulen", type="string", example="Notulen meeting", description="Notulen atau hasil meeting"),
+     *                 @OA\Property(property="email", type="string", format="email", example="email@example.com", description="Email customer"),
+     *                 @OA\Property(property="penerima", type="string", example="John Doe", description="Penerima email/telepon"),
+     *                 @OA\Property(property="link_bukti_foto", type="string", example="https://example.com/foto.jpg", description="Link bukti foto"),
+     *                 @OA\Property(
+     *                     property="files[]",
+     *                     type="array",
+     *                     description="File yang akan diupload (pdf, doc, docx, jpg, jpeg, png) maksimal 10MB per file",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="binary"
+     *                     )
      *                 )
      *             )
      *         )
@@ -398,8 +456,34 @@ class CustomerActivityController extends Controller
      *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
      *                 @OA\Property(property="tipe", type="string", example="Telepon"),
      *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas"),
-     *                 @OA\Property(property="created_at", type="string", format="date-time")
+     *                 @OA\Property(property="status_leads_id", type="integer", example=2),
+     *                 @OA\Property(property="created_at", type="string", format="date-time", example="2024-07-01T10:30:00.000000Z"),
+     *                 @OA\Property(property="created_by", type="string", example="John Doe"),
+     *                 @OA\Property(
+     *                     property="leads",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Perusahaan")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="files",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama_file", type="string", example="Notulen Meeting"),
+     *                         @OA\Property(property="url_file", type="string", example="http://example.com/document/customer-activity/NotulenMeeting20240701103000012345.pdf")
+     *                     )
+     *                 )
      *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="File tidak valid",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
      *     ),
      *     @OA\Response(
@@ -407,21 +491,7 @@ class CustomerActivityController extends Controller
      *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(
-     *                 property="errors",
-     *                 type="object",
-     *                 @OA\Property(
-     *                     property="leads_id",
-     *                     type="array",
-     *                     @OA\Items(type="string", example="The leads id field is required.")
-     *                 ),
-     *                 @OA\Property(
-     *                     property="tgl_activity",
-     *                     type="array",
-     *                     @OA\Items(type="string", example="The tgl activity field is required.")
-     *                 )
-     *             )
+     *             @OA\Property(property="message", type="object", description="Object error dari validator")
      *         )
      *     ),
      *     @OA\Response(
@@ -446,67 +516,73 @@ class CustomerActivityController extends Controller
         try {
             DB::beginTransaction();
 
-            $validator = Validator::make($request->all(), [
-                'leads_id' => 'required|exists:sl_leads,id',
-                'tgl_activity' => 'required|date',
-                'tipe' => 'required|string',
-                'tgl_realisasi' => 'nullable|date',
-                'files' => 'nullable|array',
-                'files.*.nama_file' => 'required_with:files|string',
-                'files.*.file_content' => 'required_with:files|string' // base64 encoded file
-            ]);
+            // Ekstrak file jika ada (untuk multipart/form-data)
+            $requestData = $request->all();
+
+            // Validate request menggunakan rules untuk ADD
+            $validator = Validator::make(
+                $requestData,
+                array_merge(
+                    $this->getValidationRules(false), // isUpdate = false
+                    [
+                        'files' => 'nullable|array',
+                        'files.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:1024' // 10MB
+                    ]
+                ),
+                $this->getValidationMessages()
+            );
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
+            }
+
+            // Check if leads exists and not deleted
+            $leads = Leads::find($request->leads_id);
+            if (!$leads || $leads->deleted_at) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Leads tidak ditemukan atau sudah dihapus.'
+                ], 404);
             }
 
             $nomor = $this->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
-            $activityData = $request->only([
-                'leads_id',
-                'tgl_activity',
-                'tipe',
-                'notes',
-                'tim_sales_id',
-                'tim_sales_d_id',
-                'status_leads_id',
-                'start',
-                'end',
-                'durasi',
-                'tgl_realisasi',
-                'jam_realisasi',
-                'jenis_visit_id',
-                'notulen',
-                'email'
-            ]);
-
+            // Prepare activity data using allowed fields
+            $activityData = $request->only($this->getAllowedFields());
             $activityData['nomor'] = $nomor;
-            $activityData['branch_id'] = Leads::find($request->leads_id)->branch_id;
+            $activityData['branch_id'] = $leads->branch_id;
             $activityData['user_id'] = Auth::id();
             $activityData['created_by'] = Auth::user()->full_name;
             $activityData['created_at'] = $current_date_time;
 
             $activity = CustomerActivity::create($activityData);
 
-            // Handle file uploads
-            if ($request->has('files')) {
-                foreach ($request->files as $fileData) {
-                    $this->saveActivityFile($activity->id, $fileData);
+            // Handle file uploads dari multipart/form-data
+            if ($request->hasFile('files')) {
+                $uploadedFiles = $request->file('files');
+
+                foreach ($uploadedFiles as $file) {
+                    $this->storeActivityFile($activity->id, $file);
                 }
             }
 
             // Update status leads jika ada
             if ($request->status_leads_id) {
-                Leads::where('id', $request->leads_id)
-                    ->update(['status_leads_id' => $request->status_leads_id]);
+                $leads->update([
+                    'status_leads_id' => $request->status_leads_id,
+                    'updated_by' => Auth::user()->full_name,
+                    'updated_at' => $current_date_time
+                ]);
             }
 
             DB::commit();
+
+            // Return with complete data
+            $activity->load(['leads', 'files', 'statusLeads']);
 
             return response()->json([
                 'success' => true,
@@ -516,9 +592,10 @@ class CustomerActivityController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error in CustomerActivityController@add: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -527,7 +604,7 @@ class CustomerActivityController extends Controller
      * @OA\Put(
      *     path="/api/customer-activities/update/{id}",
      *     summary="Update customer activity",
-     *     description="Mengupdate aktivitas customer berdasarkan ID",
+     *     description="Mengupdate aktivitas customer berdasarkan ID. Field leads_id tidak dapat diupdate.",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -540,21 +617,29 @@ class CustomerActivityController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         description="Data yang akan diupdate",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
-     *             @OA\Property(property="tipe", type="string", example="Email"),
-     *             @OA\Property(property="notes", type="string", example="Catatan aktivitas updated"),
-     *             @OA\Property(property="tim_sales_id", type="integer", example=2),
-     *             @OA\Property(property="tim_sales_d_id", type="integer", example=2),
-     *             @OA\Property(property="status_leads_id", type="integer", example=3),
-     *             @OA\Property(property="start", type="string", example="10:00"),
-     *             @OA\Property(property="end", type="string", example="11:00"),
-     *             @OA\Property(property="durasi", type="integer", example=60),
-     *             @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-02"),
-     *             @OA\Property(property="jam_realisasi", type="string", example="10:30"),
-     *             @OA\Property(property="jenis_visit_id", type="integer", example=2),
-     *             @OA\Property(property="notulen", type="string", example="Updated notulen"),
-     *             @OA\Property(property="email", type="string", format="email", example="newemail@example.com")
+     *         @OA\MediaType(
+     *             mediaType="application/json",
+     *             @OA\Schema(
+     *                 type="object",
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-02", description="Tanggal aktivitas"),
+     *                 @OA\Property(property="tipe", type="string", example="Email", description="Tipe aktivitas: Telepon, Email, Meeting, Visit, Online Meeting"),
+     *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas updated", description="Catatan atau keterangan aktivitas"),
+     *                 @OA\Property(property="notes_tipe", type="string", example="Catatan spesifik tipe updated", description="Catatan berdasarkan tipe aktivitas"),
+     *                 @OA\Property(property="tim_sales_id", type="integer", example=2, description="ID tim sales"),
+     *                 @OA\Property(property="tim_sales_d_id", type="integer", example=2, description="ID detail tim sales"),
+     *                 @OA\Property(property="status_leads_id", type="integer", example=3, description="ID status leads yang akan diupdate"),
+     *                 @OA\Property(property="start", type="string", example="10:00", description="Jam mulai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="end", type="string", example="11:00", description="Jam selesai aktivitas (format: HH:mm)"),
+     *                 @OA\Property(property="durasi", type="integer", example=60, description="Durasi aktivitas dalam menit"),
+     *                 @OA\Property(property="tgl_realisasi", type="string", format="date", example="2024-07-02", description="Tanggal realisasi"),
+     *                 @OA\Property(property="jam_realisasi", type="string", example="10:30", description="Jam realisasi (format: HH:mm)"),
+     *                 @OA\Property(property="jenis_visit_id", type="integer", example=2, description="ID jenis visit (jika tipe = Visit)"),
+     *                 @OA\Property(property="jenis_visit", type="string", example="Presentasi", description="Jenis visit"),
+     *                 @OA\Property(property="notulen", type="string", example="Updated notulen", description="Notulen atau hasil meeting"),
+     *                 @OA\Property(property="email", type="string", format="email", example="newemail@example.com", description="Email customer"),
+     *                 @OA\Property(property="penerima", type="string", example="Jane Doe", description="Penerima email/telepon"),
+     *                 @OA\Property(property="link_bukti_foto", type="string", example="https://example.com/new-foto.jpg", description="Link bukti foto")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -568,11 +653,19 @@ class CustomerActivityController extends Controller
      *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-092024-00001"),
-     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-01"),
+     *                 @OA\Property(property="tgl_activity", type="string", format="date", example="2024-07-02"),
      *                 @OA\Property(property="tipe", type="string", example="Email"),
      *                 @OA\Property(property="notes", type="string", example="Catatan aktivitas updated"),
-     *                 @OA\Property(property="updated_at", type="string", format="date-time"),
-     *                 @OA\Property(property="updated_by", type="string", example="John Doe")
+     *                 @OA\Property(property="status_leads_id", type="integer", example=3),
+     *                 @OA\Property(property="updated_at", type="string", format="date-time", example="2024-07-02T15:45:00.000000Z"),
+     *                 @OA\Property(property="updated_by", type="string", example="Jane Doe"),
+     *                 @OA\Property(
+     *                     property="leads",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Perusahaan"),
+     *                     @OA\Property(property="status_leads_id", type="integer", example=3)
+     *                 )
      *             )
      *         )
      *     ),
@@ -586,11 +679,10 @@ class CustomerActivityController extends Controller
      *     ),
      *     @OA\Response(
      *         response=422,
-     *         description="Validation Error",
+     *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(property="errors", type="object")
+     *             @OA\Property(property="message", type="object", description="Object error dari validator")
      *         )
      *     ),
      *     @OA\Response(
@@ -623,43 +715,47 @@ class CustomerActivityController extends Controller
                 ], 404);
             }
 
-            $validator = Validator::make($request->all(), [
-                'tgl_activity' => 'sometimes|required|date',
-                'tipe' => 'sometimes|required|string',
-                'tgl_realisasi' => 'nullable|date'
-            ]);
+            // Validate request menggunakan rules untuk UPDATE
+            $validator = Validator::make(
+                $request->all(),
+                $this->getValidationRules(true), // isUpdate = true
+                $this->getValidationMessages()
+            );
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
-            $updateData = $request->only([
-                'tgl_activity',
-                'tipe',
-                'notes',
-                'tim_sales_id',
-                'tim_sales_d_id',
-                'status_leads_id',
-                'start',
-                'end',
-                'durasi',
-                'tgl_realisasi',
-                'jam_realisasi',
-                'jenis_visit_id',
-                'notulen',
-                'email'
-            ]);
+            // Get allowed fields (exclude leads_id untuk update)
+            $allowedUpdateFields = array_diff($this->getAllowedFields(), ['leads_id']);
+            $updateData = $request->only($allowedUpdateFields);
 
-            $updateData['updated_by'] = Auth::user()->full_name;
-            $updateData['updated_at'] = Carbon::now();
+            // Only update if there's actual data
+            if (!empty($updateData)) {
+                $current_time = Carbon::now();
+                $updateData['updated_by'] = Auth::user()->full_name;
+                $updateData['updated_at'] = $current_time;
 
-            $activity->update($updateData);
+                $activity->update($updateData);
+
+                // Update status leads jika ada dan berubah
+                if ($request->has('status_leads_id') && $request->status_leads_id != $activity->leads->status_leads_id) {
+                    $activity->leads->update([
+                        'status_leads_id' => $request->status_leads_id,
+                        'updated_by' => Auth::user()->full_name,
+                        'updated_at' => $current_time
+                    ]);
+                }
+            }
 
             DB::commit();
+
+            // Reload relationships
+            $activity->refresh();
+            $activity->load(['leads', 'files', 'statusLeads']);
 
             return response()->json([
                 'success' => true,
@@ -669,9 +765,10 @@ class CustomerActivityController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Error in CustomerActivityController@update: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -902,85 +999,38 @@ class CustomerActivityController extends Controller
         }
     }
 
-    /**
-     * Generate nomor customer activity
-     */
-    private function generateNomor($leadsId): string
-    {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-
-        $prefix = "CAT/";
-        if ($leads) {
-            switch ($leads->kebutuhan_id) {
-                case 2:
-                    $prefix .= "LS/";
-                    break;
-                case 1:
-                    $prefix .= "SG/";
-                    break;
-                case 3:
-                    $prefix .= "CS/";
-                    break;
-                case 4:
-                    $prefix .= "LL/";
-                    break;
-                default:
-                    $prefix .= "NN/";
-                    break;
-            }
-            $prefix .= $leads->nomor . "-";
-        } else {
-            $prefix .= "NN/NNNNN-";
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $year = $now->year;
-
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
-        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-
-        return $prefix . $month . $year . "-" . $sequence;
-    }
-
-    /**
-     * Save activity file
-     */
-    private function saveActivityFile($activityId, $fileData): void
-    {
-        // Handle base64 file upload
-        if (isset($fileData['file_content'])) {
-            $fileContent = base64_decode($fileData['file_content']);
-            $fileName = $fileData['nama_file'] . '_' . time() . '.pdf'; // Adjust extension as needed
-
-            Storage::disk('bukti-activity')->put($fileName, $fileContent);
-
-            $fileUrl = env('APP_URL') . '/public/uploads/customer-activity/' . $fileName;
-
-            CustomerActivityFile::create([
-                'customer_activity_id' => $activityId,
-                'nama_file' => $fileData['nama_file'],
-                'url_file' => $fileUrl,
-                'created_by' => Auth::user()->full_name,
-                'created_at' => Carbon::now()
-            ]);
-        }
-    }
-
 
     /**
      * @OA\Post(
      *     path="/api/customer-activities/send-email",
-     *     summary="Send email notification",
-     *     description="Mengirim email notifikasi terkait customer activity",
+     *     summary="Send email notification with dynamic SMTP configuration",
+     *     description="Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. 
+     *                 Jika user memiliki konfigurasi email, akan digunakan. 
+     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"subject", "body", "recipients"},
-     *             @OA\Property(property="subject", type="string", example="Update Customer Activity"),
-     *             @OA\Property(property="body", type="string", example="Customer activity telah diupdate"),
+     *             required={"subject", "body", "recipients", "leads_id"},
+     *             @OA\Property(
+     *                 property="subject", 
+     *                 type="string", 
+     *                 example="Update Customer Activity",
+     *                 description="Subject email"
+     *             ),
+     *             @OA\Property(
+     *                 property="body", 
+     *                 type="string", 
+     *                 example="Customer activity telah diupdate. Berikut detailnya:\n\nNama Perusahaan: PT ABC\nTanggal: 2024-12-09\nTipe: Meeting\nCatatan: Follow up penawaran produk",
+     *                 description="Isi email (mendukung line breaks)"
+     *             ),
+     *             @OA\Property(
+     *                 property="leads_id", 
+     *                 type="integer", 
+     *                 example=1,
+     *                 description="ID leads untuk membuat activity baru"
+     *             ),
      *             @OA\Property(
      *                 property="recipients", 
      *                 type="array", 
@@ -990,51 +1040,315 @@ class CustomerActivityController extends Controller
      *                     format="email",
      *                     example="customer@example.com"
      *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="cc", 
+     *                 type="array", 
+     *                 description="Optional: CC recipients",
+     *                 @OA\Items(type="string", format="email")
+     *             ),
+     *             @OA\Property(
+     *                 property="bcc", 
+     *                 type="array", 
+     *                 description="Optional: BCC recipients",
+     *                 @OA\Items(type="string", format="email")
+     *             ),
+     *             @OA\Property(
+     *                 property="attachments", 
+     *                 type="array", 
+     *                 description="Optional: File attachments",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="name", type="string", example="document.pdf"),
+     *                     @OA\Property(property="content", type="string", description="Base64 encoded file content"),
+     *                     @OA\Property(property="mime", type="string", example="application/pdf")
+     *                 )
      *             )
      *         )
      *     ),
      *     @OA\Response(
-     *         response=200,
-     *         description="Email berhasil dikirim",
+     *         response=201,
+     *         description="Email berhasil dikirim dan activity baru dibuat",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim")
+     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@example.com>"),
+     *                 @OA\Property(property="recipients_count", type="integer", example=3),
+     *                 @OA\Property(
+     *                     property="activity",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-122024-00001"),
+     *                     @OA\Property(property="tipe", type="string", example="Email")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="config_source",
+     *                     type="string",
+     *                     example="user_custom",
+     *                     description="user_custom, user_default, or system_default"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=207,
+     *         description="Multi-Status - Beberapa email berhasil, beberapa gagal",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 2 dari 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(property="partial_success", type="boolean", example=true),
+     *             @OA\Property(property="failed_recipients", type="array", @OA\Items(type="string"))
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Gagal mengirim email: SMTP connection failed")
      *         )
      *     )
      * )
      */
     public function sendEmail(Request $request): JsonResponse
     {
+        set_time_limit(0);
+
         try {
+            DB::beginTransaction();
+
+            // === VALIDASI REQUEST ===
             $validator = Validator::make($request->all(), [
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
-                'recipients' => 'required|array',
-                'recipients.*' => 'email'
+                'leads_id' => 'required|exists:sl_leads,id',
+                'recipients' => 'required|array|min:1',
+                'recipients.*' => 'required|email',
+                'cc' => 'nullable|array',
+                'cc.*' => 'email',
+                'bcc' => 'nullable|array',
+                'bcc.*' => 'email',
+                'attachments' => 'nullable|array',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 422);
             }
 
-            foreach ($request->recipients as $recipient) {
-                // Mail::to($recipient)->send(new CustomerActivityEmail($request->subject, $request->body));
+            // === DAPATKAN USER DAN KONFIGURASI ===
+            $user = Auth::user();
+
+            // === SETUP DYNAMIC MAILER ===
+            try {
+                $mailerSetup = $this->dynamicMailerService->setupMailer($user);
+            } catch (\Exception $e) {
+                throw new \Exception('Gagal mengkonfigurasi email: ' . $e->getMessage());
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Email berhasil dikirim'
-            ]);
+            $mailerName = $mailerSetup['name'];
+            $fromConfig = $mailerSetup['config'];
+            $configSource = $mailerSetup['config_source'];
+
+            // === BUAT ACTIVITY BARU (TIPE EMAIL) ===
+            $leads = Leads::find($request->leads_id);
+            $nomor = $this->generateNomor($request->leads_id);
+            $current_date_time = Carbon::now();
+
+            // Gabungkan recipients untuk disimpan di notes
+            $recipientsList = implode(', ', $request->recipients);
+            $notes = "Email dikirim ke: {$recipientsList}\nSubject: {$request->subject}\n\n{$request->body}";
+
+            if ($request->cc) {
+                $notes .= "\nCC: " . implode(', ', $request->cc);
+            }
+
+            if ($request->bcc) {
+                $notes .= "\nBCC: " . implode(', ', $request->bcc);
+            }
+
+            // Buat activity baru
+            $activityData = [
+                'nomor' => $nomor,
+                'leads_id' => $request->leads_id,
+                'tgl_activity' => $current_date_time->toDateString(),
+                'tipe' => 'Email',
+                'notes' => $notes,
+                'branch_id' => $leads->branch_id,
+                'user_id' => $user->id,
+                'created_by' => $user->full_name,
+                'created_at' => $current_date_time
+            ];
+
+            $activity = CustomerActivity::create($activityData);
+
+            // === PREPARE EMAIL CONTENT ===
+            $fullBody = $request->body;
+
+            // // Tambahkan info activity ke body email
+            // $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
+            // $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
+            // $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
+            // $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
+            // $activityInfo .= "Tipe: " . $activity->tipe . "\n";
+
+            // $fullBody .= $activityInfo;
+
+            // === SEND EMAILS ===
+            $sentCount = 0;
+            $failedRecipients = [];
+            $successRecipients = [];
+
+            $totalRecipients = count($request->recipients);
+
+            foreach ($request->recipients as $index => $recipient) {
+                $attempt = $index + 1;
+
+                try {
+                    // Buat email instance
+                    $email = new CustomerActivityEmail(
+                        subject: $request->subject,
+                        body: $fullBody,
+                        fromAddress: $fromConfig['address'],
+                        fromName: $fromConfig['name']
+                    );
+
+                    // Tambahkan CC jika ada
+                    if (!empty($request->cc)) {
+                        $email->cc($request->cc);
+                    }
+
+                    // Tambahkan BCC jika ada
+                    if (!empty($request->bcc)) {
+                        $email->bcc($request->bcc);
+                    }
+
+                    // Kirim email menggunakan mailer dinamis
+                    Mail::mailer($mailerName)->to($recipient)->send($email);
+
+                    $sentCount++;
+                    $successRecipients[] = $recipient;
+
+                } catch (\Exception $e) {
+                    $failedRecipients[] = [
+                        'email' => $recipient,
+                        'error' => $e->getMessage(),
+                        'attempt' => $attempt
+                    ];
+                }
+
+                // Delay kecil antar email untuk menghindari rate limit
+                if ($attempt < $totalRecipients) {
+                    usleep(50000); // 50ms delay
+                }
+            }
+
+            DB::commit();
+
+            // === RESPONSE ===
+            if ($sentCount === $totalRecipients) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Email berhasil dikirim ke {$sentCount} penerima dan activity baru telah dibuat",
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'recipients_count' => $sentCount,
+                        'recipients' => $successRecipients,
+                        'activity' => [
+                            'id' => $activity->id,
+                            'nomor' => $activity->nomor,
+                            'tipe' => $activity->tipe,
+                            'tgl_activity' => $activity->tgl_activity,
+                            'created_at' => $activity->created_at
+                        ],
+                        'cc' => $request->cc ?? [],
+                        'bcc' => $request->bcc ?? []
+                    ]
+                ], 201);
+            } elseif ($sentCount > 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Email berhasil dikirim ke {$sentCount} dari {$totalRecipients} penerima dan activity baru telah dibuat",
+                    'partial_success' => true,
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'success_recipients' => $successRecipients,
+                        'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'activity' => [
+                            'id' => $activity->id,
+                            'nomor' => $activity->nomor,
+                            'tipe' => $activity->tipe,
+                            'tgl_activity' => $activity->tgl_activity,
+                            'created_at' => $activity->created_at
+                        ],
+                        'success_count' => $sentCount,
+                        'failed_count' => count($failedRecipients)
+                    ]
+                ], 207);
+            } else {
+                // Rollback activity jika semua email gagal
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mengirim email ke semua penerima',
+                    'data' => [
+                        'mailer_used' => $mailerName,
+                        'config_source' => $configSource,
+                        'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
+                        'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'errors' => array_column($failedRecipients, 'error')
+                    ]
+                ], 500);
+            }
 
         } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('=== CRITICAL ERROR in sendEmail ===');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('Trace: ' . $e->getTraceAsString());
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengirim email'
+                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Helper untuk test koneksi mailer
+     */
+    private function testMailerConnection($mailerName, $fromConfig): array
+    {
+        try {
+            // Coba kirim email test ke diri sendiri
+            Mail::mailer($mailerName)->raw('Test connection', function ($message) use ($fromConfig) {
+                $message->to($fromConfig['address'])
+                    ->subject('Test Connection - ' . date('Y-m-d H:i:s'))
+                    ->from($fromConfig['address'], $fromConfig['name']);
+            });
+
+            return ['success' => true, 'message' => 'Connection successful'];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
@@ -1178,8 +1492,8 @@ class CustomerActivityController extends Controller
 
             // Handle file uploads jika ada
             if ($request->has('files')) {
-                foreach ($request->files as $fileData) {
-                    $this->saveActivityFile($activity->id, $fileData);
+                foreach ($request->files as $file) {
+                    $this->storeActivityFile($activity->id, $file);
                 }
             }
 
@@ -1656,119 +1970,332 @@ class CustomerActivityController extends Controller
         }
     }
 
+
     /**
      * @OA\Get(
-     *     path="/api/customer-activities/paginated",
-     *     summary="Get paginated customer activities",
-     *     description="Mengambil daftar customer activities dengan pagination untuk feed",
+     *     path="/api/customer-activities/available",
+     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas",
+     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:
+     *                 - Sales (29): hanya melihat leads mereka sendiri
+     *                 - Team Leader (31): melihat leads seluruh anggota tim
+     *                 - RO (6,8): melihat semua leads
+     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="page",
-     *         in="query",
-     *         description="Halaman",
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="per_page",
-     *         in="query",
-     *         description="Jumlah data per halaman",
-     *         @OA\Schema(type="integer", example=10)
-     *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Success",
+     *         description="Berhasil mengambil data leads tersedia",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
      *             @OA\Property(
-     *                 property="data", 
+     *                 property="data",
      *                 type="array",
      *                 @OA\Items(
-     *                     type="object",
      *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-092024-00001"),
-     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2024-09-23"),
-     *                     @OA\Property(property="tipe", type="string", example="Telepon"),
-     *                     @OA\Property(property="keterangan", type="string", example="Follow up customer"),
-     *                     @OA\Property(property="created_at", type="string", format="date-time"),
-     *                     @OA\Property(property="nama", type="string", example="PT. Contoh Perusahaan"),
-     *                     @OA\Property(property="sales", type="string", example="John Doe"),
-     *                     @OA\Property(property="kebutuhan", type="string", example="Laboratory Service"),
-     *                     @OA\Property(property="status_leads", type="string", example="Follow Up")
+     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="salesEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManagerEmail", type="string", example=""),
+     *                     @OA\Property(property="branchManager", type="string", example=""),
+     *                     @OA\Property(
+     *                         property="status_leads",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="branch",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="kebutuhan",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     )
      *                 )
-     *             ),
-     *             @OA\Property(property="current_page", type="integer", example=1),
-     *             @OA\Property(property="per_page", type="integer", example=10),
-     *             @OA\Property(property="total", type="integer", example=50),
-     *             @OA\Property(property="last_page", type="integer", example=5)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Unauthorized",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
      *         )
      *     )
      * )
      */
-    public function getPaginatedActivities(Request $request): JsonResponse
+    public function availableLeads()
     {
         try {
-            $perPage = $request->get('per_page', 10);
-            $page = $request->get('page', 1);
+            $user = Auth::user();
 
-            $db2 = DB::connection('mysqlhris')->getDatabaseName();
-
-            $query = DB::table('sl_customer_activity')
-                ->join('sl_leads', 'sl_leads.id', 'sl_customer_activity.leads_id')
-                ->leftJoin('m_tim_sales_d', 'sl_leads.tim_sales_d_id', '=', 'm_tim_sales_d.id')
-                ->leftJoin('m_kebutuhan', 'sl_leads.kebutuhan_id', '=', 'm_kebutuhan.id')
-                ->leftJoin('m_status_leads', 'sl_customer_activity.status_leads_id', '=', 'm_status_leads.id')
-                ->select([
-                    'sl_customer_activity.id',
-                    'sl_customer_activity.nomor',
-                    'sl_customer_activity.tgl_activity',
-                    'sl_customer_activity.tipe',
-                    'sl_customer_activity.notes as keterangan',
-                    'sl_customer_activity.created_at',
-                    'sl_leads.nama_perusahaan as nama',
-                    'm_tim_sales_d.nama as sales',
-                    'm_kebutuhan.nama as kebutuhan',
-                    'm_status_leads.nama as status_leads'
+            // Gunakan scope dari model dengan select hanya kolom yang diperlukan
+            $query = Leads::select([
+                'id',
+                'nama_perusahaan',
+                'branch_id',
+                'tgl_leads',
+                'pic',
+                'no_telp'
+            ])
+                ->with([
+                    'branch:id,name' // Hanya ambil id dan name dari branch
                 ])
-                ->whereNull('sl_customer_activity.deleted_at')
-                ->orderBy('sl_customer_activity.tgl_activity', 'desc');
+                ->availableForActivity($user);
 
-            // Apply filters if provided
-            if ($request->tgl_dari && $request->tgl_sampai) {
-                $query->whereBetween('sl_customer_activity.tgl_activity', [$request->tgl_dari, $request->tgl_sampai]);
-            }
+            $data = $query->get();
 
-            if ($request->branch) {
-                $query->where('sl_leads.branch_id', $request->branch);
-            }
-
-            if ($request->kebutuhan) {
-                $query->where('m_kebutuhan.id', $request->kebutuhan);
-            }
-
-            if ($request->tipe) {
-                $query->where('sl_customer_activity.tipe', $request->tipe);
-            }
-
-            $total = $query->count();
-            $results = $query->offset(($page - 1) * $perPage)
-                ->limit($perPage)
-                ->get();
+            // Transformasi data
+            $transformed = $data->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'nama_branch' => $item->branch ? $item->branch->name : null,
+                    'tanggal_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'pic' => $item->pic,
+                    'no_telp_pic' => $item->no_telp
+                ];
+            });
 
             return response()->json([
                 'success' => true,
-                'data' => $results,
-                'current_page' => (int) $page,
-                'per_page' => (int) $perPage,
-                'total' => $total,
-                'last_page' => ceil($total / $perPage)
+                'message' => 'Data leads tersedia berhasil diambil',
+                'data' => $transformed
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server.'
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+
+    //=====halper functions=====//
+    /**
+     * Menggabungkan dan mengelola validation rules untuk Add (Create) dan Update.
+     *
+     * @param bool $isUpdate True jika rules untuk update, false untuk add (create).
+     * @return array
+     */
+    private function getValidationRules(bool $isUpdate = false): array
+    {
+        // Default rules
+        $rules = [
+            'tgl_activity' => 'required|date',
+            'tipe' => 'required|string|in:Telepon,Email,Meeting,Visit,Online Meeting',
+            'notes' => 'nullable|string',
+            'notes_tipe' => 'nullable|string',
+            'tim_sales_id' => 'nullable|exists:m_tim_sales,id',
+            'tim_sales_d_id' => 'nullable|exists:m_tim_sales_d,id',
+            'status_leads_id' => 'nullable|exists:m_status_leads,id',
+            'start' => 'nullable|date_format:H:i',
+            'end' => 'nullable|date_format:H:i|after:start',
+            'durasi' => 'nullable|integer|min:0',
+            'tgl_realisasi' => 'nullable|date',
+            'jam_realisasi' => 'nullable|date_format:H:i',
+            'jenis_visit_id' => 'nullable|integer',
+            'jenis_visit' => 'nullable|string',
+            'notulen' => 'nullable|string',
+            'email' => 'nullable|email',
+            'penerima' => 'nullable|string',
+            'link_bukti_foto' => 'nullable|url',
+        ];
+
+        if (!$isUpdate) {
+            // Rules khusus untuk ADD (Create)
+            $rules['leads_id'] = 'required|exists:sl_leads,id';
+            $rules['tgl_realisasi'] .= '|after_or_equal:tgl_activity'; // Tambahkan rule ini hanya untuk ADD
+            $rules['files'] = 'nullable|array';
+            $rules['files.*.nama_file'] = 'required_with:files|string|max:255';
+            $rules['files.*.file_content'] = 'required_with:files|string';
+        } else {
+            // Rules khusus untuk UPDATE
+            // Ubah rule 'required' di tgl_activity dan tipe menjadi 'sometimes|required'
+            $rules['tgl_activity'] = 'sometimes|' . $rules['tgl_activity'];
+            $rules['tipe'] = 'sometimes|' . $rules['tipe'];
+            // Hapus rule files untuk update jika tidak diperlukan
+            unset($rules['files'], $rules['files.*.nama_file'], $rules['files.*.file_content']);
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Custom validation messages.
+     *
+     * @return array
+     */
+    private function getValidationMessages(): array
+    {
+        return [
+            // Required messages
+            'leads_id.required' => 'Leads wajib dipilih.',
+            'leads_id.exists' => 'Leads yang dipilih tidak valid.',
+            'tgl_activity.required' => 'Tanggal activity wajib diisi.',
+            'tgl_activity.date' => 'Format tanggal activity tidak valid.',
+            'tipe.required' => 'Tipe activity wajib dipilih.',
+            'tipe.in' => 'Tipe activity harus salah satu dari: Telepon, Email, Meeting, Visit, atau Online Meeting.',
+
+            // Tim Sales validation
+            'tim_sales_id.exists' => 'Tim Sales yang dipilih tidak valid.',
+            'tim_sales_d_id.exists' => 'Sales yang dipilih tidak valid.',
+
+            // Status leads validation
+            'status_leads_id.exists' => 'Status leads yang dipilih tidak valid.',
+
+            // Time validation
+            'start.date_format' => 'Format jam mulai harus HH:MM (contoh: 09:00).',
+            'end.date_format' => 'Format jam selesai harus HH:MM (contoh: 10:00).',
+            'end.after' => 'Jam selesai harus lebih besar dari jam mulai.',
+            'jam_realisasi.date_format' => 'Format jam realisasi harus HH:MM (contoh: 09:00).',
+
+            // Duration validation
+            'durasi.integer' => 'Durasi harus berupa angka.',
+            'durasi.min' => 'Durasi tidak boleh kurang dari 0.',
+
+            // Date validation
+            'tgl_realisasi.date' => 'Format tanggal realisasi tidak valid.',
+            'tgl_realisasi.after_or_equal' => 'Tanggal realisasi tidak boleh sebelum tanggal activity.',
+
+            // Email validation
+            'email.email' => 'Format email tidak valid.',
+
+            // URL validation
+            'link_bukti_foto.url' => 'Format link bukti foto tidak valid.',
+
+            // File validation
+            'files.array' => 'Format files harus berupa array.',
+            'files.*.file' => 'File yang diupload harus berupa file.',
+            'files.*.mimes' => 'File harus berformat: pdf, doc, docx, jpg, jpeg, atau png.',
+            'files.*.max' => 'Ukuran file maksimal 1MB.',
+
+        ];
+    }
+
+    /**
+     * Fields yang diizinkan untuk create/update.
+     *
+     * @return array
+     */
+    private function getAllowedFields(): array
+    {
+        return [
+            'leads_id',
+            'tgl_activity',
+            'tipe',
+            'notes',
+            'notes_tipe',
+            'tim_sales_id',
+            'tim_sales_d_id',
+            'status_leads_id',
+            'start',
+            'end',
+            'durasi',
+            'tgl_realisasi',
+            'jam_realisasi',
+            'jenis_visit_id',
+            'jenis_visit',
+            'notulen',
+            'email',
+            'penerima',
+            'link_bukti_foto'
+        ];
+    }
+
+    /**
+     * Generate nomor customer activity
+     */
+    private function generateNomor($leadsId): string
+    {
+        $now = Carbon::now();
+        $leads = Leads::find($leadsId);
+
+        $prefix = "CAT/";
+        if ($leads) {
+            switch ($leads->kebutuhan_id) {
+                case 2:
+                    $prefix .= "LS/";
+                    break;
+                case 1:
+                    $prefix .= "SG/";
+                    break;
+                case 3:
+                    $prefix .= "CS/";
+                    break;
+                case 4:
+                    $prefix .= "LL/";
+                    break;
+                default:
+                    $prefix .= "NN/";
+                    break;
+            }
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
+    }
+    /**
+     * Store activity file - Konsisten dengan storeSpkFile di SpkController
+     * 
+     * @param int $activityId
+     * @param \Illuminate\Http\UploadedFile $file
+     * @return string
+     */
+    private function storeActivityFile($activityId, $file)
+    {
+        try {
+            $fileExtension = $file->getClientOriginalExtension();
+            $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+
+            // ✅ Simpan file ke disk 'customer-activity' yang sudah dikonfigurasi
+            Storage::disk('customer-activity')->put($fileName, file_get_contents($file));
+
+            // ✅ Generate URL manual (konsisten dengan uploadSpk)
+            $fileUrl = url('document/customer-activity/' . $fileName);
+
+            \Log::info('Customer Activity File Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . Storage::disk('customer-activity')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('customer-activity')->exists($fileName) ? 'Yes' : 'No'));
+
+            // Simpan ke database
+            CustomerActivityFile::create([
+                'customer_activity_id' => $activityId,
+                'nama_file' => $file->getClientOriginalName(),
+                'url_file' => $fileUrl,
+                'created_by' => Auth::user()->full_name,
+                'created_at' => Carbon::now()
+            ]);
+
+            return $fileName;
+
+        } catch (\Exception $e) {
+            Log::error('Error storing activity file: ' . $e->getMessage());
+            throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
     }
 }

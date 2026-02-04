@@ -42,9 +42,11 @@ class Quotation extends Model
         'ot1',
         'ot2',
         'ot3',
+        'pengiriman_invoice',
         // Kolom baru yang ditambahkan
         'quotation_client_id',
         'layanan_id',
+        'jenis_kontrak',
         'layanan',
         'nama_site',
         'company',
@@ -121,8 +123,11 @@ class Quotation extends Model
         'ot4',
         'ot5',
         'is_sandbox',
+        'quotation_referensi_id',
+        'tipe_quotation'
     ];
     protected $dates = ['deleted_at'];
+
 
     // Tambahan: Accessor untuk format tanggal
     public function getTglQuotationAttribute($value)
@@ -159,6 +164,10 @@ class Quotation extends Model
     public function spk()
     {
         return $this->hasOne(Spk::class, 'quotation_id');
+    }
+    public function jenisperusahaan()
+    {
+        return $this->belongsTo(JenisPerusahaan::class, 'jenis_perusahaan_id');
     }
 
     public function quotationDetails()
@@ -253,6 +262,12 @@ class Quotation extends Model
     {
         return $this->hasMany(QuotationKerjasama::class, 'quotation_id');
     }
+    // File: app/Models/Quotation.php
+
+    public function managementFee()
+    {
+        return $this->belongsTo(ManagementFee::class, 'management_fee_id');
+    }
 
     // Relasi ke QuotationTraining
     public function quotationTrainings()
@@ -264,6 +279,17 @@ class Quotation extends Model
     public function timSalesDetail()
     {
         return $this->belongsTo(TimSalesDetail::class, 'tim_sales_d_id');
+    }
+    // Di file Quotation.php, tambahkan method relasi ini:
+
+    public function salaryRule()
+    {
+        return $this->belongsTo(SalaryRule::class, 'salary_rule_id');
+    }
+
+    public function ruleThr()
+    {
+        return $this->belongsTo(RuleThr::class, 'rule_thr_id');
     }
 
     // ACCESSOR/METHOD BARU YANG DIPERLUKAN:
@@ -293,10 +319,10 @@ class Quotation extends Model
     }
 
     // Method untuk mengecek apakah quotation aktif
-    public function isActive()
-    {
-        return $this->is_aktif == 1;
-    }
+    // public function isActive()
+    // {
+    //     return $this->is_aktif == 1;
+    // }
 
     // Scope untuk quotation aktif
     public function scopeActive($query)
@@ -336,26 +362,32 @@ class Quotation extends Model
             return $query;
         }
 
+        // 🌟 PERUBAHAN: TAMBAHKAN ROLE ID 2 (SUPERADMIN) DI SINI
+        if ($user->cais_role_id == 2) {
+            // Superadmin dapat mengakses SEMUA data tanpa filter.
+            return $query;
+        }
+        // -----------------------------------------------------
+
         // Sales division
-        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-            if ($user->role_id == 29) {
+        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            if ($user->cais_role_id == 29) {
                 // Sales
                 $query->whereHas('leads.timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
-            } elseif ($user->role_id == 31) {
+            } elseif ($user->cais_role_id == 31) {
                 // SPV Sales - menggunakan model dengan scope
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
                     $memberSales = TimSalesDetail::byTeam($tim->tim_sales_id)
-                        ->active() // hanya yang aktif
                         ->pluck('user_id');
                     $query->whereHas('leads.timSalesD', function ($q) use ($memberSales) {
                         $q->whereIn('user_id', $memberSales);
                     });
                 }
             }
-        } elseif (in_array($user->role_id, [4, 5])) {
+        } elseif (in_array($user->cais_role_id, [4, 5])) {
             // RO
             $query->whereHas('leads', function ($q) use ($user) {
                 $q->where('ro_id', $user->id);
@@ -417,5 +449,18 @@ class Quotation extends Model
     public function quotationTurunan()
     {
         return $this->hasMany(Quotation::class, 'quotation_referensi_id');
+    }
+    public function wage()
+    {
+        return $this->hasOne(QuotationDetailWage::class);
+    }
+
+    public function logApprovals()
+    {
+        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'sl_quotation');
+    }
+    public function logNotifications()
+    {
+        return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
     }
 }

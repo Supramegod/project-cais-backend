@@ -11,6 +11,17 @@ class JenisVisit extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'm_jenis_visit';
-    protected $fillable = ['nama'];
+    
+    protected $fillable = [
+        'nama',
+        'created_by',
+        'updated_by',
+        'deleted_by'
+    ];
+    
     protected $dates = ['deleted_at'];
+    
+    const CREATED_AT = 'created_at';
+    const UPDATED_AT = 'updated_at';
+    const DELETED_AT = 'deleted_at';
 }

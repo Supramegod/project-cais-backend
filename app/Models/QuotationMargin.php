@@ -11,6 +11,7 @@ class QuotationMargin extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'sl_quotation_margin';
+
     protected $fillable = [
         'quotation_id',
         'leads_id',
@@ -25,17 +26,17 @@ class QuotationMargin extends Model
         'gpm_hpp',
         'gpm_harga_pokok',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'deleted_by' // Ditambahkan untuk konsistensi
     ];
+
     protected $dates = ['deleted_at'];
 
-    // Relasi ke Quotation
     public function quotation()
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
 
-    // Relasi ke Leads
     public function lead()
     {
         return $this->belongsTo(Leads::class, 'leads_id');

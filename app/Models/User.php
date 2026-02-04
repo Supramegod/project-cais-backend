@@ -29,7 +29,7 @@ class User extends Authenticatable
         'password',
         'full_name',
         'email',
-        'role_id',
+        'cais_role_id',
         'branch_id',
         'is_active',
         'created_by',
@@ -62,7 +62,7 @@ class User extends Authenticatable
     // Relasi ke role
     public function role()
     {
-        return $this->belongsTo(Role::class, 'role_id', 'id');
+        return $this->belongsTo(Role::class, 'cais_role_id', 'id');
     }
 
     // Relasi ke branch
@@ -81,6 +81,21 @@ class User extends Authenticatable
     {
         return $this->hasMany(CustomerActivity::class, 'user_id');
     }
+    // app/Models/User.php (tambahkan method)
+    public function emailConfig()
+    {
+        return $this->hasOne(UserEmailConfig::class, 'user_id', 'id');
+    }
+
+    public function getActiveEmailConfig()
+    {
+        return $this->emailConfig()
+            ->where('is_active', true)
+            ->whereNotNull('email_host')
+            ->whereNotNull('email_username')
+            ->whereNotNull('email_password')
+            ->first();
+    }
     // Method untuk membuat token pair dengan Sanctum
     public function createTokenPair($name = 'auth_token', array $abilities = ['*'])
     {
@@ -94,6 +109,8 @@ class User extends Authenticatable
         $refreshToken = RefreshTokens::create([
             'access_token_id' => $accessToken->accessToken->id,
             'token' => hash('sha256', $plainRefreshToken = \Illuminate\Support\Str::random(40)),
+            'tokenable_id' => $this->id,           // ✅ PENTING: Simpan user id
+            'tokenable_type' => get_class($this),  // ✅ PENTING: Simpan user class (App\Models\U
             // 'expires_at' => now()->addDays(7)
         ]);
 
@@ -123,5 +140,47 @@ class User extends Authenticatable
 
         return $query->where('username', $username)
             ->where('password', $hashedPassword);
+    }
+    /**
+     * Get the user's notifications.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(LogNotification::class, 'user_id');
+    }
+
+    /**
+     * Get the user's unread notifications.
+     */
+    public function unreadNotifications()
+    {
+        return $this->notifications()->unread(true);
+    }
+
+    /**
+     * Get the user's read notifications.
+     */
+    public function readNotifications()
+    {
+        return $this->notifications()->unread(false);
+    }
+
+    /**
+     * Get notifications count.
+     *
+     * @param  bool  $unread
+     * @return int
+     */
+    public function notificationsCount($unread = null)
+    {
+        $query = $this->notifications();
+
+        if ($unread === true) {
+            $query->unread(true);
+        } elseif ($unread === false) {
+            $query->unread(false);
+        }
+
+        return $query->count();
     }
 }

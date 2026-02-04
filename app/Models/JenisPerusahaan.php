@@ -129,4 +129,8 @@ class JenisPerusahaan extends Model
     {
         return $this->hasMany(Leads::class, 'jenis_perusahaan_id', 'id');
     }
+    public function quotation()
+    {
+        return $this->hasMany(Quotation::class,'jenis_perusahaan_id,id');
+    }
 }

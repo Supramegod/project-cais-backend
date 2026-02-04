@@ -448,12 +448,12 @@ class SiteController extends Controller
         $user = Auth::user();
 
         // Sales division
-        if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-            if ($user->role_id == 29) { // Sales
+        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            if ($user->cais_role_id == 29) { // Sales
                 $query->whereHas('timSalesDetail', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
-            } elseif ($user->role_id == 31) { // SPV Sales
+            } elseif ($user->cais_role_id == 31) { // SPV Sales
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
                 if ($tim) {
                     $memberIds = TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
@@ -466,15 +466,15 @@ class SiteController extends Controller
         }
 
         // RO division
-        elseif (in_array($user->role_id, [4, 5, 6, 8])) {
-            if (in_array($user->role_id, [4, 5])) {
+        elseif (in_array($user->cais_role_id, [4, 5, 6, 8])) {
+            if (in_array($user->cais_role_id, [4, 5])) {
                 $query->where('ro_id', $user->id);
             }
         }
 
         // CRM division
-        elseif (in_array($user->role_id, [54, 55, 56])) {
-            if ($user->role_id == 54) {
+        elseif (in_array($user->cais_role_id, [54, 55, 56])) {
+            if ($user->cais_role_id == 54) {
                 $query->where('crm_id', $user->id);
             }
         }

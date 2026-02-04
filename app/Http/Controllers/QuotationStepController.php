@@ -220,7 +220,7 @@ class QuotationStepController extends Controller
      * )
      */
     public function updateStep(QuotationStepRequest $request, $id, $step): JsonResponse
-    {
+    { set_time_limit(0);
         DB::beginTransaction();
         try {
             $quotation = Quotation::notDeleted()->findOrFail($id);
@@ -233,7 +233,7 @@ class QuotationStepController extends Controller
             }
             $this->quotationStepService->$updateMethod($quotation, $request);
             // Update step progress
-            if (!$request->has('edit') || !$request->edit) {
+            if ($quotation->step < 12) {
                 $quotation->update([
                     'step' => max($quotation->step, $step + 1),
                     'updated_by' => Auth::user()->full_name
@@ -254,4 +254,5 @@ class QuotationStepController extends Controller
             ], 500);
         }
     }
+    
 }

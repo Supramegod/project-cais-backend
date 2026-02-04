@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -14,6 +15,7 @@ class CustomerActivity extends Model
     protected $table = 'sl_customer_activity';
     protected $fillable = [
         'tgl_activity',
+        'quotation_id',
         'branch_id',
         'nomor',
         'leads_id',
@@ -44,7 +46,8 @@ class CustomerActivity extends Model
         'user_id',
         'created_by',
         'updated_by',
-        'deleted_by'
+        'deleted_by',
+        'deleted_at'
     ];
 
     protected $dates = ['deleted_at'];
@@ -83,14 +86,36 @@ class CustomerActivity extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-    public function getCreatedAtAttribute($value)
+    // CustomerActivity.php - tambahkan method ini
+
+    public function pks()
     {
-        return Carbon::parse($value)->format('d-m-Y');
+        return $this->belongsTo(Pks::class, 'pks_id');
     }
 
+    public function spk()
+    {
+        return $this->belongsTo(Spk::class, 'spk_id');
+    }
+    public function scopeByLeadsId(Builder $query, int $leadsId, array $filters = [])
+    {
+        return $query->where('leads_id', $leadsId);
+
+    }
+
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
+    
+    public function getCreatedAtAttribute($value)
+    {
+        // Menggunakan 'd-m-Y H:i:s' untuk menyertakan jam (24-jam), menit, dan detik.
+        return Carbon::parse($value)->format('d-m-Y H:i:s');
+    }
 
     public function getUpdatedAtAttribute($value)
     {
-        return Carbon::parse($value)->format('d-m-Y');
+        return Carbon::parse($value)->format('d-m-Y H:i:s');
     }
 }

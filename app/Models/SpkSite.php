@@ -62,6 +62,11 @@ class SpkSite extends Model
     {
         return $this->hasOne(Site::class, 'spk_site_id');
     }
+    // Di SpkSite.php
+    public function hrissite()
+    {
+        return $this->hasOne(HrisSite::class, 'spk_site_id'); // Sesuaikan foreign key-nya
+    }
 
     public function getCreatedAtAttribute($value)
     {

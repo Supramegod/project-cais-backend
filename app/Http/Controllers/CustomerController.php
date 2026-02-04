@@ -171,8 +171,6 @@ class CustomerController extends Controller
             $tglDari = $request->tgl_dari ?: Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi tanggal
-            $error = null;
             $ctglDari = Carbon::parse($tglDari);
             $ctglSampai = Carbon::parse($tglSampai);
 
@@ -181,11 +179,17 @@ class CustomerController extends Controller
                 $error = 'Tanggal dari tidak boleh melebihi tanggal sampai';
             }
 
-
-            // Query base dengan role-based filtering
-            $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD'])
+            // Query base dengan role-based filtering dan relasi yang diperlukan
+            $query = Leads::with([
+                'statusLeads:id,nama,warna_background,warna_font',
+                'branch:id,name',
+                'platform:id,nama',
+                'timSalesD:id,nama'
+            ])
+                ->filterByUserRole()
                 ->whereNull('customer_id')
-                ->where('status_leads_id', 102);
+                ->where('status_leads_id', 102)
+                ->orderBy('id', 'desc');
 
             // Apply filters
             if ($request->branch) {
@@ -198,40 +202,69 @@ class CustomerController extends Controller
                 $query->where('status_leads_id', $request->status);
             }
 
-            // Apply role-based filtering
-            $query = $this->applyRoleFilter($query);
-            $tim = TimSalesDetail::where('user_id', Auth::id())->first();
+            // Apply role-based filtering menggunakan scope dari model
+            $query->filterByUserRole();
 
-            $customers = $query->get()->map(function ($item) use ($tim) {
-                // Format tambahan untuk response
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->sales = $item->timSalesD->nama ?? null;
-                $item->status_name = $item->statusLeads->nama ?? null;
-                $item->branch_name = $item->branch->name ?? null;
-                $item->platform_name = $item->platform->nama ?? null;
-                $item->warna_background = $item->statusLeads->warna_background ?? null;
-                $item->warna_font = $item->statusLeads->warna_font ?? null;
+            // Get data dan mapping sesuai kebutuhan
+            $customers = $query->get()->map(function ($item) {
+                return [
+                    // ID untuk referensi
+                    'id' => $item->id,
 
-                // Permission check
-                $item->can_view = $this->checkViewPermission($item, $tim);
-                $item->aksi = $item->can_view ? 'view' : 'no_access';
+                    // Data utama list
+                    'nomor' => $item->nomor,
+                    'branch_name' => $item->branch->name ?? '-',
+                    'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'telp_perusahaan' => $item->telp_perusahaan ?? '-',
+                    'provinsi' => $item->provinsi ?? '-',
+                    'kota' => $item->kota ?? '-',
+                    'telp_pic' => $item->no_telp ?? '-',
+                    'email_pic' => $item->email ?? '-',
+                    'status' => $item->statusLeads->nama ?? '-',
+                    'platform' => $item->platform->nama ?? '-',
+                    'created_by' => $item->created_by ?? '-',
+                    'notes' => $item->notes ?? '-',
 
-                return $item;
+                    // Data tambahan untuk UI
+                    'pic' => $item->pic ?? '-',
+                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                        return [
+                            'id' => $kebutuhan->id,
+                            'nama' => $kebutuhan->nama,
+                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
+                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
+                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                        ];
+                    })->toArray()
+                ];
             });
 
             return response()->json([
                 'success' => true,
                 'data' => [
                     'customers' => $customers,
-                    'error' => $error
-                ]
+                    // 'total' => $customers->count(),
+                    // 'filters' => [
+                    //     'tgl_dari' => $tglDari,
+                    //     'tgl_sampai' => $tglSampai,
+                    //     'branch' => $request->branch,
+                    //     'platform' => $request->platform,
+                    //     'status' => $request->status,
+                    // ]
+                ],
+                'message' => 'Data berhasil diambil'
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Customer API List Error: ' . $e->getMessage());
+            \Log::error('Customer API List Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Internal server error'
+                'message' => 'Terjadi kesalahan saat mengambil data',
+                'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }
@@ -391,7 +424,7 @@ class CustomerController extends Controller
                 'data' => array_merge([
                     'customer' => $data,
                     'activity' => $activity
-                ],)
+                ], )
             ]);
 
         } catch (\Exception $e) {
@@ -537,7 +570,7 @@ class CustomerController extends Controller
      */
     private function applyRoleFilter($query)
     {
-        $roleId = Auth::user()->role_id;
+        $roleId = Auth::user()->cais_role_id;
 
         // Sales division filtering
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
@@ -583,7 +616,7 @@ class CustomerController extends Controller
      */
     private function applyComplexRoleFilter($query)
     {
-        $roleId = Auth::user()->role_id;
+        $roleId = Auth::user()->cais_role_id;
 
         // divisi sales
         if (in_array($roleId, [29, 30, 31, 32, 33])) {
@@ -630,7 +663,7 @@ class CustomerController extends Controller
      */
     private function checkViewPermission($data, $tim): bool
     {
-        if (Auth::user()->role_id == 29) {
+        if (Auth::user()->cais_role_id == 29) {
             return $data->tim_sales_d_id == $tim->id;
         }
         return true;

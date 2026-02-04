@@ -2,9 +2,8 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
 
-class QuotationCopyRequest extends FormRequest
+class QuotationCopyRequest extends BaseRequest
 {
     public function authorize(): bool
     {

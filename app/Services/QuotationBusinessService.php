@@ -1,9 +1,11 @@
 <?php
 
 namespace App\Services;
+use App\Models\LeadsKebutuhan;
 use App\Models\Pks;
 use App\Models\Province;
 use App\Models\City;
+use App\Models\SalesActivity;
 use App\Models\Ump;
 use App\Models\Umk;
 use App\Models\Company;
@@ -13,6 +15,7 @@ use App\Models\Leads;
 use App\Models\QuotationSite;
 use App\Models\QuotationPic;
 use App\Models\CustomerActivity;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,11 +53,11 @@ class QuotationBusinessService
     public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy): void
     {
         if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) {
+            foreach ($request->multisite as $key => $value) { // Nama site
                 $this->createQuotationSite($quotation, $request, $key, true, $createdBy);
             }
         } else {
-            $this->createQuotationSite($quotation, $request, null, false, $createdBy);
+            $this->createQuotationSite($quotation, $request, null, false, $createdBy); // Single site
         }
     }
 
@@ -83,13 +86,42 @@ class QuotationBusinessService
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
-            'provinsi_id' => $province->id,
+            'provinsi_id' => $provinceId,
             'provinsi' => $province->nama,
-            'kota_id' => $city->id,
-            'kota' => $city->nama,
+            'kota_id' => $cityId,
+            'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
+            'created_by' => $createdBy
+        ]);
+    }
+    // Di QuotationBusinessService
+    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy)
+    {
+        // Ambil UMP & UMK berdasarkan provinsi & kota dari refSite
+        $province = Province::findOrFail($refSite->provinsi_id);
+        $city = City::findOrFail($refSite->kota_id);
+
+        $ump = Ump::where('province_id', $province->id)
+            ->active()
+            ->first();
+
+        $umk = Umk::where('city_id', $city->id)
+            ->active()
+            ->first();
+
+        return QuotationSite::create([
+            'quotation_id' => $quotation->id,
+            'leads_id' => $quotation->leads_id,
+            'nama_site' => $refSite->nama_site,
+            'provinsi_id' => $refSite->provinsi_id,
+            'provinsi' => $province->nama,
+            'kota_id' => $refSite->kota_id,
+            'kota' => $city->name,
+            'ump' => $ump ? $ump->ump : 0,
+            'umk' => $umk ? $umk->umk : 0, // ✅ UMK TERBARU
+            'penempatan' => $refSite->penempatan,
             'created_by' => $createdBy
         ]);
     }
@@ -113,26 +145,98 @@ class QuotationBusinessService
         ]);
     }
 
-    /**
-     * Create initial customer activity
-     */
-    public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId): void
+    public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
         $nomorActivity = $this->generateActivityNomor($quotation->leads_id);
 
-        CustomerActivity::create([
+        // Buat notes berdasarkan tipe quotation
+        $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
+
+        // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
+        $user = Auth::user();
+
+        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
+            // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
+            $this->createSalesActivity($quotation, $createdBy);
+        } else {
+            // Untuk role lain, buat CustomerActivity seperti biasa
+            CustomerActivity::create([
+                'leads_id' => $quotation->leads_id,
+                'quotation_id' => $quotation->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => Carbon::now(),
+                'nomor' => $nomorActivity,
+                'tipe' => $this->getActivityType($tipe),
+                'notes' => $notes,
+                'is_activity' => 0,
+                'user_id' => $userId,
+                'created_by' => $createdBy
+            ]);
+        }
+    }
+
+    /**
+     * Create sales activity for quotation
+     */
+    private function createSalesActivity(Quotation $quotation, string $createdBy): void
+    {
+        $user = Auth::user();
+
+        // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari quotation
+        $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+            ->first();
+
+        SalesActivity::create([
             'leads_id' => $quotation->leads_id,
-            'quotation_id' => $quotation->id,
-            'branch_id' => $leads->branch_id,
+            'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
             'tgl_activity' => Carbon::now(),
-            'nomor' => $nomorActivity,
-            'tipe' => 'Quotation',
-            'notes' => 'Quotation dengan nomor :' . $quotation->nomor . ' terbentuk',
-            'is_activity' => 0,
-            'user_id' => $userId,
+            'jenis_activity' => 'Quotation',
+            'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
             'created_by' => $createdBy
         ]);
+    }
+
+    /**
+     * Generate activity notes based on quotation type
+     */
+    private function generateActivityNotes(Quotation $quotation, string $tipe, ?Quotation $quotationReferensi): string
+    {
+        switch ($tipe) {
+            case 'revisi':
+                return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
+
+            case 'rekontrak':
+                return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
+
+            case 'baru_dengan_referensi':
+                return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
+
+            default: // 'baru'
+                return "Quotation baru {$quotation->nomor} dibuat dari awal";
+        }
+    }
+
+    /**
+     * Get activity type based on quotation type
+     */
+    private function getActivityType(string $tipe): string
+    {
+        switch ($tipe) {
+            case 'revisi':
+                return 'Quotation Revisi';
+
+            case 'rekontrak':
+                return 'Quotation Rekontrak';
+
+            case 'baru_dengan_referensi':
+                return 'Quotation copy';
+
+            default: // 'baru'
+                return 'Quotation';
+        }
     }
 
     /**
@@ -195,7 +299,7 @@ class QuotationBusinessService
     /**
      * Generate nomor quotation berdasarkan jenis
      */
-    public function generateNomorByType($leadsId, $companyId, $tipeQuotation , $quotationReferensi = null): string
+    public function generateNomorByType($leadsId, $companyId, $tipeQuotation, $quotationReferensi = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
@@ -228,13 +332,39 @@ class QuotationBusinessService
     public function generateActivityNomor($leadsId): string
     {
         $now = Carbon::now();
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-        $count = CustomerActivity::where('leads_id', $leadsId)
-            ->whereYear('created_at', $now->year)
-            ->whereMonth('created_at', $now->month)
-            ->count();
+        $leads = Leads::find($leadsId);
 
-        return "ACT/" . $leadsId . "/" . $month . $now->year . "/" . sprintf("%04d", $count + 1);
+        $prefix = "CAT/";
+        if ($leads) {
+            switch ($leads->kebutuhan_id) {
+                case 2:
+                    $prefix .= "LS/";
+                    break;
+                case 1:
+                    $prefix .= "SG/";
+                    break;
+                case 3:
+                    $prefix .= "CS/";
+                    break;
+                case 4:
+                    $prefix .= "LL/";
+                    break;
+                default:
+                    $prefix .= "NN/";
+                    break;
+            }
+            $prefix .= $leads->nomor . "-";
+        } else {
+            $prefix .= "NN/NNNNN-";
+        }
+
+        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $year = $now->year;
+
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
+
+        return $prefix . $month . $year . "-" . $sequence;
     }
     /**
      * Validate multi site data consistency
@@ -265,7 +395,7 @@ class QuotationBusinessService
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereNotIn('status_quotation_id', [1, 2, 4, 5])
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5,8])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -274,14 +404,14 @@ class QuotationBusinessService
                 break;
 
             case 'revisi':
-                $query->whereIn('status_quotation_id', [1, 2, 4, 5]);
+                $query->whereIn('status_quotation_id', [1, 2, 4, 5,8]);
                 break;
 
             case 'rekontrak':
-                $query->whereHas('pks', function ($q) {
-                    $q->where('is_aktif', 1)
-                        ->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                });
+                $query
+                    // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
+                    ->where('status_quotation_id', 3)
+                    ->orWhereNotNull('ot1');
                 break;
         }
 
@@ -299,8 +429,9 @@ class QuotationBusinessService
             'id' => $quotation->id,
             'nomor' => $quotation->nomor,
             'nama_perusahaan' => $quotation->nama_perusahaan,
+            'mulai_kontrak' => $quotation->mulai_kontrak,
+            'kontrak_selesai' => $quotation->kontrak_selesai,
             'tgl_quotation' => $quotation->tgl_quotation,
-            'tgl_quotation_formatted' => $quotation->tgl_quotation ? Carbon::parse($quotation->tgl_quotation)->isoFormat('D MMMM Y') : null,
             'kebutuhan_id' => $quotation->kebutuhan_id,
             'jumlah_site' => $quotation->jumlah_site,
             'step' => $quotation->step,
@@ -345,4 +476,6 @@ class QuotationBusinessService
 
         return $data;
     }
+
+
 }

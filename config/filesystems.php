@@ -41,10 +41,25 @@ return [
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),
-            'url' => env('APP_URL').'/storage',
+            'url' => env('APP_URL') . '/storage',
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
+        ],
+        // config/filesystems.php
+        'spk' => [
+            'driver' => 'local',
+            'root' => public_path('document/spk'),
+            'url' => env('APP_URL') . '/document/spk', // ✅ Tetap pakai /public/
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+        'pks' => [
+            'driver' => 'local',
+            'root' => public_path('document/pks'),
+            'url' => env('APP_URL') . '/document/pks',
+            'visibility' => 'public',
+            'throw' => false,
         ],
 
         's3' => [
@@ -58,6 +73,21 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => false,
             'report' => false,
+        ],
+        // ✅ TAMBAHKAN INI
+        'customer-activity' => [
+            'driver' => 'local',
+            'root' => public_path('document/customer-activity'),
+            'url' => env('APP_URL') . '/document/customer-activity',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+        'sales-activity' => [
+            'driver' => 'local',
+            'root' => public_path('document/sales-activity'),
+            'url' => env('APP_URL') . '/document/sales-activity',
+            'visibility' => 'public',
+            'throw' => false,
         ],
 
     ],

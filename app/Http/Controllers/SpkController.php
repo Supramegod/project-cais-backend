@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\LeadsKebutuhan;
 use App\Models\QuotationAplikasi;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDetail;
@@ -16,6 +17,8 @@ use App\Models\QuotationKerjasama;
 use App\Models\QuotationOhc;
 use App\Models\QuotationPic;
 use App\Models\QuotationTraining;
+use App\Models\SalesActivity;
+use App\Services\QuotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -260,21 +263,21 @@ class SpkController extends Controller
     public function availableLeads(Request $request)
     {
         try {
-            $data = Leads::whereHas('quotations.quotationSites', function ($query) {
-                $query->whereNull('deleted_at')
-                    ->whereDoesntHave('spkSite', function ($q) {
-                        $q->whereNull('deleted_at');
-                    });
-            })
+            $query = Leads::filterByuserRole()
+                ->whereHas('quotations.quotationSites', function ($query) {
+                    $query->whereNull('deleted_at')
+                        ->whereDoesntHave('spkSite', function ($q) {
+                            $q->whereNull('deleted_at');
+                        });
+                })
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
                         ->where('is_aktif', 1);
-                })
-                ->whereHas('timSalesD', function ($query) {
-                    $query->where('user_id', Auth::user()->id);
-                })
-                ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+                });
+
+            $data = $query->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
                 ->distinct()
+                ->orderBy('id', 'desc')
                 ->get();
 
             return $this->successResponse('Available leads retrieved successfully', $data);
@@ -285,7 +288,7 @@ class SpkController extends Controller
         }
     }
 
-    /**up
+    /**
      * @OA\Post(
      *     path="/api/spk/add",
      *     summary="Membuat SPK baru",
@@ -322,7 +325,16 @@ class SpkController extends Controller
      */
     public function add(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        // Ekstrak hanya ID dari array of objects jika diperlukan
+        $siteIds = $request->site_ids;
+
+        // Jika site_ids adalah array of objects, ekstrak id-nya
+        if (is_array($siteIds) && count($siteIds) > 0 && is_array($siteIds[0])) {
+            $siteIds = array_column($siteIds, 'id');
+        }
+
+        // Validasi dengan data yang sudah diolah
+        $validator = Validator::make(array_merge($request->all(), ['site_ids' => $siteIds]), [
             'leads_id' => 'required|exists:sl_leads,id',
             'tanggal_spk' => 'required|date',
             'site_ids' => 'required|array|min:1',
@@ -339,32 +351,37 @@ class SpkController extends Controller
             $leads = Leads::whereNull('deleted_at')->find($request->leads_id);
 
             if (!$leads) {
-                throw new \Exception("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
+                return $this->errorResponse("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
             }
 
-            // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih dan belum memiliki SPK
-            $invalidSites = QuotationSite::whereIn('id', $request->site_ids)
+            // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih
+            $invalidSites = QuotationSite::whereIn('id', $siteIds)
                 ->where('leads_id', '!=', $request->leads_id)
                 ->exists();
 
             if ($invalidSites) {
-                throw new \Exception("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+                return $this->errorResponse("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
             }
 
             // Validasi: pastikan site belum memiliki SPK
-            $sitesWithSPK = QuotationSite::whereIn('id', $request->site_ids)
+            $sitesWithSPK = QuotationSite::whereIn('id', $siteIds)
                 ->whereHas('spkSite')
                 ->exists();
 
             if ($sitesWithSPK) {
-                throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
+                return $this->errorResponse("Beberapa site yang dipilih sudah memiliki SPK.");
             }
+
+            // Ambil quotation_id dari site pertama (jika diperlukan)
+            $firstSite = QuotationSite::find($siteIds[0]);
+            $quotationId = $firstSite ? $firstSite->quotation_id : null;
 
             $spkNomor = $this->generateNomorNew($leads->id);
 
-            // Buat SPK TANPA quotation_id
+            // Buat SPK
             $spk = Spk::create([
                 'leads_id' => $leads->id,
+                // 'quotation_id' => $quotationId,
                 'nomor' => $spkNomor,
                 'tgl_spk' => $request->tanggal_spk,
                 'nama_perusahaan' => $leads->nama_perusahaan,
@@ -375,7 +392,7 @@ class SpkController extends Controller
                 'created_by' => Auth::user()->full_name ?? 'System'
             ]);
 
-            $this->createSpkSites($spk, $request->site_ids);
+            $this->createSpkSites($spk, $siteIds);
             $this->createCustomerActivity($leads, $spk, $spkNomor);
 
             DB::commit();
@@ -444,23 +461,228 @@ class SpkController extends Controller
         try {
             $spk = Spk::with([
                 'leads',
+                'leads.jabatanPic',
                 'statusSpk',
-                'spkSites.quotation',
-                'spkSites.quotationSite'
+                'spkSites.quotation',  // Relasi ke quotation dari spkSite
+                'spkSites.quotation.quotationPics.jabatan', // Relasi ke PIC dengan jabatan
+                'spkSites.quotation.company', // Relasi ke company untuk alamat
+                'spkSites.quotation.quotationDetails', // Relasi ke details untuk HC
+                'spkSites.quotation.quotationDetailCosses', // Relasi ke details untuk HC
+                'spkSites.quotation.quotationTrainings', // Relasi ke training
+                'spkSites' // Relasi ke site
             ])->find($id);
 
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
+            // DEBUG: Cek apakah company dimuat dengan benar
+            if ($spk->spkSites->isNotEmpty()) {
+                $firstSite = $spk->spkSites->first();
+                if ($firstSite->quotation) {
+                    // Cek ini di browser/Postman
+                    \Log::info('Quotation ID: ' . $firstSite->quotation->id);
+                    \Log::info('Company ID: ' . ($firstSite->quotation->company_id ?? 'null'));
+                    \Log::info('Company loaded: ' . ($firstSite->quotation->relationLoaded('company') ? 'yes' : 'no'));
+                    // \Log::info('Company object: ', $firstSite->quotation->company ? $firstSite->quotation->company->toArray() : ['null']);
+                }
+            }
 
-            // Format dates
-            $spk->stgl_spk = Carbon::parse($spk->tgl_spk)->isoFormat('D MMMM Y');
-            $spk->screated_at = Carbon::parse($spk->created_at)->isoFormat('D MMMM Y');
-            $spk->status = $spk->statusSpk->nama ?? 'Unknown';
+            // 1. Informasi SPK
+            $spkInfo = [
+                'nomor_spk' => $spk->nomor,
+                'tanggal_spk' => $spk->tgl_spk,
+                'link_spk_disetujui' => $spk->link_spk_disetujui ?? null,
+            ];
+            // 2. Informasi Leads
+            $leadsInfo = [
+                'id' => $spk->leads->id ?? null,
+                'nama_perusahaan' => $spk->leads->nama_perusahaan ?? null,
+                'telp_perusahaan' => $spk->leads->telp_perusahaan ?? null,
+                'nama_pic' => $spk->leads->pic ?? null,
+                'telepon_pic' => $spk->leads->no_telp ?? null,
+                'email_pic' => $spk->leads->email ?? null,
+                'alamat_perusahaan' => $spk->leads->alamat ?? null,
+                'jabatan_nama' => $spk->leads->jabatanPic?->nama ?? null,
+            ];
 
-            return $this->successResponse('SPK details retrieved successfully', $spk);
+            // 3. Informasi Quotation (ARRAY karena bisa lebih dari satu)
+            $quotationsInfo = [];
+
+            // Kelompokkan quotation berdasarkan ID untuk menghindari duplikat
+            $uniqueQuotations = collect();
+
+            foreach ($spk->spkSites as $spkSite) {
+                if ($spkSite->quotation && !$uniqueQuotations->contains('id', $spkSite->quotation->id)) {
+                    $uniqueQuotations->push($spkSite->quotation);
+                }
+            }
+
+            foreach ($uniqueQuotations as $quotation) {
+                // Calculate quotation using service
+                $calculatedQuotation = null;
+                try {
+                    $quotationService = new QuotationService();
+                    $calculatedQuotation = $quotationService->calculateQuotation($quotation);
+                } catch (\Exception $e) {
+                    \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
+                }
+
+                // Get BPJS percentages from calculation summary
+                $persenBpjsBreakdown = [];
+                if ($calculatedQuotation && isset($calculatedQuotation->calculation_summary)) {
+                    $summary = $calculatedQuotation->calculation_summary;
+                    $persenBpjsBreakdown = [
+                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk ?? 0,
+                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm ?? 0,
+                        'persen_bpjs_jht' => $summary->persen_bpjs_jht ?? 0,
+                        'persen_bpjs_jp' => $summary->persen_bpjs_jp ?? 0,
+                        'persen_bpjs_kesehatan' => $summary->persen_bpjs_kesehatan ?? 0,
+                    ];
+                } else {
+                    // Fallback to first detail if calculation fails
+                    $firstDetail = $quotation->quotationDetailCosses->first();
+                    $persenBpjsBreakdown = [
+                        'persen_bpjs_jkk' => $firstDetail->persen_bpjs_jkk ?? 0,
+                        'persen_bpjs_jkm' => $firstDetail->persen_bpjs_jkm ?? 0,
+                        'persen_bpjs_jht' => $firstDetail->persen_bpjs_jht ?? 0,
+                        'persen_bpjs_jp' => $firstDetail->persen_bpjs_jp ?? 0,
+                        'persen_bpjs_kesehatan' => $firstDetail->persen_bpjs_kesehatan ?? 0,
+                    ];
+                }
+                // Cari PIC utama (is_kuasa = 1)
+                // fallback: ambil Company via relation() jika properti ->company bukan model
+                $companyModel = null;
+                if ($quotation->relationLoaded('company') && $quotation->company instanceof Company) {
+                    $companyModel = $quotation->company;
+                } elseif (!empty($quotation->company_id)) {
+                    $companyModel = Company::find($quotation->company_id);
+                }
+
+                // $picKuasa = $quotation->quotationPics->where('is_kuasa', 1)->first();
+                $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
+                // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
+                $cossdata = $quotation->quotationDetailCosses->first();
+
+                // Get first detail for BPJS percentages
+                $firstDetail = $quotation->quotationDetails->first();
+                $adatserikat = $quotation->status_serikat ? "Ada" : "Tidak Ada";
+
+                $quotationsInfo[] = [
+                    'id' => $quotation->id,
+                    'nomor_quotation' => $quotation->nomor ?? null,
+                    'nama_perusahaan' => $quotation->nama_perusahaan ?? null,
+                    'kebutuhan' => $quotation->kebutuhan ?? null,
+                    'jenis_kontrak' => $quotation->jenis_kontrak ?? null,
+                    'tanggal_penempatan' => $quotation->tgl_penempatan ?? null,
+                    'company_name' => $companyModel ? ($companyModel->name ?? null) : null,
+                    'company_address' => $companyModel ? ($companyModel->address ?? null) : null,
+                    'tanggal_quotation' => $quotation->tgl_quotation ?? null,
+                    'npwp' => $quotation->npwp ?? null,
+                    'materai' => $quotation->materai ?? null,
+                    'total_hc' => $totalHc,
+                    'alamat_npwp' => $quotation->alamat_npwp ?? null,
+                    'durasi_kerjasama' => $quotation->durasi_kerjasama ?? null,
+                    'durasi_karyawan' => $quotation->durasi_karyawan ?? null,
+                    'evaluasi_kontrak' => $quotation->evaluasi_kontrak ?? null,
+                    'evaluasi_karyawan' => $quotation->evaluasi_karyawan ?? null,
+                    'mulai_kontrak' => $quotation->mulai_kontrak ?? null,
+                    'kontrak_selesai' => $quotation->kontrak_selesai ?? null,
+                    'hari_kerja' => $quotation->hari_kerja ?? null,
+                    'jam_kerja' => $quotation->jam_kerja ?? null,
+                    'shift_kerja' => $quotation->shift_kerja ?? null,
+                    'kunjungan_operasional' => $quotation->kunjungan_operasional ?? null,
+                    'kunjungan_tim_crm' => $quotation->kunjungan_tim_crm ?? null,
+                    'keterangan_kunjungan_tim_crm' => $quotation->keterangan_kunjungan_tim_crm ?? null,
+                    'keterangan_kunjungan_operasional' => $quotation->keterangan_kunjungan_operasional ?? null,
+                    'persen_bpjs_jkk' => $persenBpjsBreakdown['persen_bpjs_jkk'],
+                    'persen_bpjs_jkm' => $persenBpjsBreakdown['persen_bpjs_jkm'],
+                    'persen_bpjs_jht' => $persenBpjsBreakdown['persen_bpjs_jht'],
+                    'persen_bpjs_jp' => $persenBpjsBreakdown['persen_bpjs_jp'],
+                    'persen_bpjs_kesehatan' => $persenBpjsBreakdown['persen_bpjs_kesehatan'],
+                    'kompensasi' => $cossdata ? $cossdata->kompensasi ?? null : null,
+                    'lembur' => $cossdata ? $cossdata->lembur ?? null : null,
+                    'thr' => $cossdata ? $cossdata->tunjangan_hari_raya ?? null : null,
+                    'joker_reliever' => $quotation->joker_reliever ?? null,
+                    'syarat_invoice' => $quotation->syarat_invoice ?? null,
+                    'top' => $quotation->top ?? null,
+                    'jumlah_hari_invoice' => $quotation->jumlah_hari_invoice ?? null,
+                    'tipe_hari_invoice' => $quotation->tipe_hari_invoice ?? null,
+                    'alamat_penagihan_invoice' => $quotation->alamat_penagihan_invoice ?? null,
+                    'catatan_site' => $quotation->catatan_site ?? null,
+                    'cuti' => $quotation->cuti ?? null,
+                    'gaji_saat_cuti' => $quotation->gaji_saat_cuti ?? null,
+                    'prorate' => $quotation->prorate ?? null,
+                    'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
+                    'ada_serikat' => $adatserikat,
+                    'salary_rule' => $quotation->salaryRule ? [
+                        'id' => $quotation->salaryRule->id,
+                        'nama' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->nama_salary_rule ?? null) : null,
+                        'cutoff' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->cutoff ?? null) : null,
+                        'crosscheck' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->crosscheck_absen ?? null) : null,
+                        'pengiriman_invoice' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->pengiriman_invoice ?? null) : null,
+                        'perkiraan_invoice_diterima' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->perkiraan_invoice_diterima ?? null) : null,
+                        'rilis_payroll' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->rilis_payroll ?? null) : null
+                    ] : null,
+                    'rulethr' => $quotation->ruleThr ? [
+                        'id' => $quotation->ruleThr->id,
+                        'nama' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->nama ?? null) : null,
+                        'hari_rilis_thr' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_rilis_thr ?? null) : null,
+                        'hari_pembayaran_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_pembayaran_invoice ?? null) : null,
+                        'hari_penagihan_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_penagihan_invoice ?? null) : null
+                    ] : null,
+                    'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
+                        return [
+                            'id' => $detail->id,
+                            'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
+                            'jumlah_hc' => $detail->jumlah_hc
+                        ];
+                    }),
+                    'quotation_pics' => $quotation->quotationPics->map(function ($pic) {
+                        return [
+                            'id' => $pic->id,
+                            'nama' => $pic->nama,
+                            'jabatan' => is_object($pic->jabatan) ? ($pic->jabatan->nama ?? null) : null,
+                            'no_telp' => $pic->no_telp,
+                            'email' => $pic->email,
+                            'is_kuasa' => $pic->is_kuasa
+                        ];
+                    }),
+                    'quotation_trainings' => $quotation->quotationTrainings->map(function ($training) {
+                        return [
+                            'id' => $training->id,
+                            'training_id' => $training->training_id,
+                            'nama' => $training->nama,
+                        ];
+                    })
+                ];
+            }
+
+            // 4. Informasi Site (array karena bisa banyak site)
+            $sitesInfo = $spk->spkSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'quotation_id' => $site->quotation_id
+                ];
+            });
+
+            // Struktur respons akhir
+            $responseData = [
+                'spk' => $spkInfo,
+                'leads' => $leadsInfo,
+                'quotations' => $quotationsInfo,
+                'sites' => $sitesInfo
+            ];
+
+            return $this->successResponse('SPK details retrieved successfully', $responseData);
 
         } catch (\Exception $e) {
+            // Untuk debugging, tambahkan ini:
+            \Log::error('SPK View Error: ' . $e->getMessage());
+            \Log::error('SPK View Stack Trace: ' . $e->getTraceAsString());
+
             return $this->errorResponse('Error fetching SPK details', $e->getMessage());
         }
     }
@@ -622,7 +844,13 @@ class SpkController extends Controller
      *         description="File berhasil diupload",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="File uploaded successfully")
+     *             @OA\Property(property="message", type="string", example="SPK file uploaded successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="nomor", type="string", example="SPK/LEAD001-012024-00001"),
+     *                 @OA\Property(property="status_spk_id", type="integer", example=2),
+     *                 @OA\Property(property="link_spk_disetujui", type="string", example="http://example.com/public/spk/file.pdf")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -632,13 +860,29 @@ class SpkController extends Controller
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="SPK tidak ditemukan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="SPK not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Error server",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error uploading SPK file")
+     *         )
      *     )
      * )
      */
     public function uploadSpk(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240'
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
         ]);
 
         if ($validator->fails()) {
@@ -646,26 +890,67 @@ class SpkController extends Controller
         }
 
         try {
+            DB::beginTransaction();
+
             $spk = Spk::find($id);
+
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
+            // Hapus file lama jika ada
+            if ($spk->link_spk_disetujui) {
+                $oldFileName = basename($spk->link_spk_disetujui);
+                if (Storage::disk('spk')->exists($oldFileName)) {
+                    Storage::disk('spk')->delete($oldFileName);
+                }
+            }
+
+            // Upload file baru
             $fileName = $this->storeSpkFile($request->file('file'));
+
+            // ✅ Generate URL menggunakan Storage facade
+            // $fileUrl = Storage::disk('spk')->url($fileName);
+
+            // ATAU jika mau manual:
+            $fileUrl = url('document/spk/' . $fileName);
+
+            \Log::info('Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . Storage::disk('spk')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('spk')->exists($fileName) ? 'Yes' : 'No'));
 
             $spk->update([
                 'status_spk_id' => 2,
-                'link_spk_disetujui' => env('APP_URL') . "/public/spk/" . $fileName,
+                'link_spk_disetujui' => $fileUrl,
                 'updated_by' => Auth::user()->full_name
             ]);
 
-            return $this->successResponse('File uploaded successfully');
+            // Catat aktivitas
+            $this->createUploadActivity($spk);
+
+            DB::commit();
+
+            $spk->load(['statusSpk']);
+
+            return $this->successResponse('SPK file uploaded successfully', [
+                'id' => $spk->id,
+                'nomor' => $spk->nomor,
+                'status_spk_id' => $spk->status_spk_id,
+                'status' => $spk->statusSpk->nama ?? null,
+                'link_spk_disetujui' => $spk->link_spk_disetujui
+            ]);
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error uploading file', $e->getMessage());
+            DB::rollBack();
+
+            if (isset($fileName) && Storage::disk('spk')->exists($fileName)) {
+                Storage::disk('spk')->delete($fileName);
+            }
+
+            return $this->errorResponse('Error uploading SPK file', $e->getMessage());
         }
     }
-
     /**
      * @OA\Post(
      *     path="/api/spk/ajukan-ulang/{spkId}",
@@ -1036,7 +1321,7 @@ class SpkController extends Controller
             $sites = QuotationSite::with(['quotation'])
                 ->where('leads_id', $leadsId)
                 ->whereNull('deleted_at')
-                // ->whereDoesntHave('spkSite')
+                ->whereDoesntHave('spkSite')
                 ->get()
                 ->map(function ($site) {
                     return [
@@ -1044,7 +1329,7 @@ class SpkController extends Controller
                         'nama_site' => $site->nama_site,
                         'provinsi' => $site->provinsi,
                         'kota' => $site->kota,
-                        'quotation' => $site->quotation->nomor,
+                        'quotation' => is_object($site->quotation) ? $site->quotation->nomor : $site->quotation,
                         'ump' => $site->ump,
                         'umk' => $site->umk,
                         'nominal_upah' => $site->nominal_upah,
@@ -1218,6 +1503,187 @@ class SpkController extends Controller
             return $this->errorResponse('Error deleting SPK site', $e->getMessage());
         }
     }
+    /**
+     * @OA\Post(
+     *     path="/api/spk/{id}/submit-checklist",
+     *     tags={"SPK"},
+     *     summary="Submit SPK checklist",
+     *     description="Submits checklist data for SPK including NPWP, invoice, and other administrative details",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="Quotation ID",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Checklist data",
+     *         @OA\JsonContent(
+     *             required={"npwp", "alamat_npwp", "pic_invoice", "telp_pic_invoice", "email_pic_invoice", "materai", "joker_reliever", "syarat_invoice", "alamat_penagihan_invoice", "status_serikat"},
+     *             @OA\Property(property="npwp", type="string", description="NPWP number", example="123456789012345"),
+     *             @OA\Property(property="alamat_npwp", type="string", description="NPWP address", example="Jl. Sudirman No. 123, Jakarta"),
+     *             @OA\Property(property="pic_invoice", type="string", description="PIC for invoice", example="John Doe"),
+     *             @OA\Property(property="telp_pic_invoice", type="string", description="Phone number of PIC", example="081234567890"),
+     *             @OA\Property(property="email_pic_invoice", type="string", format="email", description="Email of PIC", example="john@example.com"),
+     *             @OA\Property(property="materai", type="string", description="Stamp duty amount", example="10000"),
+     *             @OA\Property(property="joker_reliever", type="string", description="Joker/Reliever availability", example="Tersedia"),
+     *             @OA\Property(property="syarat_invoice", type="string", description="Invoice terms", example="Net 30 days"),
+     *             @OA\Property(property="alamat_penagihan_invoice", type="string", description="Invoice billing address", example="Jl. Thamrin No. 456, Jakarta"),
+     *             @OA\Property(property="catatan_site", type="string", description="Site notes", example="Catatan penting untuk site"),
+     *             @OA\Property(property="status_serikat", type="string", description="Union status", example="Tidak Ada"),
+     *             @OA\Property(property="ada_serikat", type="string", description="Union existence", example="Tidak Ada"),
+     *             @OA\Property(
+     *                 property="pics",
+     *                 type="array",
+     *                 description="Array of PIC data",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     required={"nama", "jabatan", "no_telp", "email"},
+     *                     @OA\Property(property="nama", type="string", example="Jane Doe"),
+     *                     @OA\Property(property="jabatan", type="integer", example=1),
+     *                     @OA\Property(property="no_telp", type="string", example="081234567890"),
+     *                     @OA\Property(property="email", type="string", example="jane@example.com")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Checklist submitted successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Checklist submitted successfully"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="npwp", type="string", example="123456789012345"),
+     *                 @OA\Property(property="pic_invoice", type="string", example="John Doe"),
+     *                 @OA\Property(property="pics_added", type="integer", example=2)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Quotation not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Quotation not found")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Validation error"),
+     *             @OA\Property(property="errors", type="object")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to submit checklist"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+    public function submitChecklist(Request $request, string $id): JsonResponse
+    {
+        DB::beginTransaction();
+        try {
+            $user = Auth::user();
+            $current_date_time = Carbon::now()->toDateTimeString();
+
+            // Validasi input
+            $validator = Validator::make($request->all(), [
+                'npwp' => 'required|string|max:50',
+                'alamat_npwp' => 'required|string|max:255',
+                'materai' => 'required|string|max:50',
+                'joker_reliever' => 'required|string|max:50',
+                'syarat_invoice' => 'required|string|max:255',
+                'alamat_penagihan_invoice' => 'required|string|max:255',
+                'status_serikat' => 'required|string|max:50',
+                'catatan_site' => 'nullable|string',
+                'ada_serikat' => 'nullable|string',
+                // Validasi untuk PICs
+                'pics' => 'nullable|array',
+                'pics.*.nama' => 'required_if:pics,!=,null|string|max:100',
+                'pics.*.jabatan' => 'nullable:pics,!=,null|integer|exists:m_jabatan_pic,id',
+                'pics.*.no_telp' => 'nullable:pics,!=,null|string|max:20',
+                'pics.*.email' => 'nullable:pics,!=,null|email|max:100'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $validator->errors()
+                ], 422);
+            }
+
+            // Cari quotation
+            $quotation = Quotation::notDeleted()->findOrFail($id);
+
+            // Logika untuk status serikat
+            $statusSerikat = $request->status_serikat;
+            if ($request->ada_serikat === "Tidak Ada") {
+                $statusSerikat = "Tidak Ada";
+            }
+
+            // Update quotation data
+            $quotation->update([
+                'npwp' => $request->npwp,
+                'alamat_npwp' => $request->alamat_npwp,
+                'pic_invoice' => $request->pic_invoice,
+                'telp_pic_invoice' => $request->telp_pic_invoice,
+                'email_pic_invoice' => $request->email_pic_invoice,
+                'materai' => $request->materai,
+                'joker_reliever' => $request->joker_reliever,
+                'syarat_invoice' => $request->syarat_invoice,
+                'alamat_penagihan_invoice' => $request->alamat_penagihan_invoice,
+                'catatan_site' => $request->catatan_site,
+                'status_serikat' => $statusSerikat,
+                'updated_at' => $current_date_time,
+                'updated_by' => $user->full_name
+            ]);
+
+            // Tambah PICs jika ada
+            $picsAdded = 0;
+            if ($request->has('pics') && is_array($request->pics)) {
+                foreach ($request->pics as $picData) {
+                    $this->addDetailPic($quotation, $picData, $current_date_time);
+                    $picsAdded++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Checklist submitted successfully',
+                'data' => [
+                    'id' => $quotation->id,
+                    'npwp' => $quotation->npwp,
+                    'pic_invoice' => $quotation->pic_invoice,
+                    'pics_added' => $picsAdded
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Failed to submit checklist: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to submit checklist',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     /**
      * =============================================
@@ -1249,7 +1715,6 @@ class SpkController extends Controller
                 'provinsi' => $quotationSite->provinsi,
                 'kota_id' => $quotationSite->kota_id,
                 'kota' => $quotationSite->kota,
-                ~
                 'ump' => $quotationSite->ump,
                 'umk' => $quotationSite->umk,
                 'nominal_upah' => $quotationSite->nominal_upah,
@@ -1266,19 +1731,55 @@ class SpkController extends Controller
     private function createCustomerActivity($leads, $spk, $spkNomor): void
     {
         $nomorActivity = $this->generateActivityNomor($leads->id);
+        $user = Auth::user();
 
-        CustomerActivity::create([
-            'leads_id' => $leads->id,
-            'spk_id' => $spk->id,
-            'branch_id' => $leads->branch_id,
-            'tgl_activity' => now(),
-            'nomor' => $nomorActivity,
-            'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
-            'is_activity' => 0,
-            'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
-        ]);
+        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            // Untuk Sales, buat SalesActivity
+            $this->createSalesActivity($spk, $leads);
+        } else {
+            // Untuk non-Sales, buat CustomerActivity
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'spk_id' => $spk->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $nomorActivity,
+                'tipe' => 'SPK',
+                'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
+                'is_activity' => 0,
+                'user_id' => Auth::user()->id,
+                'created_by' => Auth::user()->full_name
+            ]);
+        }
+    }
+
+    private function createSalesActivity($spk, $leads): void
+    {
+        $user = Auth::user();
+
+        // Ambil semua kebutuhan yang diassign ke sales ini dari leads_kebutuhan
+        $leadsKebutuhanList = LeadsKebutuhan::where('leads_id', $spk->leads_id)
+            ->whereNotNull('tim_sales_d_id')
+            ->get();
+
+        // Buat SalesActivity untuk setiap kebutuhan yang diassign ke sales ini
+        foreach ($leadsKebutuhanList as $leadsKebutuhan) {
+            // Cek apakah kebutuhan ini ada di SPK sites
+            $spkSiteExists = SpkSite::where('spk_id', $spk->id)
+                ->where('kebutuhan_id', $leadsKebutuhan->kebutuhan_id)
+                ->exists();
+
+            if ($spkSiteExists) {
+                SalesActivity::create([
+                    'leads_id' => $spk->leads_id,
+                    'leads_kebutuhan_id' => $leadsKebutuhan->id,
+                    'tgl_activity' => Carbon::now(),
+                    'jenis_activity' => 'spk',
+                    'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
+                    'created_by' => $user->full_name
+                ]);
+            }
+        }
     }
 
     private function storeSpkFile($file)
@@ -1287,6 +1788,7 @@ class SpkController extends Controller
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
 
+        // ✅ Simpan file ke disk 'spk' yang sudah dikonfigurasi
         Storage::disk('spk')->put($fileName, file_get_contents($file));
 
         return $fileName;
@@ -1298,7 +1800,7 @@ class SpkController extends Controller
         // Tambahkan pengecekan null untuk leads
         $leads = Leads::whereNull('deleted_at')->find($leadsId);
         if (!$leads) {
-            throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan");
+            return $this->errorResponse("Leads dengan ID {$leadsId} tidak ditemukan");
         }
 
         $baseNumber = "SPK/" . $leads->nomor . "-";
@@ -1593,6 +2095,26 @@ class SpkController extends Controller
             'created_by' => Auth::user()->full_name
         ]);
     }
+    /**
+     * Helper method untuk membuat aktivitas upload SPK
+     */
+    private function createUploadActivity($spk): void
+    {
+        $leads = Leads::find($spk->leads_id);
+
+        CustomerActivity::create([
+            'leads_id' => $leads->id,
+            'spk_id' => $spk->id,
+            'branch_id' => $leads->branch_id,
+            'tgl_activity' => now(),
+            'nomor' => $this->generateActivityNomor($leads->id),
+            'tipe' => 'SPK',
+            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
+            'is_activity' => 0,
+            'user_id' => Auth::user()->id,
+            'created_by' => Auth::user()->full_name
+        ]);
+    }
 
     private function errorResponse(string $message, string $error = null, int $status = 500)
     {
@@ -1607,21 +2129,46 @@ class SpkController extends Controller
 
         return response()->json($response, $status);
     }
-
+    /**
+     * Unified validation error response
+     * Digunakan untuk semua jenis error (validation, not found, server error, dll)
+     * 
+     * @param mixed $errors - Bisa berupa string, array, atau MessageBag dari validator
+     * @param int $status - HTTP status code
+     */
     private function validationError($errors, int $status = 400)
     {
+        // Jika errors adalah MessageBag dari validator, convert ke array
+        if (is_object($errors) && method_exists($errors, 'toArray')) {
+            $errors = $errors->toArray();
+        }
+
         return response()->json([
             'success' => false,
-            'message' => 'Validation error',
-            'errors' => $errors
+            'message' => $errors
         ], $status);
     }
-
     private function notFoundResponse(string $message = 'Resource not found')
     {
         return response()->json([
             'success' => false,
             'message' => $message
         ], 404);
+    }
+    private function addDetailPic($quotation, $picData, $currentDateTime)
+    {
+        $user = Auth::user();
+
+        QuotationPic::create([
+            'quotation_id' => $quotation->id,
+            'nama' => $picData['nama'],
+            'jabatan_id' => $picData['jabatan'],
+            'no_telp' => $picData['no_telp'],
+            'email' => $picData['email'],
+            'leads_id' => $quotation->leads_id,
+            'is_kuasa' => 0, // Default tidak kuasa
+            'created_at' => $currentDateTime,
+            'created_by' => $user->full_name
+        ]);
     }
 }

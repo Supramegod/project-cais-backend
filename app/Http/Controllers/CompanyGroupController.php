@@ -296,8 +296,7 @@ class CompanyGroupController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 400);
             }
 
@@ -560,8 +559,7 @@ class CompanyGroupController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
+                    'message' => $validator->errors()
                 ], 400);
             }
 

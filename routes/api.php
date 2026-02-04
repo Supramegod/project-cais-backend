@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AdminPanelController;
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardApprovalController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SalesActivityController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -30,7 +33,10 @@ use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\TargetController;
+use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -234,10 +240,12 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('customer-activities')->controller(CustomerActivityController::class)->group(function () {
         Route::get('/list', 'list');
         Route::get('/view/{id}', 'view');
+        Route::post('/send-email', 'sendEmail');
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
         Route::get('/leads/{leadsId}/track', 'trackActivity');
+        Route::get('/available', 'availableLeads');
     });
 
     // Company Group Routes - UPDATED
@@ -274,20 +282,21 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/restore/{id}', 'restore');
 
         // Additional endpoints
+        Route::get('/available-sales/{id}', 'availableSales');
+        Route::get('/sales-kebutuhan/{id}', 'getSalesKebutuhan');
         Route::get('/deleted', 'listTerhapus');
         Route::get('/child/{id}', 'childLeads');
         Route::post('/child/{id}', 'saveChildLeads');
         Route::get('/belum-aktif', 'leadsBelumAktif');
-        Route::get('/available', 'availableLeads');
         Route::get('/available-quotation', 'availableQuotation');
         Route::post('/activate/{id}', 'activateLead');
         Route::post('/import', 'import');
         Route::get('/export', 'exportExcel');
         Route::get('/template-import', 'templateImport');
         Route::post('/generate-null-kode', 'generateNullKode');
-
-
-
+        Route::get('/spk/{id}', 'getSpkByLead');
+        Route::get('/pks/{id}', 'getPksByLead');
+        Route::get('/customeractivity/{id}', 'getCustomerActivityByLead');
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');
@@ -321,6 +330,9 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
         Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
+        
+        // Submit Checklist
+        Route::post('/{id}/submit-checklist', 'submitChecklist');
     });
     // Role Management
     Route::prefix('roles')->controller(RoleController::class)->group(function () {
@@ -348,6 +360,9 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Available Resources
         Route::get('/available-leads', 'getAvailableLeads');
         Route::get('/available-sites/{leadsId}', 'getAvailableSites');
+        Route::post('/{id}/submit-checklist', 'submitChecklist');
+        Route::post('/upload/{id}', 'uploadPks');
+        // });
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
@@ -358,11 +373,13 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/{sourceId}/copy/{targetId}', 'copy');
         Route::post('/{id}/resubmit', 'resubmit');
         Route::post('/{id}/submit-approval', 'submitForApproval');
+        Route::post('/{id}/reset-approval', 'resetApproval');
         Route::get('/{id}/calculate', 'calculate');
         Route::get('/{id}/export-pdf', 'exportPdf');
         Route::get('/{id}/status', 'getStatus');
         Route::get('/available-leads/{tipe_quotation}', 'availableLeads');
         Route::get('/reference/{leads_id}', 'getReferenceQuotations');
+        Route::get('/hc-high-cost', 'getSitesWithHighHcAndCost');
     });
 
     // Quotation Step Management
@@ -375,6 +392,8 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
     Route::prefix('options')->controller(OptionController::class)->group(function () {
         Route::get('/branches', 'getBranches');
         Route::get('/users', 'getUsers');
+        Route::get('/list-user', 'getListUser');
+        Route::get('/list-jenis-visit', 'getListJenisVisit');
         Route::get('/platforms', 'getPlatforms');
         Route::get('/status-leads', 'getStatusLeads');
         Route::get('/benua', 'getBenua');
@@ -383,13 +402,74 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/entitas', 'listEntitas');
         Route::get('/entitas/{layanan_id}', 'getEntitas');
         Route::get('/status-quotation', 'getStatusQuotation');
+        Route::get('/branches/{provinceId}', 'getBranchesByProvince');
         // Location data endpoints
         Route::get('/provinsi', 'getProvinsi');
         Route::get('/kota/{provinsiId}', 'getKota');
         Route::get('/kecamatan/{kotaId}', 'getKecamatan');
         Route::get('/kelurahan/{kecamatanId}', 'getKelurahan');
         Route::get('/negara/{benuaId}', 'getNegara');
+        Route::get('/loyalty', 'loyaltylist');
+        Route::get('/kategori-sesuai-hc', 'kategorusesuaihc');
+        Route::get('/rule-thr', 'rulethr');
+        Route::get('/salary-rule', 'salaryrule');
+        Route::get('/status-pks', 'statuspks');
+        Route::get('/status-spk', 'statusspk');
 
+    });
+    // User Email Config
+    Route::prefix('user')->controller(UserEmailConfigController::class)->group(function () {
+        Route::get('/list', 'getConfig');
+        Route::post('/add', 'saveConfig');
+        Route::post('/test', 'testConnection');
+    });
+    // Tambahkan di bagian yang sesuai, misalnya setelah route quotations
+    Route::prefix('dashboard-approval')->controller(DashboardApprovalController::class)->group(function () {
+        Route::get('/list', 'getListDashboardApprovalData');
+        Route::get('/notifications', 'getNotifications');
+        Route::put('/notifications/{id}/read', 'markAsRead');
+        Route::put('/notifications/read-all', 'markAllAsRead');
+        Route::get('/notifications/unread-count', 'getUnreadCount');
+    });
+
+    // Sales Activity Routes
+    Route::prefix('sales-activity')->controller(SalesActivityController::class)->group(function () {
+        Route::get('/available-leads', 'getAvailableLeads');
+        Route::get('/list', 'index');
+        Route::post('/add', 'store');
+        Route::get('/view/{id}', 'show');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'destroy');
+        Route::get('/kebutuhan/{leadsId}', 'getKebutuhanByLeads');
+        Route::get('/stats', 'getStats');
+    });
+
+    // Sales Revenue Management
+    Route::prefix('sales-revenue')->controller(SalesRevenueController::class)->group(function () {
+        Route::get('/list', 'getMonthlyRevenue');
+        Route::get('/summary', 'getRevenueSummary');
+        Route::get('/by-user', 'getRevenueByUser');
+        Route::get('/by-month', 'getRevenueByMonth');
+    });
+
+    // Target Management
+    Route::prefix('targets')->controller(TargetController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::post('/add', 'storeOrUpdate');
+    });
+
+    // Admin Panel Routes - untuk update step quotation secara khusus
+    Route::prefix('admin-panel')->controller(AdminPanelController::class)->group(function () {
+        // Get step data
+        Route::get('/quotations/{quotation}/step-data/{step}', 'getStepData');
+
+        // Update steps - menggunakan POST (jika ingin konsisten)
+        Route::post('/quotations/{quotation}/hc', 'updateStep3');
+        Route::post('/quotations/{quotation}/kaporlap', 'updateStep7');
+        Route::post('/quotations/{quotation}/devices', 'updateStep8');
+        Route::post('/quotations/{quotation}/chemical', 'updateStep9');
+        Route::post('/quotations/{quotation}/ohc', 'updateStep10');
+        Route::post('/quotations/{quotation}/harga-jual', 'updateStep11');
     });
 
 });

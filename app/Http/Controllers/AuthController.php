@@ -61,7 +61,7 @@ class AuthController extends Controller
      *                     @OA\Property(property="username", type="string", example="3578142602980002"),
      *                     @OA\Property(property="name", type="string", example="John Doe"),
      *                     @OA\Property(property="email", type="string", example="john@example.com"),
-     *                     @OA\Property(property="role_id", type="integer", example=1),
+     *                     @OA\Property(property="cais_role_id", type="integer", example=1),
      *                     @OA\Property(property="branch_id", type="integer", example=1)
      *                 ),
      *                 @OA\Property(property="access_token", type="string", example="1|abcdefghijklmnopqrstuvwxyz123456789", description="Sanctum access token berlaku 2 jam"),
@@ -144,8 +144,10 @@ class AuthController extends Controller
                         'username' => $user->username,
                         'name' => $user->full_name ?? $user->name,
                         'email' => $user->email,
-                        'role_id' => $user->role_id,
+                        'cais_role_id' => $user->cais_role_id,
+                        'user_role' => $user->role->name ?? null,
                         'branch_id' => $user->branch_id,
+                        'branch_name' => $user->branch->name ?? null,
                     ],
                     'access_token' => $tokenPair['access_token']->plainTextToken,
                     'refresh_token' => $tokenPair['refresh_token'],
@@ -276,7 +278,6 @@ class AuthController extends Controller
     {
         try {
             $user = Auth::user();
-
             // Cek apakah user terautentikasi
             if (!$user) {
                 return response()->json([
@@ -284,7 +285,6 @@ class AuthController extends Controller
                     'message' => 'Unauthenticated'
                 ], 401);
             }
-
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -298,14 +298,12 @@ class AuthController extends Controller
                     ]
                 ]
             ], 200);
-
         } catch (Exception $e) {
             Log::error('User endpoint error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => Auth::id() ?? 'unknown'
             ]);
-
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan pada server'
@@ -373,7 +371,6 @@ class AuthController extends Controller
                 'refresh_token' => 'required|string'
             ]);
 
-            // Cari refresh token
             $hashedToken = hash('sha256', $request->refresh_token);
             $refreshTokenModel = RefreshTokens::where('token', $hashedToken)->first();
 
@@ -384,7 +381,6 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Cek apakah refresh token expired
             if ($refreshTokenModel->isExpired()) {
                 $refreshTokenModel->delete();
                 return response()->json([
@@ -393,7 +389,6 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Dapatkan user dari refresh token
             $user = $refreshTokenModel->tokenableUser();
 
             if (!$user) {
@@ -403,15 +398,17 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // 🔥 HAPUS SEMUA TOKEN LAMA USER INI
-            $this->revokeAllUserTokens($user);
+            // Ambil ID token saat ini agar tidak ikut terhapus (mengenali device)
+            $currentTokenId = $refreshTokenModel->access_token_id;
 
-            // Buat token pair baru
+            // Hapus semua token lain kecuali yang sedang dipakai ini
+            $this->revokeAllUserTokens($user, $currentTokenId);
+
             $tokenPair = $user->createTokenPair('auth_token');
 
-            Log::info('Access token berhasil direfresh - semua session lama dihapus', [
+            Log::info('Access token refreshed', [
                 'user_id' => $user->id,
-                'username' => $user->username,
+                'device_info' => $request->userAgent(), // Mengenali via User Agent
                 'timestamp' => now()
             ]);
 
@@ -438,46 +435,86 @@ class AuthController extends Controller
                 'errors' => $e->errors()
             ], 422);
         } catch (Exception $e) {
-            Log::error('Refresh token error', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
+            Log::error('Refresh token error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan pada server'
             ], 500);
         }
     }
+
     /**
-     * 🔥 HELPER: Hapus semua token user (access + refresh)
+     * 🔥 HELPER: Hapus token yang sudah expired (access token & refresh token)
+     * Refresh token yang belum expired TIDAK akan dihapus
      */
-    private function revokeAllUserTokens(User $user)
+    private function revokeAllUserTokens(User $user, $excludeTokenId = null)
     {
         try {
-            // 1. Dapatkan semua access token user ini
-            $accessTokenIds = $user->tokens()->pluck('id')->toArray();
+            $now = now();
 
-            // 2. Hapus semua refresh token yang terkait dengan access token user ini
-            if (!empty($accessTokenIds)) {
-                RefreshTokens::whereIn('access_token_id', $accessTokenIds)->delete();
+            // 1️⃣ Hapus ACCESS TOKEN yang sudah expired
+            $queryAccessToken = $user->tokens()->where('expires_at', '<', $now);
+
+            if ($excludeTokenId) {
+                $queryAccessToken->where('id', '!=', $excludeTokenId);
             }
 
-            // 3. Hapus semua access token user ini
-            $user->tokens()->delete();
+            $expiredAccessTokenIds = $queryAccessToken->pluck('id')->toArray();
 
-            Log::info('All user tokens revoked', [
+            if (!empty($expiredAccessTokenIds)) {
+                $user->tokens()->whereIn('id', $expiredAccessTokenIds)->delete();
+            }
+
+            // 2️⃣ Hapus REFRESH TOKEN yang sudah expired (pakai tokenable_id langsung)
+            $expiredRefreshCount = RefreshTokens::where('tokenable_type', User::class)
+                ->where('tokenable_id', $user->id)
+                ->where('expires_at', '<', $now)
+                ->count();
+
+            if ($expiredRefreshCount > 0) {
+                RefreshTokens::where('tokenable_type', User::class)
+                    ->where('tokenable_id', $user->id)
+                    ->where('expires_at', '<', $now)
+                    ->delete();
+            }
+
+            Log::info('Expired user tokens revoked', [
                 'user_id' => $user->id,
-                'access_tokens_deleted' => count($accessTokenIds),
-                'timestamp' => now()
+                'expired_access_tokens_count' => count($expiredAccessTokenIds),
+                'expired_refresh_tokens_count' => $expiredRefreshCount,
+                'timestamp' => $now
             ]);
 
         } catch (Exception $e) {
-            Log::error('Error revoking user tokens', [
+            Log::error('Error revoking expired user tokens', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage()
             ]);
             throw $e;
         }
     }
+    //     private function revokeAllUserTokens(User $user)
+// {
+//     try {
+//         $accessTokenIds = $user->tokens()->pluck('id')->toArray();
+
+    //         if (!empty($accessTokenIds)) {
+//             RefreshTokens::whereIn('access_token_id', $accessTokenIds)->delete();
+//             $user->tokens()->delete();
+//         }
+
+    //         Log::info('All user tokens revoked', [
+//             'user_id' => $user->id,
+//             'count' => count($accessTokenIds),
+//             'timestamp' => now()
+//         ]);
+
+    //     } catch (Exception $e) {
+//         Log::error('Error revoking all user tokens', [
+//             'user_id' => $user->id,
+//             'error' => $e->getMessage()
+//         ]);
+//         throw $e;
+//     }
+// }
 }

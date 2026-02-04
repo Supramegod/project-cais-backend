@@ -137,7 +137,7 @@ class RoleController extends Controller
 
             return $this->successResponse($roleData);
         } catch (\Exception $e) {
-            $this->logError('Fetch role error', $e, ['role_id' => $id]);
+            $this->logError('Fetch role error', $e, ['cais_role_id' => $id]);
             return $this->errorResponse();
         }
     }
@@ -199,13 +199,13 @@ class RoleController extends Controller
     {
         try {
             $user = Auth::user();
-            if (!$user || !$user->role_id) {
+            if (!$user || !$user->cais_role_id) {
                 return $this->forbiddenResponse('User role not found');
             }
 
             // Ambil semua menu aktif dengan LEFT JOIN ke permissions
             $menus = Sysmenu::active()
-                ->withPermissions($user->role_id)
+                ->withPermissions($user->cais_role_id)
                 ->withGroupInfo()
                 ->selectMenuFields()
                 ->ordered()
@@ -326,7 +326,7 @@ class RoleController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             $this->logError('Update permissions error', $e, [
-                'role_id' => $id,
+                'cais_role_id' => $id,
                 'permissions' => $request->input('akses')
             ]);
             return $this->errorResponse('Failed to update permissions');
@@ -452,6 +452,7 @@ class RoleController extends Controller
                     'id' => $menu->id,
                     'nama' => $menu->nama,
                     'url' => $menu->url,
+                    'status' => $menu->status,
                     'parent_id' => $menu->parent_id,
                     'is_view' => (bool) $menu->is_view,
                     'is_add' => (bool) $menu->is_add,
@@ -481,6 +482,7 @@ class RoleController extends Controller
                     'nama' => $menu->nama,
                     'icon' => $menu->icon,
                     'url' => $menu->url,
+                    'status' => $menu->status,
                     'parent_id' => $menu->parent_id,
                     'group_id' => $currentGroupId,
                     'group_name' => $currentGroupName,

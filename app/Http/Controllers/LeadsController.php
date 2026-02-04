@@ -9,11 +9,15 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\JabatanPic;
 use App\Models\JenisPerusahaan;
+use App\Models\Kebutuhan;
 use App\Models\Leads;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
+use App\Models\Pks;
 use App\Models\Province;
+use App\Models\SalesActivity;
+use App\Models\Spk;
 use App\Models\StatusLeads;
 use App\Models\Platform;
 use App\Models\TimSalesDetail;
@@ -78,6 +82,27 @@ class LeadsController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Pencarian berdasarkan nama perusahaan. Jika ada parameter search, filter tanggal akan diabaikan untuk mencari di semua data",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman untuk pagination (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman untuk pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Berhasil mengambil data leads",
@@ -116,6 +141,16 @@ class LeadsController extends Controller
      *                         @OA\Property(property="nama", type="string")
      *                     )
      *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="pagination",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=75),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="to", type="integer", example=15)
      *             )
      *         )
      *     ),
@@ -139,63 +174,117 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
-            $tim = TimSalesDetail::where('user_id', Auth::id())->first();
-
-            $query = Leads::with(['statusLeads', 'branch', 'platform', 'timSalesD', 'kebutuhan'])
+            $query = Leads::select([
+                'id',
+                'nomor',
+                'branch_id',
+                'tgl_leads',
+                'tim_sales_d_id',
+                'nama_perusahaan',
+                'telp_perusahaan',
+                'provinsi',
+                'kota',
+                'no_telp',
+                'email',
+                'status_leads_id',
+                'platform_id',
+                'created_by',
+                'notes',
+                'created_at'
+            ])
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name',
+                    'platform:id,nama',
+                    'timSalesD:id,nama',
+                    'kebutuhan' => function ($q) {
+                        $q->select('m_kebutuhan.id', 'm_kebutuhan.nama'); // sesuaikan nama tabel kebutuhan
+                    },
+                    'leadsKebutuhan.timSalesD:id,nama'
+                ])
                 ->where('status_leads_id', '!=', 102);
 
-            if ($request->filled('tgl_dari')) {
-                $query->where('tgl_leads', '>=', $request->tgl_dari);
+            // ✅ Gunakan scope yang sudah ada di model Leads.php
+            $query->filterByUserRole();
+
+            // ✅ Optimasi Search dengan Fulltext
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
+                if (str_contains($searchTerm, ' ')) {
+                    $searchTerm = '"' . $searchTerm . '"';
+                } else {
+                    $searchTerm = $searchTerm . '*';
+                }
+
+                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
             } else {
-                $query->whereDate('tgl_leads', Carbon::today());
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
 
-            if ($request->filled('tgl_sampai')) {
-                $query->where('tgl_leads', '<=', $request->tgl_sampai);
-            } else {
-                $query->whereDate('tgl_leads', Carbon::today());
-            }
-
-            if ($request->filled('branch')) {
+            // Filter tambahan
+            if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
-            }
-
-            if ($request->filled('platform')) {
+            if ($request->filled('platform'))
                 $query->where('platform_id', $request->platform);
-            }
-
-            if ($request->filled('status')) {
+            if ($request->filled('status'))
                 $query->where('status_leads_id', $request->status);
-            }
 
-            // 🧩 Tambahkan ini sebelum get()
-            $query->orderBy('created_at', 'desc');
+            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
-            $data = $query->get();
-
-            $data->transform(function ($item) use ($tim) {
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                $item->can_view = $this->canViewLead($item, $tim);
-                return $item;
+            $transformedData = $data->getCollection()->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nomor' => $item->nomor,
+                    'wilayah' => $item->branch->name ?? '-',
+                    'wilayah_id' => $item->branch_id,
+                    'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'sales' => $item->timSalesD->nama ?? '-',
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'telp_perusahaan' => $item->telp_perusahaan,
+                    'provinsi' => $item->provinsi,
+                    'kota' => $item->kota,
+                    'no_telp' => $item->no_telp,
+                    'email' => $item->email,
+                    'status_leads' => $item->statusLeads->nama ?? '-',
+                    'status_leads_id' => $item->status_leads_id,
+                    'sumber_leads' => $item->platform->nama ?? '-',
+                    'sumber_leads_id' => $item->platform_id,
+                    'created_by' => $item->created_by,
+                    'notes' => $item->notes,
+                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
+                        return [
+                            'id' => $lk->kebutuhan_id,
+                            'nama' => $lk->kebutuhan->nama ?? '-',
+                            'tim_sales_d_id' => $lk->tim_sales_d_id,
+                            'sales_name' => $lk->timSalesD->nama ?? '-'
+                        ];
+                    })
+                ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads berhasil diambil',
-                'data' => $data
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ]
             ]);
+
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-
     private function canViewLead($lead, $tim)
     {
-        if (Auth::user()->role_id == 29) {
+        if (Auth::user()->cais_role_id == 29) {
             return $tim && $lead->tim_sales_d_id == $tim->id;
         }
         return true;
@@ -268,21 +357,12 @@ class LeadsController extends Controller
             $lead->screated_at = Carbon::parse($lead->created_at)->isoFormat('D MMMM Y');
             $lead->kebutuhan_array = $lead->kebutuhan_id ? array_map('trim', explode(',', $lead->kebutuhan_id)) : [];
 
+
             return response()->json([
                 'success' => true,
                 'message' => 'Detail lead berhasil diambil',
-                'data' => [
-                    'lead' => $lead,
-                    'activities' => CustomerActivity::where('leads_id', $id)
-                        ->latest()
-                        ->limit(5)
-                        ->get()
-                        ->map(function ($a) {
-                            $a->screated_at = Carbon::parse($a->created_at)->isoFormat('D MMMM Y HH:mm');
-                            $a->stgl_activity = Carbon::parse($a->tgl_activity)->isoFormat('D MMMM Y');
-                            return $a;
-                        })
-                ]
+                'data' => $lead,
+
             ]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
@@ -427,6 +507,27 @@ class LeadsController extends Controller
             set_time_limit(0);
             DB::beginTransaction();
 
+            // // Debug: Test if UniqueCompanyStrict class exists
+            // if (!class_exists(UniqueCompanyStrict::class)) {
+            //     \Log::error('UniqueCompanyStrict class not found');
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'UniqueCompanyStrict class not found'
+            //     ], 500);
+            // }
+
+            // // Debug: Test instantiation
+            // try {
+            //     $testRule = new UniqueCompanyStrict();
+            //     \Log::info('UniqueCompanyStrict instantiated successfully');
+            // } catch (\Exception $e) {
+            //     \Log::error('Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage());
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage()
+            //     ], 500);
+            // }
+
             $validator = Validator::make($request->all(), [
                 'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
                 'pic' => 'required',
@@ -442,14 +543,19 @@ class LeadsController extends Controller
                 'kebutuhan.array' => 'Kebutuhan harus berupa array',
                 'kebutuhan.min' => 'Kebutuhan harus dipilih minimal 1',
             ]);
-
             if ($validator->fails()) {
+                \Log::info('Validation failed', [
+                    'errors' => $validator->errors()->toArray()
+                ]);
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()->toArray()
+                    'message' => $validator->errors()->toArray()
                 ], 400);
             }
+
+            // \Log::info('Validation passed', [
+            //     'nama_perusahaan' => $request->nama_perusahaan
+            // ]);
             $current_date_time = Carbon::now()->toDateTimeString();
 
             // Get related data using models
@@ -468,7 +574,7 @@ class LeadsController extends Controller
             $lead = Leads::create([
                 'nomor' => $nomor,
                 'tgl_leads' => $current_date_time,
-                'nama_perusahaan' => $request->nama_perusahaan,
+                'nama_perusahaan' => strtoupper($request->nama_perusahaan),
                 'telp_perusahaan' => $request->telp_perusahaan,
                 'jenis_perusahaan_id' => $request->jenis_perusahaan,
                 'jenis_perusahaan' => $jenisPerusahaan ? $jenisPerusahaan->nama : null,
@@ -503,7 +609,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (Auth::user()->role_id == 29) {
+            if (Auth::user()->cais_role_id == 29) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -716,7 +822,7 @@ class LeadsController extends Controller
             }
 
             $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
+                'nama_perusahaan' => ['sometimes', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
                 'pic' => 'required',
                 'branch' => 'required',
                 'kebutuhan' => 'required|array|min:1',
@@ -727,8 +833,7 @@ class LeadsController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()->toArray()
+                    'message' => $validator->errors()->toArray()
                 ], 400);
             }
 
@@ -744,7 +849,7 @@ class LeadsController extends Controller
             $bidangPerusahaan = BidangPerusahaan::find($request->bidang_perusahaan);
 
             $lead->update([
-                'nama_perusahaan' => $request->nama_perusahaan,
+                'nama_perusahaan' => $request->nama_perusahaan ?? $lead->nama_perusahaan,
                 'telp_perusahaan' => $request->telp_perusahaan,
                 'jenis_perusahaan_id' => $request->jenis_perusahaan,
                 'jenis_perusahaan' => $jenisPerusahaan ? $jenisPerusahaan->nama : null,
@@ -778,7 +883,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES (SAMA SEPERTI DI ADD)
             // CASE 1: Auto assign jika user adalah sales (role 29) dan lead belum memiliki sales
-            if (Auth::user()->role_id == 29 && !$lead->tim_sales_d_id) {
+            if (Auth::user()->cais_role_id == 29 && !$lead->tim_sales_d_id) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -799,7 +904,7 @@ class LeadsController extends Controller
                 'nomor' => $nomorActivity,
                 'notes' => 'Leads Diupdate' .
                     (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
-                'tipe' => 'Leads Update',
+                'tipe' => 'Leads',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
@@ -1303,7 +1408,7 @@ class LeadsController extends Controller
                 'created_by' => Auth::user()->full_name
             ]);
 
-            if (Auth::user()->role_id == 29) {
+            if (Auth::user()->cais_role_id == 29) {
                 $timSalesD = DB::table('m_tim_sales_d')->where('user_id', Auth::id())->first();
                 if ($timSalesD) {
                     $newLead->update([
@@ -1424,152 +1529,6 @@ class LeadsController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/leads/available",
-     *     summary="Mendapatkan daftar leads yang tersedia untuk aktivitas",
-     *     description="Endpoint ini digunakan untuk mengambil leads yang tersedia untuk dilakukan aktivitas sales selanjutnya. Data difilter berdasarkan role user:
-     *                 - Sales (29): hanya melihat leads mereka sendiri
-     *                 - Team Leader (31): melihat leads seluruh anggota tim
-     *                 - RO (6,8): melihat semua leads
-     *                 - CRM (54,55,56): melihat leads berdasarkan assignment CRM",
-     *     tags={"Leads"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Berhasil mengambil data leads tersedia",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Data leads tersedia berhasil diambil"),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
-     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
-     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
-     *                     @OA\Property(property="salesEmail", type="string", example=""),
-     *                     @OA\Property(property="branchManagerEmail", type="string", example=""),
-     *                     @OA\Property(property="branchManager", type="string", example=""),
-     *                     @OA\Property(
-     *                         property="status_leads",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="branch",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     ),
-     *                     @OA\Property(
-     *                         property="kebutuhan",
-     *                         type="object",
-     *                         @OA\Property(property="id", type="integer"),
-     *                         @OA\Property(property="nama", type="string")
-     *                     )
-     *                 )
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Unauthorized",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal Server Error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
-     *         )
-     *     )
-     * )
-     */
-    public function availableLeads()
-    {
-        try {
-            // Pastikan Anda telah mengimpor kelas Leads, DB, dan Auth (jika di luar controller/model)
-            // use App\Models\Leads;
-            // use Illuminate\Support\Facades\DB;
-            // use Illuminate\Support\Facades\Auth;
-
-            $user = auth()->user();
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD']);
-
-            // Role-based filtering
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                // Role 29: Individual Sales (hanya melihat Leads mereka sendiri)
-                if ($user->role_id == 29) {
-                    // Filter Leads berdasarkan TimSalesDetail yang memiliki user_id sama dengan user yang login
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                }
-                // Role 31: Sales Leader (melihat Leads tim mereka)
-                elseif ($user->role_id == 31) {
-                    // 1. Dapatkan TimSalesDetail untuk user leader
-                    $timSalesDetail = TimSalesDetail::where('user_id', $user->id)->first();
-
-                    if ($timSalesDetail) {
-                        // 2. Dapatkan semua user_id anggota tim (termasuk leader itu sendiri)
-                        $memberSalesUserIds = TimSalesDetail::where('tim_sales_id', $timSalesDetail->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-
-                        // 3. Filter Leads yang dimiliki oleh anggota tim tersebut
-                        $query->whereHas('timSalesD', function ($q) use ($memberSalesUserIds) {
-                            $q->whereIn('user_id', $memberSalesUserIds);
-                        });
-                    } else {
-                        // Jika leader tidak terdaftar di m_tim_sales_d, kembalikan Leads kosong
-                        $query->whereRaw('1 = 0');
-                    }
-                }
-            }
-            // RO roles
-            elseif (in_array($user->role_id, [6, 8])) {
-                // Implementasi filter RO, jika ada (saat ini kosong)
-            }
-            // CRM roles
-            elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
-
-            $data = $query->get();
-
-            // Transformasi data
-            $data->transform(function ($item) {
-                // Pastikan kolom 'tgl_leads' tersedia di model Leads
-                $item->tgl = Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y');
-                // Properti ini mungkin perlu diisi dengan data dari relasi 'timSalesD' dan 'branch' jika diperlukan
-                $item->salesEmail = '';
-                $item->branchManagerEmail = '';
-                $item->branchManager = '';
-                return $item;
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data leads tersedia berhasil diambil',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            // Penanganan error
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
      *     path="/api/leads/available-quotation",
      *     summary="Mendapatkan daftar leads yang tersedia untuk pembuatan quotation",
      *     description="Endpoint ini digunakan untuk mengambil leads yang memenuhi syarat untuk dibuatkan quotation. Hanya menampilkan leads parent (bukan child) dan difilter berdasarkan role user dengan aturan yang sama seperti available leads.",
@@ -1632,37 +1591,11 @@ class LeadsController extends Controller
     public function availableQuotation()
     {
         try {
-            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
-                ->whereNull('leads_id');
+            $user = Auth::user();
 
-            // Role-based filtering
-            $user = auth()->user();
-            if (in_array($user->role_id, [29, 30, 31, 32, 33])) {
-                if ($user->role_id == 29) {
-                    $query->whereHas('timSalesD', function ($q) use ($user) {
-                        $q->where('user_id', $user->id);
-                    });
-                } elseif ($user->role_id == 31) {
-                    $tim = DB::table('m_tim_sales_d')->where('user_id', $user->id)->first();
-                    if ($tim) {
-                        $memberSales = DB::table('m_tim_sales_d')
-                            ->where('tim_sales_id', $tim->tim_sales_id)
-                            ->pluck('user_id')
-                            ->toArray();
-                        $query->whereHas('timSalesD', function ($q) use ($memberSales) {
-                            $q->whereIn('user_id', $memberSales);
-                        });
-                    }
-                }
-            } elseif (in_array($user->role_id, [4, 5, 6, 8])) {
-                if (in_array($user->role_id, [4, 5])) {
-                    $query->where('ro_id', $user->id);
-                }
-            } elseif (in_array($user->role_id, [54, 55, 56])) {
-                if ($user->role_id == 54) {
-                    $query->where('crm_id', $user->id);
-                }
-            }
+            // Gunakan scope dari model
+            $query = Leads::with(['statusLeads', 'branch', 'kebutuhan', 'timSales', 'timSalesD'])
+                ->availableForQuotation($user);
 
             $data = $query->get();
 
@@ -1683,7 +1616,6 @@ class LeadsController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * @OA\Post(
@@ -2182,10 +2114,177 @@ class LeadsController extends Controller
         }
     }
     /**
+     * @OA\Get(
+     *     path="/api/leads/available-sales/{id}",
+     *     summary="Mendapatkan daftar tim sales yang available untuk diassign ke lead tertentu",
+     *     description="Endpoint ini digunakan untuk mengambil daftar tim sales yang dapat diassign ke lead tertentu berdasarkan branch_id dari lead tersebut.",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead yang akan diassign sales",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data tim sales",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data tim sales berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nama", type="string", example="John Sales"),
+     *                     @OA\Property(property="tim_sales_id", type="integer", example=1),
+     *                     @OA\Property(property="user_id", type="integer", example=10),
+     *                     @OA\Property(property="is_leader", type="boolean", example=false),
+     *                     @OA\Property(property="is_active", type="boolean", example=true),
+     *                     @OA\Property(
+     *                         property="user",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=10),
+     *                         @OA\Property(property="full_name", type="string", example="John Doe"),
+     *                         @OA\Property(property="email", type="string", example="john@example.com")
+     *                     ),
+     *                     @OA\Property(
+     *                         property="tim_sales",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nama", type="string", example="Tim Sales Jakarta"),
+     *                         @OA\Property(property="branch_id", type="integer", example=1),
+     *                         @OA\Property(
+     *                             property="branch",
+     *                             type="object",
+     *                             @OA\Property(property="id", type="integer", example=1),
+     *                             @OA\Property(property="nama", type="string", example="Jakarta")
+     *                         )
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=403, description="Forbidden - Tidak memiliki akses"),
+     *     @OA\Response(response=404, description="Lead tidak ditemukan"),
+     *     @OA\Response(response=500, description="Internal Server Error")
+     * )
+     */
+    public function availableSales($id)
+    {
+        try {
+            $user = Auth::user();
+            $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
+
+            // Cek apakah user memiliki akses
+            if (!in_array($user->cais_role_id, $allowedRoles)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki akses untuk melihat daftar tim sales'
+                ], 403);
+            }
+
+            // Cari lead untuk mendapatkan branch_id
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // Pastikan branch_id adalah integer
+            if (!is_numeric($lead->branch_id)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak memiliki branch_id yang valid'
+                ], 400);
+            }
+
+            $query = TimSalesDetail::with([
+                'user:id,full_name',
+                'timSales:id,nama,branch_id',
+                'timSales.branch:id,name'
+            ]);
+
+            // Filter berdasarkan role
+            if ($user->cais_role_id == 31) { // Sales Leader
+                // Dapatkan tim sales leader
+                $leaderTim = TimSalesDetail::where('user_id', $user->id)
+                    ->first();
+
+                if ($leaderTim) {
+                    // Hanya tampilkan anggota tim yang sama
+                    $query->where('tim_sales_id', $leaderTim->tim_sales_id);
+                } else {
+                    // Jika leader tidak memiliki tim, return empty
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Data tim sales berhasil diambil',
+                        'data' => []
+                    ]);
+                }
+            }
+
+            // Filter berdasarkan branch_id dari lead
+            $query->whereHas('timSales', function ($q) use ($lead) {
+                $q->where('branch_id', (int) $lead->branch_id);
+            });
+
+            $sales = $query->get();
+
+            // Transform data untuk response
+            $salesData = $sales->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nama' => $item->nama,
+                    'tim_sales_id' => $item->tim_sales_id,
+                    'user_id' => $item->user_id,
+                    'is_leader' => (bool) $item->is_leader,
+                    'is_active' => (bool) $item->is_active,
+                    'user' => $item->user ? [
+                        'id' => $item->user->id,
+                        'full_name' => $item->user->full_name,
+                    ] : null,
+                    'tim_sales' => $item->timSales ? [
+                        'id' => $item->timSales->id,
+                        'nama' => $item->timSales->nama,
+                        'branch_id' => $item->timSales->branch_id,
+                        'branch' => $item->timSales->branch ? [
+                            'id' => $item->timSales->branch->id,
+                            'nama' => $item->timSales->branch->name
+                        ] : null
+                    ] : null
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data tim sales berhasil diambil',
+                'data' => $salesData,
+                'debug' => [
+                    'lead_id' => $lead->id,
+                    'branch_id' => $lead->branch_id,
+                    'total_sales' => $salesData->count()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ], 500);
+        }
+    }
+    /**
      * @OA\Put(
      *     path="/api/leads/assign-sales/{id}",
      *     summary="Mengassign sales ke leads berdasarkan kebutuhan",
-     *     description="Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
+     *     description="Endpoint ini digunakan untuk memilih atau mengubah sales untuk suatu lead di tabel leads_kebutuhan. Satu sales bisa diassign ke multiple kebutuhan. Hanya user dengan cais_role_id 30, 31, 32, 33, 53, atau 96 yang dapat mengakses.",
      *     tags={"Leads"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
@@ -2244,11 +2343,11 @@ class LeadsController extends Controller
                 ], 404);
             }
 
-            // Cek authorization - hanya user dengan role_id tertentu yang bisa assign sales
+            // Cek authorization - hanya user dengan cais_role_id tertentu yang bisa assign sales
             $user = Auth::user();
-            $allowedRoles = [30, 31, 32, 33, 53, 96];
+            $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-            if (!in_array($user->role_id, $allowedRoles)) {
+            if (!in_array($user->cais_role_id, $allowedRoles)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Anda tidak memiliki akses untuk mengassign sales'
@@ -2273,6 +2372,7 @@ class LeadsController extends Controller
 
             $assignmentResults = [];
             $allAssignedKebutuhan = [];
+            $allAssignedKebutuhanNames = []; // Tambahkan array untuk menyimpan nama kebutuhan
 
             // Process each assignment
             foreach ($request->assignments as $assignment) {
@@ -2298,6 +2398,12 @@ class LeadsController extends Controller
 
                     $assignedKebutuhan[] = $kebutuhan_id;
                     $allAssignedKebutuhan[] = $kebutuhan_id;
+
+                    // Ambil nama kebutuhan
+                    $kebutuhan = Kebutuhan::find($kebutuhan_id);
+                    if ($kebutuhan) {
+                        $allAssignedKebutuhanNames[] = $kebutuhan->nama;
+                    }
                 }
 
                 $assignmentResults[] = [
@@ -2318,7 +2424,7 @@ class LeadsController extends Controller
                 'branch_id' => $lead->branch_id,
                 'tgl_activity' => Carbon::now()->toDateTimeString(),
                 'nomor' => $nomorActivity,
-                'notes' => 'Sales diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhan)),
+                'notes' => $timSalesD->user->full_name . ' diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhanNames)), // Gunakan nama kebutuhan
                 'tipe' => 'Assignment',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
@@ -2453,7 +2559,256 @@ class LeadsController extends Controller
         }
     }
 
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/spk/{id}",
+     *     summary="Mendapatkan daftar SPK berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua SPK yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data SPK"
+     *     )
+     * )
+     */
+    public function getSpkByLead($id, Request $request)
+    {
+        try {
+            // Validasi leads_id
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+            $spkData = Spk::with('statusSpk')
+                ->byLeadsId($id)
+                ->select('id', 'nomor', 'leads_id', 'tgl_spk', 'status_spk_id')
+                ->orderBy('tgl_spk', 'desc')
+                ->get();
+
+            // Di sini kita bisa menggunakan `map` untuk menambahkan accessor dan menghilangkan relasi
+            $spkData = $spkData->map(function ($item) {
+                $data = $item->toArray();
+                // Tambahkan nama status menggunakan accessor yang baru dibuat
+                $data['nama_status'] = $item->nama_status;
+
+                // Hapus objek relasi statusSpk (opsional, jika Anda hanya mau nama status)
+                unset($data['status_spk']);
+
+                return $data;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data SPK berhasil diambil',
+                'data' => $spkData, // <-- Menggunakan data yang sudah di-map
+                'summary' => Spk::getSummaryByLeadsId($id)
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/leads/pks/{id}",
+     *     summary="Mendapatkan daftar PKS berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua PKS yang terkait dengan leads tertentu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data PKS"
+     *     )
+     * )
+     */
+    public function getPksByLead($id, Request $request)
+    {
+        try {
+            $lead = Leads::find($id);
+            if (!$lead) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+
+            // GUNAKAN MODEL PKS LANGSUNG dengan scope byLeadsId
+            // Logika query ADA DI MODEL PKS, bukan di controller
+            $pksData = Pks::with('leads')
+                ->byLeadsId($id)
+                ->select('id', 'nomor', 'leads_id', 'tgl_pks', 'status_pks_id', 'kontrak_akhir') // <-- TAMBAH 'kontrak_akhir'
+                ->orderBy('tgl_pks', 'desc')
+                ->get();
+
+            // 2. Map data dan tambahkan informasi tambahan
+            $pksData = $pksData->map(function ($item) {
+                $data = $item->toArray();
+                $data['nama_status'] = $item->nama_status;
+
+                // Hitung sisa kontrak menggunakan method di class ini
+                $data['sisa_kontrak'] = $this->hitungBerakhirKontrak($item->kontrak_akhir);
+
+                unset($data['leads']);
+
+                return $data;
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data PKS berhasil diambil',
+                'data' => $pksData,
+                'summary' => Pks::getSummaryByLeadsId($id) // Summary dari model Pks
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/leads/customeractivity/{id}",
+     *     summary="Mendapatkan daftar aktivitas customer dan sales berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua aktivitas customer dan sales activity yang terkait dengan leads tertentu, diurutkan berdasarkan tanggal dan waktu",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data aktivitas"
+     *     )
+     * )
+     */
+    public function getcustomeractivityByLead($id, Request $request)
+    {
+        try {
+            // Ambil Customer Activity
+            $customerActivities = CustomerActivity::with('leads')
+                ->byLeadsId($id)
+                ->whereNull('deleted_at')
+                ->get()
+                ->map(function ($act) {
+                    $baseData = [
+                        'id' => $act->id,
+                        'source' => 'Customer Activity', // Menandai sumber data
+                        'tipe' => $act->tipe,
+                        'notes' => $act->notes_tipe ?? $act->notes ?? $act->notulen,
+                        'tgl_activity' => $act->tgl_activity,
+                        'created_by' => $act->created_by,
+                        'created_at' => $act->getRawOriginal('created_at')  // Untuk sorting
+                    ];
+
+                    // Conditional fields berdasarkan tipe
+                    if (in_array(strtolower($act->tipe), ['telepon', 'online meeting'])) {
+                        $baseData['start'] = $act->start;
+                        $baseData['end'] = $act->end;
+                        $baseData['durasi'] = $act->durasi;
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                    } elseif (strtolower($act->tipe) === 'visit') {
+                        $baseData['tgl_realisasi'] = $act->tgl_realisasi;
+                        $baseData['jam_realisasi'] = $act->jam_realisasi;
+                        $baseData['jenis_visit'] = $act->jenis_visit;
+                    }
+
+                    return $baseData;
+                });
+
+            // Ambil Sales Activity
+            $salesActivities = SalesActivity::with(['lead', 'leadsKebutuhan.kebutuhan'])
+                ->where('leads_id', $id)
+                ->get()
+                ->map(function ($act) {
+                    return [
+                        'id' => $act->id,
+                        'source' => 'Sales Activity', // Menandai sumber data
+                        'tipe' => $act->jenis_activity,
+                        'notes' => $act->notulen,
+                        'tgl_activity' => $act->tgl_activity,
+                        'created_by' => $act->created_by,
+                        'created_at' => $act->getRawOriginal('created_at'), // Untuk sorting
+                        'kebutuhan' => $act->leadsKebutuhan && $act->leadsKebutuhan->kebutuhan
+                            ? $act->leadsKebutuhan->kebutuhan->nama
+                            : null
+                    ];
+                });
+
+            // Gabungkan kedua collection
+            $allActivities = $customerActivities->merge($salesActivities);
+
+            // Urutkan berdasarkan created_at (datetime) secara descending
+            $allActivities = $allActivities->sortByDesc(function ($activity) {
+                return Carbon::parse($activity['created_at']);
+            })->values(); // Reset array keys
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data aktivitas berhasil diambil',
+                'data' => $allActivities
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
     //==============================================================================//
+    private function hitungBerakhirKontrak($tanggalBerakhir)
+    {
+        if (is_null($tanggalBerakhir)) {
+            return "-";
+        }
+
+        $tanggalSekarang = Carbon::now();
+        $tanggalBerakhir = Carbon::createFromFormat('Y-m-d', $tanggalBerakhir);
+
+        if ($tanggalSekarang->greaterThanOrEqualTo($tanggalBerakhir)) {
+            return "Kontrak habis";
+        }
+
+        $selisih = $tanggalSekarang->diff($tanggalBerakhir);
+
+        $hasil = [];
+        if ($selisih->y > 0)
+            $hasil[] = "{$selisih->y} tahun";
+        if ($selisih->m > 0)
+            $hasil[] = "{$selisih->m} bulan";
+        if ($selisih->d > 0)
+            $hasil[] = "{$selisih->d} hari";
+
+        return implode(', ', $hasil);
+    }
 
 
     // Tambahkan method helper untuk generate nomor lanjutan
@@ -2561,7 +2916,7 @@ class LeadsController extends Controller
         $user = Auth::user();
         $assignmentResults = [];
 
-        if ($user->role_id == 29) {
+        if ($user->cais_role_id == 29) {
             $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
 
             if ($timSalesD) {
@@ -2604,9 +2959,9 @@ class LeadsController extends Controller
     {
         $user = Auth::user();
         $assignmentResults = [];
-        $allowedRoles = [30, 31, 32, 33, 53, 96];
+        $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-        if (!in_array($user->role_id, $allowedRoles)) {
+        if (!in_array($user->cais_role_id, $allowedRoles)) {
             return $assignmentResults;
         }
 

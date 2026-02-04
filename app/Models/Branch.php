@@ -19,7 +19,9 @@ class Branch extends Model
         'is_active',
         'name',
         'description',
+        'city_id', // tambahkan ini
     ];
+    
     protected $casts = [
         'is_active' => 'boolean',
     ];
@@ -28,6 +30,7 @@ class Branch extends Model
     {
         return $this->hasMany(TimSales::class, 'branch_id', 'id');
     }
+    
     public function leads()
     {
         return $this->hasMany(Leads::class, 'branch_id');
@@ -36,6 +39,12 @@ class Branch extends Model
     public function customerActivities()
     {
         return $this->hasMany(CustomerActivity::class, 'branch_id');
+    }
+    
+    // Tambahkan relasi ke City
+    public function city()
+    {
+        return $this->belongsTo(City::class, 'city_id');
     }
     
     public function getCreatedAtAttribute($value)
@@ -49,5 +58,15 @@ class Branch extends Model
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
+    }
+    
+    /**
+     * Scope untuk filter berdasarkan province
+     */
+    public function scopeByProvince($query, $provinceId)
+    {
+        return $query->whereHas('city', function($q) use ($provinceId) {
+            $q->where('province_id', $provinceId);
+        });
     }
 }
