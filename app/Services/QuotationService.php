@@ -2388,7 +2388,7 @@ class QuotationService
             $tingkat = 1;
         } elseif ($user->cais_role_id == 97) {
             if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
-                return ['success' => false, 'message' => 'Quotation belum disetujui di Level 1.'];
+                return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
             }
 
             $updateData = [
