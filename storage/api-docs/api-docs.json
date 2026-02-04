@@ -16861,13 +16861,28 @@
                 ]
             }
         },
-        "/api/pks/add": {
+        "/api/pks/add/{tipe}": {
             "post": {
                 "tags": [
                     "PKS"
                 ],
-                "summary": "Create new PKS",
-                "operationId": "7c9572ffb782399262abc1f949d94887",
+                "summary": "Create new PKS - Kontrak Baru atau Rekontrak",
+                "operationId": "4893d0b9d9cabaac9f247b2e922e7490",
+                "parameters": [
+                    {
+                        "name": "tipe",
+                        "in": "path",
+                        "description": "Tipe kontrak: baru atau rekontrak",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "rekontrak"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -16875,7 +16890,6 @@
                             "schema": {
                                 "required": [
                                     "leads_id",
-                                    "site_ids",
                                     "tanggal_pks",
                                     "tanggal_awal_kontrak",
                                     "tanggal_akhir_kontrak",
@@ -16888,66 +16902,66 @@
                                 "properties": {
                                     "leads_id": {
                                         "type": "integer",
-                                        "example": 38
+                                        "example": 1
                                     },
                                     "site_ids": {
+                                        "description": "Required untuk tipe=baru. Array of SpkSite IDs",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
                                         },
                                         "example": [
-                                            130
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    },
+                                    "quotation_site_ids": {
+                                        "description": "Required untuk tipe=rekontrak. Array of QuotationSite IDs",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
                                         ]
                                     },
                                     "tanggal_pks": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2025-10-14"
+                                        "example": "2025-01-15"
                                     },
                                     "tanggal_awal_kontrak": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2025-11-01"
+                                        "example": "2025-02-01"
                                     },
                                     "tanggal_akhir_kontrak": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2026-10-31"
+                                        "example": "2026-01-31"
                                     },
                                     "kategoriHC": {
-                                        "description": "Kategori HC ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "loyalty": {
-                                        "description": "Loyalty ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "salary_rule": {
-                                        "description": "Salary Rule ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "rule_thr": {
-                                        "description": "Rule THR ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "entitas": {
-                                        "description": "Entitas ID",
                                         "type": "integer",
                                         "example": 1
-                                    },
-                                    "perjanjian_data": {
-                                        "description": "Template data for frontend to generate agreement",
-                                        "type": "object",
-                                        "example": {
-                                            "nomor_perjanjian": "PKS/2025/001",
-                                            "pihak_pertama": "PT ABC",
-                                            "pihak_kedua": "PT Client XYZ",
-                                            "lokasi_penandatanganan": "Jakarta"
-                                        }
                                     }
                                 },
                                 "type": "object"
@@ -16968,35 +16982,9 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "PKS berhasil dibuat"
+                                            "example": "PKS created successfully"
                                         },
                                         "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nomor": {
-                                                    "type": "string",
-                                                    "example": "PKS/2025/001"
-                                                },
-                                                "leads_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "tanggal_pks": {
-                                                    "type": "string",
-                                                    "example": "14-10-2025"
-                                                },
-                                                "tanggal_awal_kontrak": {
-                                                    "type": "string",
-                                                    "example": "01-11-2025"
-                                                },
-                                                "tanggal_akhir_kontrak": {
-                                                    "type": "string",
-                                                    "example": "31-10-2026"
-                                                }
-                                            },
                                             "type": "object"
                                         }
                                     },
@@ -17005,36 +16993,11 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Invalid tipe parameter"
+                    },
                     "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation failed"
-                                        },
-                                        "errors": {
-                                            "type": "object",
-                                            "example": {
-                                                "leads_id": [
-                                                    "The leads id field is required."
-                                                ],
-                                                "site_ids": [
-                                                    "The site ids field is required."
-                                                ]
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -17471,13 +17434,13 @@
                 ]
             }
         },
-        "/api/pks/available-sites/{leadsId}": {
+        "/api/pks/available-sites/{leadsId}/{tipe}": {
             "get": {
                 "tags": [
                     "PKS"
                 ],
                 "summary": "Get available sites for leads",
-                "operationId": "462a69b4f54f525970fe5050b8eb50af",
+                "operationId": "6f4e902bdbcb72c41eb3c7981a85589b",
                 "parameters": [
                     {
                         "name": "leadsId",
@@ -17485,6 +17448,18 @@
                         "required": true,
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tipe",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "rekontrak"
+                            ]
                         }
                     }
                 ],

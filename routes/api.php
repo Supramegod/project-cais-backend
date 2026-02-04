@@ -346,7 +346,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Basic CRUD
         Route::get('/list', 'index');
         Route::get('/view/{id}', 'show');
-        Route::post('/add', 'store');
+        Route::post('/add/{tipe}', 'store');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'destroy');
 
@@ -359,7 +359,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
 
         // Available Resources
         Route::get('/available-leads', 'getAvailableLeads');
-        Route::get('/available-sites/{leadsId}', 'getAvailableSites');
+        Route::get('/available-sites/{leadsId}/{tipe}', 'getAvailableSites');
         Route::post('/{id}/submit-checklist', 'submitChecklist');
         Route::post('/upload/{id}', 'uploadPks');
         // });

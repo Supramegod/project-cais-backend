@@ -19,6 +19,7 @@ use App\Models\QuotationDetailCoss;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationMargin;
 use App\Models\QuotationPic;
+use App\Models\QuotationSite;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\SalesActivity;
@@ -651,40 +652,47 @@ class PksController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/pks/add",
-     *     summary="Create new PKS",
+     *     path="/api/pks/add/{tipe}",
+     *     summary="Create new PKS - Kontrak Baru atau Rekontrak",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="tipe",
+     *         in="path",
+     *         required=true,
+     *         description="Tipe kontrak: baru atau rekontrak",
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"baru", "rekontrak"}
+     *         )
+     *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"leads_id", "site_ids", "tanggal_pks", "tanggal_awal_kontrak", "tanggal_akhir_kontrak", "kategoriHC", "loyalty", "salary_rule", "rule_thr", "entitas"},
-     *             @OA\Property(property="leads_id", type="integer", example=38),
+     *             required={"leads_id","tanggal_pks","tanggal_awal_kontrak","tanggal_akhir_kontrak","kategoriHC","loyalty","salary_rule","rule_thr","entitas"},
+     *             @OA\Property(property="leads_id", type="integer", example=1),
      *             @OA\Property(
-     *                 property="site_ids", 
-     *                 type="array", 
+     *                 property="site_ids",
+     *                 type="array",
+     *                 description="Required untuk tipe=baru. Array of SpkSite IDs",
      *                 @OA\Items(type="integer"),
-     *                 example={130}
+     *                 example={1, 2, 3}
      *             ),
-     *             @OA\Property(property="tanggal_pks", type="string", format="date", example="2025-10-14"),
-     *             @OA\Property(property="tanggal_awal_kontrak", type="string", format="date", example="2025-11-01"),
-     *             @OA\Property(property="tanggal_akhir_kontrak", type="string", format="date", example="2026-10-31"),
-     *             @OA\Property(property="kategoriHC", type="integer", example=1, description="Kategori HC ID"),
-     *             @OA\Property(property="loyalty", type="integer", example=1, description="Loyalty ID"),
-     *             @OA\Property(property="salary_rule", type="integer", example=1, description="Salary Rule ID"),
-     *             @OA\Property(property="rule_thr", type="integer", example=1, description="Rule THR ID"),
-     *             @OA\Property(property="entitas", type="integer", example=1, description="Entitas ID"),
      *             @OA\Property(
-     *                 property="perjanjian_data", 
-     *                 type="object", 
-     *                 description="Template data for frontend to generate agreement",
-     *                 example={
-     *                     "nomor_perjanjian": "PKS/2025/001",
-     *                     "pihak_pertama": "PT ABC",
-     *                     "pihak_kedua": "PT Client XYZ",
-     *                     "lokasi_penandatanganan": "Jakarta"
-     *                 }
-     *             )
+     *                 property="quotation_site_ids",
+     *                 type="array",
+     *                 description="Required untuk tipe=rekontrak. Array of QuotationSite IDs",
+     *                 @OA\Items(type="integer"),
+     *                 example={1, 2, 3}
+     *             ),
+     *             @OA\Property(property="tanggal_pks", type="string", format="date", example="2025-01-15"),
+     *             @OA\Property(property="tanggal_awal_kontrak", type="string", format="date", example="2025-02-01"),
+     *             @OA\Property(property="tanggal_akhir_kontrak", type="string", format="date", example="2026-01-31"),
+     *             @OA\Property(property="kategoriHC", type="integer", example=1),
+     *             @OA\Property(property="loyalty", type="integer", example=1),
+     *             @OA\Property(property="salary_rule", type="integer", example=1),
+     *             @OA\Property(property="rule_thr", type="integer", example=1),
+     *             @OA\Property(property="entitas", type="integer", example=1)
      *         )
      *     ),
      *     @OA\Response(
@@ -692,83 +700,65 @@ class PksController extends Controller
      *         description="PKS created successfully",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="PKS berhasil dibuat"),
-     *             @OA\Property(
-     *                 property="data", 
-     *                 type="object",
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="nomor", type="string", example="PKS/2025/001"),
-     *                 @OA\Property(property="leads_id", type="integer", example=1),
-     *                 @OA\Property(property="tanggal_pks", type="string", example="14-10-2025"),
-     *                 @OA\Property(property="tanggal_awal_kontrak", type="string", example="01-11-2025"),
-     *                 @OA\Property(property="tanggal_akhir_kontrak", type="string", example="31-10-2026")
-     *             )
+     *             @OA\Property(property="message", type="string", example="PKS created successfully"),
+     *             @OA\Property(property="data", type="object")
      *         )
      *     ),
      *     @OA\Response(
+     *         response=400,
+     *         description="Invalid tipe parameter"
+     *     ),
+     *     @OA\Response(
      *         response=422,
-     *         description="Validation error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validation failed"),
-     *             @OA\Property(
-     *                 property="errors", 
-     *                 type="object",
-     *                 example={
-     *                     "leads_id": {"The leads id field is required."},
-     *                     "site_ids": {"The site ids field is required."}
-     *                 }
-     *             )
-     *         )
+     *         description="Validation error"
      *     )
      * )
      */
-
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, $tipe): JsonResponse
     {
+        // 1. Validasi Input (Bisa dipindah ke FormRequest agar lebih clean lagi)
+        $rules = [
+            'leads_id' => 'required|exists:sl_leads,id',
+            'tanggal_pks' => 'required|date',
+            'tanggal_awal_kontrak' => 'required|date',
+            'tanggal_akhir_kontrak' => 'required|date|after:tanggal_awal_kontrak',
+            'kategoriHC' => 'required|exists:m_kategori_sesuai_hc,id',
+            'loyalty' => 'required|exists:m_loyalty,id',
+            'salary_rule' => 'required|exists:m_salary_rule,id',
+            'rule_thr' => 'required|exists:m_rule_thr,id',
+            'entitas' => 'required|exists:m_company,id',
+        ];
+
+        if ($tipe === 'baru') {
+            $rules['site_ids'] = 'required|array';
+            $rules['site_ids.*'] = 'integer|exists:sl_spk_site,id';
+        } elseif ($tipe === 'rekontrak') {
+            $rules['quotation_site_ids'] = 'required|array';
+            $rules['quotation_site_ids.*'] = 'integer|exists:sl_quotation_site,id';
+        } else {
+            return response()->json(['success' => false, 'message' => 'Invalid tipe'], 400);
+        }
+
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()], 422);
+        }
+
+        // 2. Eksekusi Core Logic
         try {
-            $validator = Validator::make($request->all(), [
-                'leads_id' => 'required|integer|exists:sl_leads,id',
-                'site_ids' => 'required|array',
-                'site_ids.*' => 'integer|exists:sl_spk_site,id',
-                'tanggal_pks' => 'required|date',
-                'tanggal_awal_kontrak' => 'required|date',
-                'tanggal_akhir_kontrak' => 'required|date|after:tanggal_awal_kontrak',
-                'kategoriHC' => 'required|integer|exists:m_kategori_sesuai_hc,id',
-                'loyalty' => 'required|integer|exists:m_loyalty,id',
-                'salary_rule' => 'required|integer|exists:m_salary_rule,id',
-                'rule_thr' => 'required|integer|exists:m_rule_thr,id',
-                'entitas' => 'required|integer|exists:m_company,id'
-            ]);
+            return DB::transaction(function () use ($request, $tipe) {
+                $pks = $this->processPksLogic($request, $tipe);
 
-            if ($validator->fails()) {
                 return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
-            }
-
-            DB::beginTransaction();
-
-            $pksData = $this->createPks($request);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'PKS created successfully',
-                'data' => $pksData
-            ], 201);
-
+                    'success' => true,
+                    'message' => 'PKS created successfully',
+                    'data' => $pks
+                ], 201);
+            });
         } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
     /**
      * @OA\Put(
      *     path="/api/pks/update/{id}",
@@ -1178,7 +1168,7 @@ class PksController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/pks/available-sites/{leadsId}",
+     *     path="/api/pks/available-sites/{leadsId}/{tipe}",
      *     summary="Get available sites for leads",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
@@ -1187,6 +1177,12 @@ class PksController extends Controller
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="tipe",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="string", enum={"baru", "rekontrak"})
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -1210,16 +1206,16 @@ class PksController extends Controller
      * )
      */
 
-    public function getAvailableSites($leadsId): JsonResponse
+    public function getAvailableSites($leadsId, $tipe): JsonResponse
     {
         try {
-            $sites = $this->getAvailableSitesData($leadsId);
+            // Panggil fungsi yang sudah disatukan
+            $sites = $this->getAvailableSitesData($leadsId, $tipe);
 
             return response()->json([
                 'success' => true,
                 'data' => $sites
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -1564,25 +1560,23 @@ class PksController extends Controller
     // ======================================================================
     // PRIVATE METHODS - Business Logic
     // ======================================================================
-
-    private function createPks($request)
+    private function processPksLogic($request, $tipe)
     {
         $leads = Leads::findOrFail($request->leads_id);
         $kebutuhan = Kebutuhan::find($leads->kebutuhan_id);
-        $kategoriHC = KategoriSesuaiHc::find($request->kategoriHC);
-        $loyalty = Loyalty::find($request->loyalty);
-        $ruleThr = RuleThr::find($request->rule_thr);
-        $salaryRule = SalaryRule::find($request->salary_rule);
-        $company = Company::find($request->entitas);
-        $quotation = Quotation::where('leads_id', $leads->id)->first();
-        // $spkSite = SpkSite::where('id', $request->site_ids)->first();
-
         $pksNomor = $this->generateNomor($leads->id, $request->entitas);
 
-        // Create PKS
+        // Cari Quotation ID jika rekontrak
+        $quotationId = null;
+        if ($tipe === 'rekontrak') {
+            $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
+            $quotationId = $firstSite->quotation_id;
+        }
+
+        // 1. Create PKS (Unified)
         $pks = Pks::create([
             'leads_id' => $leads->id,
-            // 'spk_id' => $spkSite->spk_id,
+            'quotation_id' => $quotationId ?? (Quotation::where('leads_id', $leads->id)->first()->id ?? null),
             'branch_id' => $leads->branch_id,
             'nomor' => $pksNomor,
             'tgl_pks' => $request->tanggal_pks,
@@ -1601,11 +1595,11 @@ class PksController extends Controller
             'sales_id' => Auth::id(),
             'company_id' => $request->entitas,
             'salary_rule_id' => $request->salary_rule,
-            'rule_thr_id' => $quotation->rule_thr_id,
+            'rule_thr_id' => $request->rule_thr,
             'kategori_sesuai_hc_id' => $request->kategoriHC,
-            'kategori_sesuai_hc' => $kategoriHC->nama ?? null,
+            'kategori_sesuai_hc' => KategoriSesuaiHc::find($request->kategoriHC)->nama ?? null,
             'loyalty_id' => $request->loyalty,
-            'loyalty' => $loyalty->nama ?? null,
+            'loyalty' => Loyalty::find($request->loyalty)->nama ?? null,
             'provinsi_id' => $leads->provinsi_id,
             'provinsi' => $leads->provinsi,
             'kota_id' => $leads->kota_id,
@@ -1614,16 +1608,80 @@ class PksController extends Controller
             'created_by' => Auth::user()->full_name
         ]);
 
-        // Create Sites
-        $this->createSites($pks, $request->site_ids, $pksNomor, $kebutuhan, $leads);
+        // 2. Create Sites (Conditional)
 
-        // Create Initial Activity
+
+        $siteIds = ($tipe === 'baru') ? $request->site_ids : $request->quotation_site_ids;
+
+        $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $tipe);
+
+        // 3. Side Effects
         $this->createInitialActivity($pks, $leads, $pksNomor);
-        $this->createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor);
-
+        $this->createPksPerjanjian(
+            $pks,
+            $leads,
+            Company::find($request->entitas),
+            $kebutuhan,
+            RuleThr::find($request->rule_thr),
+            SalaryRule::find($request->salary_rule),
+            $pksNomor
+        );
 
         return $pks;
     }
+
+    private function syncPksSites($pks, array $siteIds, $pksNomor, $kebutuhan, $leads, $type = 'baru')
+    {
+        $isBaru = ($type === 'baru');
+        $model = $isBaru ? SpkSite::class : QuotationSite::class;
+
+        foreach ($siteIds as $key => $id) {
+            $sourceSite = $model::find($id);
+            if (!$sourceSite)
+                continue;
+
+            $nomorSite = $pksNomor . '-' . sprintf("%04d", ($key + 1));
+
+            // Format Nama Proyek (Centralized logic)
+            $namaProyek = sprintf(
+                '%s-%s.%s.%s',
+                Carbon::parse($pks->kontrak_awal)->format('my'),
+                Carbon::parse($pks->kontrak_akhir)->format('my'),
+                strtoupper(substr($kebutuhan->nama, 0, 2)),
+                strtoupper($leads->nama_perusahaan)
+            );
+
+            Site::create([
+                'pks_id' => $pks->id,
+                'leads_id' => $leads->id,
+                'quotation_id' => $sourceSite->quotation_id,
+                'nomor' => $nomorSite,
+                'nomor_proyek' => $nomorSite,
+                'nama_proyek' => $namaProyek,
+                'nama_site' => $sourceSite->nama_site,
+                'provinsi_id' => $sourceSite->provinsi_id,
+                'provinsi' => $sourceSite->provinsi,
+                'kota_id' => $sourceSite->kota_id,
+                'kota' => $sourceSite->kota,
+                'nominal_upah' => $sourceSite->nominal_upah,
+                'penempatan' => $sourceSite->penempatan,
+                'kebutuhan_id' => $leads->kebutuhan_id,
+                'kebutuhan' => $kebutuhan->nama ?? null,
+                'created_by' => Auth::user()->full_name,
+
+                // Logic conditional untuk SPK
+                'spk_id' => $isBaru ? $sourceSite->spk_id : null,
+                'spk_site_id' => $isBaru ? $sourceSite->id : null,
+                'quotation_site_id' => $isBaru ? $sourceSite->quotation_site_id : $sourceSite->id,
+                'nomor_quotation' => $isBaru ? $sourceSite->nomor_quotation : ($sourceSite->quotation->nomor ?? null),
+
+                // UMP/UMK (hanya jika ada di source)
+                'ump' => $sourceSite->ump ?? null,
+                'umk' => $sourceSite->umk ?? null,
+            ]);
+        }
+    }
+
 
     /**
      * Create PKS Perjanjian using service
@@ -1652,48 +1710,6 @@ class PksController extends Controller
         }
     }
 
-    private function createSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads)
-    {
-        foreach ($siteIds as $key => $siteId) {
-            $spkSite = SpkSite::where('id', $siteId)->first();
-
-            if ($spkSite) {
-                $nomorSite = $pksNomor . '-' . sprintf("%04d", ($key + 1));
-                $namaProyek = sprintf(
-                    '%s-%s.%s.%s',
-                    Carbon::parse($pks->kontrak_awal)->format('my'),
-                    Carbon::parse($pks->kontrak_akhir)->format('my'),
-                    strtoupper(substr($kebutuhan->nama, 0, 2)),
-                    strtoupper($leads->nama_perusahaan)
-                );
-
-                Site::create([
-                    'quotation_id' => $spkSite->quotation_id,
-                    'spk_id' => $spkSite->spk_id,
-                    'pks_id' => $pks->id,
-                    'quotation_site_id' => $spkSite->quotation_site_id,
-                    'spk_site_id' => $spkSite->id,
-                    'leads_id' => $spkSite->leads_id,
-                    'nomor' => $nomorSite,
-                    'nomor_proyek' => $nomorSite,
-                    'nama_proyek' => $namaProyek,
-                    'nama_site' => $spkSite->nama_site,
-                    'provinsi_id' => $spkSite->provinsi_id,
-                    'provinsi' => $spkSite->provinsi,
-                    'kota_id' => $spkSite->kota_id,
-                    'kota' => $spkSite->kota,
-                    'ump' => $spkSite->ump,
-                    'umk' => $spkSite->umk,
-                    'nominal_upah' => $spkSite->nominal_upah,
-                    'penempatan' => $spkSite->penempatan,
-                    'kebutuhan_id' => $spkSite->kebutuhan_id,
-                    'kebutuhan' => $spkSite->kebutuhan,
-                    'nomor_quotation' => $spkSite->nomor_quotation,
-                    'created_by' => Auth::user()->full_name
-                ]);
-            }
-        }
-    }
 
     private function createInitialActivity($pks, $leads, $pksNomor)
     {
@@ -2127,81 +2143,99 @@ class PksController extends Controller
             ->orderBy('id', 'desc')
             ->get();
     }
-    private function getAvailableSitesData($leadsId)
+    private function getAvailableSitesData($leadsId, $tipe = 'baru')
     {
-        // Ambil data sites yang tersedia dengan relasi yang diperlukan
-        $sites = SpkSite::with([
-            'spk',
-            'quotation' => function ($query) {
-                $query->with(['company', 'salaryRule', 'ruleThr']);
-            },
-            'quotation.quotationSites',
-            'leads'
-        ])
-            ->where('leads_id', $leadsId)
+        $isBaru = ($tipe === 'baru');
+
+        // Tentukan Model dan Relasi berdasarkan tipe
+        if ($isBaru) {
+            $query = SpkSite::with([
+                'spk',
+                'quotation' => function ($q) {
+                    $q->with(['company', 'salaryRule', 'ruleThr']);
+                },
+                'leads'
+            ])
+                ->whereHas('spk', function ($q) {
+                    $q->whereNull('deleted_at');
+                });
+
+            $orderTable = 'sl_spk';
+            $orderColumn = 'spk_id';
+        } else {
+            $query = QuotationSite::with([
+                'quotation' => function ($q) {
+                    $q->with(['company', 'salaryRule', 'ruleThr'])
+                        ->where('tipe_quotation', 'rekontrak'); // Kondisi tambahan untuk rekontrak
+                },
+                'leads'
+            ])
+                ->whereHas('quotation', function ($q) {
+                    $q->whereNull('deleted_at')
+                        ->where('tipe_quotation', 'rekontrak');
+                });
+
+            $orderTable = 'sl_quotation';
+            $orderColumn = 'quotation_id';
+        }
+
+        return $query->where('leads_id', $leadsId)
             ->whereNull('deleted_at')
-            ->whereDoesntHave('site')
-            ->whereHas('spk', function ($query) {
-                $query->whereNull('deleted_at');
-            })
-            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'spk_id', 'quotation_id')
-            ->orderBy(function ($query) {
-                $query->select('nomor')
-                    ->from('sl_spk')
-                    ->whereColumn('sl_spk.id', 'sl_spk_site.spk_id')
+            ->whereDoesntHave('site') // Memastikan belum diproses menjadi PKS
+            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'id'))
+            ->orderBy(function ($q) use ($orderTable, $orderColumn) {
+                $q->select('nomor')
+                    ->from($orderTable)
+                    ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
             }, 'asc')
             ->get()
-            ->map(function ($site) {
+            ->map(function ($site) use ($isBaru) {
                 $quotation = $site->quotation;
-                $quotationCompany = $quotation ? $quotation->company()->first() : null;
-
+                $companyRelation = $quotation ? $quotation->getRelation('company') : null;
 
                 return [
                     'id' => $site->id,
-                    'nomor' => $site->spk->nomor ?? null,
+                    'nomor' => $isBaru ? ($site->spk->nomor ?? null) : ($quotation->nomor ?? null),
                     'nama_site' => $site->nama_site,
                     'provinsi' => $site->provinsi,
                     'kota' => $site->kota,
                     'penempatan' => $site->penempatan,
 
-                    // Data dari Quotation
+                    // Data Kontrak
                     'mulai_kontrak' => $quotation?->mulai_kontrak,
                     'kontrak_selesai' => $quotation?->kontrak_selesai,
                     'durasi_kerjasama' => $quotation?->durasi_kerjasama,
 
-                    // Data company dari quotation
-                    'company' => $quotationCompany ? [
-                        'id' => $quotationCompany->id,
-                        'name' => $quotationCompany->name ?? null,
-                        'code' => $quotationCompany->code ?? null,
+                    // Data Entitas (Company)
+                    'company' => $companyRelation ? [
+                        'id' => $companyRelation->id,
+                        'name' => $companyRelation->name ?? $companyRelation->nama ?? null,
+                        'code' => $companyRelation->code ?? null,
                     ] : null,
 
-                    // Data salary rule dari quotation
-                    'salary_rule' => $quotation && $quotation->salaryRule ? [
-                        'id' => $quotation->salaryRule->id ?? null,
+                    // Data Salary Rule
+                    'salary_rule' => $quotation?->salaryRule ? [
+                        'id' => $quotation->salaryRule->id,
                         'nama' => $quotation->salaryRule->nama_salary_rule ?? null,
-                        'cutoff' => $quotation->salaryRule->cutoff ?? null,
-                        'pembayaran_invoice' => $quotation->salaryRule->pembayaran_invoice ?? null,
-                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll ?? null
+                        'cutoff' => $quotation->salaryRule->cutoff,
+                        'pembayaran_invoice' => $quotation->salaryRule->pembayaran_invoice,
+                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll
                     ] : null,
 
-                    // Data rule THR dari quotation
-                    'rule_thr' => $quotation && $quotation->ruleThr ? [
-                        'id' => $quotation->ruleThr->id ?? null,
+                    // Data Rule THR
+                    'rule_thr' => $quotation?->ruleThr ? [
+                        'id' => $quotation->ruleThr->id,
                         'nama' => $quotation->ruleThr->nama ?? null,
-                        'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice ?? null,
-                        'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice ?? null,
-                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr ?? null
+                        'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice,
+                        'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice,
+                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr
                     ] : null,
 
-                    // Data tambahan dari quotation yang mungkin berguna
                     'quotation_id' => $quotation?->id,
                     'nomor_quotation' => $quotation?->nomor,
                 ];
             });
-
-        return $sites;
     }
     // ======================================================================
     // PRIVATE METHODS FOR ACTIVATE FUNCTION
