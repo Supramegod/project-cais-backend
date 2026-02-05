@@ -674,7 +674,9 @@ class QuotationController extends Controller
                 'quotationChemicals',
                 'quotationOhcs',
                 'quotationTrainings',
-                'quotationKerjasamas'
+                'quotationKerjasamas',
+                'logNotifications',
+                'logApprovals',
             ])->findOrFail($id);
 
             // ✅ BENAR: Melewatkan model Quotation ke Resource
@@ -1045,11 +1047,13 @@ class QuotationController extends Controller
                 ], 422);
             }
 
-            $this->quotationService->submitForApproval($quotation, $request->all(), Auth::user());
+            $result = $this->quotationService->submitForApproval($quotation, $request->all(), Auth::user());
 
             return response()->json([
-                'success' => true,
-                'message' => $request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully'
+                'success' => $result['success'],
+                'message' => $result['success'] 
+                    ? ($request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully')
+                    : $result['message']
             ]);
 
         } catch (\Exception $e) {

@@ -12,6 +12,8 @@ use App\Models\Company;
 use App\Models\JabatanPic;
 use App\Models\JenisBarang;
 use App\Models\JenisPerusahaan;
+use App\Models\LeadsKebutuhan;
+use App\Models\LogNotification;
 use App\Models\ManagementFee;
 use App\Models\Position;
 use App\Models\Province;
@@ -643,9 +645,9 @@ class QuotationStepService
 // <br>
 // <span class="text-danger">*prosentase Bpjs Tk J. Kecelakaan Kerja disesuaikan dengan tingkat resiko sesuai ketentuan.</span>';
 
-//             $quotationUpdateData['note_harga_jual'] = $note;
+        //             $quotationUpdateData['note_harga_jual'] = $note;
 
-//             \Log::info("Adding note_harga_jual to quotation", [
+        //             \Log::info("Adding note_harga_jual to quotation", [
 //                 'quotation_id' => $quotation->id,
 //                 'year' => Carbon::now()->year
 //             ]);
@@ -1045,6 +1047,8 @@ class QuotationStepService
 
             // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
+            // Create notification untuk Dir Sales dan Dir Keu
+            $this->createStepUpdateNotification($quotation, $statusData, $currentDateTime);
 
             DB::commit();
 
@@ -1423,6 +1427,76 @@ class QuotationStepService
             'is_aktif' => $needsApprovalLevel2 ? 0 : 1,
             'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
         ];
+    }
+    private function createStepUpdateNotification(Quotation $quotation, array $statusData, Carbon $currentDateTime): void
+    {
+        $user = Auth::user();
+
+        // Tentukan user yang akan menerima notifikasi
+        $dirSales = [27927, 127822]; // User ID untuk Dir Sales (role_id 96)
+        $dirKeu = [27928, 16986, 127823]; // User ID untuk Dir Keu (role_id 97 atau 40)
+        $dirUmum = []; // User ID untuk Dir Umum (role_id 99) - jika ada
+
+        $recipientUserIds = [];
+
+        if (empty($quotation->ot1)) {
+            $recipientUserIds = array_merge($recipientUserIds, $dirSales);
+        }
+
+        // Jika quotation belum ada ot2 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Keu
+        if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
+            $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
+        }
+
+        // Jika sudah ada ot1 dan ot2, tapi belum ada ot3 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Umum
+        if (!empty($quotation->ot1) && !empty($quotation->ot2) && empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
+            $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
+        }
+
+        // Remove duplicates jika ada
+        $recipientUserIds = array_unique($recipientUserIds);
+
+        // Jika tidak ada recipient, tidak perlu create notifikasi
+        if (empty($recipientUserIds)) {
+            return;
+        }
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+
+
+        // Buat pesan notifikasi
+        $quotationNumber = $quotation->nomor;
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+
+        $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
+
+        // Kirim notifikasi ke setiap recipient
+        foreach ($recipientUserIds as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        \Log::info("Step 12 notifications created", [
+            'quotation_id' => $quotation->id,
+            'quotation_number' => $quotationNumber,
+            'quotation_ot1' => $quotation->ot1,
+            'quotation_ot2' => $quotation->ot2,
+            'quotation_ot3' => $quotation->ot3,
+            'quotation_top' => $quotation->top,
+            'recipients' => $recipientUserIds,
+            'message' => $msg
+        ]);
     }
     private function insertRequirements(Quotation $quotation): void
     {
@@ -2512,7 +2586,7 @@ class QuotationStepService
 
             // Track which details are processed
             $processedDetailIds = array_keys($tunjanganData);
-            
+
             // Delete tunjangan for details not in request
             $detailsToDeleteTunjangan = array_diff($allDetails, $processedDetailIds);
             if (!empty($detailsToDeleteTunjangan)) {
@@ -2522,7 +2596,7 @@ class QuotationStepService
                         'deleted_at' => $currentDateTime,
                         'deleted_by' => $user
                     ]);
-                
+
                 \Log::debug("Deleted tunjangan for details not in request", [
                     'detail_ids' => $detailsToDeleteTunjangan
                 ]);
@@ -2561,7 +2635,7 @@ class QuotationStepService
                                 'deleted_at' => $currentDateTime,
                                 'deleted_by' => $user
                             ]);
-                        
+
                         \Log::debug("Deleted all tunjangan for detail (null/empty data)", [
                             'detail_id' => $detailId
                         ]);

@@ -2388,7 +2388,7 @@ class QuotationService
             $tingkat = 1;
         } elseif ($user->cais_role_id == 97) {
             if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
-                return ['success' => false, 'message' => 'Quotation belum disetujui di Level 1.'];
+                return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
             }
 
             $updateData = [
@@ -2424,6 +2424,15 @@ class QuotationService
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
+        \Log::info('LeadsKebutuhan query result', [
+            'quotation_leads_id' => $quotation->leads_id,
+            'quotation_kebutuhan_id' => $quotation->kebutuhan_id,
+            'leadsKebutuhan_found' => $leadsKebutuhan ? 'YES' : 'NO',
+            'leadsKebutuhan_id' => $leadsKebutuhan->id ?? null,
+            'timSalesD_exists' => $leadsKebutuhan && $leadsKebutuhan->timSalesD ? 'YES' : 'NO',
+            'timSalesD_user_id' => $leadsKebutuhan && $leadsKebutuhan->timSalesD ? $leadsKebutuhan->timSalesD->user_id : null
+        ]);
+
         if ($leadsKebutuhan && $leadsKebutuhan->timSalesD) {
             $quotationNumber = $quotation->nomor;
             $approverName = $user->full_name;
@@ -2431,8 +2440,7 @@ class QuotationService
 
             $msg = $isApproved
                 ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
-                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" .
-                ($reason ? " dengan alasan: {$reason}" : "");
+                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}".($reason ? " dengan alasan: {$reason}" : "");
 
             LogNotification::create([
                 'user_id' => $leadsKebutuhan->timSalesD->user_id,

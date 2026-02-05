@@ -28,6 +28,7 @@ class LogNotification extends Model
         'doc_id',
         'transaksi',
         'pesan',
+        'reason',
         'is_read',
         'created_by',
         'updated_by',
@@ -307,5 +308,13 @@ class LogNotification extends Model
         }
         
         return $query->latestFirst()->get();
+    }
+
+    /**
+     * Get the quotation associated with the notification.
+     */
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'doc_id')->where('tabel', 'sl_quotation');
     }
 }
