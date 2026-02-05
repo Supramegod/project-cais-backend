@@ -30,6 +30,7 @@ use App\Models\Kebutuhan;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\PksPerjanjianTemplateService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -2147,15 +2148,18 @@ class PksController extends Controller
     {
         $isBaru = ($tipe === 'baru');
 
-        // Tentukan Model dan Relasi berdasarkan tipe
+        // 1. Inisialisasi Query berdasarkan Tipe
         if ($isBaru) {
             $query = SpkSite::with([
                 'spk',
-                'quotation' => function ($q) {
-                    $q->with(['company', 'salaryRule', 'ruleThr']);
+                'quotation' => function ($q) use ($leadsId) {
+                    // Pastikan quotation yang ditarik hanya milik leads ini
+                    $q->where('leads_id', $leadsId)
+                        ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads'
             ])
+                ->where('leads_id', $leadsId)
                 ->whereHas('spk', function ($q) {
                     $q->whereNull('deleted_at');
                 });
@@ -2164,34 +2168,44 @@ class PksController extends Controller
             $orderColumn = 'spk_id';
         } else {
             $query = QuotationSite::with([
-                'quotation' => function ($q) {
-                    $q->with(['company', 'salaryRule', 'ruleThr'])
-                        ->where('tipe_quotation', 'rekontrak'); // Kondisi tambahan untuk rekontrak
+                'quotation' => function ($q) use ($leadsId) {
+                    // Pastikan quotation milik leads ini dan bertipe rekontrak
+                    $q->where('leads_id', $leadsId)
+                        ->where('tipe_quotation', 'rekontrak')
+                        ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads'
             ])
-                ->whereHas('quotation', function ($q) {
-                    $q->whereNull('deleted_at')
-                        ->where('tipe_quotation', 'rekontrak');
+                ->where('leads_id', $leadsId)
+                ->whereHas('quotation', function ($q) use ($leadsId) {
+                    $q->where('leads_id', $leadsId)
+                        ->where('tipe_quotation', 'rekontrak')
+                        ->whereNull('deleted_at');
                 });
 
             $orderTable = 'sl_quotation';
             $orderColumn = 'quotation_id';
         }
 
-        return $query->where('leads_id', $leadsId)
-            ->whereNull('deleted_at')
-            ->whereDoesntHave('site') // Memastikan belum diproses menjadi PKS
-            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'id'))
+        // 2. Eksekusi Query dengan Filter Tambahan
+        return $query->whereNull('deleted_at')
+            ->whereDoesntHave('site') // Hanya site yang belum ada di tabel sl_site (PKS)
+            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
-            }, 'asc')
+            }, 'desc')
             ->get()
+            // 3. Filter koleksi untuk memastikan relasi quotation tidak null (keamanan data)
+            ->filter(function ($site) {
+                return $site->quotation !== null;
+            })
             ->map(function ($site) use ($isBaru) {
                 $quotation = $site->quotation;
+
+                // Mengambil relasi secara eksplisit untuk menghindari konflik dengan kolom string 'company'
                 $companyRelation = $quotation ? $quotation->getRelation('company') : null;
 
                 return [
@@ -2208,7 +2222,7 @@ class PksController extends Controller
                     'durasi_kerjasama' => $quotation?->durasi_kerjasama,
 
                     // Data Entitas (Company)
-                    'company' => $companyRelation ? [
+                    'company' => ($companyRelation instanceof \Illuminate\Database\Eloquent\Model) ? [
                         'id' => $companyRelation->id,
                         'name' => $companyRelation->name ?? $companyRelation->nama ?? null,
                         'code' => $companyRelation->code ?? null,
@@ -2235,7 +2249,8 @@ class PksController extends Controller
                     'quotation_id' => $quotation?->id,
                     'nomor_quotation' => $quotation?->nomor,
                 ];
-            });
+            })
+            ->values(); // Reset index array agar tetap berurutan di JSON
     }
     // ======================================================================
     // PRIVATE METHODS FOR ACTIVATE FUNCTION

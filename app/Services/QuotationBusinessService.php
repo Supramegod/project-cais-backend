@@ -156,7 +156,7 @@ class QuotationBusinessService
         // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
         $user = Auth::user();
 
-        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
+        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
             $this->createSalesActivity($quotation, $createdBy);
         } else {
@@ -388,14 +388,14 @@ class QuotationBusinessService
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
         $query = Quotation::with(['statusQuotation', 'pks', 'quotationSites'])
-            ->where('leads_id', $leadsId)
             ->withoutTrashed();
 
         switch ($tipeQuotation) {
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5,8])
+                    ->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -404,14 +404,17 @@ class QuotationBusinessService
                 break;
 
             case 'revisi':
-                $query->whereIn('status_quotation_id', [1, 2, 4, 5,8]);
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
+
                 break;
 
             case 'rekontrak':
-                $query
-                    // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
-                    ->where('status_quotation_id', 3)
-                    ->orWhereNotNull('ot1');
+                $query->where('leads_id', $leadsId)
+                    ->where(function ($q) {
+                        $q->where('status_quotation_id', 3)
+                            ->orWhereNotNull('ot1');
+                    });
                 break;
         }
 
