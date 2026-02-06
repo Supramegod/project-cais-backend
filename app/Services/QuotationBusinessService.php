@@ -207,18 +207,16 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
-
             case 'rekontrak':
                 return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
-
+            case 'addendum':
+                return "Quotation addendum {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
             case 'baru_dengan_referensi':
                 return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
-
             default: // 'baru'
                 return "Quotation baru {$quotation->nomor} dibuat dari awal";
         }
     }
-
     /**
      * Get activity type based on quotation type
      */
@@ -227,13 +225,12 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return 'Quotation Revisi';
-
             case 'rekontrak':
                 return 'Quotation Rekontrak';
-
+            case 'addendum':
+                return 'Quotation addendum';
             case 'baru_dengan_referensi':
                 return 'Quotation copy';
-
             default: // 'baru'
                 return 'Quotation';
         }
@@ -408,6 +405,10 @@ class QuotationBusinessService
                     ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
 
                 break;
+            // case 'addendum': // Sama dengan revisi
+            //     $query->where('leads_id', $leadsId)
+            //         ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
+            //     break;
 
             case 'rekontrak':
                 $query->where('leads_id', $leadsId)

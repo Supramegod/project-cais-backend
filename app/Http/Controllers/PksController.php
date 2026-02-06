@@ -2147,13 +2147,13 @@ class PksController extends Controller
     private function getAvailableSitesData($leadsId, $tipe = 'baru')
     {
         $isBaru = ($tipe === 'baru');
+        $isaddendum = ($tipe === 'addendum');
+        $isRekontrak = ($tipe === 'rekontrak');
 
-        // 1. Inisialisasi Query berdasarkan Tipe
         if ($isBaru) {
             $query = SpkSite::with([
                 'spk',
                 'quotation' => function ($q) use ($leadsId) {
-                    // Pastikan quotation yang ditarik hanya milik leads ini
                     $q->where('leads_id', $leadsId)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
@@ -2167,19 +2167,21 @@ class PksController extends Controller
             $orderTable = 'sl_spk';
             $orderColumn = 'spk_id';
         } else {
+            // Logika untuk Rekontrak ATAU addendum (keduanya pakai QuotationSite)
+            $tipeQuotation = $isaddendum ? 'addendum' : 'rekontrak';
+
             $query = QuotationSite::with([
-                'quotation' => function ($q) use ($leadsId) {
-                    // Pastikan quotation milik leads ini dan bertipe rekontrak
+                'quotation' => function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', 'rekontrak')
+                        ->where('tipe_quotation', $tipeQuotation)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads'
             ])
                 ->where('leads_id', $leadsId)
-                ->whereHas('quotation', function ($q) use ($leadsId) {
+                ->whereHas('quotation', function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', 'rekontrak')
+                        ->where('tipe_quotation', $tipeQuotation)
                         ->whereNull('deleted_at');
                 });
 
@@ -2187,25 +2189,21 @@ class PksController extends Controller
             $orderColumn = 'quotation_id';
         }
 
-        // 2. Eksekusi Query dengan Filter Tambahan
         return $query->whereNull('deleted_at')
-            ->whereDoesntHave('site') // Hanya site yang belum ada di tabel sl_site (PKS)
+            ->whereDoesntHave('site')
             ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
-            }, 'desc')
+            }, 'asc')
             ->get()
-            // 3. Filter koleksi untuk memastikan relasi quotation tidak null (keamanan data)
             ->filter(function ($site) {
                 return $site->quotation !== null;
             })
             ->map(function ($site) use ($isBaru) {
                 $quotation = $site->quotation;
-
-                // Mengambil relasi secara eksplisit untuk menghindari konflik dengan kolom string 'company'
                 $companyRelation = $quotation ? $quotation->getRelation('company') : null;
 
                 return [
@@ -2250,7 +2248,7 @@ class PksController extends Controller
                     'nomor_quotation' => $quotation?->nomor,
                 ];
             })
-            ->values(); // Reset index array agar tetap berurutan di JSON
+            ->values();
     }
     // ======================================================================
     // PRIVATE METHODS FOR ACTIVATE FUNCTION
