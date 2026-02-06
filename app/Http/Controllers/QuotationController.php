@@ -1261,10 +1261,10 @@ class QuotationController extends Controller
     {
         try {
             // Validasi parameter tipe_quotation
-            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak'])) {
+            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, atau rekontrak'
+                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum'
                 ], 400);
             }
 
@@ -1360,7 +1360,7 @@ class QuotationController extends Controller
      *         in="query",
      *         description="Type of quotation to filter references",
      *         required=true,
-     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="revisi")
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak", "addendum"}, example="revisi")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -1414,7 +1414,7 @@ class QuotationController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'tipe_quotation' => 'required|in:baru,revisi,rekontrak'
+                'tipe_quotation' => 'required|in:baru,revisi,rekontrak,addendum'
             ]);
 
             if ($validator->fails()) {

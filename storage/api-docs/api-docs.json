@@ -20668,7 +20668,8 @@
                             "enum": [
                                 "baru",
                                 "revisi",
-                                "rekontrak"
+                                "rekontrak",
+                                "addendum"
                             ],
                             "example": "revisi"
                         }

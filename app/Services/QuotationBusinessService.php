@@ -405,10 +405,21 @@ class QuotationBusinessService
                     ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
 
                 break;
-            // case 'addendum': // Sama dengan revisi
-            //     $query->where('leads_id', $leadsId)
-            //         ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
-            //     break;
+            case 'addendum':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
+                    // ->where(function ($q) {
+                    //     $q->whereHas('sites', function ($siteQuery) {
+                    //         $siteQuery->whereHas('pks', function ($pksQuery) {
+                    //             $pksQuery->where('is_aktif', 1)
+                    //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
+                    //         });
+                    //     })
+                    //     ->orWhereHas('sites', function ($siteQuery) {
+                    //         $siteQuery->whereNull('pks_id');
+                    //     });
+                    // });
+                break;
 
             case 'rekontrak':
                 $query->where('leads_id', $leadsId)
@@ -416,6 +427,12 @@ class QuotationBusinessService
                         $q->where('status_quotation_id', 3)
                             ->orWhereNotNull('ot1');
                     });
+                    // ->whereHas('sites', function ($siteQuery) {
+                    //     $siteQuery->whereHas('pks', function ($pksQuery) {
+                    //         $pksQuery->where('is_aktif', 1)
+                    //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                    //     });
+                    // });
                 break;
         }
 
