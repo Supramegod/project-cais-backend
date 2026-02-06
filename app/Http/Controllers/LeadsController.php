@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\LeadsListRequested;
 use App\Http\Controllers\Controller;
-use App\Http\Resources\LeadsCollection;
 use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\City;
@@ -28,7 +26,6 @@ use App\Models\Village;
 use App\Rules\UniqueCompanyStrict;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -177,48 +174,120 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
-            $cacheKey = $this->generateCacheKey($request);
-            
-            $data = Cache::remember($cacheKey, 300, function () use ($request) {
-                $query = event(new LeadsListRequested(
-                    $request,
-                    auth()->id(),
-                    auth()->user()->role ?? null
-                ))[0];
+            $query = Leads::select([
+                'id',
+                'nomor',
+                'branch_id',
+                'tgl_leads',
+                'tim_sales_d_id',
+                'nama_perusahaan',
+                'telp_perusahaan',
+                'provinsi',
+                'kota',
+                'no_telp',
+                'email',
+                'status_leads_id',
+                'platform_id',
+                'created_by',
+                'notes',
+                'created_at'
+            ])
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name',
+                    'platform:id,nama',
+                    'timSalesD:id,nama',
+                    'kebutuhan' => function ($q) {
+                        $q->select('m_kebutuhan.id', 'm_kebutuhan.nama'); // sesuaikan nama tabel kebutuhan
+                    },
+                    'leadsKebutuhan.timSalesD:id,nama'
+                ])
+                ->where('status_leads_id', '!=', 102);
 
-                return $query->orderBy('created_at', 'desc')
-                    ->paginate($request->get('per_page', 15));
+            // ✅ Gunakan scope yang sudah ada di model Leads.php
+            $query->filterByUserRole();
+
+            // ✅ Optimasi Search dengan Fulltext
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
+                if (str_contains($searchTerm, ' ')) {
+                    $searchTerm = '"' . $searchTerm . '"';
+                } else {
+                    $searchTerm = $searchTerm . '*';
+                }
+
+                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+            } else {
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
+            }
+
+            // Filter tambahan
+            if ($request->filled('branch'))
+                $query->where('branch_id', $request->branch);
+            if ($request->filled('platform'))
+                $query->where('platform_id', $request->platform);
+            if ($request->filled('status'))
+                $query->where('status_leads_id', $request->status);
+
+            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+
+            $transformedData = $data->getCollection()->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'nomor' => $item->nomor,
+                    'wilayah' => $item->branch->name ?? '-',
+                    'wilayah_id' => $item->branch_id,
+                    'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'sales' => $item->timSalesD->nama ?? '-',
+                    'nama_perusahaan' => $item->nama_perusahaan,
+                    'telp_perusahaan' => $item->telp_perusahaan,
+                    'provinsi' => $item->provinsi,
+                    'kota' => $item->kota,
+                    'no_telp' => $item->no_telp,
+                    'email' => $item->email,
+                    'status_leads' => $item->statusLeads->nama ?? '-',
+                    'status_leads_id' => $item->status_leads_id,
+                    'sumber_leads' => $item->platform->nama ?? '-',
+                    'sumber_leads_id' => $item->platform_id,
+                    'created_by' => $item->created_by,
+                    'notes' => $item->notes,
+                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
+                        return [
+                            'id' => $lk->kebutuhan_id,
+                            'nama' => $lk->kebutuhan->nama ?? '-',
+                            'tim_sales_d_id' => $lk->tim_sales_d_id,
+                            'sales_name' => $lk->timSalesD->nama ?? '-'
+                        ];
+                    })
+                ];
             });
 
-            return new LeadsCollection($data);
+            return response()->json([
+                'success' => true,
+                'message' => 'Data leads berhasil diambil',
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ]
+            ]);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
-    private function generateCacheKey(Request $request): string
+    private function canViewLead($lead, $tim)
     {
-        $params = $request->only([
-            'search',
-            'tgl_dari',
-            'tgl_sampai',
-            'branch',
-            'platform',
-            'status',
-            'per_page',
-            'page'
-        ]);
-        
-        return 'leads_list_' . auth()->id() . '_' . md5(json_encode($params));
-    }
-
-    public function clearCache()
-    {
-        Cache::flush();
+        if (Auth::user()->cais_role_id == 29) {
+            return $tim && $lead->tim_sales_d_id == $tim->id;
+        }
+        return true;
     }
 
     /**
@@ -540,7 +609,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (in_array(Auth::user()->cais_role_id, [29, 31, 32, 33])) {
+            if (Auth::user()->cais_role_id == 29) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
