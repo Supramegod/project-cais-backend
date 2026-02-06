@@ -4,15 +4,15 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Resources\Json\ResourceCollection;
 
-class LeadsCollection extends ResourceCollection
+class CustomerCollection extends ResourceCollection
 {
-    public $collects = LeadsResource::class;
+    public $collects = CustomerResource::class;
 
     public function toArray($request)
     {
         return [
             'success' => true,
-            'message' => 'Data leads berhasil diambil',
+            'message' => 'Data berhasil diambil',
             'data' => $this->collection,
             'pagination' => [
                 'current_page' => $this->currentPage(),
@@ -22,7 +22,7 @@ class LeadsCollection extends ResourceCollection
             ]
         ];
     }
-    public function paginationInformation($request, $paginated, $default)
+      public function paginationInformation($request, $paginated, $default)
     {
         return [];
     }
