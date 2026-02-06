@@ -1183,7 +1183,7 @@ class PksController extends Controller
      *         name="tipe",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", enum={"baru", "rekontrak"})
+     *         @OA\Schema(type="string", enum={"baru", "rekontrak","addendum"})
      *     ),
      *     @OA\Response(
      *         response=200,

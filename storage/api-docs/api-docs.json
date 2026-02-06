@@ -17431,7 +17431,8 @@
                             "type": "string",
                             "enum": [
                                 "baru",
-                                "rekontrak"
+                                "rekontrak",
+                                "addendum"
                             ]
                         }
                     }
