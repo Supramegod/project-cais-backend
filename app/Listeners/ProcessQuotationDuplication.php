@@ -107,9 +107,27 @@ class ProcessQuotationDuplication implements ShouldQueue
 
             } elseif ($hasExistingSite && !$hasNewSiteRequest) {
                 // Kasus 2: ADA SITE EXISTING, TIDAK ADA SITE BARU
+                // Link existing sites to new quotation
                 $this->linkExistingSites($quotation, $request, $user->full_name);
-                $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                Log::info('Linked to existing sites and copied other data');
+                
+                // Reload quotation with sites to get accurate count
+                $quotation->load('quotationSites');
+                $jumlahSiteLinked = $quotation->quotationSites->count();
+                $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
+                
+                Log::info('Existing site link comparison', [
+                    'jumlah_site_linked' => $jumlahSiteLinked,
+                    'jumlah_site_referensi' => $jumlahSiteReferensi
+                ]);
+                
+                // Copy data based on site count match
+                if ($jumlahSiteLinked === $jumlahSiteReferensi) {
+                    $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
+                    Log::info('Linked to existing sites and copied data with site mapping');
+                } else {
+                    $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
+                    Log::info('Linked to existing sites and copied all data to each site');
+                }
 
             } else {
                 // Kasus 3: ADA SITE BARU (dengan atau tanpa existing site)
@@ -172,31 +190,43 @@ class ProcessQuotationDuplication implements ShouldQueue
 
         if ($request->jumlah_site == "Multi Site") {
             foreach ($request->multisite as $key => $namaSite) {
-                $site = QuotationSite::where('leads_id', $leadsId)
+                $existingSite = QuotationSite::where('leads_id', $leadsId)
                     ->where('nama_site', $namaSite)
                     ->where('provinsi_id', $request->provinsi_multi[$key])
                     ->where('kota_id', $request->kota_multi[$key])
                     ->first();
 
-                if ($site) {
-                    $site->update(['quotation_id' => $quotation->id]);
-                    Log::info('Linked existing site to new quotation', [
-                        'site_id' => $site->id,
+                if ($existingSite) {
+                    // CREATE new site record instead of updating existing one
+                    $newSite = $existingSite->replicate();
+                    $newSite->quotation_id = $quotation->id;
+                    $newSite->created_by = $createdBy;
+                    $newSite->save();
+                    
+                    Log::info('Created new site record from existing site', [
+                        'old_site_id' => $existingSite->id,
+                        'new_site_id' => $newSite->id,
                         'quotation_id' => $quotation->id
                     ]);
                 }
             }
         } else {
-            $site = QuotationSite::where('leads_id', $leadsId)
+            $existingSite = QuotationSite::where('leads_id', $leadsId)
                 ->where('nama_site', $request->nama_site)
                 ->where('provinsi_id', $request->provinsi)
                 ->where('kota_id', $request->kota)
                 ->first();
 
-            if ($site) {
-                $site->update(['quotation_id' => $quotation->id]);
-                Log::info('Linked existing site to new quotation', [
-                    'site_id' => $site->id,
+            if ($existingSite) {
+                // CREATE new site record instead of updating existing one
+                $newSite = $existingSite->replicate();
+                $newSite->quotation_id = $quotation->id;
+                $newSite->created_by = $createdBy;
+                $newSite->save();
+                
+                Log::info('Created new site record from existing site', [
+                    'old_site_id' => $existingSite->id,
+                    'new_site_id' => $newSite->id,
                     'quotation_id' => $quotation->id
                 ]);
             }
