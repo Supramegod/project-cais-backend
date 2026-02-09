@@ -517,7 +517,7 @@ class QuotationBarangService
             if ($jenisBarang === 'chemicals') {
                 $masa_pakai = (int) $item->masa_pakai;
                 if ($masa_pakai <= 0) {
-                    $masa_pakai = 1;
+                    $masa_pakai = 12;
                 }
 
                 $jumlah_pertahun = (int) $item->jumlah / $masa_pakai * 12;
