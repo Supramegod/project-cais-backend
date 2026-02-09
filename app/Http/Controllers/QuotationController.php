@@ -504,7 +504,7 @@ class QuotationController extends Controller
             ]);
 
             // ✅ TRIGGER EVENT (menggantikan semua logika duplikasi)
-            event(new QuotationCreated($quotation, $request, $tipe_quotation, $quotationReferensi, $user));
+            QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
 
             DB::commit();
 

@@ -126,25 +126,53 @@ class QuotationBusinessService
         ]);
     }
 
+    // QuotationBusinessService.php
     /**
      * Create initial PIC for quotation
      */
-    public function createInitialPic(Quotation $quotation, Request $request, string $createdBy): void
-    {
-        $leads = Leads::findOrFail($request->perusahaan_id);
+    // QuotationBusinessService.php
+    /**
+     * Create initial PIC for quotation
+     */
+// QuotationBusinessService.php - Perbaiki method createInitialPic
+public function createInitialPic(Quotation $quotation, string $createdBy): void
+{
+    try {
+        // Get leads data
+        $leads = $quotation->leads;
 
-        QuotationPic::create([
+        if (!$leads) {
+            \Log::warning('Leads not found for quotation', [
+                'quotation_id' => $quotation->id
+            ]);
+            return;
+        }
+
+        // Create PIC from leads contact person
+        if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
+            $quotation->quotationPics()->create([
+                'leads_id' => $leads->id,
+                'nama' => $leads->pic ?? 'Unknown',
+                'jabatan' => $leads->jabatan ?? 'Contact Person',
+                'email' => $leads->email ?? '',
+                'no_hp' => $leads->telp_perusahaan ?? '',
+                'created_by' => $createdBy
+            ]);
+
+            \Log::info('Initial PIC created from leads', [
+                'quotation_id' => $quotation->id,
+                'pic_name' => $leads->pic
+            ]);
+        }
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to create initial PIC', [
             'quotation_id' => $quotation->id,
-            'leads_id' => $quotation->leads_id,
-            'nama' => $leads->pic,
-            'jabatan_id' => $leads->jabatan_id,
-            'jabatan' => $leads->jabatan,
-            'no_telp' => $leads->no_telp,
-            'email' => $leads->email,
-            'created_by' => $createdBy
+            'error' => $e->getMessage()
         ]);
+        // Don't throw, just log the error
     }
-
+}
     public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
@@ -408,17 +436,17 @@ class QuotationBusinessService
             case 'addendum':
                 $query->where('leads_id', $leadsId)
                     ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
-                    // ->where(function ($q) {
-                    //     $q->whereHas('sites', function ($siteQuery) {
-                    //         $siteQuery->whereHas('pks', function ($pksQuery) {
-                    //             $pksQuery->where('is_aktif', 1)
-                    //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
-                    //         });
-                    //     })
-                    //     ->orWhereHas('sites', function ($siteQuery) {
-                    //         $siteQuery->whereNull('pks_id');
-                    //     });
-                    // });
+                // ->where(function ($q) {
+                //     $q->whereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereHas('pks', function ($pksQuery) {
+                //             $pksQuery->where('is_aktif', 1)
+                //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
+                //         });
+                //     })
+                //     ->orWhereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereNull('pks_id');
+                //     });
+                // });
                 break;
 
             case 'rekontrak':
@@ -427,12 +455,12 @@ class QuotationBusinessService
                         $q->where('status_quotation_id', 3)
                             ->orWhereNotNull('ot1');
                     });
-                    // ->whereHas('sites', function ($siteQuery) {
-                    //     $siteQuery->whereHas('pks', function ($pksQuery) {
-                    //         $pksQuery->where('is_aktif', 1)
-                    //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
-                    //     });
-                    // });
+                // ->whereHas('sites', function ($siteQuery) {
+                //     $siteQuery->whereHas('pks', function ($pksQuery) {
+                //         $pksQuery->where('is_aktif', 1)
+                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                //     });
+                // });
                 break;
         }
 
