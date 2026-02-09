@@ -12,7 +12,7 @@ class QuotationCreated
     use Dispatchable, SerializesModels;
 
     public $quotation;
-    public $request;
+    public $requestData;  
     public $tipeQuotation;
     public $quotationReferensi;
     public $user;
@@ -20,7 +20,7 @@ class QuotationCreated
     public function __construct(Quotation $quotation, Request $request, string $tipeQuotation, $quotationReferensi, $user)
     {
         $this->quotation = $quotation;
-        $this->request = $request;
+        $this->requestData = $request->all();
         $this->tipeQuotation = $tipeQuotation;
         $this->quotationReferensi = $quotationReferensi;
         $this->user = $user;

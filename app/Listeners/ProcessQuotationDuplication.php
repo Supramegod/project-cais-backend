@@ -11,10 +11,13 @@ use App\Models\Province;
 use App\Models\City;
 use App\Models\Ump;
 use App\Models\Umk;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
-class ProcessQuotationDuplication
+class ProcessQuotationDuplication implements ShouldQueue
 {
+    use InteractsWithQueue;
     protected $quotationDuplicationService;
     protected $quotationBusinessService;
 
@@ -29,7 +32,8 @@ class ProcessQuotationDuplication
     public function handle(QuotationCreated $event)
     {
         $quotation = $event->quotation;
-        $request = $event->request;
+        // Convert array back to object for easier property access
+        $request = (object) $event->requestData;
         $tipeQuotation = $event->tipeQuotation;
         $quotationReferensi = $event->quotationReferensi;
         $user = $event->user;
@@ -39,7 +43,7 @@ class ProcessQuotationDuplication
         $hasExistingSite = false;
 
         if ($request->jumlah_site == "Multi Site") {
-            if ($request->has('multisite') && !empty($request->multisite)) {
+            if (isset($request->multisite) && !empty($request->multisite)) {
                 foreach ($request->multisite as $key => $namaSite) {
                     $isExisting = $this->checkSiteExists(
                         $request->perusahaan_id,
@@ -60,7 +64,7 @@ class ProcessQuotationDuplication
                 }
             }
         } else {
-            if ($request->has('nama_site') && !empty($request->nama_site)) {
+            if (isset($request->nama_site) && !empty($request->nama_site)) {
                 $isExisting = $this->checkSiteExists(
                     $request->perusahaan_id,
                     $request->nama_site,
