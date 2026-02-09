@@ -246,7 +246,7 @@ class PksController extends Controller
                     'current_page' => $pksList->currentPage(),
                     'last_page' => $pksList->lastPage(),
                     'total' => $pksList->total(),
-                    'per_page' => $pksList->perPage(),
+                    'total_per_page' => $pksList->count(),
                 ],
                 'meta' => [
                     'tgl_dari' => $tglDari,

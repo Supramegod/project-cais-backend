@@ -209,11 +209,11 @@ class SpkController extends Controller
 
             return $this->successResponse('SPK data retrieved successfully', [
                 'list' => $data->items(),
-                'pagination' => [
+                 'pagination' => [
                     'current_page' => $data->currentPage(),
-                    'total' => $data->total(),
                     'last_page' => $data->lastPage(),
-                    'per_page' => $data->perPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
                 ]
             ]);
 

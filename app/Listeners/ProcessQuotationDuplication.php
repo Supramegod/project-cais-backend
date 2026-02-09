@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 class ProcessQuotationDuplication implements ShouldQueue
 {
     use InteractsWithQueue;
+    
     protected $quotationDuplicationService;
     protected $quotationBusinessService;
 
@@ -32,294 +33,317 @@ class ProcessQuotationDuplication implements ShouldQueue
     public function handle(QuotationCreated $event)
     {
         $quotation = $event->quotation;
-        // Convert array back to object for easier property access
         $request = (object) $event->requestData;
         $tipeQuotation = $event->tipeQuotation;
         $quotationReferensi = $event->quotationReferensi;
         $user = $event->user;
 
-        // Hitung $hasNewSiteRequest dan $hasExistingSite
-        $hasNewSiteRequest = false;
-        $hasExistingSite = false;
-
-        if ($request->jumlah_site == "Multi Site") {
-            if (isset($request->multisite) && !empty($request->multisite)) {
-                foreach ($request->multisite as $key => $namaSite) {
-                    $isExisting = $this->checkSiteExists(
-                        $request->perusahaan_id,
-                        $namaSite,
-                        $request->provinsi_multi[$key] ?? null,
-                        $request->kota_multi[$key] ?? null
-                    );
-
-                    if ($isExisting) {
-                        $hasExistingSite = true;
-                        Log::info('Site sudah existing', [
-                            'nama_site' => $namaSite,
-                            'perusahaan_id' => $request->perusahaan_id
-                        ]);
-                    } else {
-                        $hasNewSiteRequest = true;
-                    }
-                }
-            }
-        } else {
-            if (isset($request->nama_site) && !empty($request->nama_site)) {
-                $isExisting = $this->checkSiteExists(
-                    $request->perusahaan_id,
-                    $request->nama_site,
-                    $request->provinsi,
-                    $request->kota
-                );
-
-                if ($isExisting) {
-                    $hasExistingSite = true;
-                    Log::info('Site sudah existing', [
-                        'nama_site' => $request->nama_site,
-                        'perusahaan_id' => $request->perusahaan_id
-                    ]);
-                } else {
-                    $hasNewSiteRequest = true;
-                }
-            }
-        }
-
-        Log::info('Site request check in listener', [
-            'jumlah_site' => $request->jumlah_site,
-            'has_new_site_request' => $hasNewSiteRequest,
-            'has_existing_site' => $hasExistingSite,
-            'has_referensi' => $quotationReferensi !== null,
-            'tipe_quotation' => $tipeQuotation
-        ]);
-
-        // Logic berdasarkan status site
-        if ($quotationReferensi) {
-            Log::info('Starting duplication process from reference for ' . $tipeQuotation, [
-                'has_new_site_request' => $hasNewSiteRequest,
-                'has_existing_site' => $hasExistingSite,
-                'ref_site_count' => $quotationReferensi->quotationSites->count()
+        try {
+            Log::info('Starting quotation duplication process', [
+                'quotation_id' => $quotation->id,
+                'tipe_quotation' => $tipeQuotation,
+                'has_referensi' => $quotationReferensi !== null
             ]);
 
-            if (!$hasNewSiteRequest && !$hasExistingSite) {
-                // Kasus 1: TIDAK ADA SITE BARU & TIDAK ADA SITE EXISTING
-                $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
-                Log::info('Copied ALL data including sites from reference quotation');
+            // ✅ 1. BUAT SEMUA SITE DARI REQUEST (TANPA BATASAN APAPUN)
+            $sitesCreated = $this->createAllSitesNoRestrictions($quotation, $request, $user->full_name);
 
-            } elseif ($hasExistingSite && !$hasNewSiteRequest) {
-                // Kasus 2: ADA SITE EXISTING, TIDAK ADA SITE BARU
-                // Link existing sites to new quotation
-                $this->linkExistingSites($quotation, $request, $user->full_name);
-                
-                // Reload quotation with sites to get accurate count
-                $quotation->load('quotationSites');
-                $jumlahSiteLinked = $quotation->quotationSites->count();
-                $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-                
-                Log::info('Existing site link comparison', [
-                    'jumlah_site_linked' => $jumlahSiteLinked,
-                    'jumlah_site_referensi' => $jumlahSiteReferensi
-                ]);
-                
-                // Copy data based on site count match
-                if ($jumlahSiteLinked === $jumlahSiteReferensi) {
-                    $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-                    Log::info('Linked to existing sites and copied data with site mapping');
-                } else {
-                    $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                    Log::info('Linked to existing sites and copied all data to each site');
-                }
+            Log::info('Sites created from request (no restrictions)', [
+                'quotation_id' => $quotation->id,
+                'sites_created_count' => count($sitesCreated),
+                'requested_sites_count' => $this->countRequestedSites($request)
+            ]);
 
+            // ✅ 2. LOGIC BERDASARKAN ADA/TIDAKNYA REFERENSI
+            if ($quotationReferensi) {
+                $this->handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user, $sitesCreated);
             } else {
-                // Kasus 3: ADA SITE BARU (dengan atau tanpa existing site)
-                $this->createNewSitesOnly($quotation, $request, $user->full_name);
-
-                $jumlahSiteRequest = 0;
-                if ($request->jumlah_site == "Multi Site") {
-                    $jumlahSiteRequest = is_array($request->multisite) ? count($request->multisite) : 0;
-                } else {
-                    $jumlahSiteRequest = 1;
-                }
-
-                $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-
-                Log::info('Site comparison for new sites', [
-                    'jumlah_site_request' => $jumlahSiteRequest,
-                    'jumlah_site_referensi' => $jumlahSiteReferensi,
-                    'has_existing_site' => $hasExistingSite
-                ]);
-
-                if ($jumlahSiteRequest === $jumlahSiteReferensi && !$hasExistingSite) {
-                    $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-                    Log::info('Copied data with site mapping (same count, no existing)');
-                } else {
-                    $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                    Log::info('Copied all data to new sites (different count or with existing)');
-                }
-            }
-        } else {
-            // Kasus 4: TIDAK ADA REFERENSI (hanya untuk tipe 'baru')
-            Log::info('Creating quotation WITHOUT reference (brand new)');
-
-            if (!$hasNewSiteRequest && !$hasExistingSite) {
-                throw new \Exception('Data site wajib diisi untuk quotation baru tanpa referensi');
+                $this->handleWithoutReference($quotation, $request, $tipeQuotation, $user);
             }
 
-            $this->createNewSitesOnly($quotation, $request, $user->full_name);
-            $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
+            // ✅ 3. BUAT ACTIVITY
+            $this->createActivity($quotation, $tipeQuotation, $quotationReferensi, $user);
+
+            Log::info('Quotation duplication process completed', [
+                'quotation_id' => $quotation->id,
+                'sites_count' => $quotation->quotationSites()->count(),
+                'details_count' => $quotation->quotationDetails()->count()
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Quotation duplication failed', [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            $quotation->update([
+                'error_message' => $e->getMessage(),
+                'is_error' => 1
+            ]);
+            
+            throw $e;
         }
-
-        // Create initial activity
-        $this->createActivity($quotation, $tipeQuotation, $quotationReferensi, $user);
     }
 
     /**
-     * Helper methods
+     * Buat semua site dari request TANPA BATASAN APAPUN
+     * - Duplikat dalam request? BUAT!
+     * - Sudah ada di database? BUAT LAGI!
+     * - Data tidak lengkap? BUAT DENGAN DATA DEFAULT!
      */
-    private function checkSiteExists($leadsId, $namaSite, $provinsiId, $kotaId)
+    private function createAllSitesNoRestrictions(Quotation $quotation, $request, string $createdBy): array
     {
-        return QuotationSite::where('leads_id', $leadsId)
-            ->where('nama_site', $namaSite)
-            ->where('provinsi_id', $provinsiId)
-            ->where('kota_id', $kotaId)
-            ->exists();
-    }
-
-    private function linkExistingSites(Quotation $quotation, $request, $createdBy)
-    {
+        $createdSites = [];
         $leadsId = $request->perusahaan_id;
 
         if ($request->jumlah_site == "Multi Site") {
             foreach ($request->multisite as $key => $namaSite) {
-                $existingSite = QuotationSite::where('leads_id', $leadsId)
-                    ->where('nama_site', $namaSite)
-                    ->where('provinsi_id', $request->provinsi_multi[$key])
-                    ->where('kota_id', $request->kota_multi[$key])
-                    ->first();
+                $provinsiId = $request->provinsi_multi[$key] ?? null;
+                $kotaId = $request->kota_multi[$key] ?? null;
+                $penempatan = $request->penempatan_multi[$key] ?? null;
 
-                if ($existingSite) {
-                    // CREATE new site record instead of updating existing one
-                    $newSite = $existingSite->replicate();
-                    $newSite->quotation_id = $quotation->id;
-                    $newSite->created_by = $createdBy;
-                    $newSite->save();
-                    
-                    Log::info('Created new site record from existing site', [
-                        'old_site_id' => $existingSite->id,
-                        'new_site_id' => $newSite->id,
-                        'quotation_id' => $quotation->id
-                    ]);
-                }
-            }
-        } else {
-            $existingSite = QuotationSite::where('leads_id', $leadsId)
-                ->where('nama_site', $request->nama_site)
-                ->where('provinsi_id', $request->provinsi)
-                ->where('kota_id', $request->kota)
-                ->first();
-
-            if ($existingSite) {
-                // CREATE new site record instead of updating existing one
-                $newSite = $existingSite->replicate();
-                $newSite->quotation_id = $quotation->id;
-                $newSite->created_by = $createdBy;
-                $newSite->save();
+                // ✅ BUAT SITE TANPA PENGECEKAN APAPUN
+                $site = $this->createSiteWithoutChecks($quotation, $leadsId, $namaSite, $provinsiId, $kotaId, $penempatan, $createdBy);
                 
-                Log::info('Created new site record from existing site', [
-                    'old_site_id' => $existingSite->id,
-                    'new_site_id' => $newSite->id,
-                    'quotation_id' => $quotation->id
+                $createdSites[] = $site;
+                
+                Log::info('Created site (no restrictions)', [
+                    'quotation_id' => $quotation->id,
+                    'site_id' => $site->id,
+                    'site_name' => $namaSite,
+                    'key' => $key,
+                    'total_created' => count($createdSites)
                 ]);
             }
-        }
-    }
-
-    private function createNewSitesOnly(Quotation $quotation, $request, $createdBy)
-    {
-        $leadsId = $request->perusahaan_id;
-
-        if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $namaSite) {
-                $isExisting = $this->checkSiteExists(
-                    $leadsId,
-                    $namaSite,
-                    $request->provinsi_multi[$key],
-                    $request->kota_multi[$key]
-                );
-
-                if (!$isExisting) {
-                    $this->createNewSite($quotation, $request, $key, true, $createdBy);
-                }
-            }
         } else {
-            $isExisting = $this->checkSiteExists(
-                $leadsId,
-                $request->nama_site,
-                $request->provinsi,
-                $request->kota
-            );
+            // Single site
+            $namaSite = $request->nama_site;
+            $provinsiId = $request->provinsi;
+            $kotaId = $request->kota;
+            $penempatan = $request->penempatan;
 
-            if (!$isExisting) {
-                $this->createNewSite($quotation, $request, null, false, $createdBy);
+            // ✅ BUAT SITE TANPA PENGECEKAN APAPUN
+            $site = $this->createSiteWithoutChecks($quotation, $leadsId, $namaSite, $provinsiId, $kotaId, $penempatan, $createdBy);
+            
+            $createdSites[] = $site;
+            
+            Log::info('Created single site (no restrictions)', [
+                'quotation_id' => $quotation->id,
+                'site_id' => $site->id,
+                'site_name' => $namaSite
+            ]);
+        }
+
+        return $createdSites;
+    }
+
+    /**
+     * Buat site tanpa pengecekan apapun
+     */
+    private function createSiteWithoutChecks(Quotation $quotation, $leadsId, $namaSite, $provinsiId, $kotaId, $penempatan, string $createdBy): QuotationSite
+    {
+        try {
+            // Default values jika data tidak lengkap
+            $defaultProvinceId = $provinsiId ?? 31; // Default DKI Jakarta
+            $defaultCityId = $kotaId ?? 3171; // Default Jakarta Pusat
+            
+            $province = Province::find($defaultProvinceId);
+            $city = City::find($defaultCityId);
+
+            // Jika province/city tidak ditemukan, gunakan default
+            if (!$province) {
+                $province = Province::first();
+                Log::warning('Province not found, using default', [
+                    'requested_province_id' => $provinsiId,
+                    'default_province_id' => $province->id ?? null
+                ]);
             }
+
+            if (!$city) {
+                $city = City::first();
+                Log::warning('City not found, using default', [
+                    'requested_city_id' => $kotaId,
+                    'default_city_id' => $city->id ?? null
+                ]);
+            }
+
+            // Cari UMP/UMK jika ada
+            $ump = null;
+            $umk = null;
+            
+            if ($province) {
+                $ump = Ump::where('province_id', $province->id)
+                    ->active()
+                    ->first();
+            }
+            
+            if ($city) {
+                $umk = Umk::where('city_id', $city->id)
+                    ->active()
+                    ->first();
+            }
+
+            $site = QuotationSite::create([
+                'quotation_id' => $quotation->id,
+                'leads_id' => $quotation->leads_id,
+                'nama_site' => $namaSite ?? 'Site Tanpa Nama',
+                'provinsi_id' => $province->id ?? null,
+                'provinsi' => $province->nama ?? 'Unknown',
+                'kota_id' => $city->id ?? null,
+                'kota' => $city->name ?? 'Unknown',
+                'ump' => $ump ? $ump->ump : 0,
+                'umk' => $umk ? $umk->umk : 0,
+                'penempatan' => $penempatan ?? 'Tidak Ditentukan',
+                'created_by' => $createdBy
+            ]);
+
+            return $site;
+            
+        } catch (\Exception $e) {
+            Log::error('Failed to create site, trying fallback', [
+                'error' => $e->getMessage(),
+                'quotation_id' => $quotation->id,
+                'site_name' => $namaSite
+            ]);
+            
+            // Fallback: buat site dengan data minimal
+            return QuotationSite::create([
+                'quotation_id' => $quotation->id,
+                'leads_id' => $quotation->leads_id,
+                'nama_site' => $namaSite ?? 'Site Error',
+                'provinsi_id' => null,
+                'provinsi' => 'Error',
+                'kota_id' => null,
+                'kota' => 'Error',
+                'ump' => 0,
+                'umk' => 0,
+                'penempatan' => 'Error',
+                'created_by' => $createdBy
+            ]);
         }
     }
 
-    private function createNewSite(Quotation $quotation, $request, $index, $isMulti, $createdBy)
+    /**
+     * Handle dengan referensi
+     */
+    private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user, $sitesCreated): void
     {
-        $provinceId = $isMulti ? $request->provinsi_multi[$index] : $request->provinsi;
-        $cityId = $isMulti ? $request->kota_multi[$index] : $request->kota;
-
-        $province = Province::findOrFail($provinceId);
-        $city = City::findOrFail($cityId);
-
-        $ump = Ump::where('province_id', $province->id)
-            ->active()
-            ->first();
-
-        $umk = Umk::where('city_id', $city->id)
-            ->active()
-            ->first();
-
-        QuotationSite::create([
+        Log::info('Starting duplication from reference', [
             'quotation_id' => $quotation->id,
-            'leads_id' => $quotation->leads_id,
-            'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
-            'provinsi_id' => $provinceId,
-            'provinsi' => $province->nama,
-            'kota_id' => $cityId,
-            'kota' => $city->name,
-            'ump' => $ump ? $ump->ump : 0,
-            'umk' => $umk ? $umk->umk : 0,
-            'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
-            'created_by' => $createdBy
+            'referensi_id' => $quotationReferensi->id,
+            'tipe_quotation' => $tipeQuotation,
+            'sites_created_count' => count($sitesCreated),
+            'ref_sites_count' => $quotationReferensi->quotationSites->count()
         ]);
 
-        Log::info('Created new site for quotation', [
-            'quotation_id' => $quotation->id,
-            'site_name' => $isMulti ? $request->multisite[$index] : $request->nama_site
-        ]);
+        $jumlahSiteRequest = count($sitesCreated);
+        $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
+
+        // Tentukan metode duplikasi berdasarkan jumlah site
+        if ($jumlahSiteRequest === $jumlahSiteReferensi) {
+            // ✅ JUMLAH SITE SAMA: Gunakan mapping per site
+            $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
+            Log::info('Used site mapping duplication (same count)', [
+                'request_sites' => $jumlahSiteRequest,
+                'ref_sites' => $jumlahSiteReferensi
+            ]);
+        } else {
+            // ✅ JUMLAH SITE BERBEDA: Copy semua detail ke semua site
+            $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
+            Log::info('Used no-site duplication (different count)', [
+                'request_sites' => $jumlahSiteRequest,
+                'ref_sites' => $jumlahSiteReferensi
+            ]);
+        }
     }
 
-    private function createActivity(Quotation $quotation, $tipeQuotation, $quotationReferensi, $user)
+    /**
+     * Handle tanpa referensi
+     */
+    private function handleWithoutReference($quotation, $request, $tipeQuotation, $user): void
     {
-        $activityType = 'baru';
+        Log::info('Creating quotation without reference', [
+            'quotation_id' => $quotation->id,
+            'tipe_quotation' => $tipeQuotation
+        ]);
 
-        if ($tipeQuotation === 'revisi') {
-            $activityType = 'revisi';
-        } elseif ($tipeQuotation === 'rekontrak') {
-            $activityType = 'rekontrak';
-        } elseif ($tipeQuotation === 'addendum') {
-            $activityType = 'addendum';
-        } elseif ($tipeQuotation === 'baru' && $quotationReferensi) {
-            $activityType = 'baru_dengan_referensi';
+        // ✅ BUAT PIC AWAL (jika diperlukan)
+        try {
+            $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
+            Log::info('Created initial PIC for new quotation', [
+                'quotation_id' => $quotation->id
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to create initial PIC, continuing', [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            // Lanjutkan tanpa PIC
         }
+    }
 
-        $this->quotationBusinessService->createInitialActivity(
-            $quotation,
-            $user->full_name,
-            $user->id,
-            $activityType,
-            $quotationReferensi
-        );
+    /**
+     * Hitung jumlah site yang diminta dalam request
+     */
+    private function countRequestedSites($request): int
+    {
+        if ($request->jumlah_site == "Multi Site") {
+            return isset($request->multisite) && is_array($request->multisite) 
+                ? count($request->multisite) 
+                : 0;
+        }
+        
+        return isset($request->nama_site) && !empty($request->nama_site) ? 1 : 0;
+    }
+
+    /**
+     * Buat activity
+     */
+    private function createActivity($quotation, $tipeQuotation, $quotationReferensi, $user): void
+    {
+        try {
+            $activityType = 'baru';
+
+            if ($tipeQuotation === 'revisi') {
+                $activityType = 'revisi';
+            } elseif ($tipeQuotation === 'rekontrak') {
+                $activityType = 'rekontrak';
+            } elseif ($tipeQuotation === 'adendum') {
+                $activityType = 'adendum';
+            } elseif ($tipeQuotation === 'baru' && $quotationReferensi) {
+                $activityType = 'baru_dengan_referensi';
+            }
+
+            $this->quotationBusinessService->createInitialActivity(
+                $quotation,
+                $user->full_name,
+                $user->id,
+                $activityType,
+                $quotationReferensi
+            );
+            
+            Log::info('Created activity for quotation', [
+                'quotation_id' => $quotation->id,
+                'activity_type' => $activityType
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Failed to create activity, continuing', [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            // Lanjutkan tanpa activity
+        }
+    }
+
+    /**
+     * Handle job failure
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('ProcessQuotationDuplication job failed', [
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString()
+        ]);
     }
 }
