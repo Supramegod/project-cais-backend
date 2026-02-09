@@ -98,6 +98,20 @@ class CustomerActivityController extends Controller
      *         required=false,
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Kolom yang akan dicari (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "kebutuhan"}, example="nama_perusahaan")
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Success - Data aktivitas customer berhasil diambil",
@@ -170,32 +184,67 @@ class CustomerActivityController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
+            // 1. Inisialisasi Tanggal
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi tanggal lebih sederhana
+            // Validasi Tanggal
             if ($request->tgl_dari && $request->tgl_sampai && Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
                 return response()->json(['success' => false, 'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'], 422);
             }
 
-            // Gunakan Subquery untuk unique leads_id di level Database agar pagination akurat
-            // Kita hanya mengambil ID activity terbaru untuk setiap leads_id
+            // 2. Subquery untuk mengambil ID activity terbaru per leads_id
             $latestActivityIds = CustomerActivity::select(DB::raw('MAX(id)'))
                 ->whereNull('deleted_at')
                 ->groupBy('leads_id');
 
+            // 3. Base Query dengan Eager Loading
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
-                'leads.kebutuhan:id,nama', // sesuaikan pivot jika perlu
+                'leads.kebutuhan:id,nama',
                 'timSalesDetail:id,nama'
             ])
-                ->whereIn('id', $latestActivityIds) // Hanya ambil record terbaru per leads
-                ->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
+                ->whereIn('id', $latestActivityIds);
 
-            // Filter Role & Relation
+            // 4. Logika Pencarian (Search)
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    // Formatting untuk Boolean Mode
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+
+                    // Search ke tabel Leads menggunakan MATCH AGAINST
+                    $query->whereHas('leads', function ($q) use ($searchTerm) {
+                        $q->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                    });
+                } else {
+                    $allowedColumns = ['nomor'];
+
+                    if ($searchBy === 'kebutuhan') {
+                        // Search ke relasi kebutuhan
+                        $query->whereHas('leads.kebutuhan', function ($q) use ($searchTerm) {
+                            $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                        });
+                    } elseif (in_array($searchBy, $allowedColumns)) {
+                        // Search ke kolom di tabel activity sendiri (misal: nomor activity)
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Jika tidak ada search, gunakan filter tanggal default
+                $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
+            }
+
+            // 5. Filter Tambahan (Branch, Tipe, User)
             $query->whereHas('leads', function ($q) use ($request) {
-                $q->filterByUserRole();
+                $q->filterByUserRole(); // Gunakan scope dari model Leads
                 if ($request->filled('branch')) {
                     $q->where('branch_id', $request->branch);
                 }
@@ -206,18 +255,20 @@ class CustomerActivityController extends Controller
                 }
             });
 
-            // Filter langsung ke kolom activity
-            if ($request->filled('tipe'))
+            if ($request->filled('tipe')) {
                 $query->where('tipe', $request->tipe);
-            if ($request->filled('user'))
-                $query->where('user_id', $request->user);
+            }
 
-            // Paginate (Sekarang hasil pagination akan konsisten 15 data per halaman)
+            if ($request->filled('user')) {
+                $query->where('user_id', $request->user);
+            }
+
+            // 6. Execution & Pagination
             $activities = $query->orderBy('tgl_activity', 'desc')
                 ->orderBy('id', 'desc')
                 ->paginate($request->get('per_page', 15));
 
-            // Transformasi menggunakan transform() lebih hemat memory daripada map()
+            // 7. Transformasi Data
             $activities->getCollection()->transform(function ($activity) {
                 return [
                     'id' => $activity->id,
@@ -227,10 +278,10 @@ class CustomerActivityController extends Controller
                     'notes' => $activity->notes,
                     'status_leads_id' => $activity->status_leads_id,
                     'created_at' => $activity->getRawOriginal('created_at'),
-                    'nama_perusahaan' => $activity->leads?->nama_perusahaan,
-                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray(),
-                    'branch' => $activity->leads?->branch?->name,
-                    'sales' => $activity->timSalesDetail?->nama,
+                    'nama_perusahaan' => $activity->leads?->nama_perusahaan ?? '-',
+                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray() ?? [],
+                    'branch' => $activity->leads?->branch?->name ?? '-',
+                    'sales' => $activity->timSalesDetail?->nama ?? '-',
                     'leads_id' => $activity->leads_id,
                     'quotation_id' => $activity->quotation_id,
                     'spk_id' => $activity->spk_id,
@@ -238,8 +289,10 @@ class CustomerActivityController extends Controller
                 ];
             });
 
+            // 8. Final Response
             return response()->json([
                 'success' => true,
+                'message' => 'Data aktivitas berhasil diambil',
                 'data' => $activities->items(),
                 'pagination' => [
                     'current_page' => $activities->currentPage(),
@@ -250,13 +303,17 @@ class CustomerActivityController extends Controller
                 'meta' => [
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
-                    'filters_applied' => $request->only(['branch', 'kebutuhan', 'tipe', 'user'])
+                    'search_applied' => $request->search,
+                    'search_by' => $request->get('search_by', 'nama_perusahaan')
                 ]
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Error in CustomerActivityController@list: ' . $e->getMessage());
-            return response()->json(['success' => false, 'message' => 'Server Error'], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage()
+            ], 500);
         }
     }
 

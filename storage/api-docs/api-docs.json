@@ -4454,6 +4454,31 @@
                             "type": "integer",
                             "example": 1
                         }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kebutuhan"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
                     }
                 ],
                 "responses": {
@@ -19298,8 +19323,6 @@
                             "enum": [
                                 "nama_perusahaan",
                                 "nomor",
-                                "kota",
-                                "provinsi",
                                 "kebutuhan"
                             ],
                             "example": "nama_perusahaan"
