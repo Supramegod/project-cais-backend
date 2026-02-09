@@ -84,6 +84,20 @@ class CustomerActivityController extends Controller
      *         required=false,
      *         @OA\Schema(type="string", example="Telepon")
      *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman untuk pagination (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman untuk pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Success - Data aktivitas customer berhasil diambil",
@@ -159,53 +173,52 @@ class CustomerActivityController extends Controller
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            if ($request->tgl_dari && $request->tgl_sampai) {
-                if (Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'
-                    ], 422);
-                }
+            // Validasi tanggal lebih sederhana
+            if ($request->tgl_dari && $request->tgl_sampai && Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
+                return response()->json(['success' => false, 'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'], 422);
             }
+
+            // Gunakan Subquery untuk unique leads_id di level Database agar pagination akurat
+            // Kita hanya mengambil ID activity terbaru untuk setiap leads_id
+            $latestActivityIds = CustomerActivity::select(DB::raw('MAX(id)'))
+                ->whereNull('deleted_at')
+                ->groupBy('leads_id');
 
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
-                'leads.kebutuhan:m_kebutuhan.id,m_kebutuhan.nama',
+                'leads.kebutuhan:id,nama', // sesuaikan pivot jika perlu
                 'timSalesDetail:id,nama'
-            ])->whereNull('deleted_at')
-            ->whereHas('leads', function ($q) {
+            ])
+                ->whereIn('id', $latestActivityIds) // Hanya ambil record terbaru per leads
+                ->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
+
+            // Filter Role & Relation
+            $query->whereHas('leads', function ($q) use ($request) {
                 $q->filterByUserRole();
+                if ($request->filled('branch')) {
+                    $q->where('branch_id', $request->branch);
+                }
+                if ($request->filled('kebutuhan')) {
+                    $q->whereHas('kebutuhan', function ($sq) use ($request) {
+                        $sq->where('m_kebutuhan.id', $request->kebutuhan);
+                    });
+                }
             });
 
-            if ($request->tgl_dari || $request->tgl_sampai) {
-                $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
-            }
-
-            if ($request->filled('branch')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('branch_id', $request->branch);
-                });
-            }
-
-            if ($request->filled('kebutuhan')) {
-                $query->whereHas('leads.kebutuhan', function ($q) use ($request) {
-                    $q->where('m_kebutuhan.id', $request->kebutuhan);
-                });
-            }
-
-            if ($request->filled('tipe')) {
+            // Filter langsung ke kolom activity
+            if ($request->filled('tipe'))
                 $query->where('tipe', $request->tipe);
-            }
-
-            if ($request->filled('user')) {
+            if ($request->filled('user'))
                 $query->where('user_id', $request->user);
-            }
 
-            $activities = $query->orderBy('created_at', 'desc')
-                ->get();
+            // Paginate (Sekarang hasil pagination akan konsisten 15 data per halaman)
+            $activities = $query->orderBy('tgl_activity', 'desc')
+                ->orderBy('id', 'desc')
+                ->paginate($request->get('per_page', 15));
 
-            $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
+            // Transformasi menggunakan transform() lebih hemat memory daripada map()
+            $activities->getCollection()->transform(function ($activity) {
                 return [
                     'id' => $activity->id,
                     'nomor' => $activity->nomor,
@@ -224,29 +237,26 @@ class CustomerActivityController extends Controller
                     'pks_id' => $activity->pks_id
                 ];
             });
-            
+
             return response()->json([
                 'success' => true,
-                'data' => $mappedActivities,
+                'data' => $activities->items(),
+                'pagination' => [
+                    'current_page' => $activities->currentPage(),
+                    'last_page' => $activities->lastPage(),
+                    'total' => $activities->total(),
+                    'per_page' => $activities->perPage(),
+                ],
                 'meta' => [
-                    'total' => $mappedActivities->count(),
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
-                    'filters_applied' => [
-                        'branch' => $request->branch,
-                        'kebutuhan' => $request->kebutuhan,
-                        'tipe' => $request->tipe,
-                        'user' => $request->user
-                    ]
+                    'filters_applied' => $request->only(['branch', 'kebutuhan', 'tipe', 'user'])
                 ]
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Error in CustomerActivityController@list: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Server Error'], 500);
         }
     }
 

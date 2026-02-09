@@ -4434,6 +4434,26 @@
                             "type": "string",
                             "example": "Telepon"
                         }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman untuk pagination (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman untuk pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
                     }
                 ],
                 "responses": {
@@ -19219,7 +19239,7 @@
                         }
                     },
                     {
-                        "name": "kebutuhan_id",
+                        "name": "kebutuhan",
                         "in": "query",
                         "description": "Service need ID filter",
                         "required": false,
@@ -19231,11 +19251,58 @@
                     {
                         "name": "status",
                         "in": "query",
-                        "description": "Status filter",
+                        "description": "Status quotation ID filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by company name (uses fulltext search)",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "example": "approved"
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Column to search in (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kota",
+                                "provinsi",
+                                "kebutuhan"
+                            ],
+                            "example": "nama_perusahaan"
                         }
                     }
                 ],
@@ -19306,6 +19373,27 @@
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 100
+                                                },
+                                                "total_per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
                                         },
                                         "message": {
                                             "type": "string",
