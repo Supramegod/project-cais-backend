@@ -183,6 +183,7 @@ class QuotationController extends Controller
                 ->byUserRole()
                 ->notDeleted()
                 ->orderBy('created_at', 'desc');
+
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'

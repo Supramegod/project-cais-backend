@@ -50,114 +50,212 @@ class PksController extends Controller
      * @OA\Get(
      *     path="/api/pks/list",
      *     summary="Get list of PKS",
+     *     description="Mengambil daftar PKS dengan filter tanggal, status, branch, dan pencarian",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tgl_dari",
      *         in="query",
-     *         description="Start date",
+     *         description="Tanggal mulai filter (format: Y-m-d). Default: 6 bulan kebelakang",
      *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2025-10-01")
+     *         @OA\Schema(type="string", format="date", example="2025-01-01")
      *     ),
      *     @OA\Parameter(
      *         name="tgl_sampai",
      *         in="query",
-     *         description="End date",
+     *         description="Tanggal akhir filter (format: Y-m-d). Default: hari ini",
      *         required=false,
-     *         @OA\Schema(type="string", format="date",example="2025-11-01")
+     *         @OA\Schema(type="string", format="date", example="2025-12-31")
      *     ),
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
-     *         description="Status filter",
+     *         description="Filter berdasarkan status PKS ID",
      *         required=false,
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch",
+     *         in="query",
+     *         description="Filter berdasarkan branch ID dari leads",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Kolom yang akan dicari (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="id", type="integer"),
-     *                 @OA\Property(property="nomor", type="string"),
-     *                 @OA\Property(property="nama_perusahaan", type="string"),
-     *                 @OA\Property(property="tgl_pks", type="string"),
-     *                 @OA\Property(property="formatted_tgl_pks", type="string"),
-     *                 @OA\Property(property="kontrak_awal", type="string"),
-     *                 @OA\Property(property="kontrak_akhir", type="string"),
-     *                 @OA\Property(property="formatted_kontrak_awal", type="string"),
-     *                 @OA\Property(property="formatted_kontrak_akhir", type="string"),
-     *                 @OA\Property(property="status", type="string"),
-     *                 @OA\Property(property="berakhir_dalam", type="string"),
-     *                 @OA\Property(property="status_berlaku", type="string"),
-     *                 @OA\Property(property="created_at", type="string", format="date-time"),
-     *                 @OA\Property(property="created_by", type="string")
-     *             ))
+     *             @OA\Property(property="message", type="string", example="PKS data retrieved successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="PKS/LEAD001-012024-00001"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                     @OA\Property(property="tgl_pks", type="string", format="date", example="2025-01-15"),
+     *                     @OA\Property(property="nama_site", type="array", @OA\Items(type="string"), example={"Site A", "Site B"}),
+     *                     @OA\Property(property="kontrak_awal", type="string", format="date", example="2025-01-01"),
+     *                     @OA\Property(property="kontrak_akhir", type="string", format="date", example="2025-12-31"),
+     *                     @OA\Property(property="formatted_kontrak_awal", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="formatted_kontrak_akhir", type="string", example="31 Desember 2025"),
+     *                     @OA\Property(property="status", type="string", example="Aktif"),
+     *                     @OA\Property(property="berakhir_dalam", type="string", example="6 bulan"),
+     *                     @OA\Property(property="status_berlaku", type="string", example="Berlaku"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time", example="2025-01-15 10:30:00"),
+     *                     @OA\Property(property="created_by", type="string", example="John Doe")
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="pagination",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="total", type="integer", example=75),
+     *                 @OA\Property(property="per_page", type="integer", example=15)
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="tgl_dari", type="string", format="date", example="2025-01-01"),
+     *                 @OA\Property(property="tgl_sampai", type="string", format="date", example="2025-12-31")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Unauthenticated"
+     *         description="Unauthenticated",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to retrieve PKS list"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
      *     )
      * )
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'tgl_dari' => 'nullable|date',
-                'tgl_sampai' => 'nullable|date|after_or_equal:tgl_dari',
-                'status' => 'nullable|integer|exists:m_status_pks,id'
-            ]);
+            // 1. Inisialisasi Tanggal & Filter Dasar
+            $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(6)->toDateString();
+            $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $query = Pks::with(['statusPks'])
+            // 2. Query Base dengan Eager Loading (Leads & Sites ditambahkan)
+            $query = Pks::with(['statusPks', 'leads', 'sites'])
                 ->whereNull('deleted_at')
                 ->orderBy('created_at', 'desc');
 
-            if (!empty($request->status)) {
+            // 3. Logika Search (Pola sama dengan Leads & SPK)
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } else {
+                    $allowedColumns = ['nomor'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Filter tanggal hanya jika tidak sedang search
+                $query->whereBetween('tgl_pks', [$tglDari, $tglSampai]);
+            }
+
+            // 4. Filter Tambahan (Status & Branch)
+            if ($request->filled('status')) {
                 $query->where('status_pks_id', $request->status);
             }
 
-            if (!empty($request->tgl_dari) && !empty($request->tgl_sampai)) {
-                $query->whereBetween('tgl_pks', [
-                    $request->tgl_dari,
-                    $request->tgl_sampai
-                ]);
+            if ($request->filled('branch')) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('branch_id', $request->branch);
+                });
             }
 
-            $pksList = $query->get()->map(function ($pks) {
+            // 5. Eksekusi dengan Paginate (Lebih efisien untuk data banyak)
+            $pksList = $query->paginate($request->get('per_page', 15));
+
+            // 6. Transformasi Data (Menggunakan getCollection agar info pagination tidak hilang)
+            $pksList->getCollection()->transform(function ($pks) {
                 return [
                     'id' => $pks->id,
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
                     'tgl_pks' => $pks->tgl_pks,
+                    'nama_site' => $pks->sites->pluck('nama_site')->toArray(), // Array nama site sesuai permintaan
                     'kontrak_awal' => $pks->kontrak_awal,
                     'kontrak_akhir' => $pks->kontrak_akhir,
                     'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
                     'formatted_kontrak_akhir' => Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y'),
-                    'status' => $pks->statusPks->nama ?? null,
+                    'status' => $pks->statusPks->nama ?? '-',
                     'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->kontrak_akhir),
                     'status_berlaku' => $this->getStatusBerlaku($pks->kontrak_akhir),
-                    'created_at' => $pks->created_at,
+                    'created_at' => $pks->getRawOriginal('created_at'), // Mengambil format asli DB jika ada accessor
                     'created_by' => $pks->created_by
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $pksList
+                'message' => 'PKS data retrieved successfully',
+                'data' => $pksList->items(),
+                'pagination' => [
+                    'current_page' => $pksList->currentPage(),
+                    'last_page' => $pksList->lastPage(),
+                    'total' => $pksList->total(),
+                    'per_page' => $pksList->perPage(),
+                ],
+                'meta' => [
+                    'tgl_dari' => $tglDari,
+                    'tgl_sampai' => $tglSampai
+                ]
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error in PksController@index: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS list',

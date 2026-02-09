@@ -16626,37 +16626,93 @@
                     "PKS"
                 ],
                 "summary": "Get list of PKS",
+                "description": "Mengambil daftar PKS dengan filter tanggal, status, branch, dan pencarian",
                 "operationId": "f6442ddd28bc570e93b0273b03c4c55c",
                 "parameters": [
                     {
                         "name": "tgl_dari",
                         "in": "query",
-                        "description": "Start date",
+                        "description": "Tanggal mulai filter (format: Y-m-d). Default: 6 bulan kebelakang",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "format": "date",
-                            "example": "2025-10-01"
+                            "example": "2025-01-01"
                         }
                     },
                     {
                         "name": "tgl_sampai",
                         "in": "query",
-                        "description": "End date",
+                        "description": "Tanggal akhir filter (format: Y-m-d). Default: hari ini",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "format": "date",
-                            "example": "2025-11-01"
+                            "example": "2025-12-31"
                         }
                     },
                     {
                         "name": "status",
                         "in": "query",
-                        "description": "Status filter",
+                        "description": "Filter berdasarkan status PKS ID",
                         "required": false,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter berdasarkan branch ID dari leads",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
@@ -16671,56 +16727,119 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS data retrieved successfully"
+                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
                                                 "properties": {
                                                     "id": {
-                                                        "type": "integer"
+                                                        "type": "integer",
+                                                        "example": 1
                                                     },
                                                     "nomor": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "PKS/LEAD001-012024-00001"
                                                     },
                                                     "nama_perusahaan": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
                                                     },
                                                     "tgl_pks": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-15"
                                                     },
-                                                    "formatted_tgl_pks": {
-                                                        "type": "string"
+                                                    "nama_site": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "example": [
+                                                            "Site A",
+                                                            "Site B"
+                                                        ]
                                                     },
                                                     "kontrak_awal": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-01"
                                                     },
                                                     "kontrak_akhir": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-12-31"
                                                     },
                                                     "formatted_kontrak_awal": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "1 Januari 2025"
                                                     },
                                                     "formatted_kontrak_akhir": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "31 Desember 2025"
                                                     },
                                                     "status": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "Aktif"
                                                     },
                                                     "berakhir_dalam": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "6 bulan"
                                                     },
                                                     "status_berlaku": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "Berlaku"
                                                     },
                                                     "created_at": {
                                                         "type": "string",
-                                                        "format": "date-time"
+                                                        "format": "date-time",
+                                                        "example": "2025-01-15 10:30:00"
                                                     },
                                                     "created_by": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "John Doe"
                                                     }
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "tgl_dari": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-01-01"
+                                                },
+                                                "tgl_sampai": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-12-31"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -16729,7 +16848,44 @@
                         }
                     },
                     "401": {
-                        "description": "Unauthenticated"
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve PKS list"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -24100,7 +24256,8 @@
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2024-01-01"
                         }
                     },
                     {
@@ -24110,7 +24267,8 @@
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2024-12-31"
                         }
                     },
                     {
@@ -24119,7 +24277,62 @@
                         "description": "Filter berdasarkan status SPK ID",
                         "required": false,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter berdasarkan branch ID dari leads",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
@@ -24139,62 +24352,72 @@
                                             "example": "SPK data retrieved successfully"
                                         },
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nomor": {
-                                                        "type": "string",
-                                                        "example": "SPK/LEAD001-012024-00001"
-                                                    },
-                                                    "tgl_spk": {
-                                                        "type": "string",
-                                                        "example": "2024-01-15"
-                                                    },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT Example Company"
-                                                    },
-                                                    "status_spk_id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "example": "2024-01-15 10:30:00"
-                                                    },
-                                                    "leads": {
+                                            "properties": {
+                                                "list": {
+                                                    "type": "array",
+                                                    "items": {
                                                         "properties": {
                                                             "id": {
                                                                 "type": "integer",
                                                                 "example": 1
+                                                            },
+                                                            "nomor_spk": {
+                                                                "type": "string",
+                                                                "example": "SPK/LEAD001-012024-00001"
+                                                            },
+                                                            "tgl_spk": {
+                                                                "type": "string",
+                                                                "example": "2024-01-15"
                                                             },
                                                             "nama_perusahaan": {
                                                                 "type": "string",
                                                                 "example": "PT Example Company"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "status_spk": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
                                                             },
-                                                            "nama": {
+                                                            "nama_site": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                },
+                                                                "example": [
+                                                                    "Site A",
+                                                                    "Site B"
+                                                                ]
+                                                            },
+                                                            "status": {
                                                                 "type": "string",
                                                                 "example": "Draft"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
                                                 },
-                                                "type": "object"
-                                            }
+                                                "pagination": {
+                                                    "properties": {
+                                                        "current_page": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "total": {
+                                                            "type": "integer",
+                                                            "example": 100
+                                                        },
+                                                        "last_page": {
+                                                            "type": "integer",
+                                                            "example": 7
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer",
+                                                            "example": 15
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
