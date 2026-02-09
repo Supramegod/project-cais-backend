@@ -234,7 +234,7 @@ class LeadsController extends Controller
 
             $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->map(function ($item) {
+            $transformedData = $data->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,

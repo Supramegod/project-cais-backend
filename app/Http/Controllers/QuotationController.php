@@ -75,7 +75,7 @@ class QuotationController extends Controller
      *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
-     *         name="kebutuhan_id",
+     *         name="kebutuhan",
      *         in="query",
      *         description="Service need ID filter",
      *         required=false,
@@ -84,9 +84,37 @@ class QuotationController extends Controller
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
-     *         description="Status filter",
+     *         description="Status quotation ID filter",
      *         required=false,
-     *         @OA\Schema(type="string", example="approved")
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search by company name (uses fulltext search)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Number of items per page",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number for pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Column to search in (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -111,6 +139,12 @@ class QuotationController extends Controller
      *                     )
      *                 )
      *             ),
+     *             @OA\Property(property="pagination", type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="total", type="integer", example=100),
+     *                 @OA\Property(property="total_per_page", type="integer", example=15)
+     *             ),
      *             @OA\Property(property="message", type="string", example="Quotations retrieved successfully")
      *         )
      *     ),
@@ -128,7 +162,7 @@ class QuotationController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $quotations = Quotation::select([
+            $query = Quotation::select([
                 'id',
                 'nomor',
                 'step',
@@ -144,19 +178,53 @@ class QuotationController extends Controller
             ])
                 ->with([
                     'quotationSites:id,quotation_id,nama_site',
-                    'statusQuotation:id,nama'// Hanya ambil nama_site dari sites
+                    'statusQuotation:id,nama'
                 ])
                 ->byUserRole()
-                ->dateRange($request->tgl_dari, $request->tgl_sampai)
-                ->byCompany($request->company)
-                ->byKebutuhan($request->kebutuhan_id)
-                ->byStatus($request->status)
                 ->notDeleted()
-                ->orderBy('created_at', 'desc')
-                ->get();
+                ->orderBy('created_at', 'desc');
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
 
-            // Map data ke format yang diinginkan
-            $data = $quotations->map(function ($quotation) {
+                if ($searchBy === 'nama_perusahaan') {
+                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+
+                } else {
+                    $allowedColumns = ['nomor', 'kebutuhan'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Filter tanggal default (hanya jalan kalau tidak sedang search)
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
+            }
+
+            // Filter tambahan
+            if ($request->filled('branch'))
+                $query->where('branch_id', $request->branch);
+            if ($request->filled('platform'))
+                $query->where('platform_id', $request->platform);
+            if ($request->filled('status'))
+                $query->where('status_quotation_id', $request->status);
+            if ($request->filled('company'))
+                $query->where('company_id', $request->company);
+            if ($request->filled('kebutuhan'))
+                $query->where('kebutuhan_id', $request->kebutuhan_id);
+
+            $data = $query->paginate($request->get('per_page', 15));
+
+            $transformedData = $data->getCollection()->transform(function ($quotation) {
                 return [
                     'id' => $quotation->id,
                     'nomor' => $quotation->nomor,
@@ -182,7 +250,13 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $data,
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ],
                 'message' => 'Quotations retrieved successfully'
             ]);
 
