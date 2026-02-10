@@ -75,7 +75,7 @@ class QuotationController extends Controller
      *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
-     *         name="kebutuhan",
+     *         name="kebutuhan_id",
      *         in="query",
      *         description="Service need ID filter",
      *         required=false,
@@ -220,7 +220,7 @@ class QuotationController extends Controller
                 $query->where('status_quotation_id', $request->status);
             if ($request->filled('company'))
                 $query->where('company_id', $request->company);
-            if ($request->filled('kebutuhan'))
+            if ($request->filled('kebutuhan_id'))
                 $query->where('kebutuhan_id', $request->kebutuhan_id);
 
             $data = $query->paginate($request->get('per_page', 15));
