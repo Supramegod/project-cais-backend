@@ -274,7 +274,7 @@ class ProcessQuotationDuplication implements ShouldQueue
         ]);
 
         // ✅ LOGIC DUPLIKASI BERDASARKAN KONDISI SITE
-        if ($currentSiteCount === 0) {
+        if ($currentSiteCount === 0 && $jumlahSiteRequest === 0) {
             // ✅ TIDAK ADA SITE: Copy semua termasuk sites dari referensi
             $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
             Log::info('No sites exist, copied ALL data including sites from reference');
