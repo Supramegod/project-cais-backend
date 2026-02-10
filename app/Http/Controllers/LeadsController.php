@@ -609,7 +609,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (Auth::user()->cais_role_id == 29) {
+            if(in_array(Auth::user()->cais_role_id, [29,31,32,33]) ) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
