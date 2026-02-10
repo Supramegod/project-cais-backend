@@ -17040,19 +17040,20 @@
                 "tags": [
                     "PKS"
                 ],
-                "summary": "Create new PKS - Kontrak Baru atau Rekontrak",
+                "summary": "Create new PKS - Kontrak Baru, Rekontrak, atau Addendum",
                 "operationId": "4893d0b9d9cabaac9f247b2e922e7490",
                 "parameters": [
                     {
                         "name": "tipe",
                         "in": "path",
-                        "description": "Tipe kontrak: baru atau rekontrak",
+                        "description": "Tipe kontrak: baru, rekontrak, atau addendum",
                         "required": true,
                         "schema": {
                             "type": "string",
                             "enum": [
                                 "baru",
-                                "rekontrak"
+                                "rekontrak",
+                                "addendum"
                             ]
                         }
                     }
@@ -17075,6 +17076,12 @@
                                 ],
                                 "properties": {
                                     "leads_id": {
+                                        "description": "Required untuk semua tipe kecuali addendum (untuk addendum gunakan pks_id)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "pks_id": {
+                                        "description": "Required untuk tipe=addendum. ID PKS induk yang akan di-addendum",
                                         "type": "integer",
                                         "example": 1
                                     },
@@ -17091,7 +17098,7 @@
                                         ]
                                     },
                                     "quotation_site_ids": {
-                                        "description": "Required untuk tipe=rekontrak. Array of QuotationSite IDs",
+                                        "description": "Required untuk tipe=rekontrak dan addendum. Array of QuotationSite IDs",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
@@ -17134,6 +17141,7 @@
                                         "example": 1
                                     },
                                     "entitas": {
+                                        "description": "Untuk addendum, entitas akan diambil dari PKS induk",
                                         "type": "integer",
                                         "example": 1
                                     }
@@ -19420,7 +19428,7 @@
                         }
                     },
                     {
-                        "name": "kebutuhan",
+                        "name": "kebutuhan_id",
                         "in": "query",
                         "description": "Service need ID filter",
                         "required": false,

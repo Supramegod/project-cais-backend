@@ -393,6 +393,7 @@ class PksController extends Controller
                 'id' => $pks->id,
                 'nomor' => $pks->nomor ?? null,
                 'link_pks_disetujui' => $pks->link_pks_disetujui ?? null,
+                'status' => $pks->statusPks ? $pks->statusPks->nama : null,
                 'activities' => $pks->activities->map(function ($activity) {
                     return [
                         'id' => $activity->id,
@@ -752,24 +753,30 @@ class PksController extends Controller
     /**
      * @OA\Post(
      *     path="/api/pks/add/{tipe}",
-     *     summary="Create new PKS - Kontrak Baru atau Rekontrak",
+     *     summary="Create new PKS - Kontrak Baru, Rekontrak, atau Addendum",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tipe",
      *         in="path",
      *         required=true,
-     *         description="Tipe kontrak: baru atau rekontrak",
+     *         description="Tipe kontrak: baru, rekontrak, atau addendum",
      *         @OA\Schema(
      *             type="string",
-     *             enum={"baru", "rekontrak"}
+     *             enum={"baru", "rekontrak", "addendum"}
      *         )
      *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"leads_id","tanggal_pks","tanggal_awal_kontrak","tanggal_akhir_kontrak","kategoriHC","loyalty","salary_rule","rule_thr","entitas"},
-     *             @OA\Property(property="leads_id", type="integer", example=1),
+     *             @OA\Property(property="leads_id", type="integer", example=1, description="Required untuk semua tipe kecuali addendum (untuk addendum gunakan pks_id)"),
+     *             @OA\Property(
+     *                 property="pks_id",
+     *                 type="integer",
+     *                 description="Required untuk tipe=addendum. ID PKS induk yang akan di-addendum",
+     *                 example=1
+     *             ),
      *             @OA\Property(
      *                 property="site_ids",
      *                 type="array",
@@ -780,7 +787,7 @@ class PksController extends Controller
      *             @OA\Property(
      *                 property="quotation_site_ids",
      *                 type="array",
-     *                 description="Required untuk tipe=rekontrak. Array of QuotationSite IDs",
+     *                 description="Required untuk tipe=rekontrak dan addendum. Array of QuotationSite IDs",
      *                 @OA\Items(type="integer"),
      *                 example={1, 2, 3}
      *             ),
@@ -791,7 +798,7 @@ class PksController extends Controller
      *             @OA\Property(property="loyalty", type="integer", example=1),
      *             @OA\Property(property="salary_rule", type="integer", example=1),
      *             @OA\Property(property="rule_thr", type="integer", example=1),
-     *             @OA\Property(property="entitas", type="integer", example=1)
+     *             @OA\Property(property="entitas", type="integer", example=1, description="Untuk addendum, entitas akan diambil dari PKS induk")
      *         )
      *     ),
      *     @OA\Response(
@@ -815,7 +822,7 @@ class PksController extends Controller
      */
     public function store(Request $request, $tipe): JsonResponse
     {
-        // 1. Validasi Input (Bisa dipindah ke FormRequest agar lebih clean lagi)
+        // 1. Validasi Input
         $rules = [
             'leads_id' => 'required|exists:sl_leads,id',
             'tanggal_pks' => 'required|date',
@@ -831,11 +838,17 @@ class PksController extends Controller
         if ($tipe === 'baru') {
             $rules['site_ids'] = 'required|array';
             $rules['site_ids.*'] = 'integer|exists:sl_spk_site,id';
-        } elseif ($tipe === 'rekontrak') {
+        } elseif ($tipe === 'rekontrak' || $tipe === 'addendum') {
+            // Modifikasi: gabungkan rekontrak dan addendum karena logika sama
             $rules['quotation_site_ids'] = 'required|array';
             $rules['quotation_site_ids.*'] = 'integer|exists:sl_quotation_site,id';
+
+            // Untuk addendum, perlu PKS ID yang di-addendum
+            if ($tipe === 'addendum') {
+                $rules['pks_id'] = 'required|exists:sl_pks,id';
+            }
         } else {
-            return response()->json(['success' => false, 'message' => 'Invalid tipe'], 400);
+            return response()->json(['success' => false, 'message' => 'Invalid tipe. Pilihan: baru, rekontrak, addendum'], 400);
         }
 
         $validator = Validator::make($request->all(), $rules);
@@ -1663,19 +1676,35 @@ class PksController extends Controller
     {
         $leads = Leads::findOrFail($request->leads_id);
         $kebutuhan = Kebutuhan::find($leads->kebutuhan_id);
-        $pksNomor = $this->generateNomor($leads->id, $request->entitas);
 
-        // Cari Quotation ID jika rekontrak
-        $quotationId = null;
-        if ($tipe === 'rekontrak') {
-            $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
-            $quotationId = $firstSite->quotation_id;
+        // Tentukan nomor PKS berdasarkan tipe
+        if ($tipe === 'addendum') {
+            // Untuk addendum, gunakan nomor addendum
+            $pksNomor = $this->generateNomorAddendum($request->pks_id);
+            $pksInduk = Pks::findOrFail($request->pks_id);
+
+            // Gunakan data dari PKS induk untuk beberapa field
+            $quotationId = $pksInduk->quotation_id;
+            $companyId = $pksInduk->company_id ?? $request->entitas;
+        } else {
+            // Untuk baru dan rekontrak, gunakan generate nomor biasa
+            $pksNomor = $this->generateNomor($leads->id, $request->entitas);
+            $companyId = $request->entitas;
+
+            // Cari Quotation ID jika rekontrak
+            $quotationId = null;
+            if ($tipe === 'rekontrak') {
+                $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
+                $quotationId = $firstSite->quotation_id;
+            } else {
+                $quotationId = Quotation::where('leads_id', $leads->id)->first()->id ?? null;
+            }
         }
 
         // 1. Create PKS (Unified)
         $pks = Pks::create([
             'leads_id' => $leads->id,
-            'quotation_id' => $quotationId ?? (Quotation::where('leads_id', $leads->id)->first()->id ?? null),
+            'quotation_id' => $quotationId,
             'branch_id' => $leads->branch_id,
             'nomor' => $pksNomor,
             'tgl_pks' => $request->tanggal_pks,
@@ -1690,9 +1719,9 @@ class PksController extends Controller
             'jenis_perusahaan' => $leads->jenis_perusahaan,
             'kontrak_awal' => $request->tanggal_awal_kontrak,
             'kontrak_akhir' => $request->tanggal_akhir_kontrak,
-            'status_pks_id' => 5,
+            'status_pks_id' => 5, // Draft
             'sales_id' => Auth::id(),
-            'company_id' => $request->entitas,
+            'company_id' => $companyId,
             'salary_rule_id' => $request->salary_rule,
             'rule_thr_id' => $request->rule_thr,
             'kategori_sesuai_hc_id' => $request->kategoriHC,
@@ -1704,22 +1733,34 @@ class PksController extends Controller
             'kota_id' => $leads->kota_id,
             'kota' => $leads->kota,
             'pma' => $leads->pma,
+            // Tambahkan field untuk addendum
+            'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
+            'tipe_pks' => $tipe, // tambahkan field tipe_pks jika ada di database
             'created_by' => Auth::user()->full_name
         ]);
 
         // 2. Create Sites (Conditional)
-
-
         $siteIds = ($tipe === 'baru') ? $request->site_ids : $request->quotation_site_ids;
 
-        $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $tipe);
+        // Tentukan tipe untuk syncPksSites
+        $syncType = ($tipe === 'baru') ? 'baru' : 'rekontrak';
+
+        $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $syncType);
 
         // 3. Side Effects
         $this->createInitialActivity($pks, $leads, $pksNomor);
+
+        // Untuk addendum, gunakan data company dari PKS induk
+        if ($tipe === 'addendum') {
+            $company = Company::find($companyId);
+        } else {
+            $company = Company::find($request->entitas);
+        }
+
         $this->createPksPerjanjian(
             $pks,
             $leads,
-            Company::find($request->entitas),
+            $company,
             $kebutuhan,
             RuleThr::find($request->rule_thr),
             SalaryRule::find($request->salary_rule),
@@ -1741,7 +1782,6 @@ class PksController extends Controller
 
             $nomorSite = $pksNomor . '-' . sprintf("%04d", ($key + 1));
 
-            // Format Nama Proyek (Centralized logic)
             $namaProyek = sprintf(
                 '%s-%s.%s.%s',
                 Carbon::parse($pks->kontrak_awal)->format('my'),
@@ -1768,13 +1808,11 @@ class PksController extends Controller
                 'kebutuhan' => $kebutuhan->nama ?? null,
                 'created_by' => Auth::user()->full_name,
 
-                // Logic conditional untuk SPK
                 'spk_id' => $isBaru ? $sourceSite->spk_id : null,
                 'spk_site_id' => $isBaru ? $sourceSite->id : null,
                 'quotation_site_id' => $isBaru ? $sourceSite->quotation_site_id : $sourceSite->id,
                 'nomor_quotation' => $isBaru ? $sourceSite->nomor_quotation : ($sourceSite->quotation->nomor ?? null),
 
-                // UMP/UMK (hanya jika ada di source)
                 'ump' => $sourceSite->ump ?? null,
                 'umk' => $sourceSite->umk ?? null,
             ]);
@@ -2784,6 +2822,27 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name
         ]);
+    }
+    /**
+     * Generate nomor untuk addendum PKS
+     * Format: ADD/{nomor PKS induk}/{urutan 4 digit}
+     * 
+     * @param int $pksIndukId
+     * @return string
+     */
+    private function generateNomorAddendum($pksIndukId): string
+    {
+        $pksInduk = Pks::findOrFail($pksIndukId);
+        $nomorPksInduk = $pksInduk->nomor;
+
+        // Hitung sudah berapa addendum untuk PKS induk ini
+        $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
+            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
+            ->count();
+
+        $urutan = sprintf("%04d", $jumlahAddendum + 1);
+
+        return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
 
 

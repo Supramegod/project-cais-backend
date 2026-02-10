@@ -209,7 +209,7 @@ class SpkController extends Controller
 
             return $this->successResponse('SPK data retrieved successfully', [
                 'list' => $data->items(),
-                 'pagination' => [
+                'pagination' => [
                     'current_page' => $data->currentPage(),
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
@@ -583,6 +583,7 @@ class SpkController extends Controller
                 'nomor_spk' => $spk->nomor,
                 'tanggal_spk' => $spk->tgl_spk,
                 'link_spk_disetujui' => $spk->link_spk_disetujui ?? null,
+                'status' => $spk->statusSpk?->nama ?? null,
             ];
             // 2. Informasi Leads
             $leadsInfo = [
