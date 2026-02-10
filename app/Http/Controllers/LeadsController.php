@@ -234,32 +234,32 @@ class LeadsController extends Controller
 
             $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->map(function ($item) {
+            $transformedData = $data->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
-                    'wilayah' => $item->branch->name ?? '-',
+                    'wilayah' => $item->branch->name ?? null,
                     'wilayah_id' => $item->branch_id,
                     'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
-                    'sales' => $item->timSalesD->nama ?? '-',
+                    'sales' => $item->timSalesD->nama ?? null,
                     'nama_perusahaan' => $item->nama_perusahaan,
                     'telp_perusahaan' => $item->telp_perusahaan,
                     'provinsi' => $item->provinsi,
                     'kota' => $item->kota,
                     'no_telp' => $item->no_telp,
                     'email' => $item->email,
-                    'status_leads' => $item->statusLeads->nama ?? '-',
+                    'status_leads' => $item->statusLeads->nama ?? null,
                     'status_leads_id' => $item->status_leads_id,
-                    'sumber_leads' => $item->platform->nama ?? '-',
+                    'sumber_leads' => $item->platform->nama ?? null,
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
                     'notes' => $item->notes,
                     'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
                         return [
                             'id' => $lk->kebutuhan_id,
-                            'nama' => $lk->kebutuhan->nama ?? '-',
+                            'nama' => $lk->kebutuhan->nama ?? null,
                             'tim_sales_d_id' => $lk->tim_sales_d_id,
-                            'sales_name' => $lk->timSalesD->nama ?? '-'
+                            'sales_name' => $lk->timSalesD->nama ?? null
                         ];
                     })
                 ];
@@ -609,7 +609,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (in_array(Auth::user()->cais_role_id, [29, 31, 32, 33])) {
+            if (Auth::user()->cais_role_id == 29) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang

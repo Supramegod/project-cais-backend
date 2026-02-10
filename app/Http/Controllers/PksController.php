@@ -50,114 +50,212 @@ class PksController extends Controller
      * @OA\Get(
      *     path="/api/pks/list",
      *     summary="Get list of PKS",
+     *     description="Mengambil daftar PKS dengan filter tanggal, status, branch, dan pencarian",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tgl_dari",
      *         in="query",
-     *         description="Start date",
+     *         description="Tanggal mulai filter (format: Y-m-d). Default: 6 bulan kebelakang",
      *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2025-10-01")
+     *         @OA\Schema(type="string", format="date", example="2025-01-01")
      *     ),
      *     @OA\Parameter(
      *         name="tgl_sampai",
      *         in="query",
-     *         description="End date",
+     *         description="Tanggal akhir filter (format: Y-m-d). Default: hari ini",
      *         required=false,
-     *         @OA\Schema(type="string", format="date",example="2025-11-01")
+     *         @OA\Schema(type="string", format="date", example="2025-12-31")
      *     ),
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
-     *         description="Status filter",
+     *         description="Filter berdasarkan status PKS ID",
      *         required=false,
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch",
+     *         in="query",
+     *         description="Filter berdasarkan branch ID dari leads",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Kolom yang akan dicari (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="id", type="integer"),
-     *                 @OA\Property(property="nomor", type="string"),
-     *                 @OA\Property(property="nama_perusahaan", type="string"),
-     *                 @OA\Property(property="tgl_pks", type="string"),
-     *                 @OA\Property(property="formatted_tgl_pks", type="string"),
-     *                 @OA\Property(property="kontrak_awal", type="string"),
-     *                 @OA\Property(property="kontrak_akhir", type="string"),
-     *                 @OA\Property(property="formatted_kontrak_awal", type="string"),
-     *                 @OA\Property(property="formatted_kontrak_akhir", type="string"),
-     *                 @OA\Property(property="status", type="string"),
-     *                 @OA\Property(property="berakhir_dalam", type="string"),
-     *                 @OA\Property(property="status_berlaku", type="string"),
-     *                 @OA\Property(property="created_at", type="string", format="date-time"),
-     *                 @OA\Property(property="created_by", type="string")
-     *             ))
+     *             @OA\Property(property="message", type="string", example="PKS data retrieved successfully"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="PKS/LEAD001-012024-00001"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                     @OA\Property(property="tgl_pks", type="string", format="date", example="2025-01-15"),
+     *                     @OA\Property(property="nama_site", type="array", @OA\Items(type="string"), example={"Site A", "Site B"}),
+     *                     @OA\Property(property="kontrak_awal", type="string", format="date", example="2025-01-01"),
+     *                     @OA\Property(property="kontrak_akhir", type="string", format="date", example="2025-12-31"),
+     *                     @OA\Property(property="formatted_kontrak_awal", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="formatted_kontrak_akhir", type="string", example="31 Desember 2025"),
+     *                     @OA\Property(property="status", type="string", example="Aktif"),
+     *                     @OA\Property(property="berakhir_dalam", type="string", example="6 bulan"),
+     *                     @OA\Property(property="status_berlaku", type="string", example="Berlaku"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time", example="2025-01-15 10:30:00"),
+     *                     @OA\Property(property="created_by", type="string", example="John Doe")
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="pagination",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="total", type="integer", example=75),
+     *                 @OA\Property(property="per_page", type="integer", example=15)
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(property="tgl_dari", type="string", format="date", example="2025-01-01"),
+     *                 @OA\Property(property="tgl_sampai", type="string", format="date", example="2025-12-31")
+     *             )
      *         )
      *     ),
      *     @OA\Response(
      *         response=401,
-     *         description="Unauthenticated"
+     *         description="Unauthenticated",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to retrieve PKS list"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
      *     )
      * )
      */
     public function index(Request $request): JsonResponse
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'tgl_dari' => 'nullable|date',
-                'tgl_sampai' => 'nullable|date|after_or_equal:tgl_dari',
-                'status' => 'nullable|integer|exists:m_status_pks,id'
-            ]);
+            // 1. Inisialisasi Tanggal & Filter Dasar
+            $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(6)->toDateString();
+            $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $query = Pks::with(['statusPks'])
+            // 2. Query Base dengan Eager Loading (Leads & Sites ditambahkan)
+            $query = Pks::with(['statusPks', 'leads', 'sites'])
                 ->whereNull('deleted_at')
                 ->orderBy('created_at', 'desc');
 
-            if (!empty($request->status)) {
+            // 3. Logika Search (Pola sama dengan Leads & SPK)
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } else {
+                    $allowedColumns = ['nomor'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Filter tanggal hanya jika tidak sedang search
+                $query->whereBetween('tgl_pks', [$tglDari, $tglSampai]);
+            }
+
+            // 4. Filter Tambahan (Status & Branch)
+            if ($request->filled('status')) {
                 $query->where('status_pks_id', $request->status);
             }
 
-            if (!empty($request->tgl_dari) && !empty($request->tgl_sampai)) {
-                $query->whereBetween('tgl_pks', [
-                    $request->tgl_dari,
-                    $request->tgl_sampai
-                ]);
+            if ($request->filled('branch')) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('branch_id', $request->branch);
+                });
             }
 
-            $pksList = $query->get()->map(function ($pks) {
+            // 5. Eksekusi dengan Paginate (Lebih efisien untuk data banyak)
+            $pksList = $query->paginate($request->get('per_page', 15));
+
+            // 6. Transformasi Data (Menggunakan getCollection agar info pagination tidak hilang)
+            $pksList->getCollection()->transform(function ($pks) {
                 return [
                     'id' => $pks->id,
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
                     'tgl_pks' => $pks->tgl_pks,
+                    'nama_site' => $pks->sites->pluck('nama_site')->toArray(), // Array nama site sesuai permintaan
                     'kontrak_awal' => $pks->kontrak_awal,
                     'kontrak_akhir' => $pks->kontrak_akhir,
                     'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
                     'formatted_kontrak_akhir' => Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y'),
-                    'status' => $pks->statusPks->nama ?? null,
+                    'status' => $pks->statusPks->nama ?? '-',
                     'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->kontrak_akhir),
                     'status_berlaku' => $this->getStatusBerlaku($pks->kontrak_akhir),
-                    'created_at' => $pks->created_at,
+                    'created_at' => $pks->getRawOriginal('created_at'), // Mengambil format asli DB jika ada accessor
                     'created_by' => $pks->created_by
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $pksList
+                'message' => 'PKS data retrieved successfully',
+                'data' => $pksList->items(),
+                'pagination' => [
+                    'current_page' => $pksList->currentPage(),
+                    'last_page' => $pksList->lastPage(),
+                    'total' => $pksList->total(),
+                    'total_per_page' => $pksList->count(),
+                ],
+                'meta' => [
+                    'tgl_dari' => $tglDari,
+                    'tgl_sampai' => $tglSampai
+                ]
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Error in PksController@index: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS list',
@@ -295,6 +393,7 @@ class PksController extends Controller
                 'id' => $pks->id,
                 'nomor' => $pks->nomor ?? null,
                 'link_pks_disetujui' => $pks->link_pks_disetujui ?? null,
+                'status' => $pks->statusPks ? $pks->statusPks->nama : null,
                 'activities' => $pks->activities->map(function ($activity) {
                     return [
                         'id' => $activity->id,
@@ -654,24 +753,30 @@ class PksController extends Controller
     /**
      * @OA\Post(
      *     path="/api/pks/add/{tipe}",
-     *     summary="Create new PKS - Kontrak Baru atau Rekontrak",
+     *     summary="Create new PKS - Kontrak Baru, Rekontrak, atau Addendum",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
      *         name="tipe",
      *         in="path",
      *         required=true,
-     *         description="Tipe kontrak: baru atau rekontrak",
+     *         description="Tipe kontrak: baru, rekontrak, atau addendum",
      *         @OA\Schema(
      *             type="string",
-     *             enum={"baru", "rekontrak"}
+     *             enum={"baru", "rekontrak", "addendum"}
      *         )
      *     ),
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"leads_id","tanggal_pks","tanggal_awal_kontrak","tanggal_akhir_kontrak","kategoriHC","loyalty","salary_rule","rule_thr","entitas"},
-     *             @OA\Property(property="leads_id", type="integer", example=1),
+     *             @OA\Property(property="leads_id", type="integer", example=1, description="Required untuk semua tipe kecuali addendum (untuk addendum gunakan pks_id)"),
+     *             @OA\Property(
+     *                 property="pks_id",
+     *                 type="integer",
+     *                 description="Required untuk tipe=addendum. ID PKS induk yang akan di-addendum",
+     *                 example=1
+     *             ),
      *             @OA\Property(
      *                 property="site_ids",
      *                 type="array",
@@ -682,7 +787,7 @@ class PksController extends Controller
      *             @OA\Property(
      *                 property="quotation_site_ids",
      *                 type="array",
-     *                 description="Required untuk tipe=rekontrak. Array of QuotationSite IDs",
+     *                 description="Required untuk tipe=rekontrak dan addendum. Array of QuotationSite IDs",
      *                 @OA\Items(type="integer"),
      *                 example={1, 2, 3}
      *             ),
@@ -693,7 +798,7 @@ class PksController extends Controller
      *             @OA\Property(property="loyalty", type="integer", example=1),
      *             @OA\Property(property="salary_rule", type="integer", example=1),
      *             @OA\Property(property="rule_thr", type="integer", example=1),
-     *             @OA\Property(property="entitas", type="integer", example=1)
+     *             @OA\Property(property="entitas", type="integer", example=1, description="Untuk addendum, entitas akan diambil dari PKS induk")
      *         )
      *     ),
      *     @OA\Response(
@@ -717,7 +822,7 @@ class PksController extends Controller
      */
     public function store(Request $request, $tipe): JsonResponse
     {
-        // 1. Validasi Input (Bisa dipindah ke FormRequest agar lebih clean lagi)
+        // 1. Validasi Input
         $rules = [
             'leads_id' => 'required|exists:sl_leads,id',
             'tanggal_pks' => 'required|date',
@@ -733,11 +838,17 @@ class PksController extends Controller
         if ($tipe === 'baru') {
             $rules['site_ids'] = 'required|array';
             $rules['site_ids.*'] = 'integer|exists:sl_spk_site,id';
-        } elseif ($tipe === 'rekontrak') {
+        } elseif ($tipe === 'rekontrak' || $tipe === 'addendum') {
+            // Modifikasi: gabungkan rekontrak dan addendum karena logika sama
             $rules['quotation_site_ids'] = 'required|array';
             $rules['quotation_site_ids.*'] = 'integer|exists:sl_quotation_site,id';
+
+            // Untuk addendum, perlu PKS ID yang di-addendum
+            if ($tipe === 'addendum') {
+                $rules['pks_id'] = 'required|exists:sl_pks,id';
+            }
         } else {
-            return response()->json(['success' => false, 'message' => 'Invalid tipe'], 400);
+            return response()->json(['success' => false, 'message' => 'Invalid tipe. Pilihan: baru, rekontrak, addendum'], 400);
         }
 
         $validator = Validator::make($request->all(), $rules);
@@ -1183,7 +1294,7 @@ class PksController extends Controller
      *         name="tipe",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string", enum={"baru", "rekontrak"})
+     *         @OA\Schema(type="string", enum={"baru", "rekontrak","addendum"})
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -1565,19 +1676,35 @@ class PksController extends Controller
     {
         $leads = Leads::findOrFail($request->leads_id);
         $kebutuhan = Kebutuhan::find($leads->kebutuhan_id);
-        $pksNomor = $this->generateNomor($leads->id, $request->entitas);
 
-        // Cari Quotation ID jika rekontrak
-        $quotationId = null;
-        if ($tipe === 'rekontrak') {
-            $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
-            $quotationId = $firstSite->quotation_id;
+        // Tentukan nomor PKS berdasarkan tipe
+        if ($tipe === 'addendum') {
+            // Untuk addendum, gunakan nomor addendum
+            $pksNomor = $this->generateNomorAddendum($request->pks_id);
+            $pksInduk = Pks::findOrFail($request->pks_id);
+
+            // Gunakan data dari PKS induk untuk beberapa field
+            $quotationId = $pksInduk->quotation_id;
+            $companyId = $pksInduk->company_id ?? $request->entitas;
+        } else {
+            // Untuk baru dan rekontrak, gunakan generate nomor biasa
+            $pksNomor = $this->generateNomor($leads->id, $request->entitas);
+            $companyId = $request->entitas;
+
+            // Cari Quotation ID jika rekontrak
+            $quotationId = null;
+            if ($tipe === 'rekontrak') {
+                $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
+                $quotationId = $firstSite->quotation_id;
+            } else {
+                $quotationId = Quotation::where('leads_id', $leads->id)->first()->id ?? null;
+            }
         }
 
         // 1. Create PKS (Unified)
         $pks = Pks::create([
             'leads_id' => $leads->id,
-            'quotation_id' => $quotationId ?? (Quotation::where('leads_id', $leads->id)->first()->id ?? null),
+            'quotation_id' => $quotationId,
             'branch_id' => $leads->branch_id,
             'nomor' => $pksNomor,
             'tgl_pks' => $request->tanggal_pks,
@@ -1592,9 +1719,9 @@ class PksController extends Controller
             'jenis_perusahaan' => $leads->jenis_perusahaan,
             'kontrak_awal' => $request->tanggal_awal_kontrak,
             'kontrak_akhir' => $request->tanggal_akhir_kontrak,
-            'status_pks_id' => 5,
+            'status_pks_id' => 5, // Draft
             'sales_id' => Auth::id(),
-            'company_id' => $request->entitas,
+            'company_id' => $companyId,
             'salary_rule_id' => $request->salary_rule,
             'rule_thr_id' => $request->rule_thr,
             'kategori_sesuai_hc_id' => $request->kategoriHC,
@@ -1606,22 +1733,34 @@ class PksController extends Controller
             'kota_id' => $leads->kota_id,
             'kota' => $leads->kota,
             'pma' => $leads->pma,
+            // Tambahkan field untuk addendum
+            'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
+            'tipe_pks' => $tipe, // tambahkan field tipe_pks jika ada di database
             'created_by' => Auth::user()->full_name
         ]);
 
         // 2. Create Sites (Conditional)
-
-
         $siteIds = ($tipe === 'baru') ? $request->site_ids : $request->quotation_site_ids;
 
-        $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $tipe);
+        // Tentukan tipe untuk syncPksSites
+        $syncType = ($tipe === 'baru') ? 'baru' : 'rekontrak';
+
+        $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $syncType);
 
         // 3. Side Effects
         $this->createInitialActivity($pks, $leads, $pksNomor);
+
+        // Untuk addendum, gunakan data company dari PKS induk
+        if ($tipe === 'addendum') {
+            $company = Company::find($companyId);
+        } else {
+            $company = Company::find($request->entitas);
+        }
+
         $this->createPksPerjanjian(
             $pks,
             $leads,
-            Company::find($request->entitas),
+            $company,
             $kebutuhan,
             RuleThr::find($request->rule_thr),
             SalaryRule::find($request->salary_rule),
@@ -1643,7 +1782,6 @@ class PksController extends Controller
 
             $nomorSite = $pksNomor . '-' . sprintf("%04d", ($key + 1));
 
-            // Format Nama Proyek (Centralized logic)
             $namaProyek = sprintf(
                 '%s-%s.%s.%s',
                 Carbon::parse($pks->kontrak_awal)->format('my'),
@@ -1670,13 +1808,11 @@ class PksController extends Controller
                 'kebutuhan' => $kebutuhan->nama ?? null,
                 'created_by' => Auth::user()->full_name,
 
-                // Logic conditional untuk SPK
                 'spk_id' => $isBaru ? $sourceSite->spk_id : null,
                 'spk_site_id' => $isBaru ? $sourceSite->id : null,
                 'quotation_site_id' => $isBaru ? $sourceSite->quotation_site_id : $sourceSite->id,
                 'nomor_quotation' => $isBaru ? $sourceSite->nomor_quotation : ($sourceSite->quotation->nomor ?? null),
 
-                // UMP/UMK (hanya jika ada di source)
                 'ump' => $sourceSite->ump ?? null,
                 'umk' => $sourceSite->umk ?? null,
             ]);
@@ -2147,13 +2283,13 @@ class PksController extends Controller
     private function getAvailableSitesData($leadsId, $tipe = 'baru')
     {
         $isBaru = ($tipe === 'baru');
+        $isaddendum = ($tipe === 'addendum');
+        $isRekontrak = ($tipe === 'rekontrak');
 
-        // 1. Inisialisasi Query berdasarkan Tipe
         if ($isBaru) {
             $query = SpkSite::with([
                 'spk',
                 'quotation' => function ($q) use ($leadsId) {
-                    // Pastikan quotation yang ditarik hanya milik leads ini
                     $q->where('leads_id', $leadsId)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
@@ -2167,19 +2303,21 @@ class PksController extends Controller
             $orderTable = 'sl_spk';
             $orderColumn = 'spk_id';
         } else {
+            // Logika untuk Rekontrak ATAU addendum (keduanya pakai QuotationSite)
+            $tipeQuotation = $isaddendum ? 'addendum' : 'rekontrak';
+
             $query = QuotationSite::with([
-                'quotation' => function ($q) use ($leadsId) {
-                    // Pastikan quotation milik leads ini dan bertipe rekontrak
+                'quotation' => function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', 'rekontrak')
+                        ->where('tipe_quotation', $tipeQuotation)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads'
             ])
                 ->where('leads_id', $leadsId)
-                ->whereHas('quotation', function ($q) use ($leadsId) {
+                ->whereHas('quotation', function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', 'rekontrak')
+                        ->where('tipe_quotation', $tipeQuotation)
                         ->whereNull('deleted_at');
                 });
 
@@ -2187,25 +2325,21 @@ class PksController extends Controller
             $orderColumn = 'quotation_id';
         }
 
-        // 2. Eksekusi Query dengan Filter Tambahan
         return $query->whereNull('deleted_at')
-            ->whereDoesntHave('site') // Hanya site yang belum ada di tabel sl_site (PKS)
+            ->whereDoesntHave('site')
             ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
-            }, 'desc')
+            }, 'asc')
             ->get()
-            // 3. Filter koleksi untuk memastikan relasi quotation tidak null (keamanan data)
             ->filter(function ($site) {
                 return $site->quotation !== null;
             })
             ->map(function ($site) use ($isBaru) {
                 $quotation = $site->quotation;
-
-                // Mengambil relasi secara eksplisit untuk menghindari konflik dengan kolom string 'company'
                 $companyRelation = $quotation ? $quotation->getRelation('company') : null;
 
                 return [
@@ -2250,7 +2384,7 @@ class PksController extends Controller
                     'nomor_quotation' => $quotation?->nomor,
                 ];
             })
-            ->values(); // Reset index array agar tetap berurutan di JSON
+            ->values();
     }
     // ======================================================================
     // PRIVATE METHODS FOR ACTIVATE FUNCTION
@@ -2688,6 +2822,27 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name
         ]);
+    }
+    /**
+     * Generate nomor untuk addendum PKS
+     * Format: ADD/{nomor PKS induk}/{urutan 4 digit}
+     * 
+     * @param int $pksIndukId
+     * @return string
+     */
+    private function generateNomorAddendum($pksIndukId): string
+    {
+        $pksInduk = Pks::findOrFail($pksIndukId);
+        $nomorPksInduk = $pksInduk->nomor;
+
+        // Hitung sudah berapa addendum untuk PKS induk ini
+        $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
+            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
+            ->count();
+
+        $urutan = sprintf("%04d", $jumlahAddendum + 1);
+
+        return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
 
 

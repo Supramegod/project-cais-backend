@@ -54,21 +54,56 @@ class SpkController extends Controller
      *         in="query",
      *         description="Tanggal mulai filter (format: Y-m-d). Default: 3 bulan kebelakang dari sekarang",
      *         required=false,
-     *         @OA\Schema(type="string", format="date")
+     *         @OA\Schema(type="string", format="date", example="2024-01-01")
      *     ),
      *     @OA\Parameter(
      *         name="tgl_sampai",
      *         in="query",
      *         description="Tanggal akhir filter (format: Y-m-d). Default: hari ini",
      *         required=false,
-     *         @OA\Schema(type="string", format="date")
+     *         @OA\Schema(type="string", format="date", example="2024-12-31")
      *     ),
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
      *         description="Filter berdasarkan status SPK ID",
      *         required=false,
-     *         @OA\Schema(type="integer")
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch",
+     *         in="query",
+     *         description="Filter berdasarkan branch ID dari leads",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Kolom yang akan dicari (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -76,22 +111,31 @@ class SpkController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK data retrieved successfully"),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="id", type="integer", example=1),
-     *                 @OA\Property(property="nomor", type="string", example="SPK/LEAD001-012024-00001"),
-     *                 @OA\Property(property="tgl_spk", type="string", example="2024-01-15"),
-     *                 @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
-     *                 @OA\Property(property="status_spk_id", type="integer", example=1),
-     *                 @OA\Property(property="created_at", type="string", example="2024-01-15 10:30:00"),
-     *                 @OA\Property(property="leads", type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company")
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="list",
+     *                     type="array",
+     *                     @OA\Items(
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="nomor_spk", type="string", example="SPK/LEAD001-012024-00001"),
+     *                         @OA\Property(property="tgl_spk", type="string", example="2024-01-15"),
+     *                         @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
+     *                         @OA\Property(property="nama_site", type="array", @OA\Items(type="string"), example={"Site A", "Site B"}),
+     *                         @OA\Property(property="status", type="string", example="Draft"),
+     *                         @OA\Property(property="created_by", type="string", example="John Doe")
+     *                     )
      *                 ),
-     *                 @OA\Property(property="status_spk", type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="nama", type="string", example="Draft")
+     *                 @OA\Property(
+     *                     property="pagination",
+     *                     type="object",
+     *                     @OA\Property(property="current_page", type="integer", example=1),
+     *                     @OA\Property(property="total", type="integer", example=100),
+     *                     @OA\Property(property="last_page", type="integer", example=7),
+     *                     @OA\Property(property="per_page", type="integer", example=15)
      *                 )
-     *             ))
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -110,21 +154,68 @@ class SpkController extends Controller
             $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
+            // Load relasi yang dibutuhkan: leads, statusSpk, dan spkSites
             $query = Spk::with(['leads', 'statusSpk', 'spkSites'])
                 ->whereNull('deleted_at')
                 ->orderBy('created_at', 'desc');
 
-            if (!empty($request->status)) {
-                $query->where('status_spk_id', $request->status);
-            }
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
 
-            if ($tglDari && $tglSampai) {
+                if ($searchBy === 'nama_perusahaan') {
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } else {
+                    $allowedColumns = ['nomor'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
                 $query->whereBetween('tgl_spk', [$tglDari, $tglSampai]);
             }
 
-            $data = $query->get();
+            // Filter tambahan (Branch diambil dari relasi Leads)
+            if ($request->filled('branch')) {
+                $query->whereHas('leads', function ($q) use ($request) {
+                    $q->where('branch_id', $request->branch);
+                });
+            }
 
-            return $this->successResponse('SPK data retrieved successfully', $data);
+            if ($request->filled('status')) {
+                $query->where('status_spk_id', $request->status);
+            }
+
+            // Eksekusi dengan Paginate agar performa terjaga
+            $data = $query->paginate($request->get('per_page', 15));
+
+            // Mapping Data sesuai permintaan
+            $data->getCollection()->transform(function ($spk) {
+                return [
+                    'id' => $spk->id,
+                    'nomor_spk' => $spk->nomor, // Dari kolom 'nomor' di sl_spk
+                    'tgl_spk' => $spk->tgl_spk, // Menggunakan accessor format tgl spk
+                    'nama_perusahaan' => $spk->nama_perusahaan, // Dari sl_spk
+                    'nama_site' => $spk->spkSites->pluck('nama_site')->toArray(), // Menghasilkan array nama site
+                    'status' => $spk->statusSpk?->nama ?? '-', // Nama status dari m_status_spk
+                    'created_by' => $spk->created_by,
+                ];
+            });
+
+            return $this->successResponse('SPK data retrieved successfully', [
+                'list' => $data->items(),
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ]
+            ]);
 
         } catch (\Exception $e) {
             return $this->errorResponse('Error fetching SPK data', $e->getMessage());
@@ -492,6 +583,7 @@ class SpkController extends Controller
                 'nomor_spk' => $spk->nomor,
                 'tanggal_spk' => $spk->tgl_spk,
                 'link_spk_disetujui' => $spk->link_spk_disetujui ?? null,
+                'status' => $spk->statusSpk?->nama ?? null,
             ];
             // 2. Informasi Leads
             $leadsInfo = [

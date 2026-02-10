@@ -17,6 +17,7 @@ class QuotationChemical extends Model
         'quotation_id',
         'barang_id',
         'jumlah',
+        'masa_pakai',
         'harga',
         'nama',
         'jenis_barang_id',
