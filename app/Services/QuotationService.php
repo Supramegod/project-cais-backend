@@ -575,6 +575,14 @@ class QuotationService
                             'detail_id' => $detail->id,
                             'nominal_takaful' => $detail->{$config['field']}
                         ]);
+                    } else if ($key === 'kes' && $hpp && $hpp->bpjs_ks !== null && $hpp->bpjs_ks > 0) {
+                        // **PERBAIKAN: Gunakan nilai dari HPP jika sudah diedit**
+                        $detail->{$config['field']} = $hpp->bpjs_ks;
+                        $detail->{$config['percent']} = $persentase;
+                        \Log::info("Using edited BPJS KS from HPP", [
+                            'detail_id' => $detail->id,
+                            'bpjs_ks' => $hpp->bpjs_ks
+                        ]);
                     } else {
                         // Hitung berdasarkan persentase
                         $detail->{$config['field']} = $base * $persentase / 100;
