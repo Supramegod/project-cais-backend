@@ -2779,6 +2779,11 @@ class QuotationStepService
             //     $this->updateBpjsPersentaseFromRequest($quotation, $request->bpjs_persentase_data, $user, $currentDateTime);
             // }
 
+            // D2. Process BPJS KS nominal
+            if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
+                $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
+            }
+
             // E. Process tunjangan data
             if ($request->has('tunjangan_data') && is_array($request->tunjangan_data)) {
                 $this->syncTunjanganData($quotation, $request->tunjangan_data, $currentDateTime, $user);
@@ -4065,5 +4070,44 @@ class QuotationStepService
             }
         }
     }
+    /**
+     * Update nominal BPJS KS di HPP dan COSS
+     */
+    private function updateBpjsKsNominal(Quotation $quotation, array $bpjsKsData, string $user, Carbon $currentDateTime): void
+    {
+        \Log::info("Updating BPJS KS nominal", [
+            'quotation_id' => $quotation->id,
+            'details_count' => count($bpjsKsData)
+        ]);
 
+        foreach ($bpjsKsData as $detailId => $nominalBpjsKs) {
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detailId)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detailId)->first();
+
+            if (is_string($nominalBpjsKs)) {
+                $nominalBpjsKs = (float) str_replace(['.', ','], ['', '.'], $nominalBpjsKs);
+            }
+
+            if ($hpp) {
+                $hpp->update([
+                    'bpjs_ks' => $nominalBpjsKs,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ]);
+            }
+
+            if ($coss) {
+                $coss->update([
+                    'bpjs_ks' => $nominalBpjsKs,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ]);
+            }
+
+            \Log::info("Updated BPJS KS nominal", [
+                'detail_id' => $detailId,
+                'nominal' => $nominalBpjsKs
+            ]);
+        }
+    }
 }
