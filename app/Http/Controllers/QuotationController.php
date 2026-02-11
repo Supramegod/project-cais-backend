@@ -663,13 +663,13 @@ class QuotationController extends Controller
             $user = Auth::user();
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
-            // Use business service to soft delete relations
+            // Soft delete relations first
             $this->quotationBusinessService->softDeleteQuotationRelations($quotation, $user->full_name);
 
-            $quotation->update([
-                'deleted_at' => Carbon::now(),
-                'deleted_by' => $user->full_name
-            ]);
+            // Update quotation without reloading
+            $quotation->deleted_at = Carbon::now();
+            $quotation->deleted_by = $user->full_name;
+            $quotation->save();
 
             DB::commit();
 
