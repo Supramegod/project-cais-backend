@@ -2916,7 +2916,7 @@ class LeadsController extends Controller
         $user = Auth::user();
         $assignmentResults = [];
 
-        if ($user->cais_role_id == 29) {
+        if (in_array($user->cais_role_id, [29,31,32,33]) ) {
             $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
 
             if ($timSalesD) {
