@@ -27,6 +27,34 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  cais-v2-queue-worker-prod:
+    build:
+      context: /home/data/beta/project-cais-backend
+      dockerfile: Dockerfile-prod
+    init: true
+    container_name: cais-v2-queue-worker-prod
+    working_dir: /var/www/laravel
+    volumes:
+      - /home/data/beta/project-cais-backend/.env:/var/www/laravel/.env:ro
+      - /home/data/beta/project-cais-backend/storage:/var/www/laravel/storage
+    restart: unless-stopped
+    command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600 --memory=128
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+        reservations:
+          cpus: "0.1"
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - cais-v2-be-prod
+
 networks:
   default:
     external:
