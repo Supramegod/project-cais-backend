@@ -2385,14 +2385,14 @@ class LeadsController extends Controller
                 // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
                 $assignedKebutuhan = [];
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
-                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
+                    $leadsKebutuhan = LeadsKebutuhan::firstOrCreate(
                         [
                             'leads_id' => $lead->id,
-                            'kebutuhan_id' => $kebutuhan_id
+                            'kebutuhan_id' => $kebutuhan_id,
+                            'tim_sales_d_id' => $timSalesD->id
                         ],
                         [
-                            'tim_sales_id' => $timSalesD->tim_sales_id,
-                            'tim_sales_d_id' => $timSalesD->id
+                            'tim_sales_id' => $timSalesD->tim_sales_id
                         ]
                     );
 
