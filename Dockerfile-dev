@@ -1,0 +1,61 @@
+FROM php:8.2-fpm AS builder
+
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libzip-dev \
+    git \
+    unzip \
+    curl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_mysql zip
+
+RUN pecl install mongodb \
+    && docker-php-ext-enable mongodb
+
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+WORKDIR /var/www/laravel
+
+COPY composer.json composer.lock ./
+
+RUN composer install \
+    --optimize-autoloader \
+    --no-scripts \
+    --no-interaction \
+    --prefer-dist
+
+COPY . .
+
+RUN cp .env.example .env \
+    && composer run-script post-autoload-dump || true
+
+FROM php:8.2-fpm
+
+RUN apt-get update && apt-get install -y \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libzip-dev \
+    curl \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd pdo pdo_mysql zip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pecl install mongodb \
+    && docker-php-ext-enable mongodb
+
+WORKDIR /var/www/laravel
+
+COPY --from=builder --chown=www-data:www-data /var/www/laravel /var/www/laravel
+
+RUN mkdir -p storage/app/public storage/framework/{cache,sessions,views} storage/logs bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache
+
+EXPOSE 9000
+
+USER www-data
+
+CMD ["php-fpm"]
