@@ -5860,80 +5860,71 @@
                 "tags": [
                     "Customer Activity"
                 ],
-                "summary": "Send email notification with dynamic SMTP configuration",
-                "description": "Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. \n     *                 Jika user memiliki konfigurasi email, akan digunakan. \n     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
+                "summary": "Send email notification with attachments using dynamic SMTP",
+                "description": "Mengirim email notifikasi dengan attachment menggunakan konfigurasi SMTP user yang sedang login. Sistem akan otomatis membuat customer activity baru dengan tipe 'Email' dan menyimpan file attachment ke storage. Email menggunakan template profesional dengan branding perusahaan.",
                 "operationId": "075717d714fe38302a4787bfe54e4b40",
                 "requestBody": {
+                    "description": "Email data dengan support untuk multiple attachments (max 10MB per file)",
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "subject",
                                     "body",
-                                    "recipients",
-                                    "leads_id"
+                                    "leads_id",
+                                    "recipients[]"
                                 ],
                                 "properties": {
                                     "subject": {
                                         "description": "Subject email",
                                         "type": "string",
-                                        "example": "Update Customer Activity"
+                                        "maxLength": 255,
+                                        "example": "Penawaran Kerja Sama - PT Shelter Indonesia"
                                     },
                                     "body": {
-                                        "description": "Isi email (mendukung line breaks)",
+                                        "description": "Isi email (plain text atau dengan line breaks)",
                                         "type": "string",
-                                        "example": "Customer activity telah diupdate. Berikut detailnya:\\n\\nNama Perusahaan: PT ABC\\nTanggal: 2024-12-09\\nTipe: Meeting\\nCatatan: Follow up penawaran produk"
+                                        "example": "Kepada Yth. Bapak/Ibu,\\n\\nBersama ini kami sampaikan penawaran kerja sama untuk layanan Laboratory Service.\\n\\nMohon dapat ditinjau dokumen terlampir.\\n\\nTerima kasih."
                                     },
                                     "leads_id": {
-                                        "description": "ID leads untuk membuat activity baru",
+                                        "description": "ID leads yang terkait dengan email ini",
                                         "type": "integer",
                                         "example": 1
                                     },
-                                    "recipients": {
-                                        "description": "Array email penerima",
+                                    "recipients[]": {
+                                        "description": "Array email penerima (minimal 1). Gunakan recipients[0], recipients[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
                                             "format": "email",
-                                            "example": "customer@example.com"
+                                            "example": "client@example.com"
                                         }
                                     },
-                                    "cc": {
-                                        "description": "Optional: CC recipients",
+                                    "cc[]": {
+                                        "description": "Array email CC (opsional). Gunakan cc[0], cc[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
-                                            "format": "email"
+                                            "format": "email",
+                                            "example": "supervisor@shelter.com"
                                         }
                                     },
-                                    "bcc": {
-                                        "description": "Optional: BCC recipients",
+                                    "bcc[]": {
+                                        "description": "Array email BCC (opsional). Gunakan bcc[0], bcc[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
-                                            "format": "email"
+                                            "format": "email",
+                                            "example": "archive@shelter.com"
                                         }
                                     },
-                                    "attachments": {
-                                        "description": "Optional: File attachments",
+                                    "attachments[]": {
+                                        "description": "Array file attachment (opsional, max 10MB per file). Format: pdf, doc, docx, xls, xlsx, jpg, jpeg, png",
                                         "type": "array",
                                         "items": {
-                                            "properties": {
-                                                "name": {
-                                                    "type": "string",
-                                                    "example": "document.pdf"
-                                                },
-                                                "content": {
-                                                    "description": "Base64 encoded file content",
-                                                    "type": "string"
-                                                },
-                                                "mime": {
-                                                    "type": "string",
-                                                    "example": "application/pdf"
-                                                }
-                                            },
-                                            "type": "object"
+                                            "type": "string",
+                                            "format": "binary"
                                         }
                                     }
                                 },
@@ -5944,7 +5935,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Email berhasil dikirim dan activity baru dibuat",
+                        "description": "Success - Email berhasil dikirim ke semua penerima dan customer activity baru telah dibuat",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5955,43 +5946,104 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"
+                                            "example": "Email berhasil dikirim ke 2 penerima dan activity baru telah dibuat"
                                         },
                                         "data": {
                                             "properties": {
                                                 "mailer_used": {
+                                                    "description": "SMTP mailer yang digunakan",
                                                     "type": "string",
                                                     "example": "user_123_smtp"
                                                 },
-                                                "sender": {
+                                                "config_source": {
+                                                    "description": "Sumber konfigurasi: user_custom, user_default, atau system_default",
                                                     "type": "string",
-                                                    "example": "John Doe <john@example.com>"
+                                                    "example": "user_custom"
+                                                },
+                                                "sender": {
+                                                    "description": "Pengirim email",
+                                                    "type": "string",
+                                                    "example": "John Doe <john@shelter.com>"
                                                 },
                                                 "recipients_count": {
+                                                    "description": "Jumlah penerima yang berhasil",
                                                     "type": "integer",
-                                                    "example": 3
+                                                    "example": 2
+                                                },
+                                                "recipients": {
+                                                    "description": "List email penerima yang berhasil",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client@example.com",
+                                                        "manager@example.com"
+                                                    ]
+                                                },
+                                                "attachments_count": {
+                                                    "description": "Jumlah file attachment",
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "attachments": {
+                                                    "description": "List nama file attachment",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "proposal.pdf",
+                                                        "price_list.xlsx"
+                                                    ]
                                                 },
                                                 "activity": {
+                                                    "description": "Customer activity yang dibuat",
                                                     "properties": {
                                                         "id": {
                                                             "type": "integer",
-                                                            "example": 123
+                                                            "example": 456
                                                         },
                                                         "nomor": {
                                                             "type": "string",
-                                                            "example": "CAT/LS/LS001-122024-00001"
+                                                            "example": "CAT/LS/LS001-022025-00123"
                                                         },
                                                         "tipe": {
                                                             "type": "string",
                                                             "example": "Email"
+                                                        },
+                                                        "tgl_activity": {
+                                                            "type": "string",
+                                                            "format": "date",
+                                                            "example": "2025-02-13"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "example": "2025-02-13T10:30:00.000000Z"
                                                         }
                                                     },
                                                     "type": "object"
                                                 },
-                                                "config_source": {
-                                                    "description": "user_custom, user_default, or system_default",
-                                                    "type": "string",
-                                                    "example": "user_custom"
+                                                "cc": {
+                                                    "description": "List email CC",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "supervisor@shelter.com"
+                                                    ]
+                                                },
+                                                "bcc": {
+                                                    "description": "List email BCC",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "archive@shelter.com"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -6003,7 +6055,7 @@
                         }
                     },
                     "207": {
-                        "description": "Multi-Status - Beberapa email berhasil, beberapa gagal",
+                        "description": "Multi-Status - Beberapa email berhasil dikirim, beberapa gagal",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6020,33 +6072,88 @@
                                             "type": "boolean",
                                             "example": true
                                         },
-                                        "failed_recipients": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
+                                        "data": {
+                                            "properties": {
+                                                "mailer_used": {
+                                                    "type": "string",
+                                                    "example": "user_123_smtp"
+                                                },
+                                                "config_source": {
+                                                    "type": "string",
+                                                    "example": "user_custom"
+                                                },
+                                                "sender": {
+                                                    "type": "string",
+                                                    "example": "John Doe <john@shelter.com>"
+                                                },
+                                                "success_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client@example.com",
+                                                        "manager@example.com"
+                                                    ]
+                                                },
+                                                "failed_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "invalid@example.com"
+                                                    ]
+                                                },
+                                                "attachments_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "attachments": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "proposal.pdf",
+                                                        "price_list.xlsx"
+                                                    ]
+                                                },
+                                                "activity": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 456
+                                                        },
+                                                        "nomor": {
+                                                            "type": "string",
+                                                            "example": "CAT/LS/LS001-022025-00123"
+                                                        },
+                                                        "tipe": {
+                                                            "type": "string",
+                                                            "example": "Email"
+                                                        },
+                                                        "tgl_activity": {
+                                                            "type": "string",
+                                                            "format": "date",
+                                                            "example": "2025-02-13"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "success_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "failed_count": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -6055,8 +6162,58 @@
                             }
                         }
                     },
-                    "500": {
-                        "description": "Server Error",
+                    "422": {
+                        "description": "Validation Error - Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "description": "Object berisi error validation",
+                                            "type": "object",
+                                            "example": {
+                                                "subject": [
+                                                    "Subject email wajib diisi"
+                                                ],
+                                                "recipients": [
+                                                    "Minimal harus ada 1 penerima email"
+                                                ],
+                                                "attachments.0": [
+                                                    "File harus berformat: pdf, doc, docx, xls, xlsx, jpg, jpeg, atau png"
+                                                ],
+                                                "attachments.1": [
+                                                    "Ukuran file maksimal 10MB"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid atau tidak ada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Leads tidak ditemukan",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6067,7 +6224,65 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Gagal mengirim email: SMTP connection failed"
+                                            "example": "Leads dengan ID tersebut tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error - Gagal mengirim email atau error sistem",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan sistem: SMTP connection failed"
+                                        },
+                                        "data": {
+                                            "description": "Detail error jika semua email gagal",
+                                            "properties": {
+                                                "mailer_used": {
+                                                    "type": "string",
+                                                    "example": "smtp"
+                                                },
+                                                "config_source": {
+                                                    "type": "string",
+                                                    "example": "system_default"
+                                                },
+                                                "sender": {
+                                                    "type": "string",
+                                                    "example": "system@shelter.com"
+                                                },
+                                                "failed_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client1@example.com",
+                                                        "client2@example.com"
+                                                    ]
+                                                },
+                                                "errors": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "Connection timeout",
+                                                        "Authentication failed"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
