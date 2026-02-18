@@ -1070,122 +1070,256 @@ class CustomerActivityController extends Controller
     /**
      * @OA\Post(
      *     path="/api/customer-activities/send-email",
-     *     summary="Send email notification with dynamic SMTP configuration",
-     *     description="Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. 
-     *                 Jika user memiliki konfigurasi email, akan digunakan. 
-     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
+     *     summary="Send email notification with attachments using dynamic SMTP",
+     *     description="Mengirim email notifikasi dengan attachment menggunakan konfigurasi SMTP user yang sedang login. Sistem akan otomatis membuat customer activity baru dengan tipe 'Email' dan menyimpan file attachment ke storage. Email menggunakan template profesional dengan branding perusahaan.",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
+     *     
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
-     *             required={"subject", "body", "recipients", "leads_id"},
-     *             @OA\Property(
-     *                 property="subject", 
-     *                 type="string", 
-     *                 example="Update Customer Activity",
-     *                 description="Subject email"
-     *             ),
-     *             @OA\Property(
-     *                 property="body", 
-     *                 type="string", 
-     *                 example="Customer activity telah diupdate. Berikut detailnya:\n\nNama Perusahaan: PT ABC\nTanggal: 2024-12-09\nTipe: Meeting\nCatatan: Follow up penawaran produk",
-     *                 description="Isi email (mendukung line breaks)"
-     *             ),
-     *             @OA\Property(
-     *                 property="leads_id", 
-     *                 type="integer", 
-     *                 example=1,
-     *                 description="ID leads untuk membuat activity baru"
-     *             ),
-     *             @OA\Property(
-     *                 property="recipients", 
-     *                 type="array", 
-     *                 description="Array email penerima",
-     *                 @OA\Items(
-     *                     type="string", 
-     *                     format="email",
-     *                     example="customer@example.com"
-     *                 )
-     *             ),
-     *             @OA\Property(
-     *                 property="cc", 
-     *                 type="array", 
-     *                 description="Optional: CC recipients",
-     *                 @OA\Items(type="string", format="email")
-     *             ),
-     *             @OA\Property(
-     *                 property="bcc", 
-     *                 type="array", 
-     *                 description="Optional: BCC recipients",
-     *                 @OA\Items(type="string", format="email")
-     *             ),
-     *             @OA\Property(
-     *                 property="attachments", 
-     *                 type="array", 
-     *                 description="Optional: File attachments",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="name", type="string", example="document.pdf"),
-     *                     @OA\Property(property="content", type="string", description="Base64 encoded file content"),
-     *                     @OA\Property(property="mime", type="string", example="application/pdf")
+     *         description="Email data dengan support untuk multiple attachments (max 10MB per file)",
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"subject", "body", "leads_id", "recipients[]"},
+     *                 
+     *                 @OA\Property(
+     *                     property="subject",
+     *                     type="string",
+     *                     maxLength=255,
+     *                     description="Subject email",
+     *                     example="Penawaran Kerja Sama - PT Shelter Indonesia"
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="body",
+     *                     type="string",
+     *                     description="Isi email (plain text atau dengan line breaks)",
+     *                     example="Kepada Yth. Bapak/Ibu,\n\nBersama ini kami sampaikan penawaran kerja sama untuk layanan Laboratory Service.\n\nMohon dapat ditinjau dokumen terlampir.\n\nTerima kasih."
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="leads_id",
+     *                     type="integer",
+     *                     description="ID leads yang terkait dengan email ini",
+     *                     example=1
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="recipients[]",
+     *                     type="array",
+     *                     description="Array email penerima (minimal 1). Gunakan recipients[0], recipients[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="client@example.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="cc[]",
+     *                     type="array",
+     *                     description="Array email CC (opsional). Gunakan cc[0], cc[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="supervisor@shelter.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="bcc[]",
+     *                     type="array",
+     *                     description="Array email BCC (opsional). Gunakan bcc[0], bcc[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="archive@shelter.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="attachments[]",
+     *                     type="array",
+     *                     description="Array file attachment (opsional, max 10MB per file). Format: pdf, doc, docx, xls, xlsx, jpg, jpeg, png",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="binary"
+     *                     )
      *                 )
      *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=201,
-     *         description="Email berhasil dikirim dan activity baru dibuat",
+     *         description="Success - Email berhasil dikirim ke semua penerima dan customer activity baru telah dibuat",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Email berhasil dikirim ke 2 penerima dan activity baru telah dibuat"
+     *             ),
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
-     *                 @OA\Property(property="sender", type="string", example="John Doe <john@example.com>"),
-     *                 @OA\Property(property="recipients_count", type="integer", example=3),
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp", description="SMTP mailer yang digunakan"),
+     *                 @OA\Property(property="config_source", type="string", example="user_custom", description="Sumber konfigurasi: user_custom, user_default, atau system_default"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@shelter.com>", description="Pengirim email"),
+     *                 @OA\Property(property="recipients_count", type="integer", example=2, description="Jumlah penerima yang berhasil"),
+     *                 @OA\Property(
+     *                     property="recipients",
+     *                     type="array",
+     *                     description="List email penerima yang berhasil",
+     *                     @OA\Items(type="string"),
+     *                     example={"client@example.com", "manager@example.com"}
+     *                 ),
+     *                 @OA\Property(property="attachments_count", type="integer", example=2, description="Jumlah file attachment"),
+     *                 @OA\Property(
+     *                     property="attachments",
+     *                     type="array",
+     *                     description="List nama file attachment",
+     *                     @OA\Items(type="string"),
+     *                     example={"proposal.pdf", "price_list.xlsx"}
+     *                 ),
      *                 @OA\Property(
      *                     property="activity",
      *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=123),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-122024-00001"),
-     *                     @OA\Property(property="tipe", type="string", example="Email")
+     *                     description="Customer activity yang dibuat",
+     *                     @OA\Property(property="id", type="integer", example=456),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-022025-00123"),
+     *                     @OA\Property(property="tipe", type="string", example="Email"),
+     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2025-02-13"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time", example="2025-02-13T10:30:00.000000Z")
      *                 ),
      *                 @OA\Property(
-     *                     property="config_source",
-     *                     type="string",
-     *                     example="user_custom",
-     *                     description="user_custom, user_default, or system_default"
+     *                     property="cc",
+     *                     type="array",
+     *                     description="List email CC",
+     *                     @OA\Items(type="string"),
+     *                     example={"supervisor@shelter.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="bcc",
+     *                     type="array",
+     *                     description="List email BCC",
+     *                     @OA\Items(type="string"),
+     *                     example={"archive@shelter.com"}
      *                 )
      *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=207,
-     *         description="Multi-Status - Beberapa email berhasil, beberapa gagal",
+     *         description="Multi-Status - Beberapa email berhasil dikirim, beberapa gagal",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 2 dari 3 penerima dan activity baru telah dibuat"),
      *             @OA\Property(property="partial_success", type="boolean", example=true),
-     *             @OA\Property(property="failed_recipients", type="array", @OA\Items(type="string"))
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
+     *                 @OA\Property(property="config_source", type="string", example="user_custom"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@shelter.com>"),
+     *                 @OA\Property(
+     *                     property="success_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"client@example.com", "manager@example.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="failed_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"invalid@example.com"}
+     *                 ),
+     *                 @OA\Property(property="attachments_count", type="integer", example=2),
+     *                 @OA\Property(
+     *                     property="attachments",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"proposal.pdf", "price_list.xlsx"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="activity",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=456),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-022025-00123"),
+     *                     @OA\Property(property="tipe", type="string", example="Email"),
+     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2025-02-13"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time")
+     *                 ),
+     *                 @OA\Property(property="success_count", type="integer", example=2),
+     *                 @OA\Property(property="failed_count", type="integer", example=1)
+     *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=422,
-     *         description="Validation Error",
+     *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(property="errors", type="object")
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="object",
+     *                 description="Object berisi error validation",
+     *                 example={
+     *                     "subject": {"Subject email wajib diisi"},
+     *                     "recipients": {"Minimal harus ada 1 penerima email"},
+     *                     "attachments.0": {"File harus berformat: pdf, doc, docx, xls, xlsx, jpg, jpeg, atau png"},
+     *                     "attachments.1": {"Ukuran file maksimal 10MB"}
+     *                 }
+     *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
-     *         response=500,
-     *         description="Server Error",
+     *         response=401,
+     *         description="Unauthorized - Token tidak valid atau tidak ada",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=404,
+     *         description="Not Found - Leads tidak ditemukan",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Gagal mengirim email: SMTP connection failed")
+     *             @OA\Property(property="message", type="string", example="Leads dengan ID tersebut tidak ditemukan")
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error - Gagal mengirim email atau error sistem",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan sistem: SMTP connection failed"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="Detail error jika semua email gagal",
+     *                 @OA\Property(property="mailer_used", type="string", example="smtp"),
+     *                 @OA\Property(property="config_source", type="string", example="system_default"),
+     *                 @OA\Property(property="sender", type="string", example="system@shelter.com"),
+     *                 @OA\Property(
+     *                     property="failed_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"client1@example.com", "client2@example.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="errors",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"Connection timeout", "Authentication failed"}
+     *                 )
+     *             )
      *         )
      *     )
      * )
@@ -1195,10 +1329,25 @@ class CustomerActivityController extends Controller
         set_time_limit(0);
 
         try {
-            DB::beginTransaction();
+            // === AMBIL DAN BERSIHKAN INPUT UNTUK RECIPIENTS, CC, BCC ===
+            $data = $request->all();
 
-            // === VALIDASI REQUEST ===
-            $validator = Validator::make($request->all(), [
+            foreach (['recipients', 'cc', 'bcc'] as $field) {
+                if (isset($data[$field]) && is_array($data[$field])) {
+                    // Hapus elemen null atau string kosong
+                    $data[$field] = array_filter($data[$field], function ($value) {
+                        return !is_null($value) && trim($value) !== '';
+                    });
+
+                    // Jika setelah filter kosong, set ke null (kecuali recipients akan dicek required)
+                    if (empty($data[$field])) {
+                        $data[$field] = null;
+                    }
+                }
+            }
+
+            // === VALIDASI REQUEST DENGAN DATA YANG SUDAH DIBERSIHKAN ===
+            $validator = Validator::make($data, [
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
                 'leads_id' => 'required|exists:sl_leads,id',
@@ -1209,6 +1358,13 @@ class CustomerActivityController extends Controller
                 'bcc' => 'nullable|array',
                 'bcc.*' => 'email',
                 'attachments' => 'nullable|array',
+                'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            ], [
+                // Custom messages (optional, bisa disesuaikan)
+                'recipients.required' => 'Minimal harus ada 1 penerima email.',
+                'recipients.*.email' => 'Format email penerima tidak valid.',
+                'cc.*.email' => 'Format email CC tidak valid.',
+                'bcc.*.email' => 'Format email BCC tidak valid.',
             ]);
 
             if ($validator->fails()) {
@@ -1237,16 +1393,21 @@ class CustomerActivityController extends Controller
             $nomor = $this->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
-            // Gabungkan recipients untuk disimpan di notes
-            $recipientsList = implode(', ', $request->recipients);
+            // Gabungkan recipients (sudah terfilter) untuk disimpan di notes
+            $recipientsList = implode(', ', $data['recipients'] ?? []);
             $notes = "Email dikirim ke: {$recipientsList}\nSubject: {$request->subject}\n\n{$request->body}";
 
-            if ($request->cc) {
-                $notes .= "\nCC: " . implode(', ', $request->cc);
+            if (!empty($data['cc'])) {
+                $notes .= "\nCC: " . implode(', ', $data['cc']);
+            }
+            if (!empty($data['bcc'])) {
+                $notes .= "\nBCC: " . implode(', ', $data['bcc']);
             }
 
-            if ($request->bcc) {
-                $notes .= "\nBCC: " . implode(', ', $request->bcc);
+            // Tambahkan info attachments jika ada
+            if ($request->hasFile('attachments')) {
+                $attachmentCount = count($request->file('attachments'));
+                $notes .= "\nAttachments: {$attachmentCount} file(s)";
             }
 
             // Buat activity baru
@@ -1264,45 +1425,65 @@ class CustomerActivityController extends Controller
 
             $activity = CustomerActivity::create($activityData);
 
+            // === HANDLE ATTACHMENTS ===
+            $attachmentFiles = [];
+            $attachmentNames = [];
+
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    try {
+                        // Simpan file ke storage
+                        $fileName = $this->storeActivityFile($activity->id, $file);
+
+                        // Simpan file object untuk dikirim via email
+                        $attachmentFiles[] = $file;
+                        $attachmentNames[] = $file->getClientOriginalName();
+
+                        Log::info('File attached for email:', [
+                            'activity_id' => $activity->id,
+                            'filename' => $file->getClientOriginalName(),
+                            'size' => $file->getSize()
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to process attachment:', [
+                            'filename' => $file->getClientOriginalName(),
+                            'error' => $e->getMessage()
+                        ]);
+                        // Lanjutkan dengan file lain meskipun ada yang gagal
+                    }
+                }
+            }
+
             // === PREPARE EMAIL CONTENT ===
             $fullBody = $request->body;
-
-            // // Tambahkan info activity ke body email
-            // $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
-            // $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
-            // $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
-            // $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
-            // $activityInfo .= "Tipe: " . $activity->tipe . "\n";
-
-            // $fullBody .= $activityInfo;
 
             // === SEND EMAILS ===
             $sentCount = 0;
             $failedRecipients = [];
             $successRecipients = [];
+            $totalRecipients = count($data['recipients'] ?? []);
 
-            $totalRecipients = count($request->recipients);
-
-            foreach ($request->recipients as $index => $recipient) {
+            foreach (($data['recipients'] ?? []) as $index => $recipient) {
                 $attempt = $index + 1;
 
                 try {
-                    // Buat email instance
+                    // Buat email instance dengan attachments
                     $email = new CustomerActivityEmail(
-                        subject: $request->subject,
-                        body: $fullBody,
-                        fromAddress: $fromConfig['address'],
-                        fromName: $fromConfig['name']
+                        $request->subject,
+                        $fullBody,
+                        $fromConfig['address'],
+                        $fromConfig['name'],
+                        $attachmentFiles
                     );
 
-                    // Tambahkan CC jika ada
-                    if (!empty($request->cc)) {
-                        $email->cc($request->cc);
+                    // Tambahkan CC jika ada (sudah terfilter)
+                    if (!empty($data['cc'])) {
+                        $email->cc($data['cc']);
                     }
 
-                    // Tambahkan BCC jika ada
-                    if (!empty($request->bcc)) {
-                        $email->bcc($request->bcc);
+                    // Tambahkan BCC jika ada (sudah terfilter)
+                    if (!empty($data['bcc'])) {
+                        $email->bcc($data['bcc']);
                     }
 
                     // Kirim email menggunakan mailer dinamis
@@ -1311,7 +1492,19 @@ class CustomerActivityController extends Controller
                     $sentCount++;
                     $successRecipients[] = $recipient;
 
+                    Log::info('Email sent successfully:', [
+                        'recipient' => $recipient,
+                        'attempt' => $attempt,
+                        'attachments_count' => count($attachmentFiles)
+                    ]);
+
                 } catch (\Exception $e) {
+                    Log::error('Failed to send email:', [
+                        'recipient' => $recipient,
+                        'attempt' => $attempt,
+                        'error' => $e->getMessage()
+                    ]);
+
                     $failedRecipients[] = [
                         'email' => $recipient,
                         'error' => $e->getMessage(),
@@ -1338,6 +1531,8 @@ class CustomerActivityController extends Controller
                         'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
                         'recipients_count' => $sentCount,
                         'recipients' => $successRecipients,
+                        'attachments_count' => count($attachmentFiles),
+                        'attachments' => $attachmentNames,
                         'activity' => [
                             'id' => $activity->id,
                             'nomor' => $activity->nomor,
@@ -1345,8 +1540,8 @@ class CustomerActivityController extends Controller
                             'tgl_activity' => $activity->tgl_activity,
                             'created_at' => $activity->created_at
                         ],
-                        'cc' => $request->cc ?? [],
-                        'bcc' => $request->bcc ?? []
+                        'cc' => $data['cc'] ?? [],
+                        'bcc' => $data['bcc'] ?? []
                     ]
                 ], 201);
             } elseif ($sentCount > 0) {
@@ -1360,6 +1555,8 @@ class CustomerActivityController extends Controller
                         'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
                         'success_recipients' => $successRecipients,
                         'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'attachments_count' => count($attachmentFiles),
+                        'attachments' => $attachmentNames,
                         'activity' => [
                             'id' => $activity->id,
                             'nomor' => $activity->nomor,
