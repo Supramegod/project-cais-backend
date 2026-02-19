@@ -1195,7 +1195,7 @@ class QuotationService
 
             if ($special === 'chemical') {
                 // Untuk chemical: total dibagi jumlah HC detail ini
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai));
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai)/ $provisi);
                 $perPerson = $itemTotal / max($jumlahHc, 1);
 
                 \Log::info("Chemical calculation for HPP", [
