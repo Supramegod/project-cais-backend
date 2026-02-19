@@ -148,7 +148,7 @@ class QuotationResource extends JsonResource
             
             $highlights[] = [
                 'field' => 'top',
-                'message' => "TOP lebih dari 7 hari ({$jumlahHari} {$tipeHari})",
+                'message' => "TOP lebih dari 7 hari ( {$jumlahHari} hari {$tipeHari} )",
                 'type' => 'warning',
                 'value' => $this->resource->top,
                 'details' => [
