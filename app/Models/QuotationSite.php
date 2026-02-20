@@ -15,6 +15,8 @@ class QuotationSite extends Model
 
     protected $fillable = [
         'quotation_id',
+        'ump',
+        'umk',
         'leads_id',
         'nama_site',
         'provinsi_id',
