@@ -430,8 +430,8 @@ class QuotationService
             'program_bpjs' => $quotation->program_bpjs,
             'penjamin_kesehatan' => $detail->penjamin_kesehatan,
             'nominal_upah' => $detail->nominal_upah,
-            'umk' => $detail->umk,
-            'ump' => $detail->ump,
+            'umk' => $detail->quotationSite->umk ?? 0,
+            'ump' => $detail->quotationSite->ump ?? 0,
             'nominal_takaful' => $detail->nominal_takaful,
             'hpp_exists' => !is_null($hpp)
         ]);
@@ -477,7 +477,11 @@ class QuotationService
         if ($isBpjsProgram) {
             \Log::info("BPJS program is ACTIVE", ['program' => $programBpjs]);
 
-            $upahBpjs = $this->calculateUpahBpjs($detail->nominal_upah, $detail->umk, $detail->ump);
+            $upahBpjs = $this->calculateUpahBpjs(
+                $detail->nominal_upah, 
+                $detail->quotationSite->umk ?? 0, 
+                $detail->quotationSite->ump ?? 0
+            );
             \Log::info("Upah BPJS calculated", ['upah_bpjs' => $upahBpjs]);
 
             // Konfigurasi BPJS dengan nilai default
