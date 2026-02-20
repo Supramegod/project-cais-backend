@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 
 use App\Mail\CustomerActivityEmail;
+use App\Models\LeadsKebutuhan;
+use App\Models\SalesActivity;
 use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -1422,8 +1424,13 @@ class CustomerActivityController extends Controller
                 'created_by' => $user->full_name,
                 'created_at' => $current_date_time
             ];
-
-            $activity = CustomerActivity::create($activityData);
+            if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+                // Untuk Sales, buat SalesActivity
+                $activity = $this->createSalesActivity($request->leads_id, $notes);
+            } else {
+                // Untuk non-Sales, buat CustomerActivity
+                $activity = CustomerActivity::create($activityData);
+            }
 
             // === HANDLE ATTACHMENTS ===
             $attachmentFiles = [];
@@ -2561,5 +2568,32 @@ class CustomerActivityController extends Controller
             Log::error('Error storing activity file: ' . $e->getMessage());
             throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
+    }
+    private function createSalesActivity($leadsId, $notulen) // Hapus :void
+    {
+        $user = Auth::user();
+        $leadsKebutuhanList = LeadsKebutuhan::where('leads_id', $leadsId)
+            ->whereNotNull('tim_sales_d_id')
+            ->get();
+
+        $firstActivity = null;
+
+        foreach ($leadsKebutuhanList as $leadsKebutuhan) {
+            $activity = SalesActivity::create([
+                'leads_id' => $leadsId,
+                'leads_kebutuhan_id' => $leadsKebutuhan->id,
+                'tgl_activity' => Carbon::now(),
+                'jenis_activity' => 'Email',
+                'notulen' => $notulen,
+                'created_by' => $user->full_name
+            ]);
+
+            // Simpan activity pertama sebagai referensi lampiran
+            if (!$firstActivity) {
+                $firstActivity = $activity;
+            }
+        }
+
+        return $firstActivity;
     }
 }
