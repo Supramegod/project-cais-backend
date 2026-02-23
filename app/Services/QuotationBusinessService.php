@@ -134,45 +134,45 @@ class QuotationBusinessService
     /**
      * Create initial PIC for quotation
      */
-// QuotationBusinessService.php - Perbaiki method createInitialPic
-public function createInitialPic(Quotation $quotation, string $createdBy): void
-{
-    try {
-        // Get leads data
-        $leads = $quotation->leads;
+    // QuotationBusinessService.php - Perbaiki method createInitialPic
+    public function createInitialPic(Quotation $quotation, string $createdBy): void
+    {
+        try {
+            // Get leads data
+            $leads = $quotation->leads;
 
-        if (!$leads) {
-            \Log::warning('Leads not found for quotation', [
-                'quotation_id' => $quotation->id
-            ]);
-            return;
-        }
+            if (!$leads) {
+                \Log::warning('Leads not found for quotation', [
+                    'quotation_id' => $quotation->id
+                ]);
+                return;
+            }
 
-        // Create PIC from leads contact person
-        if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
-            $quotation->quotationPics()->create([
-                'leads_id' => $leads->id,
-                'nama' => $leads->pic ?? 'Unknown',
-                'jabatan' => $leads->jabatan ?? 'Contact Person',
-                'email' => $leads->email ?? '',
-                'no_hp' => $leads->telp_perusahaan ?? '',
-                'created_by' => $createdBy
-            ]);
+            // Create PIC from leads contact person
+            if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
+                $quotation->quotationPics()->create([
+                    'leads_id' => $leads->id,
+                    'nama' => $leads->pic ?? 'Unknown',
+                    'jabatan' => $leads->jabatan ?? 'Contact Person',
+                    'email' => $leads->email ?? '',
+                    'no_hp' => $leads->telp_perusahaan ?? '',
+                    'created_by' => $createdBy
+                ]);
 
-            \Log::info('Initial PIC created from leads', [
+                \Log::info('Initial PIC created from leads', [
+                    'quotation_id' => $quotation->id,
+                    'pic_name' => $leads->pic
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to create initial PIC', [
                 'quotation_id' => $quotation->id,
-                'pic_name' => $leads->pic
+                'error' => $e->getMessage()
             ]);
+            // Don't throw, just log the error
         }
-
-    } catch (\Exception $e) {
-        \Log::error('Failed to create initial PIC', [
-            'quotation_id' => $quotation->id,
-            'error' => $e->getMessage()
-        ]);
-        // Don't throw, just log the error
     }
-}
     public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
@@ -330,19 +330,30 @@ public function createInitialPic(Quotation $quotation, string $createdBy): void
         $year = $now->year;
         $month = $now->format('m');
 
+        // 1. Logic Khusus untuk Addendum
+        if ($tipeQuotation === 'addendum' && $quotationReferensi) {
+            // Ambil nomor referensi (contoh: QUOT/ABC/001-022026-00001)
+            $nomorRef = $quotationReferensi->nomor;
+
+            // Hitung sudah berapa kali quotation ini di-addendum
+            $counter = Quotation::where('tipe_quotation', 'addendum')
+                ->where('nomor', 'like', "ADD/{$nomorRef}/%")
+                ->count() + 1;
+
+            return "ADD/" . $nomorRef . "/" . str_pad($counter, 5, '0', STR_PAD_LEFT);
+        }
+
+        // 2. Logic Standar untuk tipe lain (Baru, Revisi, Rekontrak)
         $dataLeads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
 
-        // Base format: QUOT/[jenis jika ada]/[COMPANY_CODE]/[LEADS_NUMBER]-[MMYYYY]-[XXXXX]
         $base = "QUOT/";
-        // Tambahkan company code dan leads number
         if ($company) {
             $base .= $company->code . "/" . $dataLeads->nomor . "-" . $month . $year . "-";
         } else {
             $base .= "NN/NNNNN-" . $month . $year . "-";
         }
 
-        // Hitung counter berdasarkan tipe quotation dan bulan
         $counter = Quotation::where('tipe_quotation', $tipeQuotation)
             ->whereYear('created_at', $year)
             ->whereMonth('created_at', $now->month)

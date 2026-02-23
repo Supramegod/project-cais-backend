@@ -478,8 +478,8 @@ class QuotationService
             \Log::info("BPJS program is ACTIVE", ['program' => $programBpjs]);
 
             $upahBpjs = $this->calculateUpahBpjs(
-                $detail->nominal_upah, 
-                $detail->quotationSite->umk ?? 0, 
+                $detail->nominal_upah,
+                $detail->quotationSite->umk ?? 0,
                 $detail->quotationSite->ump ?? 0
             );
             \Log::info("Upah BPJS calculated", ['upah_bpjs' => $upahBpjs]);
@@ -1199,7 +1199,7 @@ class QuotationService
 
             if ($special === 'chemical') {
                 // Untuk chemical: total dibagi jumlah HC detail ini
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai)/ $provisi);
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
                 $perPerson = $itemTotal / max($jumlahHc, 1);
 
                 \Log::info("Chemical calculation for HPP", [
@@ -1986,7 +1986,7 @@ class QuotationService
         return $result;
     }
 
-    private function  getJkkPercentage($resiko)
+    private function getJkkPercentage($resiko)
     {
         $percentages = [
             "Sangat Rendah" => 0.24,
@@ -2452,7 +2452,7 @@ class QuotationService
 
             $msg = $isApproved
                 ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
-                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}".($reason ? " dengan alasan: {$reason}" : "");
+                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" . ($reason ? " dengan alasan: {$reason}" : "");
 
             LogNotification::create([
                 'user_id' => $leadsKebutuhan->timSalesD->user_id,
@@ -2464,6 +2464,13 @@ class QuotationService
                 'created_at' => $currentDateTime,
                 'created_by' => $user->full_name
             ]);
+        }
+        if ($isApproved && $quotation->tipe_quotation == 'addendum') {
+            $addendumService = app (AddendumService::class);
+            $addendumResult = $addendumService->process($quotation);
+
+            // Opsional: simpan hasil ke log atau response
+            \Log::info('Hasil addendum', $addendumResult);
         }
 
         // Log customer activity
