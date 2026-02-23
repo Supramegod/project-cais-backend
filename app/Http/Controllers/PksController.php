@@ -483,15 +483,22 @@ class PksController extends Controller
                 })->toArray();
             } else {
                 // Alternatif: Ambil sites info dari relasi sites yang sudah ada
-                $sitesInfo = $pks->sites->map(function ($site) {
-                    return [
-                        'id' => $site->id,
-                        'nama_site' => $site->nama_site,
-                        'kota' => $site->kota,
-                        'penempatan' => $site->penempatan,
-                        'quotation_id' => $site->quotation_id
-                    ];
-                })->toArray();
+                // SITES INFO - ambil site terbaru untuk setiap nama_site
+                $sitesInfo = $pks->sites()
+                    ->select('id', 'nama_site', 'kota', 'penempatan', 'quotation_id', 'created_at')
+                    ->orderBy('created_at', 'desc') // urutkan dari terbaru
+                    ->get()
+                    ->unique('nama_site') // ambil unik berdasarkan nama_site (terbaru karena sudah diurutkan)
+                    ->values()
+                    ->map(function ($site) {
+                        return [
+                            'id' => $site->id,
+                            'nama_site' => $site->nama_site,
+                            'kota' => $site->kota,
+                            'penempatan' => $site->penempatan,
+                            'quotation_id' => $site->quotation_id
+                        ];
+                    })->toArray();
             }
 
             $response = [
