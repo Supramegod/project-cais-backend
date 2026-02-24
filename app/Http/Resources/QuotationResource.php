@@ -27,7 +27,8 @@ class QuotationResource extends JsonResource
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
                 'quotationDetails.wage',
-                'quotationDetails.quotationSite' // Load relation untuk pengecekan UMK
+                'quotationDetails.quotationSite',
+                'logApprovals'
             ]);
         }
 
@@ -145,7 +146,7 @@ class QuotationResource extends JsonResource
         if ($this->resource->top == "Lebih Dari 7 Hari") {
             $jumlahHari = $this->resource->jumlah_hari_invoice ?? 0;
             $tipeHari = $this->resource->tipe_hari_invoice ?? 'Hari';
-            
+
             $highlights[] = [
                 'field' => 'top',
                 'message' => "TOP lebih dari 7 hari ( {$jumlahHari} hari {$tipeHari} )",
@@ -548,7 +549,7 @@ class QuotationResource extends JsonResource
                     'gpm' => $this->calculatedQuotation->calculation_summary->gpm ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
                     'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan ?? 0, 2),
                     'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
                 'coss' => [
@@ -564,7 +565,7 @@ class QuotationResource extends JsonResource
                     'gpm_coss' => $this->calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
                     'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0, 2),
                     'persen_insentif' => $this->persen_insentif ?? 0,
                 ],
                 'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
@@ -926,11 +927,13 @@ class QuotationResource extends JsonResource
             //     ? $this->logNotifications->pluck('pesan')->toArray()
             //     : [],
 
-            'alasan_reject' => $this->relationLoaded('logNotifications')
-                ? $this->logNotifications->filter(function ($notif) {
-                    return stripos($notif->pesan, 'reject') !== false;
-                })->pluck('pesan')->last()
-                : null,
+            'alasan_reject' => $this->whenLoaded('logApprovals', function () {
+                $rejected = $this->logApprovals
+                    ->where('is_approve', false)
+                    ->sortByDesc('created_at')
+                    ->first();
+                return $rejected ? $rejected->note : null;
+            }),
 
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
                 return $this->quotationDetails->sum('jumlah_hc');

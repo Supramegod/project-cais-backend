@@ -114,7 +114,7 @@ class QuotationController extends Controller
      *         in="query",
      *         description="Column to search in (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -199,7 +199,7 @@ class QuotationController extends Controller
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
 
                 } else {
-                    $allowedColumns = ['nomor', 'kebutuhan'];
+                    $allowedColumns = ['nomor', 'kebutuhan','created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
                         $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                     }
@@ -435,6 +435,7 @@ class QuotationController extends Controller
      *     )
      * )
      */
+
     public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
@@ -442,22 +443,18 @@ class QuotationController extends Controller
         try {
             $user = Auth::user();
 
-            // Validasi tipe_quotation (tambahkan 'addendum')
             if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
                 throw new \Exception('Tipe quotation tidak valid');
             }
 
-            // Untuk addendum, quotation_referensi_id juga wajib
             if (in_array($tipe_quotation, ['revisi', 'rekontrak', 'addendum'])) {
                 if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
                     throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
                 }
             }
 
-            // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
 
-            // Load quotation referensi jika ada
             $quotationReferensi = null;
             if ($request->has('quotation_referensi_id') && $request->quotation_referensi_id) {
                 $quotationReferensi = Quotation::with([
@@ -482,7 +479,6 @@ class QuotationController extends Controller
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
             }
 
-            // Generate nomor
             $quotationData['nomor'] = $this->quotationBusinessService->generateNomorByType(
                 $request->perusahaan_id,
                 $request->entitas,
@@ -493,17 +489,28 @@ class QuotationController extends Controller
             $quotationData['created_by'] = $user->full_name;
             $quotationData['tipe_quotation'] = $tipe_quotation;
 
-            // CREATE QUOTATION BARU
             $quotation = Quotation::create($quotationData);
 
             Log::info('New Quotation created', [
                 'id' => $quotation->id,
                 'nomor' => $quotation->nomor,
                 'tipe' => $tipe_quotation,
-                'has_referensi' => $quotationReferensi !== null
+                'has_referensi' => $quotationReferensi !== null,
             ]);
 
-            // ✅ TRIGGER EVENT (menggantikan semua logika duplikasi)
+            if ($tipe_quotation === 'baru' && $quotationReferensi === null) {
+                $this->quotationBusinessService->createQuotationSites(
+                    $quotation,
+                    $request,
+                    $user->full_name
+                );
+
+                Log::info('Sites created synchronously', [
+                    'quotation_id' => $quotation->id,
+                    'sites_count' => $quotation->quotationSites()->count(),
+                ]);
+            }
+
             QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
 
             DB::commit();
@@ -513,10 +520,10 @@ class QuotationController extends Controller
                 'quotationSites',
                 'quotationPics',
                 'quotationDetails',
-                'statusQuotation'
+                'statusQuotation',
             ]);
 
-            $newSitesCount = $quotation->quotationSites()->count();
+            $newSitesCount = $quotation->quotationSites->count();
 
             return response()->json([
                 'success' => true,
@@ -524,21 +531,21 @@ class QuotationController extends Controller
                 'message' => 'Quotation ' . $tipe_quotation . ' created successfully',
                 'metadata' => [
                     'sites_created' => $newSitesCount,
-                    'tipe_quotation' => $tipe_quotation
-                ]
+                    'tipe_quotation' => $tipe_quotation,
+                ],
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to create quotation', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create quotation',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -578,7 +585,7 @@ class QuotationController extends Controller
      */
     // Di QuotationController
     public function show($id)
-    {
+    { set_time_limit(0);
         try {
             // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
@@ -960,7 +967,7 @@ class QuotationController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
-                'alasan' => 'nullable|string'
+                'notes' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {

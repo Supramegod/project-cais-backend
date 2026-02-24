@@ -89,7 +89,7 @@ class SpkController extends Controller
      *         in="query",
      *         description="Kolom yang akan dicari (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "created_by"}, example="nama_perusahaan")
      *     ),
      *     @OA\Parameter(
      *         name="per_page",
@@ -171,7 +171,7 @@ class SpkController extends Controller
                     }
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
                 } else {
-                    $allowedColumns = ['nomor'];
+                    $allowedColumns = ['nomor', 'created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
                         $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                     }
