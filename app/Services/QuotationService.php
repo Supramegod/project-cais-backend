@@ -2425,7 +2425,7 @@ class QuotationService
 
         // Log approval
         LogApproval::create([
-            'tabel' => 'sl_quotation',
+            'tabel' => 'quotation',
             'doc_id' => $quotation->id,
             'tingkat' => $tingkat,
             'is_approve' => $isApproved,
@@ -2464,7 +2464,7 @@ class QuotationService
                 'user_id' => $leadsKebutuhan->timSalesD->user_id,
                 'doc_id' => $quotation->id,
                 'transaksi' => 'Quotation',
-                'tabel' => 'quotation',
+                'tabel' => 'sl_quotation',
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
