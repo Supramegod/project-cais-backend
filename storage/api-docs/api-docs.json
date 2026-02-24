@@ -19702,7 +19702,8 @@
                             "enum": [
                                 "nama_perusahaan",
                                 "nomor",
-                                "kebutuhan"
+                                "kebutuhan",
+                                "created_by"
                             ],
                             "example": "nama_perusahaan"
                         }

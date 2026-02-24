@@ -441,12 +441,12 @@ class QuotationBusinessService
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
 
                 break;
             case 'addendum':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8]);
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
                 // ->where(function ($q) {
                 //     $q->whereHas('sites', function ($siteQuery) {
                 //         $siteQuery->whereHas('pks', function ($pksQuery) {

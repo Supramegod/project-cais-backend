@@ -98,7 +98,7 @@
         
         .content {
             font-size: 15px;
-            line-height: 1.8;
+            line-height: 1;
             color: #495057;
             white-space: pre-wrap;
             word-wrap: break-word;
