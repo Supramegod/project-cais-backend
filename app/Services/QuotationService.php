@@ -485,12 +485,18 @@ class QuotationService
             \Log::info("Upah BPJS calculated", ['upah_bpjs' => $upahBpjs]);
 
             // Konfigurasi BPJS dengan nilai default
+            $umk = $detail->quotationSite->umk ?? 0;
+            $nominalUpah = $detail->nominal_upah;
+            
+            // Tentukan base untuk BPJS Kesehatan
+            $baseKes = ($nominalUpah > $umk) ? $nominalUpah : $umk;
+            
             $bpjsConfig = [
                 'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
                 'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30],
                 'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70],
                 'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00],
-                'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $upahBpjs]
+                'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKes]
             ];
 
             foreach ($bpjsConfig as $key => $config) {
@@ -2423,7 +2429,7 @@ class QuotationService
             'doc_id' => $quotation->id,
             'tingkat' => $tingkat,
             'is_approve' => $isApproved,
-            'note' => $data['alasan'] ?? null,
+            'note' => $data['notes'] ?? null,
             'user_id' => $user->id,
             'approval_date' => $currentDateTime,
             'created_at' => $currentDateTime,
@@ -2448,7 +2454,7 @@ class QuotationService
         if ($leadsKebutuhan && $leadsKebutuhan->timSalesD) {
             $quotationNumber = $quotation->nomor;
             $approverName = $user->full_name;
-            $reason = $data['alasan'] ?? null;
+            $reason = $data['notes'] ?? null;
 
             $msg = $isApproved
                 ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
@@ -2458,7 +2464,7 @@ class QuotationService
                 'user_id' => $leadsKebutuhan->timSalesD->user_id,
                 'doc_id' => $quotation->id,
                 'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
+                'tabel' => 'quotation',
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,

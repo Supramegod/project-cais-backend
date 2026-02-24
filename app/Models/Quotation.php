@@ -432,7 +432,7 @@ class Quotation extends Model
 
     public function logApprovals()
     {
-        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'sl_quotation');
+        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'quotation');
     }
     public function logNotifications()
     {

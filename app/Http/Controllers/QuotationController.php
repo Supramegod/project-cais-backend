@@ -585,7 +585,7 @@ class QuotationController extends Controller
      */
     // Di QuotationController
     public function show($id)
-    {
+    { set_time_limit(0);
         try {
             // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
@@ -967,7 +967,7 @@ class QuotationController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
-                'alasan' => 'nullable|string'
+                'notes' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
