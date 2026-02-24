@@ -90,6 +90,13 @@ class LeadsController extends Controller
      *         @OA\Schema(type="string", example="PT ABC")
      *     ),
      *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Column to search in (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Jumlah data per halaman untuk pagination (default: 15)",
@@ -207,23 +214,32 @@ class LeadsController extends Controller
             // ✅ Gunakan scope yang sudah ada di model Leads.php
             $query->filterByUserRole();
 
-            // ✅ Optimasi Search dengan Fulltext
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
-                if (str_contains($searchTerm, ' ')) {
-                    $searchTerm = '"' . $searchTerm . '"';
-                } else {
-                    $searchTerm = $searchTerm . '*';
-                }
+                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
 
-                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                if ($searchBy === 'nama_perusahaan') {
+                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+
+                } else {
+                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
             } else {
+                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
-                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
+                $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
             }
-
             // Filter tambahan
             if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
@@ -609,7 +625,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if(in_array(Auth::user()->cais_role_id, [29,31,32,33]) ) {
+            if (in_array(Auth::user()->cais_role_id, [29, 31, 32, 33])) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -2916,7 +2932,7 @@ class LeadsController extends Controller
         $user = Auth::user();
         $assignmentResults = [];
 
-        if (in_array($user->cais_role_id, [29,31,32,33]) ) {
+        if (in_array($user->cais_role_id, [29, 31, 32, 33])) {
             $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
 
             if ($timSalesD) {
