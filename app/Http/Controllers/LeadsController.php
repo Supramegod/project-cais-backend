@@ -231,14 +231,22 @@ class LeadsController extends Controller
                 } else {
                     $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+
+                        if ($searchBy === 'kebutuhan') {
+                            // Kebutuhan adalah relasi, gunakan whereHas
+                            $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
+                                $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                            });
+                        } else {
+                            $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                        }
                     }
                 }
             } else {
                 // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
-                $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
             // Filter tambahan
             if ($request->filled('branch'))
