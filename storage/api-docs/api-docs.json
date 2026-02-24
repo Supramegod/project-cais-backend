@@ -10692,6 +10692,22 @@
                         }
                     },
                     {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Column to search in (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kebutuhan",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
                         "name": "per_page",
                         "in": "query",
                         "description": "Jumlah data per halaman untuk pagination (default: 15)",
@@ -16905,7 +16921,8 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor"
+                                "nomor",
+                                "created_by"
                             ],
                             "example": "nama_perusahaan"
                         }
@@ -24534,7 +24551,8 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor"
+                                "nomor",
+                                "created_by"
                             ],
                             "example": "nama_perusahaan"
                         }
