@@ -27,7 +27,8 @@ class QuotationResource extends JsonResource
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
                 'quotationDetails.wage',
-                'quotationDetails.quotationSite' // Load relation untuk pengecekan UMK
+                'quotationDetails.quotationSite',
+                'logApprovals'
             ]);
         }
 
@@ -926,11 +927,13 @@ class QuotationResource extends JsonResource
             //     ? $this->logNotifications->pluck('pesan')->toArray()
             //     : [],
 
-            'alasan_reject' => $this->relationLoaded('logNotifications')
-                ? $this->logNotifications->filter(function ($notif) {
-                    return stripos($notif->pesan, 'reject') !== false;
-                })->pluck('pesan')->last()
-                : null,
+            'alasan_reject' => $this->whenLoaded('logApprovals', function () {
+                $rejected = $this->logApprovals
+                    ->where('is_approve', false)
+                    ->sortByDesc('created_at')
+                    ->first();
+                return $rejected ? $rejected->note : null;
+            }),
 
             'total_hc' => $this->whenLoaded('quotationDetails', function () {
                 return $this->quotationDetails->sum('jumlah_hc');

@@ -1439,20 +1439,18 @@ class QuotationStepService
 
         $recipientUserIds = [];
 
+        // 1. Antrean Pertama: Dir Sales
         if (empty($quotation->ot1)) {
             $recipientUserIds = array_merge($recipientUserIds, $dirSales);
         }
-
-        // Jika quotation belum ada ot2 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Keu
-        if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
+        // 2. Antrean Kedua: Dir Keu (Hanya jika Sales SUDAH approve)
+        else if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
         }
-
-        // Jika sudah ada ot1 dan ot2, tapi belum ada ot3 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Umum
-        if (!empty($quotation->ot1) && !empty($quotation->ot2) && empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
+        // 3. Antrean Ketiga: Dir Umum (Hanya jika Sales & Keu SUDAH approve)
+        else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
         }
-
         // Remove duplicates jika ada
         $recipientUserIds = array_unique($recipientUserIds);
 
