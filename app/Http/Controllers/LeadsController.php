@@ -231,7 +231,15 @@ class LeadsController extends Controller
                 } else {
                     $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+
+                        if ($searchBy === 'kebutuhan') {
+                            // Kebutuhan adalah relasi, gunakan whereHas
+                            $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
+                                $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                            });
+                        } else {
+                            $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                        }
                     }
                 }
             } else {
