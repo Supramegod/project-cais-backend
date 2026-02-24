@@ -114,7 +114,7 @@ class QuotationController extends Controller
      *         in="query",
      *         description="Column to search in (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -199,7 +199,7 @@ class QuotationController extends Controller
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
 
                 } else {
-                    $allowedColumns = ['nomor', 'kebutuhan'];
+                    $allowedColumns = ['nomor', 'kebutuhan','created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
                         $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                     }
