@@ -238,7 +238,7 @@ class LeadsController extends Controller
                 // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
-                $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
             // Filter tambahan
             if ($request->filled('branch'))
