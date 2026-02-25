@@ -50,11 +50,16 @@ class QuotationStepService
 
     protected $quotationService;
     protected $quotationBarangService;
+    protected $quotationNotificationService;
 
-    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
-    {
+    public function __construct(
+        QuotationService $quotationService,
+        QuotationBarangService $quotationBarangService,
+        QuotationNotificationService $quotationNotificationService
+    ) {
         $this->quotationService = $quotationService;
         $this->quotationBarangService = $quotationBarangService;
+        $this->quotationNotificationService = $quotationNotificationService;
     }
 
     /**
@@ -1494,7 +1499,7 @@ class QuotationStepService
             'email' => Auth::user()?->email,
         ]);
 
-        app(QuotationNotificationService::class)->sendApprovalNotification(
+        $this->quotationNotificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
