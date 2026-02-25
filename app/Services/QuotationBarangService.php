@@ -302,7 +302,15 @@ class QuotationBarangService
 
         // Cari data existing untuk update
         // $existingQuery = $modelClass::where('quotation_id', $quotation->id);
-        $existingQuery = $modelClass::where('quotation_site_id', $quotation_site_id);
+        \Log::warning("Detailnya ", [
+                        'Jenis barang' => $jenisBarang,
+                        'detail id' => $quotation_detail_id
+                    ]);
+        if($jenisBarang === 'kaporlap'){
+            $existingQuery = $modelClass::where('quotation_detail_id', $quotation_detail_id);
+        }else{
+            $existingQuery = $modelClass::where('quotation_site_id', $quotation_site_id);
+        }
 
         // Untuk custom barang, cari berdasarkan barang_id (jika ada) atau nama
         if (isset($data['is_custom']) && $data['is_custom']) {
