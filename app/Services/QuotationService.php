@@ -344,7 +344,7 @@ class QuotationService
             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
-            'potongan_bpu' => $potonganBp ?? 0,
+            'potongan_bpu' => $potonganBpu ?? 0,
         ];
 
     }
@@ -1306,7 +1306,7 @@ class QuotationService
         $grandTotal = $summary->{"grand_total_sebelum_pajak{$suffix}"};
         $maxReasonableTax = $grandTotal * 0.5;
 
-        if ($summary->{"ppn{$suffix}"} > $maxReasonableTax) {git
+        if ($summary->{"ppn{$suffix}"} > $maxReasonableTax) {
             $summary->{"ppn{$suffix}"} = 0;
         }
 
