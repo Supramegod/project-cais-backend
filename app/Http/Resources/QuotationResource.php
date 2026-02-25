@@ -926,6 +926,16 @@ class QuotationResource extends JsonResource
             // 'approval_notes' => $this->relationLoaded('logNotifications')
             //     ? $this->logNotifications->pluck('pesan')->toArray()
             //     : [],
+            //      'alasan_reject' => $this->whenLoaded('logApprovals', function () {
+            //     $rejected = $this->logApprovals
+            //         ->where('is_approve', false)
+            //         ->sortByDesc('created_at')
+            //         ->first();
+            //     return $rejected ? [
+            //         'note' => $rejected->note,
+            //         'tingkat' => $rejected->tingkat
+            //     ] : null;
+            // }),
 
             'alasan_reject' => $this->whenLoaded('logApprovals', function () {
                 $rejected = $this->logApprovals
