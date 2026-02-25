@@ -1489,6 +1489,11 @@ class QuotationStepService
         // ↓ Tambah ini
         $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
 
+        \Log::info('Auth user saat notifikasi', [
+            'user_id' => Auth::user()?->id,
+            'email' => Auth::user()?->email,
+        ]);
+
         app(QuotationNotificationService::class)->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,

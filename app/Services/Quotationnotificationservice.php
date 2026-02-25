@@ -13,12 +13,12 @@ class QuotationNotificationService
 {
     const DIR_SALES = [
         // ['name' => 'Nino', 'email' => 'nino@shelterindonesia.id', 'role' => 'Dir. Sales'],
-        ['name' => 'jalu', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Dir. Sales'],
+        ['name' => 'jalu', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [
         // ['name' => 'Alivian', 'email' => 'alivian@shelterindonesia.id', 'role' => 'Dir. Keuangan'],
-        ['name' => 'zamzam', 'email' => 'zamakbar12@gmail.com', 'role' => 'Dir. Keuangan'],
+        ['name' => 'zamzam', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
 
     const DIR_UMUM = [];
