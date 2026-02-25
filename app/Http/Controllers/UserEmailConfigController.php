@@ -170,11 +170,18 @@ class UserEmailConfigController extends Controller
             $existingConfig = UserEmailConfig::where('user_id', $user->id)->first();
 
             if ($existingConfig) {
-                // Update menggunakan model agar mutator bekerja
-                $existingConfig->update($data);
+                // Set satu per satu agar mutator bekerja
+                $existingConfig->email_host = $data['email_host'];
+                $existingConfig->email_port = $data['email_port'];
+                $existingConfig->email_username = $data['email_username'];
+                $existingConfig->email_password = $data['email_password']; // mutator encrypt di sini
+                $existingConfig->email_encryption = $data['email_encryption'];
+                $existingConfig->email_from_address = $data['email_from_address'];
+                $existingConfig->email_from_name = $data['email_from_name'];
+                $existingConfig->is_active = $data['is_active'];
+                $existingConfig->save();
                 $config = $existingConfig;
             } else {
-                // Create menggunakan model agar mutator bekerja
                 $config = UserEmailConfig::create($data);
             }
 
