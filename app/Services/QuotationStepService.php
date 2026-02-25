@@ -566,12 +566,6 @@ class QuotationStepService
 
             DB::commit();
 
-            \Log::info("Step 4 updated successfully", [
-                'quotation_id' => $quotation->id,
-                'global_data_updated' => !empty($globalData),
-                'position_data_updated' => $request->has('position_data')
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("Error in updateStep4", [
@@ -621,12 +615,6 @@ class QuotationStepService
                 'is_bpjs_kes' => $this->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0, // Default true
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name
-            ]);
-
-            \Log::info("Updated BPJS data for detail", [
-                'detail_id' => $detailId,
-                'penjamin' => $penjamin,
-                'nominal_takaful' => $nominalTakaful
             ]);
         }
 
