@@ -115,15 +115,15 @@ class QuotationNotificationService
     private function resolveStageLabel(Quotation $quotation): string
     {
         if (empty($quotation->ot1)) {
-            return 'Persetujuan Dir. Sales';
+            return 'Persetujuan Direktur Sales';
         }
 
         if (empty($quotation->ot2) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return 'Persetujuan Dir. Keuangan';
+            return 'Persetujuan Direktur Keuangan';
         }
 
         if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return 'Persetujuan Dir. Umum';
+            return 'Persetujuan Direktur Umum';
         }
 
         return 'Selesai';

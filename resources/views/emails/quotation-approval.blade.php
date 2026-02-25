@@ -31,7 +31,7 @@
         .footer { background:#1e293b; padding:28px 40px; }
         .footer-brand { font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:4px; }
         .footer-tag { font-size:12px; color:#64748b; margin-bottom:16px; }
-        .footer-contacts { display:flex; gap:24px; margin-bottom:16px; }
+        .footer-contacts { display:flex;justify-content: space-between; margin-bottom:16px; }
         .contact-label { display:block; font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:#475569; margin-bottom:2px; }
         .contact-val { font-size:12px; color:#94a3b8; }
         .footer-hr { height:1px; background:#334155; margin:14px 0; }
@@ -40,7 +40,7 @@
         @media(max-width:600px) {
             .wrapper { border-radius:0; }
             .header, .alert, .body, .footer { padding-left:20px; padding-right:20px; }
-            .footer-contacts { flex-direction:column; gap:10px; }
+            .footer-contacts { flex-direction:column; gap:20px; }
         }
     </style>
 </head>
@@ -114,11 +114,13 @@
         <div class="footer-tag">Sistem Manajemen Hubungan Pelanggan Terpadu</div>
         <div class="footer-contacts">
             <div>
-                <span class="contact-label">Dir. Sales</span>
+                <span class="contact-label">Direktur Sales</span>
+                <span class="contact-label">MUHAMMAD NINO MAYVI DIAN</span>
                 <span class="contact-val">nino@shelterindonesia.id</span>
             </div>
             <div>
-                <span class="contact-label">Dir. Keuangan</span>
+                <span class="contact-label">Direktur Keuangan</span>
+                <span class="contact-label">ALIVIAN PRANATYAS HENING LAZUARDI</span>
                 <span class="contact-val">alivian@shelterindonesia.id</span>
             </div>
         </div>
