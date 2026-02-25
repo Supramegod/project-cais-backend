@@ -1432,46 +1432,36 @@ class QuotationStepService
     {
         $user = Auth::user();
 
-        // Tentukan user yang akan menerima notifikasi
-        $dirSales = [27927, 127822]; // User ID untuk Dir Sales (role_id 96)
-        $dirKeu = [27928, 16986, 127823]; // User ID untuk Dir Keu (role_id 97 atau 40)
-        $dirUmum = []; // User ID untuk Dir Umum (role_id 99) - jika ada
+        $dirSales = [27927, 127822];
+        $dirKeu = [27928, 16986, 127823];
+        $dirUmum = [];
 
         $recipientUserIds = [];
 
-        // 1. Antrean Pertama: Dir Sales
         if (empty($quotation->ot1)) {
             $recipientUserIds = array_merge($recipientUserIds, $dirSales);
-        }
-        // 2. Antrean Kedua: Dir Keu (Hanya jika Sales SUDAH approve)
-        else if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
+        } else if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
-        }
-        // 3. Antrean Ketiga: Dir Umum (Hanya jika Sales & Keu SUDAH approve)
-        else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
+        } else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
         }
-        // Remove duplicates jika ada
+
         $recipientUserIds = array_unique($recipientUserIds);
 
-        // Jika tidak ada recipient, tidak perlu create notifikasi
         if (empty($recipientUserIds)) {
             return;
         }
+
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
-
-
-        // Buat pesan notifikasi
         $quotationNumber = $quotation->nomor;
         $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
 
         $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
 
-        // Kirim notifikasi ke setiap recipient
         foreach ($recipientUserIds as $userId) {
             LogNotification::create([
                 'user_id' => $userId,
@@ -1495,6 +1485,15 @@ class QuotationStepService
             'recipients' => $recipientUserIds,
             'message' => $msg
         ]);
+
+        // ↓ Tambah ini
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+
+        app(QuotationNotificationService::class)->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+        );
     }
     private function insertRequirements(Quotation $quotation): void
     {
