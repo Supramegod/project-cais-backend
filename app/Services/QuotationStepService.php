@@ -41,6 +41,7 @@ use App\Models\Umk;
 use App\Models\Ump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\QuotationNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -50,11 +51,16 @@ class QuotationStepService
 
     protected $quotationService;
     protected $quotationBarangService;
+    protected $quotationNotificationService;
 
-    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
-    {
+    public function __construct(
+        QuotationService $quotationService,
+        QuotationBarangService $quotationBarangService,
+        QuotationNotificationService $quotationNotificationService
+    ) {
         $this->quotationService = $quotationService;
         $this->quotationBarangService = $quotationBarangService;
+        $this->quotationNotificationService = $quotationNotificationService;
     }
 
     /**
@@ -1489,7 +1495,12 @@ class QuotationStepService
         // ↓ Tambah ini
         $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
 
-        app(QuotationNotificationService::class)->sendApprovalNotification(
+        \Log::info('Auth user saat notifikasi', [
+            'user_id' => Auth::user()?->id,
+            'email' => Auth::user()?->email,
+        ]);
+
+        $this->quotationNotificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
