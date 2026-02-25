@@ -236,7 +236,15 @@ class Quotation extends Model
     // Relasi ke QuotationDevices
     public function quotationDevices()
     {
-        return $this->hasMany(QuotationDevices::class, 'quotation_id');
+        // return $this->hasMany(QuotationDevices::class, 'quotation_id');
+        return $this->hasManyThrough(
+            QuotationDevices::class,
+            QuotationSite::class,
+            'quotation_id',        // FK di quotation_site
+            'quotation_site_id',   // FK di quotation_devices
+            'id',                  // PK di quotation
+            'id'                   // PK di quotation_site
+        );
     }
 
     // Relasi ke QuotationChemical
@@ -438,4 +446,5 @@ class Quotation extends Model
     {
         return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
     }
+
 }

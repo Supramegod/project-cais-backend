@@ -261,7 +261,7 @@ class QuotationBarangService
 
         // Siapkan data dasar terlebih dahulu
         $createData = [
-            'quotation_id' => $quotation->id,
+            // 'quotation_id' => $quotation->id,
             'barang_id' => $barang_id,
             'jumlah' => $jumlah,
             'harga' => $harga,
@@ -301,7 +301,8 @@ class QuotationBarangService
         }
 
         // Cari data existing untuk update
-        $existingQuery = $modelClass::where('quotation_id', $quotation->id);
+        // $existingQuery = $modelClass::where('quotation_id', $quotation->id);
+        $existingQuery = $modelClass::where('quotation_site_id', $quotation_site_id);
 
         // Untuk custom barang, cari berdasarkan barang_id (jika ada) atau nama
         if (isset($data['is_custom']) && $data['is_custom']) {
@@ -456,6 +457,19 @@ class QuotationBarangService
      */
     public function prepareBarangData($quotation, string $jenisBarang)
     {
+        // 'model' => QuotationDevices::class,
+        // 'jenis_barang_ids' => [8, 9, 10, 11, 12, 17],
+        // 'use_detail_id' => false,   // Tidak menggunakan detail_id
+        // 'use_site_id' => true,      // Menggunakan site_id
+        // 'default_masa_pakai' => 12
+        
+        // $relations = [
+        //     'chemicals' => 'quotationChemicals',
+        //     'kaporlap' => 'quotationKaporlaps',
+        //     'devices' => 'quotationDevices',
+        //     'ohc' => 'quotationOhcs'
+        // ];
+        
         $modelConfig = $this->getModelConfig($jenisBarang);
         $relationName = $this->getRelationName($jenisBarang);
         $useDetailId = $modelConfig['use_detail_id'];

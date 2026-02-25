@@ -939,7 +939,7 @@ class QuotationService
                 'is_general' => true,   // Devices dibagi total HC per site
                 'site_specific' => true, // Filter berdasarkan site
                 'site_field' => 'quotation_site_id',
-                'special' => null
+                'special' => 'device'
             ],
             'ohc' => [
                 'hpp_field' => 'provisi_ohc',
@@ -1071,6 +1071,7 @@ class QuotationService
                         $config['site_specific'] ? $currentSiteId : null
                     );
                 } else {
+                    \Log::error("After Personil Device Ada {$detail->id} " . $detail->personil_devices);
                     $hppValue = $this->calculateItemTotalForHpp(
                         $config['model'],
                         $quotation->id,
@@ -1161,8 +1162,13 @@ class QuotationService
         ]);
 
         // Query dengan filter soft delete
-        $query = $model::where('quotation_id', $quotationId)
-            ->whereNull('deleted_at');
+        if($special === 'device'){
+            $query = $model::where('quotation_site_id', $siteId)
+                ->whereNull('deleted_at');
+        }else{
+            $query = $model::where('quotation_id', $quotationId)
+                ->whereNull('deleted_at');    
+        }
 
         // Filter berdasarkan detail_id jika ada (untuk kaporlap)
         if ($detailId) {
