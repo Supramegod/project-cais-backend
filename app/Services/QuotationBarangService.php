@@ -54,29 +54,40 @@ class QuotationBarangService
                 ->toArray();
 
             // 2. SOFT DELETE only items that are NOT in the incoming data
-            $deleteQuery = $modelClass::where('quotation_id', $quotation->id);
-
-            // Jika ada data incoming, soft delete yang tidak ada
-            if (!empty($incomingKeys)) {
-                // Collect existing items to compare
+            
+            // Collect existing items based on the identifier used
+            if ($useDetailId) {
+                if (!$quotation->relationLoaded('quotationDetails')) {
+                    $quotation->load('quotationDetails');
+                }
+                $detailIds = $quotation->quotationDetails->pluck('id');
+                $existingItems = $modelClass::whereIn('quotation_detail_id', $detailIds)->get();
+            } elseif ($useSiteId) {
+                if (!$quotation->relationLoaded('quotationSites')) {
+                    $quotation->load('quotationSites');
+                }
+                $siteIds = $quotation->quotationSites->pluck('id');
+                $existingItems = $modelClass::whereIn('quotation_site_id', $siteIds)->get();
+            } else {
                 $existingItems = $modelClass::where('quotation_id', $quotation->id)->get();
-                $itemsToDelete = [];
+            }
 
-                foreach ($existingItems as $existing) {
-                    $existingKey = $this->generateItemKey($existing, $useDetailId, $useSiteId);
+            // Jika ada data incoming atau exist, soft delete yang tidak ada di incoming
+            $itemsToDelete = [];
+            foreach ($existingItems as $existing) {
+                $existingKey = $this->generateItemKey($existing, $useDetailId, $useSiteId);
 
-                    if (!in_array($existingKey, $incomingKeys)) {
-                        $itemsToDelete[] = $existing->id;
-                    }
+                if (!in_array($existingKey, $incomingKeys)) {
+                    $itemsToDelete[] = $existing->id;
                 }
+            }
 
-                if (!empty($itemsToDelete)) {
-                    $modelClass::whereIn('id', $itemsToDelete)
-                        ->update([
-                            'deleted_at' => now(),
-                            'deleted_by' => Auth::user()->full_name
-                        ]);
-                }
+            if (!empty($itemsToDelete)) {
+                $modelClass::whereIn('id', $itemsToDelete)
+                    ->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => Auth::user()->full_name
+                    ]);
             }
 
 
