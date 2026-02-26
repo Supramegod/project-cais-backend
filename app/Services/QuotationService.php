@@ -988,8 +988,10 @@ class QuotationService
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
+                // PERBAIKAN: Jangan dikali HC di sini karena calculateFinalTotals akan mengali HC lagi di akhir (Double Multiplication)
                 $itemTotal = (($item->harga * $item->jumlah) / $provisi);
-                $perPerson = $itemTotal * max($jumlahHc, 1); // DIKALI, bukan dibagi
+                //$perPerson = $itemTotal * max($jumlahHc, 1); // DIKALI, bukan dibagi
+                $perPerson = $itemTotal; // Tetap per personil agar di akhir dikali HC satu kali saja
                 $total += $perPerson;
             } else {
                 $itemTotal = (($item->harga * $item->jumlah) / $provisi);
