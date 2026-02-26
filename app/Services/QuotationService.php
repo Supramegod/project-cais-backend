@@ -856,14 +856,24 @@ class QuotationService
                         $config['site_specific'] ? $currentSiteId : null
                     );
                 } else {
-                    \Log::error("After Personil Device Ada {$detail->id} " . $detail->personil_devices);
-                    $hppValue = $this->calculateItemTotalForHpp(
+                // \Log::error("After Personil Device Ada {$detail->id} " . $detail->personil_devices);
+                //     $hppValue = $this->calculateItemTotalForHpp(
+                //         $config['model'],
+                //         $quotation->id,
+                //         $config['detail_id'] ?? null,
+                //         $quotation->provisi,
+                //         $hppDivider,
+                //         null,
+                //         $detail->jumlah_hc_hpp,
+                //         $config['site_specific'] ? $currentSiteId : null
+                //     );    
+                $hppValue = $this->calculateItemTotalForHpp(
                         $config['model'],
                         $quotation->id,
                         $config['detail_id'] ?? null,
                         $quotation->provisi,
                         $hppDivider,
-                        null,
+                        $config['special'] ?? null,
                         $detail->jumlah_hc_hpp,
                         $config['site_specific'] ? $currentSiteId : null
                     );
@@ -905,7 +915,7 @@ class QuotationService
                         $config['detail_id'] ?? null,
                         $quotation->provisi,
                         $cossDivider,
-                        null,
+                        $config['special'] ?? null,
                         $detail->jumlah_hc_original,
                         $config['site_specific'] ? $currentSiteId : null
                     );
@@ -914,6 +924,7 @@ class QuotationService
             }
         }
     }
+
     /**
      * Calculate item total khusus untuk HPP dengan filter site dan soft delete
      */
@@ -967,23 +978,109 @@ class QuotationService
         }
         return $total;
     }
-    /**
-     * Calculate item total khusus untuk COSS dengan filter site dan soft delete
-     */
+    
+    // /**
+    //  * Calculate item total khusus untuk COSS dengan filter site dan soft delete
+    //  */
+    // private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
+    // {
+    //     // Query dengan filter soft delete
+    //     $query = $model::where('quotation_id', $quotationId)
+    //         ->whereNull('deleted_at');
+
+    //     // Filter berdasarkan detail_id jika ada (untuk kaporlap)
+    //     if ($detailId) {
+    //         $query->where('quotation_detail_id', $detailId);
+    //     }
+
+    //     // Filter berdasarkan site_id jika ada (untuk devices, ohc, chemical)
+    //     if ($siteId !== null) {
+    //         $query->where('quotation_site_id', $siteId);
+    //     }
+
+    //     $items = $query->get();
+    //     if ($items->isEmpty()) {
+    //         return 0;
+    //     }
+
+    //     $total = 0;
+    //     $itemIndex = 0;
+
+    //     foreach ($items as $item) {
+    //         $itemIndex++;
+    //         if ($special === 'chemical') {
+    //             $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
+    //             $perPerson = $itemTotal / max($jumlahHc, 1);
+    //             $total += $perPerson;
+    //         } elseif ($special === 'kaporlap') {
+    //             // Untuk kaporlap: dikali dengan HC, bukan dibagi
+    //             $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+    //             $perPerson = $itemTotal * max($jumlahHc, 1); // DIKALI, bukan dibagi
+    //             $total += $perPerson;
+    //         } else {
+    //             $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+    //             $perPerson = $itemTotal / max($divider, 1);
+    //             $total += $perPerson;
+    //         }
+    //     }
+    //     return $total;
+    // }
+
+    private function calculateItemTotalForhpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
+    {
+        // Query dengan filter soft delete
+        $query = $model::whereNull('deleted_at');
+
+        // Logic routing query berdasarkan ketersediaan identifier (Schema update support)
+        if ($detailId) {
+            $query->where('quotation_detail_id', $detailId);
+        } elseif ($siteId !== null) {
+            $query->where('quotation_site_id', $siteId);
+        } else {
+            $query->where('quotation_id', $quotationId);
+        }
+
+        $items = $query->get();
+        if ($items->isEmpty()) {
+            return 0;
+        }
+
+        $total = 0;
+        $itemIndex = 0;
+
+        foreach ($items as $item) {
+            $itemIndex++;
+            if ($special === 'chemical') {
+                // Untuk chemical: total dibagi jumlah HC detail ini
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
+                $perPerson = $itemTotal / max($jumlahHc, 1);
+                $total += $perPerson;
+            } elseif ($special === 'kaporlap') {
+                // Untuk kaporlap: dikali dengan HC, bukan dibagi
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+                $perPerson = $itemTotal; // DIKALI, bukan dibagi
+                $total += $perPerson;
+            } else {
+                // Untuk item lain: total dibagi jumlah HC (bisa detail atau total tergantung config)
+                $itemTotal = (($item->harga * $item->jumlah) / $provisi);
+                $perPerson = $itemTotal / max($divider, 1);
+                $total += $perPerson;
+            }
+        }
+        return $total;
+    }
     private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
     {
         // Query dengan filter soft delete
-        $query = $model::where('quotation_id', $quotationId)
-            ->whereNull('deleted_at');
+        $query = $model::whereNull('deleted_at');
 
-        // Filter berdasarkan detail_id jika ada (untuk kaporlap)
+        // Logic routing query berdasarkan ketersediaan identifier (Schema update support)
         if ($detailId) {
             $query->where('quotation_detail_id', $detailId);
-        }
-
-        // Filter berdasarkan site_id jika ada (untuk devices, ohc, chemical)
-        if ($siteId !== null) {
+        } elseif ($siteId !== null) {
             $query->where('quotation_site_id', $siteId);
+        } else {
+            $query->where('quotation_id', $quotationId);
         }
 
         $items = $query->get();
