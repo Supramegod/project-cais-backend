@@ -698,12 +698,18 @@ class QuotationService
         static $siteTotalsCalculated = false;
         static $siteHcHpp = [];
         static $siteHcCoss = [];
+        static $primarySiteId = null;
+        static $primaryDetailId = null;
 
         // Hitung total HC per site hanya sekali untuk quotation ini
         if (!$siteTotalsCalculated) {
             // Reset arrays
             $siteHcHpp = [];
             $siteHcCoss = [];
+            
+            $firstDetail = $quotation->quotation_detail->first();
+            $primarySiteId = $firstDetail->quotation_site_id ?? null;
+            $primaryDetailId = $firstDetail->id ?? null;
 
             // Kelompokkan jumlah HC per site dari SEMUA detail
             foreach ($quotation->quotation_detail as $det) {
@@ -864,7 +870,8 @@ class QuotationService
                         $hppDivider,
                         $config['special'] ?? null,
                         $detail->jumlah_hc_hpp,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        ($detail->id === $primaryDetailId) // includeLegacy
                     );
                 }
                 $detail->{"personil_$key"} = $hppValue;
@@ -906,7 +913,8 @@ class QuotationService
                         $cossDivider,
                         $config['special'] ?? null,
                         $detail->jumlah_hc_original,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        ($detail->id === $primaryDetailId) // includeLegacy
                     );
                 }
                 $detail->{"personil_{$key}_coss"} = $cossValue;
@@ -917,19 +925,34 @@ class QuotationService
     /**
      * Calculate item total khusus untuk HPP dengan filter site dan soft delete
      */
-    private function calculateItemTotalForHpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
+    private function calculateItemTotalForHpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false)
     {
         // Query dengan filter soft delete
         $query = $model::whereNull('deleted_at');
 
-        // Logic routing query berdasarkan ketersediaan identifier (Schema update support)
-        if ($detailId) {
-            $query->where('quotation_detail_id', $detailId);
-        } elseif ($siteId !== null) {
-            $query->where('quotation_site_id', $siteId);
-        } else {
-            $query->where('quotation_id', $quotationId);
-        }
+        // Logic routing query Hybrid (v1 & v2 support)
+        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+            // 1. Ambil data spesifik (Apps v2 logic)
+            $q->where(function($q2) use ($detailId, $siteId) {
+                if ($detailId) {
+                    $q2->where('quotation_detail_id', $detailId);
+                } elseif ($siteId !== null) {
+                    $q2->where('quotation_site_id', $siteId);
+                } else {
+                    $q2->where('id', 0); // Failsafe agar tidak narik semua jika ID kosong
+                }
+            });
+
+            // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
+            // Hanya jika ini site/detail utama, ambil data yang site/detail-nya NULL
+            if ($includeLegacy) {
+                $q->orWhere(function($q2) use ($quotationId) {
+                    $q2->where('quotation_id', $quotationId)
+                       ->whereNull('quotation_detail_id')
+                       ->whereNull('quotation_site_id');
+                });
+            }
+        });
 
         $items = $query->get();
         if ($items->isEmpty()) {
@@ -958,22 +981,33 @@ class QuotationService
         return $total;
     }
 
-    /**
-     * Calculate item total khusus untuk COSS dengan filter site dan soft delete
-     */
-    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null)
+    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false)
     {
         // Query dengan filter soft delete
         $query = $model::whereNull('deleted_at');
 
-        // Logic routing query berdasarkan ketersediaan identifier (Schema update support)
-        if ($detailId) {
-            $query->where('quotation_detail_id', $detailId);
-        } elseif ($siteId !== null) {
-            $query->where('quotation_site_id', $siteId);
-        } else {
-            $query->where('quotation_id', $quotationId);
-        }
+        // Logic routing query Hybrid (v1 & v2 support)
+        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+            // 1. Ambil data spesifik (Apps v2 logic)
+            $q->where(function($q2) use ($detailId, $siteId) {
+                if ($detailId) {
+                    $q2->where('quotation_detail_id', $detailId);
+                } elseif ($siteId !== null) {
+                    $q2->where('quotation_site_id', $siteId);
+                } else {
+                    $q2->where('id', 0); // Failsafe
+                }
+            });
+
+            // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
+            if ($includeLegacy) {
+                $q->orWhere(function($q2) use ($quotationId) {
+                    $q2->where('quotation_id', $quotationId)
+                       ->whereNull('quotation_detail_id')
+                       ->whereNull('quotation_site_id');
+                });
+            }
+        });
 
         $items = $query->get();
         if ($items->isEmpty()) {

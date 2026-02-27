@@ -272,7 +272,7 @@ class QuotationBarangService
 
         // Siapkan data dasar terlebih dahulu
         $createData = [
-            // 'quotation_id' => $quotation->id,
+            'quotation_id' => $quotation->id,
             'barang_id' => $barang_id,
             'jumlah' => $jumlah,
             'harga' => $harga,
