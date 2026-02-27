@@ -768,7 +768,7 @@ class QuotationStepService
                         } else {
                             // Create new
                             QuotationDevices::create([
-                                'quotation_id' => $quotation->id,
+                                // 'quotation_id' => $quotation->id,
                                 'quotation_aplikasi_id' => $quotationAplikasi->id,
                                 'quotation_site_id' => $siteId,
                                 'barang_id' => $appdukung->barang_id,
