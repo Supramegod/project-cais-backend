@@ -25,7 +25,8 @@ class QuotationNotificationService
 
     public function __construct(
         private readonly DynamicMailerService $dynamicMailer
-    ) {}
+    ) {
+    }
 
     public function sendApprovalNotification(
         Quotation $quotation,
@@ -33,7 +34,7 @@ class QuotationNotificationService
         string $approvalUrl = '#',
         ?User $senderUser = null
     ): void {
-        $recipients    = $this->resolveRecipients($quotation);
+        $recipients = $this->resolveRecipients($quotation);
         $approvalStage = $this->resolveStageLabel($quotation);
 
         if (empty($recipients)) {
@@ -52,44 +53,44 @@ class QuotationNotificationService
                 'error' => $e->getMessage(),
             ]);
             $mailerConfig = [
-                'name'          => 'smtp',
-                'config'        => [
+                'name' => 'smtp',
+                'config' => [
                     'address' => config('mail.from.address'),
-                    'name'    => config('mail.from.name'),
+                    'name' => config('mail.from.name'),
                 ],
                 'config_source' => 'fallback',
             ];
         }
 
         $fromAddress = $mailerConfig['config']['address'];
-        $fromName    = $mailerConfig['config']['name'];
+        $fromName = $mailerConfig['config']['name'];
 
         foreach ($recipients as $recipient) {
             try {
                 Mail::mailer($mailerConfig['name'])
                     ->to($recipient['email'])
                     ->send(new QuotationApprovalEmail(
-                        recipientName:   $recipient['name'],
-                        recipientRole:   $recipient['role'],
+                        recipientName: $recipient['name'],
+                        recipientRole: $recipient['role'],
                         quotationNumber: $quotation->nomor,
-                        creatorName:     $creatorName,
-                        approvalStage:   $approvalStage,
-                        approvalUrl:     $approvalUrl,
-                        top:             $quotation->top ?? null,
-                        fromAddress:     $fromAddress,
-                        fromName:        $fromName,
+                        creatorName: $creatorName,
+                        approvalStage: $approvalStage,
+                        approvalUrl: $approvalUrl,
+                        top: $quotation->top ?? null,
+                        fromAddress: $fromAddress,
+                        fromName: $fromName,
                     ));
 
                 Log::info('QuotationNotificationService: email sent', [
                     'quotation_number' => $quotation->nomor,
-                    'recipient'        => $recipient['email'],
-                    'mailer'           => $mailerConfig['name'],
+                    'recipient' => $recipient['email'],
+                    'mailer' => $mailerConfig['name'],
                 ]);
             } catch (\Exception $e) {
                 Log::error('QuotationNotificationService: failed to send email', [
                     'quotation_number' => $quotation->nomor,
-                    'recipient'        => $recipient['email'],
-                    'error'            => $e->getMessage(),
+                    'recipient' => $recipient['email'],
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -97,14 +98,26 @@ class QuotationNotificationService
 
     private function resolveRecipients(Quotation $quotation): array
     {
+        // 1. Jika Direktur Sales (OT1) belum tanda tangan
         if (empty($quotation->ot1)) {
             return self::DIR_SALES;
         }
 
-        if (empty($quotation->ot2) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return self::DIR_KEU;
+        // 2. Jika OT1 sudah ada, tapi OT2 kosong (Cek apakah butuh Level 2)
+        if (empty($quotation->ot2)) {
+            // Cek Rules Baru: THR tidak diprovisikan
+            $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+                $thr = strtolower(trim($detail->wage->thr ?? ''));
+                return $thr !== 'diprovisikan';
+            });
+
+            // Jika TOP > 7 hari ATAU THR tidak diprovisikan, kirim ke Keuangan
+            if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
+                return self::DIR_KEU;
+            }
         }
 
+        // 3. Level 3 (Umum)
         if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
             return self::DIR_UMUM;
         }
@@ -118,8 +131,15 @@ class QuotationNotificationService
             return 'Persetujuan Direktur Sales';
         }
 
-        if (empty($quotation->ot2) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return 'Persetujuan Direktur Keuangan';
+        if (empty($quotation->ot2)) {
+            $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+                $thr = strtolower(trim($detail->wage->thr ?? ''));
+                return $thr !== 'diprovisikan';
+            });
+
+            if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
+                return 'Persetujuan Direktur Keuangan';
+            }
         }
 
         if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
