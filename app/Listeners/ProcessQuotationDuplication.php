@@ -28,7 +28,7 @@ class ProcessQuotationDuplication implements ShouldQueue
     public function handle(QuotationCreated $event): void
     {
         $quotation = $event->quotation;
-        $request = (object) $event->requestData;
+        $request = \Illuminate\Http\Request::create('/', 'POST', $event->requestData);
         $tipeQuotation = $event->tipeQuotation;
         $quotationReferensi = $event->quotationReferensi;
         $user = $event->user;
@@ -41,25 +41,37 @@ class ProcessQuotationDuplication implements ShouldQueue
                 'has_referensi' => $quotationReferensi !== null,
             ]);
 
-            // ✅ Sites sudah dibuat secara synchronous di controller.
-            // Listener hanya perlu handle duplikasi detail & activity.
+            // ✅ Cek site yang sudah ada (dibuat synchronous di controller untuk tipe 'baru' tanpa referensi)
             $existingSitesCount = $quotation->quotationSites()->count();
 
             Log::info('Sites status on queue start', [
                 'existing_sites_count' => $existingSitesCount,
             ]);
 
-            // ✅ LOGIC DUPLIKASI BERDASARKAN ADA/TIDAKNYA REFERENSI
+            // ✅ Jika belum ada site, buat dari request via service (konsisten dengan controller)
+            if ($existingSitesCount === 0) {
+                $this->quotationBusinessService->createQuotationSites(
+                    $quotation,
+                    $request,
+                    $user->full_name
+                );
+
+                Log::info('Sites created from request', [
+                    'created_count' => $quotation->quotationSites()->count(),
+                ]);
+            }
+
+            // ✅ Logic duplikasi berdasarkan ada/tidaknya referensi
             if ($quotationReferensi) {
                 $this->handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user);
             } else {
-                $this->handleWithoutReference($quotation, $request, $tipeQuotation, $user);
+                $this->handleWithoutReference($quotation, $tipeQuotation, $user);
             }
 
-            // ✅ BUAT ACTIVITY
+            // ✅ Buat activity
             $this->createActivity($quotation, $tipeQuotation, $quotationReferensi, $user);
 
-            // ✅ VERIFIKASI FINAL
+            // ✅ Verifikasi final
             Log::info('=== QUOTATION DUPLICATION COMPLETED ===', [
                 'quotation_id' => $quotation->id,
                 'final_sites_count' => $quotation->quotationSites()->count(),
@@ -83,45 +95,38 @@ class ProcessQuotationDuplication implements ShouldQueue
     }
 
     /**
-     * Handle dengan referensi
+     * Handle dengan referensi — duplikasi detail berdasarkan name matching site
      */
     private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user): void
     {
+        $referensiSiteNames = $quotationReferensi->quotationSites->pluck('nama_site');
+        $currentSiteNames = $quotation->quotationSites->pluck('nama_site');
+        $hasMatchingSites = $currentSiteNames->intersect($referensiSiteNames)->isNotEmpty();
+
         Log::info('Starting duplication FROM reference', [
             'quotation_id' => $quotation->id,
             'referensi_id' => $quotationReferensi->id,
             'tipe_quotation' => $tipeQuotation,
+            'referensi_sites' => $referensiSiteNames,
+            'current_sites' => $currentSiteNames,
+            'has_matching' => $hasMatchingSites,
         ]);
 
-        $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-        $currentSiteCount = $quotation->quotationSites()->count();
-
-        Log::info('Site count comparison', [
-            'referensi_count' => $jumlahSiteReferensi,
-            'current_count' => $currentSiteCount,
-        ]);
-
-        if ($currentSiteCount === 0) {
-            // ✅ Belum ada site → copy semua dari referensi termasuk sites-nya
-            $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
-            Log::info('No sites exist, copied ALL data including sites from reference');
-
-        } elseif ($currentSiteCount === $jumlahSiteReferensi) {
-            // ✅ Jumlah site sama → mapping detail per site
+        if ($hasMatchingSites) {
+            // Ada site yang nama-nya sama → mapping by name (yang match dapat detail, yang tidak skip)
             $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-            Log::info('Same site count, used site mapping');
-
+            Log::info('Used site mapping by name');
         } else {
-            // ✅ Jumlah site beda → duplikasi semua detail ke semua site
+            // Tidak ada yang match sama sekali → duplikasi semua detail ke semua site
             $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-            Log::info('Different site count, duplicated all details to all sites');
+            Log::info('No matching sites, duplicated all details to all sites');
         }
     }
 
     /**
      * Handle tanpa referensi — hanya buat PIC awal
      */
-    private function handleWithoutReference($quotation, $request, $tipeQuotation, $user): void
+    private function handleWithoutReference($quotation, $tipeQuotation, $user): void
     {
         Log::info('Creating quotation WITHOUT reference', [
             'quotation_id' => $quotation->id,
