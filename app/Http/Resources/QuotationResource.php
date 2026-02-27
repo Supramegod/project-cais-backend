@@ -794,7 +794,7 @@ class QuotationResource extends JsonResource
                     $detail = $this->quotationDetails->firstWhere('id', $detailId);
                     return [
                         'quotation_detail_id' => $detailId,
-                        'jabatan_kebutuhan' => $detail->jabatan_kebutuhan ?? null,
+                        'jabatan_kebutuhan' => $detail->jabatan_kebutuhan ?? 'Legacy Item',
                         'jumlah_hc' => $detail->jumlah_hc ?? 0,
                         'items' => $kaporlaps->map(function ($kaporlap) {
                             return [
@@ -817,10 +817,17 @@ class QuotationResource extends JsonResource
                     $site = $this->quotationSites->firstWhere('id', $siteId);
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
+                    
+                    if (!$site && !$siteId) {
+                        $namaSite = 'Legacy/Global Data';
+                        $jabatanKebutuhan = $jabatanKebutuhan ?: 'Unassigned Site';
+                    } else {
+                        $namaSite = $site->nama_site ?? 'Unknown Site';
+                    }
 
                     return [
                         'quotation_site_id' => $siteId,
-                        'nama_site' => $site->nama_site ?? null,
+                        'nama_site' => $namaSite,
                         'jabatan_kebutuhan' => $jabatanKebutuhan,
                         'jumlah_hc' => $totalHc,
                         'items' => $devices->map(function ($device) {
@@ -845,9 +852,16 @@ class QuotationResource extends JsonResource
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
 
+                    if (!$site && !$siteId) {
+                        $namaSite = 'Legacy/Global Data';
+                        $jabatanKebutuhan = $jabatanKebutuhan ?: 'Unassigned Site';
+                    } else {
+                        $namaSite = $site->nama_site ?? 'Unknown Site';
+                    }
+
                     return [
                         'quotation_site_id' => $siteId,
-                        'nama_site' => $site->nama_site ?? null,
+                        'nama_site' => $namaSite,
                         'jabatan_kebutuhan' => $jabatanKebutuhan,
                         'jumlah_hc' => $totalHc,
                         'items' => $chemicals->map(function ($chemical) {
@@ -873,9 +887,16 @@ class QuotationResource extends JsonResource
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
 
+                    if (!$site && !$siteId) {
+                        $namaSite = 'Legacy/Global Data';
+                        $jabatanKebutuhan = $jabatanKebutuhan ?: 'Unassigned Site';
+                    } else {
+                        $namaSite = $site->nama_site ?? 'Unknown Site';
+                    }
+
                     return [
                         'quotation_site_id' => $siteId,
-                        'nama_site' => $site->nama_site ?? null,
+                        'nama_site' => $namaSite,
                         'jabatan_kebutuhan' => $jabatanKebutuhan,
                         'jumlah_hc' => $totalHc,
                         'items' => $ohcs->map(function ($ohc) {
