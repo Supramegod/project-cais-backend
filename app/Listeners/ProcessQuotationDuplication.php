@@ -22,60 +22,58 @@ class ProcessQuotationDuplication implements ShouldQueue
         QuotationBusinessService $quotationBusinessService
     ) {
         $this->quotationDuplicationService = $quotationDuplicationService;
-        $this->quotationBusinessService = $quotationBusinessService;
+        $this->quotationBusinessService    = $quotationBusinessService;
     }
 
     public function handle(QuotationCreated $event): void
     {
-        $quotation = $event->quotation;
-        $request = (object) $event->requestData;
-        $tipeQuotation = $event->tipeQuotation;
+        $quotation          = $event->quotation;
+        $request            = \Illuminate\Http\Request::create('/', 'POST', $event->requestData);
+        $tipeQuotation      = $event->tipeQuotation;
         $quotationReferensi = $event->quotationReferensi;
-        $user = $event->user;
+        $user               = $event->user;
 
         try {
-            Log::info('=== STARTING QUOTATION DUPLICATION PROCESS ===', [
-                'quotation_id' => $quotation->id,
-                'nomor' => $quotation->nomor,
-                'tipe_quotation' => $tipeQuotation,
-                'has_referensi' => $quotationReferensi !== null,
-            ]);
-
-            // ✅ Sites sudah dibuat secara synchronous di controller.
-            // Listener hanya perlu handle duplikasi detail & activity.
+            // ✅ Cek site yang sudah ada (dibuat synchronous di controller untuk tipe 'baru' tanpa referensi)
             $existingSitesCount = $quotation->quotationSites()->count();
 
             Log::info('Sites status on queue start', [
                 'existing_sites_count' => $existingSitesCount,
             ]);
 
-            // ✅ LOGIC DUPLIKASI BERDASARKAN ADA/TIDAKNYA REFERENSI
+            // ✅ Jika belum ada site, buat dari request via service (konsisten dengan controller)
+            if ($existingSitesCount === 0) {
+                $this->quotationBusinessService->createQuotationSites(
+                    $quotation,
+                    $request,
+                    $user->full_name
+                );
+
+                Log::info('Sites created from request', [
+                    'created_count' => $quotation->quotationSites()->count(),
+                ]);
+            }
+
+            // ✅ Logic duplikasi berdasarkan ada/tidaknya referensi
             if ($quotationReferensi) {
                 $this->handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user);
             } else {
-                $this->handleWithoutReference($quotation, $request, $tipeQuotation, $user);
+                $this->handleWithoutReference($quotation, $tipeQuotation, $user);
             }
 
-            // ✅ BUAT ACTIVITY
+            // ✅ Buat activity
             $this->createActivity($quotation, $tipeQuotation, $quotationReferensi, $user);
-
-            // ✅ VERIFIKASI FINAL
-            Log::info('=== QUOTATION DUPLICATION COMPLETED ===', [
-                'quotation_id' => $quotation->id,
-                'final_sites_count' => $quotation->quotationSites()->count(),
-                'final_details_count' => $quotation->quotationDetails()->count(),
-            ]);
 
         } catch (\Exception $e) {
             Log::error('Quotation duplication failed', [
                 'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error'        => $e->getMessage(),
+                'trace'        => $e->getTraceAsString(),
             ]);
 
             $quotation->update([
                 'error_message' => $e->getMessage(),
-                'is_error' => 1,
+                'is_error'      => 1,
             ]);
 
             throw $e;
@@ -83,36 +81,27 @@ class ProcessQuotationDuplication implements ShouldQueue
     }
 
     /**
-     * Handle dengan referensi
+     * Handle dengan referensi — duplikasi detail berdasarkan jumlah site
      */
     private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user): void
     {
-        Log::info('Starting duplication FROM reference', [
-            'quotation_id' => $quotation->id,
-            'referensi_id' => $quotationReferensi->id,
-            'tipe_quotation' => $tipeQuotation,
-        ]);
-
         $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-        $currentSiteCount = $quotation->quotationSites()->count();
+        $currentSiteCount    = $quotation->quotationSites()->count();
 
-        Log::info('Site count comparison', [
+        Log::info('Starting duplication FROM reference', [
+            'quotation_id'    => $quotation->id,
+            'referensi_id'    => $quotationReferensi->id,
+            'tipe_quotation'  => $tipeQuotation,
             'referensi_count' => $jumlahSiteReferensi,
-            'current_count' => $currentSiteCount,
+            'current_count'   => $currentSiteCount,
         ]);
 
-        if ($currentSiteCount === 0) {
-            // ✅ Belum ada site → copy semua dari referensi termasuk sites-nya
-            $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
-            Log::info('No sites exist, copied ALL data including sites from reference');
-
-        } elseif ($currentSiteCount === $jumlahSiteReferensi) {
-            // ✅ Jumlah site sama → mapping detail per site
+        if ($currentSiteCount === $jumlahSiteReferensi) {
+            // Jumlah sama → mapping detail per site
             $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
             Log::info('Same site count, used site mapping');
-
         } else {
-            // ✅ Jumlah site beda → duplikasi semua detail ke semua site
+            // Jumlah beda → duplikasi semua detail ke semua site
             $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
             Log::info('Different site count, duplicated all details to all sites');
         }
@@ -121,10 +110,10 @@ class ProcessQuotationDuplication implements ShouldQueue
     /**
      * Handle tanpa referensi — hanya buat PIC awal
      */
-    private function handleWithoutReference($quotation, $request, $tipeQuotation, $user): void
+    private function handleWithoutReference($quotation, $tipeQuotation, $user): void
     {
         Log::info('Creating quotation WITHOUT reference', [
-            'quotation_id' => $quotation->id,
+            'quotation_id'   => $quotation->id,
             'tipe_quotation' => $tipeQuotation,
         ]);
 
@@ -145,11 +134,11 @@ class ProcessQuotationDuplication implements ShouldQueue
     {
         try {
             $activityType = match (true) {
-                $tipeQuotation === 'revisi' => 'revisi',
-                $tipeQuotation === 'rekontrak' => 'rekontrak',
-                $tipeQuotation === 'adendum' => 'adendum',
+                $tipeQuotation === 'revisi'                               => 'revisi',
+                $tipeQuotation === 'rekontrak'                            => 'rekontrak',
+                $tipeQuotation === 'adendum'                              => 'adendum',
                 $tipeQuotation === 'baru' && $quotationReferensi !== null => 'baru_dengan_referensi',
-                default => 'baru',
+                default                                                   => 'baru',
             };
 
             $this->quotationBusinessService->createInitialActivity(
