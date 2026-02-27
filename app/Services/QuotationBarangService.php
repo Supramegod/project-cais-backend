@@ -54,29 +54,40 @@ class QuotationBarangService
                 ->toArray();
 
             // 2. SOFT DELETE only items that are NOT in the incoming data
-            $deleteQuery = $modelClass::where('quotation_id', $quotation->id);
-
-            // Jika ada data incoming, soft delete yang tidak ada
-            if (!empty($incomingKeys)) {
-                // Collect existing items to compare
+            
+            // Collect existing items based on the identifier used
+            if ($useDetailId) {
+                if (!$quotation->relationLoaded('quotationDetails')) {
+                    $quotation->load('quotationDetails');
+                }
+                $detailIds = $quotation->quotationDetails->pluck('id');
+                $existingItems = $modelClass::whereIn('quotation_detail_id', $detailIds)->get();
+            } elseif ($useSiteId) {
+                if (!$quotation->relationLoaded('quotationSites')) {
+                    $quotation->load('quotationSites');
+                }
+                $siteIds = $quotation->quotationSites->pluck('id');
+                $existingItems = $modelClass::whereIn('quotation_site_id', $siteIds)->get();
+            } else {
                 $existingItems = $modelClass::where('quotation_id', $quotation->id)->get();
-                $itemsToDelete = [];
+            }
 
-                foreach ($existingItems as $existing) {
-                    $existingKey = $this->generateItemKey($existing, $useDetailId, $useSiteId);
+            // Jika ada data incoming atau exist, soft delete yang tidak ada di incoming
+            $itemsToDelete = [];
+            foreach ($existingItems as $existing) {
+                $existingKey = $this->generateItemKey($existing, $useDetailId, $useSiteId);
 
-                    if (!in_array($existingKey, $incomingKeys)) {
-                        $itemsToDelete[] = $existing->id;
-                    }
+                if (!in_array($existingKey, $incomingKeys)) {
+                    $itemsToDelete[] = $existing->id;
                 }
+            }
 
-                if (!empty($itemsToDelete)) {
-                    $modelClass::whereIn('id', $itemsToDelete)
-                        ->update([
-                            'deleted_at' => now(),
-                            'deleted_by' => Auth::user()->full_name
-                        ]);
-                }
+            if (!empty($itemsToDelete)) {
+                $modelClass::whereIn('id', $itemsToDelete)
+                    ->update([
+                        'deleted_at' => now(),
+                        'deleted_by' => Auth::user()->full_name
+                    ]);
             }
 
 
@@ -301,7 +312,16 @@ class QuotationBarangService
         }
 
         // Cari data existing untuk update
-        $existingQuery = $modelClass::where('quotation_id', $quotation->id);
+        // $existingQuery = $modelClass::where('quotation_id', $quotation->id);
+        \Log::warning("Detailnya ", [
+                        'Jenis barang' => $jenisBarang,
+                        'detail id' => $quotation_detail_id
+                    ]);
+        if($jenisBarang === 'kaporlap'){
+            $existingQuery = $modelClass::where('quotation_detail_id', $quotation_detail_id);
+        }else{
+            $existingQuery = $modelClass::where('quotation_site_id', $quotation_site_id);
+        }
 
         // Untuk custom barang, cari berdasarkan barang_id (jika ada) atau nama
         if (isset($data['is_custom']) && $data['is_custom']) {
@@ -456,6 +476,19 @@ class QuotationBarangService
      */
     public function prepareBarangData($quotation, string $jenisBarang)
     {
+        // 'model' => QuotationDevices::class,
+        // 'jenis_barang_ids' => [8, 9, 10, 11, 12, 17],
+        // 'use_detail_id' => false,   // Tidak menggunakan detail_id
+        // 'use_site_id' => true,      // Menggunakan site_id
+        // 'default_masa_pakai' => 12
+        
+        // $relations = [
+        //     'chemicals' => 'quotationChemicals',
+        //     'kaporlap' => 'quotationKaporlaps',
+        //     'devices' => 'quotationDevices',
+        //     'ohc' => 'quotationOhcs'
+        // ];
+        
         $modelConfig = $this->getModelConfig($jenisBarang);
         $relationName = $this->getRelationName($jenisBarang);
         $useDetailId = $modelConfig['use_detail_id'];

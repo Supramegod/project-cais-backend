@@ -26,6 +26,7 @@ use App\Models\Barang;
 use App\Models\Training;
 use App\Models\JabatanPic;
 use App\Services\QuotationBarangService;
+use App\Services\QuotationService;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -33,15 +34,16 @@ use Carbon\Carbon;
 class QuotationStepResource extends JsonResource
 {
     private $step;
-    private $barangService; // ADD THIS
+    private $barangService;
+    private $quotationService;
 
     public function __construct($resource, $step = null)
     {
         parent::__construct($resource);
         $this->step = $step ?: ($resource['step'] ?? null);
-        $this->barangService = new QuotationBarangService(); // ADD THIS
+        $this->barangService = new QuotationBarangService();
+        $this->quotationService = app(QuotationService::class); // tambah ini
     }
-
     public function toArray($request)
     {
         $quotation = $this['quotation'] ?? $this->resource;
@@ -414,7 +416,7 @@ class QuotationStepResource extends JsonResource
                     // CEK PRIORITAS 2: Jenis tunjangan
                     if ($jenisValueString == 'normatif' || $jenisValueString == 'ditagihkan') {
                         return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
-                    } elseif (($jenisValueString == 'flat' && $ditagihkanValueString == 'ditagihkan') || $jenisValueString == 'diprovisikan' || $jenisValueString == 'flat' ) {
+                    } elseif (($jenisValueString == 'flat' && $ditagihkanValueString == 'ditagihkan') || $jenisValueString == 'diprovisikan' || $jenisValueString == 'flat') {
                         // **PERUBAHAN PENTING**: Gunakan nilai yang sesuai (HPP atau COSS)
                         $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada2';
                         $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada2';
@@ -428,7 +430,7 @@ class QuotationStepResource extends JsonResource
 
                 return [
                     'penagihan' => $quotation->penagihan,
-                    'nama_perusahaan' => $quotation->nama_perusahaan,   
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
                     'persentase' => $quotation->persentase,
                     'management_fee_nama' => $quotation->managementFee->nama ?? null,
                     'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
@@ -529,7 +531,7 @@ class QuotationStepResource extends JsonResource
                             $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
                             $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
                             // \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
-
+        
                             $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
                             $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
 
@@ -1011,10 +1013,8 @@ class QuotationStepResource extends JsonResource
 
     private function getCalculationData()
     {
-        $quotationService = new \App\Services\QuotationService();
-        $calculation = $quotationService->calculateQuotation($this->resource);
+        $calculation = $this->quotationService->calculateQuotation($this->resource);
 
-        // Menggunakan model untuk semua query
         return [
             'calculation' => $calculation,
             'daftar_tunjangan' => QuotationDetailTunjangan::where('quotation_id', $this->resource->id)

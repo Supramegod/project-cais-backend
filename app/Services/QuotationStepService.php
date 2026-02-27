@@ -41,6 +41,7 @@ use App\Models\Umk;
 use App\Models\Ump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\QuotationNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -50,11 +51,16 @@ class QuotationStepService
 
     protected $quotationService;
     protected $quotationBarangService;
+    protected $quotationNotificationService;
 
-    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
-    {
+    public function __construct(
+        QuotationService $quotationService,
+        QuotationBarangService $quotationBarangService,
+        QuotationNotificationService $quotationNotificationService
+    ) {
         $this->quotationService = $quotationService;
         $this->quotationBarangService = $quotationBarangService;
+        $this->quotationNotificationService = $quotationNotificationService;
     }
 
     /**
@@ -560,12 +566,6 @@ class QuotationStepService
 
             DB::commit();
 
-            \Log::info("Step 4 updated successfully", [
-                'quotation_id' => $quotation->id,
-                'global_data_updated' => !empty($globalData),
-                'position_data_updated' => $request->has('position_data')
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("Error in updateStep4", [
@@ -615,12 +615,6 @@ class QuotationStepService
                 'is_bpjs_kes' => $this->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0, // Default true
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name
-            ]);
-
-            \Log::info("Updated BPJS data for detail", [
-                'detail_id' => $detailId,
-                'penjamin' => $penjamin,
-                'nominal_takaful' => $nominalTakaful
             ]);
         }
 
@@ -774,7 +768,7 @@ class QuotationStepService
                         } else {
                             // Create new
                             QuotationDevices::create([
-                                'quotation_id' => $quotation->id,
+                                // 'quotation_id' => $quotation->id,
                                 'quotation_aplikasi_id' => $quotationAplikasi->id,
                                 'quotation_site_id' => $siteId,
                                 'barang_id' => $appdukung->barang_id,
@@ -1048,7 +1042,7 @@ class QuotationStepService
             // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
             // Create notification untuk Dir Sales dan Dir Keu
-            $this->createStepUpdateNotification($quotation, $statusData, $currentDateTime);
+            $this->notifyDirSales($quotation, $currentDateTime);
 
             DB::commit();
 
@@ -1382,7 +1376,7 @@ class QuotationStepService
 
     private function calculateFinalStatus(Quotation $quotation): array
     {
-        // 1. Cek BPJS
+        // 1. Cek BPJS (Tetap sama)
         $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
             $query->where('is_bpjs_jkk', 0)
                 ->orWhere('is_bpjs_jkm', 0)
@@ -1390,13 +1384,15 @@ class QuotationStepService
                 ->orWhere('is_bpjs_jp', 0);
         })->exists();
 
-        // 2. Cek Kompensasi & THR
-        $hasNoCompensation = $quotation->quotationDetails()->whereHas('wage', function ($query) {
+        // 2. Cek Kompensasi & THR (DIPERBARUI)
+        $hasUnconventionalBenefits = $quotation->quotationDetails()->whereHas('wage', function ($query) {
             $query->where('kompensasi', 'Tidak Ada')
-                ->orWhere('thr', 'Tidak Ada');
+                ->orWhere('thr', 'Tidak Ada')
+                // RULES BARU: Jika THR bukan 'Diprovisikan', maka butuh Level 2
+                ->orWhere('thr', '!=', 'Diprovisikan');
         })->exists();
 
-        // 3. Cek Upah Custom < 85% UMK
+        // 3. Cek Upah Custom < 85% UMK (Tetap sama)
         $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
@@ -1414,13 +1410,14 @@ class QuotationStepService
         $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
         $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
 
-        // 5. Evaluasi Akhir (Bersih)
+        // 5. Evaluasi Akhir
         $needsApprovalLevel2 = (
             $hasMissingBpjs ||
-            $hasNoCompensation ||
+            $hasUnconventionalBenefits || // Menggunakan variabel yang sudah diupdate
             $isUnderMinimumWage ||
             $isLowPercentage ||
-            $quotation->company_id == 17
+            $quotation->company_id == 17 ||
+            $quotation->top == "Lebih Dari 7 Hari" // Tambahan jika TOP juga jadi penentu
         );
 
         return [
@@ -1428,51 +1425,20 @@ class QuotationStepService
             'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
         ];
     }
-    private function createStepUpdateNotification(Quotation $quotation, array $statusData, Carbon $currentDateTime): void
+    // 1. Di updateStep12
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
-        $user = Auth::user();
+        $dirSales = [27927, 127822];
 
-        // Tentukan user yang akan menerima notifikasi
-        $dirSales = [27927, 127822]; // User ID untuk Dir Sales (role_id 96)
-        $dirKeu = [27928, 16986, 127823]; // User ID untuk Dir Keu (role_id 97 atau 40)
-        $dirUmum = []; // User ID untuk Dir Umum (role_id 99) - jika ada
-
-        $recipientUserIds = [];
-
-        // 1. Antrean Pertama: Dir Sales
-        if (empty($quotation->ot1)) {
-            $recipientUserIds = array_merge($recipientUserIds, $dirSales);
-        }
-        // 2. Antrean Kedua: Dir Keu (Hanya jika Sales SUDAH approve)
-        else if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
-            $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
-        }
-        // 3. Antrean Ketiga: Dir Umum (Hanya jika Sales & Keu SUDAH approve)
-        else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
-            $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
-        }
-        // Remove duplicates jika ada
-        $recipientUserIds = array_unique($recipientUserIds);
-
-        // Jika tidak ada recipient, tidak perlu create notifikasi
-        if (empty($recipientUserIds)) {
-            return;
-        }
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
-
-
-        // Buat pesan notifikasi
-        $quotationNumber = $quotation->nomor;
         $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur Sales.";
 
-        $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
-
-        // Kirim notifikasi ke setiap recipient
-        foreach ($recipientUserIds as $userId) {
+        foreach ($dirSales as $userId) {
             LogNotification::create([
                 'user_id' => $userId,
                 'doc_id' => $quotation->id,
@@ -1485,17 +1451,15 @@ class QuotationStepService
             ]);
         }
 
-        \Log::info("Step 12 notifications created", [
-            'quotation_id' => $quotation->id,
-            'quotation_number' => $quotationNumber,
-            'quotation_ot1' => $quotation->ot1,
-            'quotation_ot2' => $quotation->ot2,
-            'quotation_ot3' => $quotation->ot3,
-            'quotation_top' => $quotation->top,
-            'recipients' => $recipientUserIds,
-            'message' => $msg
-        ]);
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+        );
     }
+
     private function insertRequirements(Quotation $quotation): void
     {
         $currentDateTime = Carbon::now();

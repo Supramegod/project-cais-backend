@@ -199,7 +199,7 @@ class QuotationController extends Controller
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
 
                 } else {
-                    $allowedColumns = ['nomor', 'kebutuhan','created_by'];
+                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
                     if (in_array($searchBy, $allowedColumns)) {
                         $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                     }
@@ -585,7 +585,8 @@ class QuotationController extends Controller
      */
     // Di QuotationController
     public function show($id)
-    { set_time_limit(0);
+    {
+        set_time_limit(0);
         try {
             // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
@@ -963,7 +964,10 @@ class QuotationController extends Controller
     public function submitForApproval(Request $request, string $id): JsonResponse
     {
         try {
-            $quotation = Quotation::notDeleted()->findOrFail($id);
+            // TAMBAHKAN: with(['quotationDetails.wage']) agar data THR terbaca di Service
+            $quotation = Quotation::notDeleted()
+                ->with(['quotationDetails.wage'])
+                ->findOrFail($id);
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
@@ -973,23 +977,28 @@ class QuotationController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors()
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors() // Lebih rapi jika dipisah
                 ], 422);
             }
 
+            // Panggil service yang sudah kita update logikanya tadi
             $result = $this->quotationService->submitForApproval($quotation, $request->all(), Auth::user());
 
+            if (!$result['success']) {
+                return response()->json($result, 400);
+            }
+
             return response()->json([
-                'success' => $result['success'],
-                'message' => $result['success']
-                    ? ($request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully')
-                    : $result['message']
+                'success' => true,
+                'message' => $request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully',
+                'data' => $result['data'] ?? null
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit quotation for approval',
+                'message' => 'Failed to process approval',
                 'error' => $e->getMessage()
             ], 500);
         }

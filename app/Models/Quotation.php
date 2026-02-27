@@ -230,25 +230,57 @@ class Quotation extends Model
     // Relasi ke QuotationKaporlap
     public function quotationKaporlaps()
     {
-        return $this->hasMany(QuotationKaporlap::class, 'quotation_id');
+        // return $this->hasMany(QuotationKaporlap::class, 'quotation_id');
+        return $this->hasManyThrough(
+            QuotationKaporlap::class,
+            QuotationDetail::class,
+            'quotation_id',        // FK di quotation_detail
+            'quotation_detail_id', // FK di quotation_kaporlap
+            'id',                  // PK di quotation
+            'id'                   // PK di quotation_detail
+        );
     }
 
     // Relasi ke QuotationDevices
     public function quotationDevices()
     {
-        return $this->hasMany(QuotationDevices::class, 'quotation_id');
+        // return $this->hasMany(QuotationDevices::class, 'quotation_id');
+        return $this->hasManyThrough(
+            QuotationDevices::class,
+            QuotationSite::class,
+            'quotation_id',        // FK di quotation_site
+            'quotation_site_id',   // FK di quotation_devices
+            'id',                  // PK di quotation
+            'id'                   // PK di quotation_site
+        );
     }
 
     // Relasi ke QuotationChemical
     public function quotationChemicals()
     {
-        return $this->hasMany(QuotationChemical::class, 'quotation_id');
+        // return $this->hasMany(QuotationChemical::class, 'quotation_id');
+        return $this->hasManyThrough(
+            QuotationChemical::class,
+            QuotationSite::class,
+            'quotation_id',        // FK di quotation_site
+            'quotation_site_id',   // FK di quotation_chemical
+            'id',                  // PK di quotation
+            'id'                   // PK di quotation_site
+        );
     }
 
     // Relasi ke QuotationOhc
     public function quotationOhcs()
     {
-        return $this->hasMany(QuotationOhc::class, 'quotation_id');
+        // return $this->hasMany(QuotationOhc::class, 'quotation_id');
+        return $this->hasManyThrough(
+            QuotationOhc::class,
+            QuotationSite::class,
+            'quotation_id',        // FK di quotation_site
+            'quotation_site_id',   // FK di quotation_ohc
+            'id',                  // PK di quotation
+            'id'                   // PK di quotation_site
+        );
     }
 
     // Relasi ke QuotationAplikasi
@@ -438,4 +470,5 @@ class Quotation extends Model
     {
         return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
     }
+
 }
