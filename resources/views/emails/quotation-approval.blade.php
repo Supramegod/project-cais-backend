@@ -118,6 +118,7 @@
                 <span class="contact-label">MUHAMMAD NINO MAYVI DIAN</span>
                 <span class="contact-val">nino@shelterindonesia.id</span>
             </div>
+            
             <div>
                 <span class="contact-label">Direktur Keuangan</span>
                 <span class="contact-label">ALIVIAN PRANATYAS HENING LAZUARDI</span>
