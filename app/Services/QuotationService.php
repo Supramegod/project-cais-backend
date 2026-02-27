@@ -173,7 +173,7 @@ class QuotationService
             try {
                 $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc, $result);
             } catch (\Exception $e) {
-                            // Skip this detail but continue with others
+                // Skip this detail but continue with others
             }
         });
     }
@@ -718,7 +718,7 @@ class QuotationService
                     $siteHcHpp[$siteId] = 0;
                     $siteHcCoss[$siteId] = 0;
                 }
-        
+
                 if (!isset($det->jumlah_hc_hpp)) {
                     $det->jumlah_hc_hpp = $det->jumlah_hc;
                 }
@@ -748,16 +748,16 @@ class QuotationService
                 'coss_field' => 'provisi_seragam',
                 'model' => QuotationKaporlap::class,
                 'detail_id' => $detail->id,
-                'is_general' => false,  
-                'site_specific' => false, 
+                'is_general' => false,
+                'site_specific' => false,
                 'special' => 'kaporlap'
             ],
             'devices' => [
                 'hpp_field' => 'provisi_peralatan',
                 'coss_field' => 'provisi_peralatan',
                 'model' => QuotationDevices::class,
-                'is_general' => true,   
-                'site_specific' => true, 
+                'is_general' => true,
+                'site_specific' => true,
                 'site_field' => 'quotation_site_id',
                 'special' => 'device'
             ],
@@ -765,8 +765,8 @@ class QuotationService
                 'hpp_field' => 'provisi_ohc',
                 'coss_field' => 'provisi_ohc',
                 'model' => QuotationOhc::class,
-                'is_general' => true,   
-                'site_specific' => true, 
+                'is_general' => true,
+                'site_specific' => true,
                 'site_field' => 'quotation_site_id',
                 'special' => null
             ],
@@ -1709,8 +1709,7 @@ class QuotationService
         $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $currentDateTime = Carbon::now();
         $tingkat = 1;
-
-        if ($user->cais_role_id == 96) {
+        if ($user->cais_role_id == 96) { // Direktur Sales
             $updateData = [
                 'ot1' => $user->full_name,
                 'updated_at' => $currentDateTime->toDateTimeString(),
@@ -1718,17 +1717,33 @@ class QuotationService
             ];
 
             if ($isApproved) {
-                $needsLevel2 = ($quotation->top == "Lebih Dari 7 Hari");
+                $isTopMoreThan7 = ($quotation->top == "Lebih Dari 7 Hari");
+
+                $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+                    $thr = strtolower(trim($detail->wage->thr ?? ''));
+                    // Jika THR bukan 'diprovisikan', maka dianggap perlu level 2
+                    return $thr !== 'diprovisikan';
+                });
+
+                // Quotation butuh level 2 jika TOP > 7 hari ATAU ada THR tidak diprovisikan
+                $needsLevel2 = ($isTopMoreThan7 || $hasNonProvisionalThr);
+
                 $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
                 $updateData['is_aktif'] = $needsLevel2 ? 0 : 1;
             } else {
-                $updateData['status_quotation_id'] = 8;
+                $updateData['status_quotation_id'] = 8; // Rejected
                 $updateData['is_aktif'] = 0;
             }
             $tingkat = 1;
         } elseif ($user->cais_role_id == 97) {
-            if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
-                return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
+            $isNotApprovedBySales = (int) $quotation->status_quotation_id !== 2;
+            $isOt1Empty = empty($quotation->ot1) || strlen(trim($quotation->ot1)) === 0;
+
+            if ($isNotApprovedBySales || $isOt1Empty) {
+                return [
+                    'success' => false,
+                    'message' => 'Quotation belum disetujui oleh Direktur Sales (Status: ' . $quotation->status_quotation_id . ')'
+                ];
             }
 
             $updateData = [
