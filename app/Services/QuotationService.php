@@ -29,9 +29,20 @@ use App\DTO\DetailCalculation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\QuotationNotificationService;
+
 
 class QuotationService
 {
+    protected $quotationNotificationService;
+
+    public function __construct(
+
+        QuotationNotificationService $quotationNotificationService
+    ) {
+
+        $this->quotationNotificationService = $quotationNotificationService;
+    }
     // ============================ MAIN CALCULATION FLOW ============================
 
     /**
@@ -706,7 +717,7 @@ class QuotationService
             // Reset arrays
             $siteHcHpp = [];
             $siteHcCoss = [];
-            
+
             $firstDetail = $quotation->quotation_detail->first();
             $primarySiteId = $firstDetail->quotation_site_id ?? null;
             $primaryDetailId = $firstDetail->id ?? null;
@@ -931,9 +942,9 @@ class QuotationService
         $query = $model::whereNull('deleted_at');
 
         // Logic routing query Hybrid (v1 & v2 support)
-        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+        $query->where(function ($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
             // 1. Ambil data spesifik (Apps v2 logic)
-            $q->where(function($q2) use ($detailId, $siteId) {
+            $q->where(function ($q2) use ($detailId, $siteId) {
                 if ($detailId) {
                     $q2->where('quotation_detail_id', $detailId);
                 } elseif ($siteId !== null) {
@@ -946,10 +957,10 @@ class QuotationService
             // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
             // Hanya jika ini site/detail utama, ambil data yang site/detail-nya NULL
             if ($includeLegacy) {
-                $q->orWhere(function($q2) use ($quotationId) {
+                $q->orWhere(function ($q2) use ($quotationId) {
                     $q2->where('quotation_id', $quotationId)
-                       ->whereNull('quotation_detail_id')
-                       ->whereNull('quotation_site_id');
+                        ->whereNull('quotation_detail_id')
+                        ->whereNull('quotation_site_id');
                 });
             }
         });
@@ -987,9 +998,9 @@ class QuotationService
         $query = $model::whereNull('deleted_at');
 
         // Logic routing query Hybrid (v1 & v2 support)
-        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+        $query->where(function ($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
             // 1. Ambil data spesifik (Apps v2 logic)
-            $q->where(function($q2) use ($detailId, $siteId) {
+            $q->where(function ($q2) use ($detailId, $siteId) {
                 if ($detailId) {
                     $q2->where('quotation_detail_id', $detailId);
                 } elseif ($siteId !== null) {
@@ -1001,10 +1012,10 @@ class QuotationService
 
             // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
             if ($includeLegacy) {
-                $q->orWhere(function($q2) use ($quotationId) {
+                $q->orWhere(function ($q2) use ($quotationId) {
                     $q2->where('quotation_id', $quotationId)
-                       ->whereNull('quotation_detail_id')
-                       ->whereNull('quotation_site_id');
+                        ->whereNull('quotation_detail_id')
+                        ->whereNull('quotation_site_id');
                 });
             }
         });
@@ -1760,6 +1771,9 @@ class QuotationService
 
         $quotation->update($updateData);
 
+        if ($user->cais_role_id == 96 && $isApproved && $needsLevel2) {
+            $this->notifyDirKeu($quotation->fresh(), $currentDateTime);
+        }
         // Log approval
         LogApproval::create([
             'tabel' => 'quotation',
@@ -1805,6 +1819,50 @@ class QuotationService
         }
 
         return ['success' => true, 'data' => $quotation->fresh()];
+    }
+    // 2. Di submitForApproval ketika Dir Sales approve
+    private function notifyDirKeu(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirKeu = [27928, 16986, 127823];
+
+        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+            $thr = strtolower(trim($detail->wage->thr ?? ''));
+            return $thr !== 'diprovisikan';
+        });
+
+        if (!($quotation->top == 'Lebih Dari 7 Hari' || $hasNonProvisionalThr)) {
+            return;
+        }
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah disetujui Direktur Sales dan membutuhkan persetujuan Direktur Keuangan.";
+
+        foreach ($dirKeu as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        // notifyDirKeu
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+        );
     }
 
     /**

@@ -12,16 +12,12 @@ use Illuminate\Support\Facades\Mail;
 class QuotationNotificationService
 {
     const DIR_SALES = [
-        // ['name' => 'Nino', 'email' => 'nino@shelterindonesia.id', 'role' => 'Dir. Sales'],
         ['name' => 'jalu pradipta', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [
-        // ['name' => 'Alivian', 'email' => 'alivian@shelterindonesia.id', 'role' => 'Dir. Keuangan'],
         ['name' => 'zamzam akabar', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
-
-    const DIR_UMUM = [];
 
     public function __construct(
         private readonly DynamicMailerService $dynamicMailer
@@ -32,10 +28,11 @@ class QuotationNotificationService
         Quotation $quotation,
         string $creatorName,
         string $approvalUrl = '#',
-        ?User $senderUser = null
+        ?User $senderUser = null,
+        ?array $overrideRecipients = null
     ): void {
-        $recipients = $this->resolveRecipients($quotation);
-        $approvalStage = $this->resolveStageLabel($quotation);
+        $recipients = $overrideRecipients ?? $this->resolveRecipients($quotation);
+        $approvalStage = $this->resolveStageLabel($overrideRecipients);
 
         if (empty($recipients)) {
             Log::info('QuotationNotificationService: no recipients for this stage', [
@@ -79,6 +76,7 @@ class QuotationNotificationService
                         top: $quotation->top ?? null,
                         fromAddress: $fromAddress,
                         fromName: $fromName,
+                        namaPerusahaan: $quotation->nama_perusahaan ?? null,
                     ));
 
                 Log::info('QuotationNotificationService: email sent', [
@@ -98,52 +96,32 @@ class QuotationNotificationService
 
     private function resolveRecipients(Quotation $quotation): array
     {
-        // 1. Jika Direktur Sales (OT1) belum tanda tangan
         if (empty($quotation->ot1)) {
             return self::DIR_SALES;
         }
 
-        // 2. Jika OT1 sudah ada, tapi OT2 kosong (Cek apakah butuh Level 2)
         if (empty($quotation->ot2)) {
-            // Cek Rules Baru: THR tidak diprovisikan
             $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
                 $thr = strtolower(trim($detail->wage->thr ?? ''));
                 return $thr !== 'diprovisikan';
             });
 
-            // Jika TOP > 7 hari ATAU THR tidak diprovisikan, kirim ke Keuangan
             if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
                 return self::DIR_KEU;
             }
         }
 
-        // 3. Level 3 (Umum)
-        if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return self::DIR_UMUM;
-        }
-
         return [];
     }
 
-    private function resolveStageLabel(Quotation $quotation): string
+    private function resolveStageLabel(?array $recipients): string
     {
-        if (empty($quotation->ot1)) {
+        if ($recipients === self::DIR_SALES) {
             return 'Persetujuan Direktur Sales';
         }
 
-        if (empty($quotation->ot2)) {
-            $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
-                $thr = strtolower(trim($detail->wage->thr ?? ''));
-                return $thr !== 'diprovisikan';
-            });
-
-            if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
-                return 'Persetujuan Direktur Keuangan';
-            }
-        }
-
-        if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return 'Persetujuan Direktur Umum';
+        if ($recipients === self::DIR_KEU) {
+            return 'Persetujuan Direktur Keuangan';
         }
 
         return 'Selesai';

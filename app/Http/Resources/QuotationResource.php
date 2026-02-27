@@ -34,7 +34,7 @@ class QuotationResource extends JsonResource
 
         // Hitung quotation menggunakan service dengan error handling
         try {
-            $quotationService = new QuotationService();
+            $quotationService = app(QuotationService::class);
             $this->calculatedQuotation = $quotationService->calculateQuotation($resource);
         } catch (\Exception $e) {
             \Log::error("Error calculating quotation in resource: " . $e->getMessage());
