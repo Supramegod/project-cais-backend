@@ -1042,7 +1042,7 @@ class QuotationStepService
             // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
             // Create notification untuk Dir Sales dan Dir Keu
-            $this->createStepUpdateNotification($quotation, $statusData, $currentDateTime);
+            $this->notifyDirSales($quotation, $currentDateTime);
 
             DB::commit();
 
@@ -1425,57 +1425,20 @@ class QuotationStepService
             'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
         ];
     }
-    private function createStepUpdateNotification(Quotation $quotation, array $statusData, Carbon $currentDateTime): void
+    // 1. Di updateStep12
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
-        $user = Auth::user();
-
         $dirSales = [27927, 127822];
-        $dirKeu = [27928, 16986, 127823];
-        $dirUmum = [];
-
-        $recipientUserIds = [];
-
-        // 1. Jika belum di-approve Sales sama sekali (OT1 kosong)
-        if (empty($quotation->ot1)) {
-            $recipientUserIds = array_merge($recipientUserIds, $dirSales);
-        }
-        // 2. Jika sudah di-approve Sales (OT1 ada) tapi butuh Level 2 (OT2 kosong)
-        else if (empty($quotation->ot2)) {
-
-            // Cek apakah ada THR yang TIDAK diprovisikan
-            $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
-                $thr = strtolower(trim($detail->wage->thr ?? ''));
-                return $thr !== 'diprovisikan';
-            });
-
-            // Rules Level 2: TOP > 7 hari ATAU THR tidak diprovisikan
-            if ($quotation->top == 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
-                $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
-            }
-        }
-        // 3. Jika butuh Level 3 (OT3 kosong)
-        else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
-            $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
-        }
-
-
-        $recipientUserIds = array_unique($recipientUserIds);
-
-        if (empty($recipientUserIds)) {
-            return;
-        }
 
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
-        $quotationNumber = $quotation->nomor;
         $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur Sales.";
 
-        $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
-
-        foreach ($recipientUserIds as $userId) {
+        foreach ($dirSales as $userId) {
             LogNotification::create([
                 'user_id' => $userId,
                 'doc_id' => $quotation->id,
@@ -1488,14 +1451,15 @@ class QuotationStepService
             ]);
         }
 
-        // Log & Email Service tetap sama...
         $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
         $this->quotationNotificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
         );
     }
+
     private function insertRequirements(Quotation $quotation): void
     {
         $currentDateTime = Carbon::now();
