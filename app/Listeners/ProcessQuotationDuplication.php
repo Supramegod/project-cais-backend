@@ -22,18 +22,25 @@ class ProcessQuotationDuplication implements ShouldQueue
         QuotationBusinessService $quotationBusinessService
     ) {
         $this->quotationDuplicationService = $quotationDuplicationService;
-        $this->quotationBusinessService    = $quotationBusinessService;
+        $this->quotationBusinessService = $quotationBusinessService;
     }
 
     public function handle(QuotationCreated $event): void
     {
-        $quotation          = $event->quotation;
-        $request            = \Illuminate\Http\Request::create('/', 'POST', $event->requestData);
-        $tipeQuotation      = $event->tipeQuotation;
+        $quotation = $event->quotation;
+        $request = \Illuminate\Http\Request::create('/', 'POST', $event->requestData);
+        $tipeQuotation = $event->tipeQuotation;
         $quotationReferensi = $event->quotationReferensi;
-        $user               = $event->user;
+        $user = $event->user;
 
         try {
+            Log::info('=== STARTING QUOTATION DUPLICATION PROCESS ===', [
+                'quotation_id' => $quotation->id,
+                'nomor' => $quotation->nomor,
+                'tipe_quotation' => $tipeQuotation,
+                'has_referensi' => $quotationReferensi !== null,
+            ]);
+
             // ✅ Cek site yang sudah ada (dibuat synchronous di controller untuk tipe 'baru' tanpa referensi)
             $existingSitesCount = $quotation->quotationSites()->count();
 
@@ -64,16 +71,23 @@ class ProcessQuotationDuplication implements ShouldQueue
             // ✅ Buat activity
             $this->createActivity($quotation, $tipeQuotation, $quotationReferensi, $user);
 
+            // ✅ Verifikasi final
+            Log::info('=== QUOTATION DUPLICATION COMPLETED ===', [
+                'quotation_id' => $quotation->id,
+                'final_sites_count' => $quotation->quotationSites()->count(),
+                'final_details_count' => $quotation->quotationDetails()->count(),
+            ]);
+
         } catch (\Exception $e) {
             Log::error('Quotation duplication failed', [
                 'quotation_id' => $quotation->id,
-                'error'        => $e->getMessage(),
-                'trace'        => $e->getTraceAsString(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $quotation->update([
                 'error_message' => $e->getMessage(),
-                'is_error'      => 1,
+                'is_error' => 1,
             ]);
 
             throw $e;
@@ -81,29 +95,31 @@ class ProcessQuotationDuplication implements ShouldQueue
     }
 
     /**
-     * Handle dengan referensi — duplikasi detail berdasarkan jumlah site
+     * Handle dengan referensi — duplikasi detail berdasarkan name matching site
      */
     private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user): void
     {
-        $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-        $currentSiteCount    = $quotation->quotationSites()->count();
+        $referensiSiteNames = $quotationReferensi->quotationSites->pluck('nama_site');
+        $currentSiteNames = $quotation->quotationSites->pluck('nama_site');
+        $hasMatchingSites = $currentSiteNames->intersect($referensiSiteNames)->isNotEmpty();
 
         Log::info('Starting duplication FROM reference', [
-            'quotation_id'    => $quotation->id,
-            'referensi_id'    => $quotationReferensi->id,
-            'tipe_quotation'  => $tipeQuotation,
-            'referensi_count' => $jumlahSiteReferensi,
-            'current_count'   => $currentSiteCount,
+            'quotation_id' => $quotation->id,
+            'referensi_id' => $quotationReferensi->id,
+            'tipe_quotation' => $tipeQuotation,
+            'referensi_sites' => $referensiSiteNames,
+            'current_sites' => $currentSiteNames,
+            'has_matching' => $hasMatchingSites,
         ]);
 
-        if ($currentSiteCount === $jumlahSiteReferensi) {
-            // Jumlah sama → mapping detail per site
+        if ($hasMatchingSites) {
+            // Ada site yang nama-nya sama → mapping by name (yang match dapat detail, yang tidak skip)
             $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-            Log::info('Same site count, used site mapping');
+            Log::info('Used site mapping by name');
         } else {
-            // Jumlah beda → duplikasi semua detail ke semua site
+            // Tidak ada yang match sama sekali → duplikasi semua detail ke semua site
             $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-            Log::info('Different site count, duplicated all details to all sites');
+            Log::info('No matching sites, duplicated all details to all sites');
         }
     }
 
@@ -113,7 +129,7 @@ class ProcessQuotationDuplication implements ShouldQueue
     private function handleWithoutReference($quotation, $tipeQuotation, $user): void
     {
         Log::info('Creating quotation WITHOUT reference', [
-            'quotation_id'   => $quotation->id,
+            'quotation_id' => $quotation->id,
             'tipe_quotation' => $tipeQuotation,
         ]);
 
@@ -134,11 +150,11 @@ class ProcessQuotationDuplication implements ShouldQueue
     {
         try {
             $activityType = match (true) {
-                $tipeQuotation === 'revisi'                               => 'revisi',
-                $tipeQuotation === 'rekontrak'                            => 'rekontrak',
-                $tipeQuotation === 'adendum'                              => 'adendum',
+                $tipeQuotation === 'revisi' => 'revisi',
+                $tipeQuotation === 'rekontrak' => 'rekontrak',
+                $tipeQuotation === 'adendum' => 'adendum',
                 $tipeQuotation === 'baru' && $quotationReferensi !== null => 'baru_dengan_referensi',
-                default                                                   => 'baru',
+                default => 'baru',
             };
 
             $this->quotationBusinessService->createInitialActivity(
