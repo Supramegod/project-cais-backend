@@ -41,6 +41,7 @@ use App\Models\Umk;
 use App\Models\Ump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\QuotationNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
@@ -50,11 +51,16 @@ class QuotationStepService
 
     protected $quotationService;
     protected $quotationBarangService;
+    protected $quotationNotificationService;
 
-    public function __construct(QuotationService $quotationService, QuotationBarangService $quotationBarangService)
-    {
+    public function __construct(
+        QuotationService $quotationService,
+        QuotationBarangService $quotationBarangService,
+        QuotationNotificationService $quotationNotificationService
+    ) {
         $this->quotationService = $quotationService;
         $this->quotationBarangService = $quotationBarangService;
+        $this->quotationNotificationService = $quotationNotificationService;
     }
 
     /**
@@ -560,12 +566,6 @@ class QuotationStepService
 
             DB::commit();
 
-            \Log::info("Step 4 updated successfully", [
-                'quotation_id' => $quotation->id,
-                'global_data_updated' => !empty($globalData),
-                'position_data_updated' => $request->has('position_data')
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("Error in updateStep4", [
@@ -615,12 +615,6 @@ class QuotationStepService
                 'is_bpjs_kes' => $this->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0, // Default true
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name
-            ]);
-
-            \Log::info("Updated BPJS data for detail", [
-                'detail_id' => $detailId,
-                'penjamin' => $penjamin,
-                'nominal_takaful' => $nominalTakaful
             ]);
         }
 
@@ -1432,48 +1426,36 @@ class QuotationStepService
     {
         $user = Auth::user();
 
-        // Tentukan user yang akan menerima notifikasi
-        $dirSales = [27927, 127822]; // User ID untuk Dir Sales (role_id 96)
-        $dirKeu = [27928, 16986, 127823]; // User ID untuk Dir Keu (role_id 97 atau 40)
-        $dirUmum = []; // User ID untuk Dir Umum (role_id 99) - jika ada
+        $dirSales = [27927, 127822];
+        $dirKeu = [27928, 16986, 127823];
+        $dirUmum = [];
 
         $recipientUserIds = [];
 
         if (empty($quotation->ot1)) {
             $recipientUserIds = array_merge($recipientUserIds, $dirSales);
-        }
-
-        // Jika quotation belum ada ot2 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Keu
-        if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
+        } else if (empty($quotation->ot2) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirKeu);
-        }
-
-        // Jika sudah ada ot1 dan ot2, tapi belum ada ot3 DAN TOP "Lebih Dari 7 Hari" -> kirim ke Dir Umum
-        if (!empty($quotation->ot1) && !empty($quotation->ot2) && empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
+        } else if (empty($quotation->ot3) && $quotation->top == 'Lebih Dari 7 Hari') {
             $recipientUserIds = array_merge($recipientUserIds, $dirUmum);
         }
 
-        // Remove duplicates jika ada
         $recipientUserIds = array_unique($recipientUserIds);
 
-        // Jika tidak ada recipient, tidak perlu create notifikasi
         if (empty($recipientUserIds)) {
             return;
         }
+
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
             ->first();
 
-
-
-        // Buat pesan notifikasi
         $quotationNumber = $quotation->nomor;
         $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
 
         $msg = "Quotation dengan nomor: {$quotationNumber} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan lebih lanjut.";
 
-        // Kirim notifikasi ke setiap recipient
         foreach ($recipientUserIds as $userId) {
             LogNotification::create([
                 'user_id' => $userId,
@@ -1497,6 +1479,20 @@ class QuotationStepService
             'recipients' => $recipientUserIds,
             'message' => $msg
         ]);
+
+        // ↓ Tambah ini
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+
+        \Log::info('Auth user saat notifikasi', [
+            'user_id' => Auth::user()?->id,
+            'email' => Auth::user()?->email,
+        ]);
+
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+        );
     }
     private function insertRequirements(Quotation $quotation): void
     {
@@ -2778,6 +2774,11 @@ class QuotationStepService
             // if ($request->has('bpjs_persentase_data') && is_array($request->bpjs_persentase_data)) {
             //     $this->updateBpjsPersentaseFromRequest($quotation, $request->bpjs_persentase_data, $user, $currentDateTime);
             // }
+
+            // D2. Process BPJS KS nominal
+            if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
+                $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
+            }
 
             // E. Process tunjangan data
             if ($request->has('tunjangan_data') && is_array($request->tunjangan_data)) {
@@ -4065,5 +4066,44 @@ class QuotationStepService
             }
         }
     }
+    /**
+     * Update nominal BPJS KS di HPP dan COSS
+     */
+    private function updateBpjsKsNominal(Quotation $quotation, array $bpjsKsData, string $user, Carbon $currentDateTime): void
+    {
+        \Log::info("Updating BPJS KS nominal", [
+            'quotation_id' => $quotation->id,
+            'details_count' => count($bpjsKsData)
+        ]);
 
+        foreach ($bpjsKsData as $detailId => $nominalBpjsKs) {
+            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detailId)->first();
+            $coss = QuotationDetailCoss::where('quotation_detail_id', $detailId)->first();
+
+            if (is_string($nominalBpjsKs)) {
+                $nominalBpjsKs = (float) str_replace(['.', ','], ['', '.'], $nominalBpjsKs);
+            }
+
+            if ($hpp) {
+                $hpp->update([
+                    'bpjs_ks' => $nominalBpjsKs,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ]);
+            }
+
+            if ($coss) {
+                $coss->update([
+                    'bpjs_ks' => $nominalBpjsKs,
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ]);
+            }
+
+            \Log::info("Updated BPJS KS nominal", [
+                'detail_id' => $detailId,
+                'nominal' => $nominalBpjsKs
+            ]);
+        }
+    }
 }

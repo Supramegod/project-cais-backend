@@ -126,25 +126,53 @@ class QuotationBusinessService
         ]);
     }
 
+    // QuotationBusinessService.php
     /**
      * Create initial PIC for quotation
      */
-    public function createInitialPic(Quotation $quotation, Request $request, string $createdBy): void
+    // QuotationBusinessService.php
+    /**
+     * Create initial PIC for quotation
+     */
+    // QuotationBusinessService.php - Perbaiki method createInitialPic
+    public function createInitialPic(Quotation $quotation, string $createdBy): void
     {
-        $leads = Leads::findOrFail($request->perusahaan_id);
+        try {
+            // Get leads data
+            $leads = $quotation->leads;
 
-        QuotationPic::create([
-            'quotation_id' => $quotation->id,
-            'leads_id' => $quotation->leads_id,
-            'nama' => $leads->pic,
-            'jabatan_id' => $leads->jabatan_id,
-            'jabatan' => $leads->jabatan,
-            'no_telp' => $leads->no_telp,
-            'email' => $leads->email,
-            'created_by' => $createdBy
-        ]);
+            if (!$leads) {
+                \Log::warning('Leads not found for quotation', [
+                    'quotation_id' => $quotation->id
+                ]);
+                return;
+            }
+
+            // Create PIC from leads contact person
+            if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
+                $quotation->quotationPics()->create([
+                    'leads_id' => $leads->id,
+                    'nama' => $leads->pic ?? 'Unknown',
+                    'jabatan' => $leads->jabatan ?? 'Contact Person',
+                    'email' => $leads->email ?? '',
+                    'no_hp' => $leads->telp_perusahaan ?? '',
+                    'created_by' => $createdBy
+                ]);
+
+                \Log::info('Initial PIC created from leads', [
+                    'quotation_id' => $quotation->id,
+                    'pic_name' => $leads->pic
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('Failed to create initial PIC', [
+                'quotation_id' => $quotation->id,
+                'error' => $e->getMessage()
+            ]);
+            // Don't throw, just log the error
+        }
     }
-
     public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
     {
         $leads = $quotation->leads;
@@ -156,7 +184,7 @@ class QuotationBusinessService
         // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
         $user = Auth::user();
 
-        if ($user && in_array($user->cais_role_id, [29,30,31,32,33])) {
+        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
             $this->createSalesActivity($quotation, $createdBy);
         } else {
@@ -207,18 +235,16 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
-
             case 'rekontrak':
                 return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
-
+            case 'addendum':
+                return "Quotation addendum {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
             case 'baru_dengan_referensi':
                 return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
-
             default: // 'baru'
                 return "Quotation baru {$quotation->nomor} dibuat dari awal";
         }
     }
-
     /**
      * Get activity type based on quotation type
      */
@@ -227,13 +253,12 @@ class QuotationBusinessService
         switch ($tipe) {
             case 'revisi':
                 return 'Quotation Revisi';
-
             case 'rekontrak':
                 return 'Quotation Rekontrak';
-
+            case 'addendum':
+                return 'Quotation addendum';
             case 'baru_dengan_referensi':
                 return 'Quotation copy';
-
             default: // 'baru'
                 return 'Quotation';
         }
@@ -305,19 +330,30 @@ class QuotationBusinessService
         $year = $now->year;
         $month = $now->format('m');
 
+        // 1. Logic Khusus untuk Addendum
+        if ($tipeQuotation === 'addendum' && $quotationReferensi) {
+            // Ambil nomor referensi (contoh: QUOT/ABC/001-022026-00001)
+            $nomorRef = $quotationReferensi->nomor;
+
+            // Hitung sudah berapa kali quotation ini di-addendum
+            $counter = Quotation::where('tipe_quotation', 'addendum')
+                ->where('nomor', 'like', "ADD/{$nomorRef}/%")
+                ->count() + 1;
+
+            return "ADD/" . $nomorRef . "/" . str_pad($counter, 5, '0', STR_PAD_LEFT);
+        }
+
+        // 2. Logic Standar untuk tipe lain (Baru, Revisi, Rekontrak)
         $dataLeads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
 
-        // Base format: QUOT/[jenis jika ada]/[COMPANY_CODE]/[LEADS_NUMBER]-[MMYYYY]-[XXXXX]
         $base = "QUOT/";
-        // Tambahkan company code dan leads number
         if ($company) {
             $base .= $company->code . "/" . $dataLeads->nomor . "-" . $month . $year . "-";
         } else {
             $base .= "NN/NNNNN-" . $month . $year . "-";
         }
 
-        // Hitung counter berdasarkan tipe quotation dan bulan
         $counter = Quotation::where('tipe_quotation', $tipeQuotation)
             ->whereYear('created_at', $year)
             ->whereMonth('created_at', $now->month)
@@ -388,14 +424,14 @@ class QuotationBusinessService
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
         $query = Quotation::with(['statusQuotation', 'pks', 'quotationSites'])
-            ->where('leads_id', $leadsId)
             ->withoutTrashed();
 
         switch ($tipeQuotation) {
             case 'baru':
                 $query
                     // Bukan revisi
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5,8])
+                    ->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8])
                     // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
                     ->whereDoesntHave('pks', function ($q) {
                         $q->where('is_aktif', 1)
@@ -404,14 +440,38 @@ class QuotationBusinessService
                 break;
 
             case 'revisi':
-                $query->whereIn('status_quotation_id', [1, 2, 4, 5,8]);
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+
+                break;
+            case 'addendum':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+                // ->where(function ($q) {
+                //     $q->whereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereHas('pks', function ($pksQuery) {
+                //             $pksQuery->where('is_aktif', 1)
+                //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
+                //         });
+                //     })
+                //     ->orWhereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereNull('pks_id');
+                //     });
+                // });
                 break;
 
             case 'rekontrak':
-                $query
-                    // 1. Tetap batasi status agar yang muncul hanya yang relevan (Draft, Sent, dsb)
-                    ->where('status_quotation_id', 3)
-                    ->orWhereNotNull('ot1');
+                $query->where('leads_id', $leadsId)
+                    ->where(function ($q) {
+                        $q->where('status_quotation_id', 3)
+                            ->orWhereNotNull('ot1');
+                    });
+                // ->whereHas('sites', function ($siteQuery) {
+                //     $siteQuery->whereHas('pks', function ($pksQuery) {
+                //         $pksQuery->where('is_aktif', 1)
+                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                //     });
+                // });
                 break;
         }
 

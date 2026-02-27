@@ -4434,6 +4434,51 @@
                             "type": "string",
                             "example": "Telepon"
                         }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman untuk pagination (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman untuk pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kebutuhan"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
                     }
                 ],
                 "responses": {
@@ -5815,80 +5860,71 @@
                 "tags": [
                     "Customer Activity"
                 ],
-                "summary": "Send email notification with dynamic SMTP configuration",
-                "description": "Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. \n     *                 Jika user memiliki konfigurasi email, akan digunakan. \n     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
+                "summary": "Send email notification with attachments using dynamic SMTP",
+                "description": "Mengirim email notifikasi dengan attachment menggunakan konfigurasi SMTP user yang sedang login. Sistem akan otomatis membuat customer activity baru dengan tipe 'Email' dan menyimpan file attachment ke storage. Email menggunakan template profesional dengan branding perusahaan.",
                 "operationId": "075717d714fe38302a4787bfe54e4b40",
                 "requestBody": {
+                    "description": "Email data dengan support untuk multiple attachments (max 10MB per file)",
                     "required": true,
                     "content": {
-                        "application/json": {
+                        "multipart/form-data": {
                             "schema": {
                                 "required": [
                                     "subject",
                                     "body",
-                                    "recipients",
-                                    "leads_id"
+                                    "leads_id",
+                                    "recipients[]"
                                 ],
                                 "properties": {
                                     "subject": {
                                         "description": "Subject email",
                                         "type": "string",
-                                        "example": "Update Customer Activity"
+                                        "maxLength": 255,
+                                        "example": "Penawaran Kerja Sama - PT Shelter Indonesia"
                                     },
                                     "body": {
-                                        "description": "Isi email (mendukung line breaks)",
+                                        "description": "Isi email (plain text atau dengan line breaks)",
                                         "type": "string",
-                                        "example": "Customer activity telah diupdate. Berikut detailnya:\\n\\nNama Perusahaan: PT ABC\\nTanggal: 2024-12-09\\nTipe: Meeting\\nCatatan: Follow up penawaran produk"
+                                        "example": "Kepada Yth. Bapak/Ibu,\\n\\nBersama ini kami sampaikan penawaran kerja sama untuk layanan Laboratory Service.\\n\\nMohon dapat ditinjau dokumen terlampir.\\n\\nTerima kasih."
                                     },
                                     "leads_id": {
-                                        "description": "ID leads untuk membuat activity baru",
+                                        "description": "ID leads yang terkait dengan email ini",
                                         "type": "integer",
                                         "example": 1
                                     },
-                                    "recipients": {
-                                        "description": "Array email penerima",
+                                    "recipients[]": {
+                                        "description": "Array email penerima (minimal 1). Gunakan recipients[0], recipients[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
                                             "format": "email",
-                                            "example": "customer@example.com"
+                                            "example": "client@example.com"
                                         }
                                     },
-                                    "cc": {
-                                        "description": "Optional: CC recipients",
+                                    "cc[]": {
+                                        "description": "Array email CC (opsional). Gunakan cc[0], cc[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
-                                            "format": "email"
+                                            "format": "email",
+                                            "example": "supervisor@shelter.com"
                                         }
                                     },
-                                    "bcc": {
-                                        "description": "Optional: BCC recipients",
+                                    "bcc[]": {
+                                        "description": "Array email BCC (opsional). Gunakan bcc[0], bcc[1], dst.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
-                                            "format": "email"
+                                            "format": "email",
+                                            "example": "archive@shelter.com"
                                         }
                                     },
-                                    "attachments": {
-                                        "description": "Optional: File attachments",
+                                    "attachments[]": {
+                                        "description": "Array file attachment (opsional, max 10MB per file). Format: pdf, doc, docx, xls, xlsx, jpg, jpeg, png",
                                         "type": "array",
                                         "items": {
-                                            "properties": {
-                                                "name": {
-                                                    "type": "string",
-                                                    "example": "document.pdf"
-                                                },
-                                                "content": {
-                                                    "description": "Base64 encoded file content",
-                                                    "type": "string"
-                                                },
-                                                "mime": {
-                                                    "type": "string",
-                                                    "example": "application/pdf"
-                                                }
-                                            },
-                                            "type": "object"
+                                            "type": "string",
+                                            "format": "binary"
                                         }
                                     }
                                 },
@@ -5899,7 +5935,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Email berhasil dikirim dan activity baru dibuat",
+                        "description": "Success - Email berhasil dikirim ke semua penerima dan customer activity baru telah dibuat",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5910,43 +5946,104 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"
+                                            "example": "Email berhasil dikirim ke 2 penerima dan activity baru telah dibuat"
                                         },
                                         "data": {
                                             "properties": {
                                                 "mailer_used": {
+                                                    "description": "SMTP mailer yang digunakan",
                                                     "type": "string",
                                                     "example": "user_123_smtp"
                                                 },
-                                                "sender": {
+                                                "config_source": {
+                                                    "description": "Sumber konfigurasi: user_custom, user_default, atau system_default",
                                                     "type": "string",
-                                                    "example": "John Doe <john@example.com>"
+                                                    "example": "user_custom"
+                                                },
+                                                "sender": {
+                                                    "description": "Pengirim email",
+                                                    "type": "string",
+                                                    "example": "John Doe <john@shelter.com>"
                                                 },
                                                 "recipients_count": {
+                                                    "description": "Jumlah penerima yang berhasil",
                                                     "type": "integer",
-                                                    "example": 3
+                                                    "example": 2
+                                                },
+                                                "recipients": {
+                                                    "description": "List email penerima yang berhasil",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client@example.com",
+                                                        "manager@example.com"
+                                                    ]
+                                                },
+                                                "attachments_count": {
+                                                    "description": "Jumlah file attachment",
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "attachments": {
+                                                    "description": "List nama file attachment",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "proposal.pdf",
+                                                        "price_list.xlsx"
+                                                    ]
                                                 },
                                                 "activity": {
+                                                    "description": "Customer activity yang dibuat",
                                                     "properties": {
                                                         "id": {
                                                             "type": "integer",
-                                                            "example": 123
+                                                            "example": 456
                                                         },
                                                         "nomor": {
                                                             "type": "string",
-                                                            "example": "CAT/LS/LS001-122024-00001"
+                                                            "example": "CAT/LS/LS001-022025-00123"
                                                         },
                                                         "tipe": {
                                                             "type": "string",
                                                             "example": "Email"
+                                                        },
+                                                        "tgl_activity": {
+                                                            "type": "string",
+                                                            "format": "date",
+                                                            "example": "2025-02-13"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time",
+                                                            "example": "2025-02-13T10:30:00.000000Z"
                                                         }
                                                     },
                                                     "type": "object"
                                                 },
-                                                "config_source": {
-                                                    "description": "user_custom, user_default, or system_default",
-                                                    "type": "string",
-                                                    "example": "user_custom"
+                                                "cc": {
+                                                    "description": "List email CC",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "supervisor@shelter.com"
+                                                    ]
+                                                },
+                                                "bcc": {
+                                                    "description": "List email BCC",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "archive@shelter.com"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -5958,7 +6055,7 @@
                         }
                     },
                     "207": {
-                        "description": "Multi-Status - Beberapa email berhasil, beberapa gagal",
+                        "description": "Multi-Status - Beberapa email berhasil dikirim, beberapa gagal",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5975,33 +6072,88 @@
                                             "type": "boolean",
                                             "example": true
                                         },
-                                        "failed_recipients": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
+                                        "data": {
+                                            "properties": {
+                                                "mailer_used": {
+                                                    "type": "string",
+                                                    "example": "user_123_smtp"
+                                                },
+                                                "config_source": {
+                                                    "type": "string",
+                                                    "example": "user_custom"
+                                                },
+                                                "sender": {
+                                                    "type": "string",
+                                                    "example": "John Doe <john@shelter.com>"
+                                                },
+                                                "success_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client@example.com",
+                                                        "manager@example.com"
+                                                    ]
+                                                },
+                                                "failed_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "invalid@example.com"
+                                                    ]
+                                                },
+                                                "attachments_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "attachments": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "proposal.pdf",
+                                                        "price_list.xlsx"
+                                                    ]
+                                                },
+                                                "activity": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer",
+                                                            "example": 456
+                                                        },
+                                                        "nomor": {
+                                                            "type": "string",
+                                                            "example": "CAT/LS/LS001-022025-00123"
+                                                        },
+                                                        "tipe": {
+                                                            "type": "string",
+                                                            "example": "Email"
+                                                        },
+                                                        "tgl_activity": {
+                                                            "type": "string",
+                                                            "format": "date",
+                                                            "example": "2025-02-13"
+                                                        },
+                                                        "created_at": {
+                                                            "type": "string",
+                                                            "format": "date-time"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "success_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "failed_count": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -6010,8 +6162,58 @@
                             }
                         }
                     },
-                    "500": {
-                        "description": "Server Error",
+                    "422": {
+                        "description": "Validation Error - Data tidak valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "description": "Object berisi error validation",
+                                            "type": "object",
+                                            "example": {
+                                                "subject": [
+                                                    "Subject email wajib diisi"
+                                                ],
+                                                "recipients": [
+                                                    "Minimal harus ada 1 penerima email"
+                                                ],
+                                                "attachments.0": [
+                                                    "File harus berformat: pdf, doc, docx, xls, xlsx, jpg, jpeg, atau png"
+                                                ],
+                                                "attachments.1": [
+                                                    "Ukuran file maksimal 10MB"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Token tidak valid atau tidak ada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found - Leads tidak ditemukan",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6022,7 +6224,65 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Gagal mengirim email: SMTP connection failed"
+                                            "example": "Leads dengan ID tersebut tidak ditemukan"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error - Gagal mengirim email atau error sistem",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan sistem: SMTP connection failed"
+                                        },
+                                        "data": {
+                                            "description": "Detail error jika semua email gagal",
+                                            "properties": {
+                                                "mailer_used": {
+                                                    "type": "string",
+                                                    "example": "smtp"
+                                                },
+                                                "config_source": {
+                                                    "type": "string",
+                                                    "example": "system_default"
+                                                },
+                                                "sender": {
+                                                    "type": "string",
+                                                    "example": "system@shelter.com"
+                                                },
+                                                "failed_recipients": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "client1@example.com",
+                                                        "client2@example.com"
+                                                    ]
+                                                },
+                                                "errors": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "example": [
+                                                        "Connection timeout",
+                                                        "Authentication failed"
+                                                    ]
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -6777,19 +7037,41 @@
                 "operationId": "6467e31be60f4e674ce0ee10bf6edef5",
                 "parameters": [
                     {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "description": "Filter tanggal mulai (format: YYYY-MM-DD). Jika kosong, akan mengambil data hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-01-01"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "description": "Filter tanggal akhir (format: YYYY-MM-DD). Jika kosong, akan mengambil data hari ini",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date",
+                            "example": "2025-12-31"
+                        }
+                    },
+                    {
                         "name": "branch",
                         "in": "query",
-                        "description": "ID Branch untuk filter customer berdasarkan cabang",
+                        "description": "Filter berdasarkan ID cabang/branch tertentu",
                         "required": false,
                         "schema": {
                             "type": "integer",
-                            "example": 2
+                            "example": 1
                         }
                     },
                     {
                         "name": "platform",
                         "in": "query",
-                        "description": "ID Platform untuk filter customer berdasarkan sumber platform (misal: Website, WhatsApp, Referral)",
+                        "description": "Filter berdasarkan ID platform sumber leads (misal: website, social media, referral)",
                         "required": false,
                         "schema": {
                             "type": "integer",
@@ -6799,39 +7081,47 @@
                     {
                         "name": "status",
                         "in": "query",
-                        "description": "ID Status Leads untuk filter customer berdasarkan status saat ini",
+                        "description": "Filter berdasarkan ID status leads (misal: new, contacted, qualified)",
                         "required": false,
                         "schema": {
                             "type": "integer",
-                            "example": 102
+                            "example": 1
                         }
                     },
                     {
-                        "name": "tgl_dari",
+                        "name": "search",
                         "in": "query",
-                        "description": "Tanggal awal periode (format: YYYY-MM-DD). Default: 3 bulan yang lalu dari hari ini",
+                        "description": "Pencarian berdasarkan nama perusahaan. Jika ada parameter search, filter tanggal akan diabaikan untuk mencari di semua data",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date",
-                            "example": "2025-07-02"
+                            "example": "PT ABC"
                         }
                     },
                     {
-                        "name": "tgl_sampai",
+                        "name": "per_page",
                         "in": "query",
-                        "description": "Tanggal akhir periode (format: YYYY-MM-DD). Default: hari ini",
+                        "description": "Jumlah data per halaman untuk pagination (default: 15)",
                         "required": false,
                         "schema": {
-                            "type": "string",
-                            "format": "date",
-                            "example": "2025-10-02"
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman untuk pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Berhasil mengambil daftar customer",
+                        "description": "Berhasil mengambil data leads",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6840,169 +7130,112 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data leads berhasil diambil"
+                                        },
                                         "data": {
-                                            "properties": {
-                                                "master": {
-                                                    "description": "Data master untuk dropdown filter",
-                                                    "properties": {
-                                                        "branch": {
-                                                            "type": "array",
-                                                            "items": {
-                                                                "properties": {
-                                                                    "id": {
-                                                                        "type": "integer",
-                                                                        "example": 2
-                                                                    },
-                                                                    "name": {
-                                                                        "type": "string",
-                                                                        "example": "Jakarta"
-                                                                    },
-                                                                    "is_active": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    }
-                                                                },
-                                                                "type": "object"
-                                                            }
-                                                        },
-                                                        "platform": {
-                                                            "type": "array",
-                                                            "items": {
-                                                                "properties": {
-                                                                    "id": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    },
-                                                                    "nama": {
-                                                                        "type": "string",
-                                                                        "example": "Website"
-                                                                    }
-                                                                },
-                                                                "type": "object"
-                                                            }
-                                                        },
-                                                        "status": {
-                                                            "type": "array",
-                                                            "items": {
-                                                                "properties": {
-                                                                    "id": {
-                                                                        "type": "integer",
-                                                                        "example": 102
-                                                                    },
-                                                                    "nama": {
-                                                                        "type": "string",
-                                                                        "example": "Customer"
-                                                                    }
-                                                                },
-                                                                "type": "object"
-                                                            }
-                                                        }
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
                                                     },
-                                                    "type": "object"
-                                                },
-                                                "customers": {
-                                                    "description": "Daftar customer yang sudah difilter",
-                                                    "type": "array",
-                                                    "items": {
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "AAAAA"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT ABC Indonesia"
+                                                    },
+                                                    "pic": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "no_telp": {
+                                                        "type": "string",
+                                                        "example": "08123456789"
+                                                    },
+                                                    "email": {
+                                                        "type": "string",
+                                                        "example": "john@abc.com"
+                                                    },
+                                                    "tgl": {
+                                                        "type": "string",
+                                                        "example": "1 Januari 2025"
+                                                    },
+                                                    "tgl_leads": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "can_view": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    },
+                                                    "status_leads": {
                                                         "properties": {
                                                             "id": {
-                                                                "type": "integer",
-                                                                "example": 1
+                                                                "type": "integer"
                                                             },
-                                                            "ro": {
-                                                                "type": "string",
-                                                                "example": "RO-2025-001"
+                                                            "nama": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "branch": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
                                                             },
-                                                            "crm": {
-                                                                "type": "string",
-                                                                "example": "CRM-2025-001"
+                                                            "nama": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "platform": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer"
                                                             },
-                                                            "nama_perusahaan": {
-                                                                "type": "string",
-                                                                "example": "PT. Contoh Indonesia"
-                                                            },
-                                                            "pic": {
-                                                                "type": "string",
-                                                                "example": "John Doe"
-                                                            },
-                                                            "no_telp": {
-                                                                "type": "string",
-                                                                "example": "08123456789"
-                                                            },
-                                                            "email": {
-                                                                "type": "string",
-                                                                "example": "john@example.com"
-                                                            },
-                                                            "tgl": {
-                                                                "type": "string",
-                                                                "example": "2 Oktober 2025"
-                                                            },
-                                                            "sales": {
-                                                                "type": "string",
-                                                                "example": "Ahmad Salesman"
-                                                            },
-                                                            "status_name": {
-                                                                "type": "string",
-                                                                "example": "Customer"
-                                                            },
-                                                            "branch_name": {
-                                                                "type": "string",
-                                                                "example": "Jakarta"
-                                                            },
-                                                            "platform_name": {
-                                                                "type": "string",
-                                                                "example": "Website"
-                                                            },
-                                                            "warna_background": {
-                                                                "type": "string",
-                                                                "example": "#28a745"
-                                                            },
-                                                            "warna_font": {
-                                                                "type": "string",
-                                                                "example": "#ffffff"
-                                                            },
-                                                            "can_view": {
-                                                                "type": "boolean",
-                                                                "example": true
-                                                            },
-                                                            "aksi": {
-                                                                "type": "string",
-                                                                "example": "view"
+                                                            "nama": {
+                                                                "type": "string"
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
                                                 },
-                                                "applied_filters": {
-                                                    "description": "Filter yang sedang digunakan",
-                                                    "properties": {
-                                                        "branch": {
-                                                            "type": "integer",
-                                                            "example": 2
-                                                        },
-                                                        "platform": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "status": {
-                                                            "type": "integer",
-                                                            "example": 102
-                                                        },
-                                                        "tgl_dari": {
-                                                            "type": "string",
-                                                            "example": "2025-07-02"
-                                                        },
-                                                        "tgl_sampai": {
-                                                            "type": "string",
-                                                            "example": "2025-10-02"
-                                                        }
-                                                    },
-                                                    "type": "object"
+                                                "type": "object"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
                                                 },
-                                                "error": {
-                                                    "type": "string",
-                                                    "example": null,
-                                                    "nullable": true
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "from": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "to": {
+                                                    "type": "integer",
+                                                    "example": 15
                                                 }
                                             },
                                             "type": "object"
@@ -7030,7 +7263,7 @@
                         }
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "Internal Server Error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7041,7 +7274,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Internal server error"
+                                            "example": "Terjadi kesalahan: Error message"
                                         }
                                     },
                                     "type": "object"
@@ -10456,6 +10689,22 @@
                         "schema": {
                             "type": "string",
                             "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Column to search in (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kebutuhan",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
                         }
                     },
                     {
@@ -16608,37 +16857,94 @@
                     "PKS"
                 ],
                 "summary": "Get list of PKS",
+                "description": "Mengambil daftar PKS dengan filter tanggal, status, branch, dan pencarian",
                 "operationId": "f6442ddd28bc570e93b0273b03c4c55c",
                 "parameters": [
                     {
                         "name": "tgl_dari",
                         "in": "query",
-                        "description": "Start date",
+                        "description": "Tanggal mulai filter (format: Y-m-d). Default: 6 bulan kebelakang",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "format": "date",
-                            "example": "2025-10-01"
+                            "example": "2025-01-01"
                         }
                     },
                     {
                         "name": "tgl_sampai",
                         "in": "query",
-                        "description": "End date",
+                        "description": "Tanggal akhir filter (format: Y-m-d). Default: hari ini",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "format": "date",
-                            "example": "2025-11-01"
+                            "example": "2025-12-31"
                         }
                     },
                     {
                         "name": "status",
                         "in": "query",
-                        "description": "Status filter",
+                        "description": "Filter berdasarkan status PKS ID",
                         "required": false,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter berdasarkan branch ID dari leads",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
@@ -16653,56 +16959,119 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS data retrieved successfully"
+                                        },
                                         "data": {
                                             "type": "array",
                                             "items": {
                                                 "properties": {
                                                     "id": {
-                                                        "type": "integer"
+                                                        "type": "integer",
+                                                        "example": 1
                                                     },
                                                     "nomor": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "PKS/LEAD001-012024-00001"
                                                     },
                                                     "nama_perusahaan": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "PT Example Company"
                                                     },
                                                     "tgl_pks": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-15"
                                                     },
-                                                    "formatted_tgl_pks": {
-                                                        "type": "string"
+                                                    "nama_site": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "example": [
+                                                            "Site A",
+                                                            "Site B"
+                                                        ]
                                                     },
                                                     "kontrak_awal": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-01"
                                                     },
                                                     "kontrak_akhir": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-12-31"
                                                     },
                                                     "formatted_kontrak_awal": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "1 Januari 2025"
                                                     },
                                                     "formatted_kontrak_akhir": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "31 Desember 2025"
                                                     },
                                                     "status": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "Aktif"
                                                     },
                                                     "berakhir_dalam": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "6 bulan"
                                                     },
                                                     "status_berlaku": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "Berlaku"
                                                     },
                                                     "created_at": {
                                                         "type": "string",
-                                                        "format": "date-time"
+                                                        "format": "date-time",
+                                                        "example": "2025-01-15 10:30:00"
                                                     },
                                                     "created_by": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "John Doe"
                                                     }
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "tgl_dari": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-01-01"
+                                                },
+                                                "tgl_sampai": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "example": "2025-12-31"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -16711,7 +17080,44 @@
                         }
                     },
                     "401": {
-                        "description": "Unauthenticated"
+                        "description": "Unauthenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to retrieve PKS list"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -16861,13 +17267,29 @@
                 ]
             }
         },
-        "/api/pks/add": {
+        "/api/pks/add/{tipe}": {
             "post": {
                 "tags": [
                     "PKS"
                 ],
-                "summary": "Create new PKS",
-                "operationId": "7c9572ffb782399262abc1f949d94887",
+                "summary": "Create new PKS - Kontrak Baru, Rekontrak, atau Addendum",
+                "operationId": "4893d0b9d9cabaac9f247b2e922e7490",
+                "parameters": [
+                    {
+                        "name": "tipe",
+                        "in": "path",
+                        "description": "Tipe kontrak: baru, rekontrak, atau addendum",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "rekontrak",
+                                "addendum"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -16875,7 +17297,6 @@
                             "schema": {
                                 "required": [
                                     "leads_id",
-                                    "site_ids",
                                     "tanggal_pks",
                                     "tanggal_awal_kontrak",
                                     "tanggal_akhir_kontrak",
@@ -16887,67 +17308,74 @@
                                 ],
                                 "properties": {
                                     "leads_id": {
+                                        "description": "Required untuk semua tipe kecuali addendum (untuk addendum gunakan pks_id)",
                                         "type": "integer",
-                                        "example": 38
+                                        "example": 1
+                                    },
+                                    "pks_id": {
+                                        "description": "Required untuk tipe=addendum. ID PKS induk yang akan di-addendum",
+                                        "type": "integer",
+                                        "example": 1
                                     },
                                     "site_ids": {
+                                        "description": "Required untuk tipe=baru. Array of SpkSite IDs",
                                         "type": "array",
                                         "items": {
                                             "type": "integer"
                                         },
                                         "example": [
-                                            130
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    },
+                                    "quotation_site_ids": {
+                                        "description": "Required untuk tipe=rekontrak dan addendum. Array of QuotationSite IDs",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
                                         ]
                                     },
                                     "tanggal_pks": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2025-10-14"
+                                        "example": "2025-01-15"
                                     },
                                     "tanggal_awal_kontrak": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2025-11-01"
+                                        "example": "2025-02-01"
                                     },
                                     "tanggal_akhir_kontrak": {
                                         "type": "string",
                                         "format": "date",
-                                        "example": "2026-10-31"
+                                        "example": "2026-01-31"
                                     },
                                     "kategoriHC": {
-                                        "description": "Kategori HC ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "loyalty": {
-                                        "description": "Loyalty ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "salary_rule": {
-                                        "description": "Salary Rule ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "rule_thr": {
-                                        "description": "Rule THR ID",
                                         "type": "integer",
                                         "example": 1
                                     },
                                     "entitas": {
-                                        "description": "Entitas ID",
+                                        "description": "Untuk addendum, entitas akan diambil dari PKS induk",
                                         "type": "integer",
                                         "example": 1
-                                    },
-                                    "perjanjian_data": {
-                                        "description": "Template data for frontend to generate agreement",
-                                        "type": "object",
-                                        "example": {
-                                            "nomor_perjanjian": "PKS/2025/001",
-                                            "pihak_pertama": "PT ABC",
-                                            "pihak_kedua": "PT Client XYZ",
-                                            "lokasi_penandatanganan": "Jakarta"
-                                        }
                                     }
                                 },
                                 "type": "object"
@@ -16968,35 +17396,9 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "PKS berhasil dibuat"
+                                            "example": "PKS created successfully"
                                         },
                                         "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nomor": {
-                                                    "type": "string",
-                                                    "example": "PKS/2025/001"
-                                                },
-                                                "leads_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "tanggal_pks": {
-                                                    "type": "string",
-                                                    "example": "14-10-2025"
-                                                },
-                                                "tanggal_awal_kontrak": {
-                                                    "type": "string",
-                                                    "example": "01-11-2025"
-                                                },
-                                                "tanggal_akhir_kontrak": {
-                                                    "type": "string",
-                                                    "example": "31-10-2026"
-                                                }
-                                            },
                                             "type": "object"
                                         }
                                     },
@@ -17005,36 +17407,11 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Invalid tipe parameter"
+                    },
                     "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation failed"
-                                        },
-                                        "errors": {
-                                            "type": "object",
-                                            "example": {
-                                                "leads_id": [
-                                                    "The leads id field is required."
-                                                ],
-                                                "site_ids": [
-                                                    "The site ids field is required."
-                                                ]
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -17471,13 +17848,13 @@
                 ]
             }
         },
-        "/api/pks/available-sites/{leadsId}": {
+        "/api/pks/available-sites/{leadsId}/{tipe}": {
             "get": {
                 "tags": [
                     "PKS"
                 ],
                 "summary": "Get available sites for leads",
-                "operationId": "462a69b4f54f525970fe5050b8eb50af",
+                "operationId": "6f4e902bdbcb72c41eb3c7981a85589b",
                 "parameters": [
                     {
                         "name": "leadsId",
@@ -17485,6 +17862,19 @@
                         "required": true,
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tipe",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "rekontrak",
+                                "addendum"
+                            ]
                         }
                     }
                 ],
@@ -19282,11 +19672,57 @@
                     {
                         "name": "status",
                         "in": "query",
-                        "description": "Status filter",
+                        "description": "Status quotation ID filter",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search by company name (uses fulltext search)",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "example": "approved"
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Number of items per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Column to search in (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "kebutuhan",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
                         }
                     }
                 ],
@@ -19358,6 +19794,27 @@
                                                 "type": "object"
                                             }
                                         },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 100
+                                                },
+                                                "total_per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
                                         "message": {
                                             "type": "string",
                                             "example": "Quotations retrieved successfully"
@@ -19419,7 +19876,8 @@
                             "enum": [
                                 "baru",
                                 "revisi",
-                                "rekontrak"
+                                "rekontrak",
+                                "addendum"
                             ],
                             "example": "baru"
                         }
@@ -20718,7 +21176,8 @@
                             "enum": [
                                 "baru",
                                 "revisi",
-                                "rekontrak"
+                                "rekontrak",
+                                "addendum"
                             ],
                             "example": "revisi"
                         }
@@ -24038,7 +24497,8 @@
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2024-01-01"
                         }
                     },
                     {
@@ -24048,7 +24508,8 @@
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date"
+                            "format": "date",
+                            "example": "2024-12-31"
                         }
                     },
                     {
@@ -24057,7 +24518,63 @@
                         "description": "Filter berdasarkan status SPK ID",
                         "required": false,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter berdasarkan branch ID dari leads",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom yang akan dicari (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman (default: 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
@@ -24077,62 +24594,72 @@
                                             "example": "SPK data retrieved successfully"
                                         },
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nomor": {
-                                                        "type": "string",
-                                                        "example": "SPK/LEAD001-012024-00001"
-                                                    },
-                                                    "tgl_spk": {
-                                                        "type": "string",
-                                                        "example": "2024-01-15"
-                                                    },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT Example Company"
-                                                    },
-                                                    "status_spk_id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "example": "2024-01-15 10:30:00"
-                                                    },
-                                                    "leads": {
+                                            "properties": {
+                                                "list": {
+                                                    "type": "array",
+                                                    "items": {
                                                         "properties": {
                                                             "id": {
                                                                 "type": "integer",
                                                                 "example": 1
+                                                            },
+                                                            "nomor_spk": {
+                                                                "type": "string",
+                                                                "example": "SPK/LEAD001-012024-00001"
+                                                            },
+                                                            "tgl_spk": {
+                                                                "type": "string",
+                                                                "example": "2024-01-15"
                                                             },
                                                             "nama_perusahaan": {
                                                                 "type": "string",
                                                                 "example": "PT Example Company"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "status_spk": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
                                                             },
-                                                            "nama": {
+                                                            "nama_site": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                },
+                                                                "example": [
+                                                                    "Site A",
+                                                                    "Site B"
+                                                                ]
+                                                            },
+                                                            "status": {
                                                                 "type": "string",
                                                                 "example": "Draft"
+                                                            },
+                                                            "created_by": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
                                                 },
-                                                "type": "object"
-                                            }
+                                                "pagination": {
+                                                    "properties": {
+                                                        "current_page": {
+                                                            "type": "integer",
+                                                            "example": 1
+                                                        },
+                                                        "total": {
+                                                            "type": "integer",
+                                                            "example": 100
+                                                        },
+                                                        "last_page": {
+                                                            "type": "integer",
+                                                            "example": 7
+                                                        },
+                                                        "per_page": {
+                                                            "type": "integer",
+                                                            "example": 15
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"

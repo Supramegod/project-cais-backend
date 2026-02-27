@@ -39,112 +39,109 @@ class CustomerController extends Controller
      *     tags={"Customer"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
+     *         name="tgl_dari",
+     *         in="query",
+     *         description="Filter tanggal mulai (format: YYYY-MM-DD). Jika kosong, akan mengambil data hari ini",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2025-01-01")
+     *     ),
+     *     @OA\Parameter(
+     *         name="tgl_sampai",
+     *         in="query",
+     *         description="Filter tanggal akhir (format: YYYY-MM-DD). Jika kosong, akan mengambil data hari ini",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date", example="2025-12-31")
+     *     ),
+     *     @OA\Parameter(
      *         name="branch",
      *         in="query",
-     *         description="ID Branch untuk filter customer berdasarkan cabang",
+     *         description="Filter berdasarkan ID cabang/branch tertentu",
      *         required=false,
-     *         @OA\Schema(type="integer", example=2)
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
      *         name="platform",
      *         in="query",
-     *         description="ID Platform untuk filter customer berdasarkan sumber platform (misal: Website, WhatsApp, Referral)",
+     *         description="Filter berdasarkan ID platform sumber leads (misal: website, social media, referral)",
      *         required=false,
      *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
-     *         description="ID Status Leads untuk filter customer berdasarkan status saat ini",
+     *         description="Filter berdasarkan ID status leads (misal: new, contacted, qualified)",
      *         required=false,
-     *         @OA\Schema(type="integer", example=102)
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
-     *         name="tgl_dari",
+     *         name="search",
      *         in="query",
-     *         description="Tanggal awal periode (format: YYYY-MM-DD). Default: 3 bulan yang lalu dari hari ini",
+     *         description="Pencarian berdasarkan nama perusahaan. Jika ada parameter search, filter tanggal akan diabaikan untuk mencari di semua data",
      *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2025-07-02")
+     *         @OA\Schema(type="string", example="PT ABC")
      *     ),
      *     @OA\Parameter(
-     *         name="tgl_sampai",
+     *         name="per_page",
      *         in="query",
-     *         description="Tanggal akhir periode (format: YYYY-MM-DD). Default: hari ini",
+     *         description="Jumlah data per halaman untuk pagination (default: 15)",
      *         required=false,
-     *         @OA\Schema(type="string", format="date", example="2025-10-02")
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman untuk pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Berhasil mengambil daftar customer",
+     *         description="Berhasil mengambil data leads",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data leads berhasil diambil"),
      *             @OA\Property(
      *                 property="data",
-     *                 type="object",
-     *                 @OA\Property(
-     *                     property="master",
-     *                     type="object",
-     *                     description="Data master untuk dropdown filter",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="AAAAA"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT ABC Indonesia"),
+     *                     @OA\Property(property="pic", type="string", example="John Doe"),
+     *                     @OA\Property(property="no_telp", type="string", example="08123456789"),
+     *                     @OA\Property(property="email", type="string", example="john@abc.com"),
+     *                     @OA\Property(property="tgl", type="string", example="1 Januari 2025"),
+     *                     @OA\Property(property="tgl_leads", type="string", format="date-time"),
+     *                     @OA\Property(property="can_view", type="boolean", example=true),
+     *                     @OA\Property(
+     *                         property="status_leads",
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
+     *                     ),
      *                     @OA\Property(
      *                         property="branch",
-     *                         type="array",
-     *                         @OA\Items(
-     *                             @OA\Property(property="id", type="integer", example=2),
-     *                             @OA\Property(property="name", type="string", example="Jakarta"),
-     *                             @OA\Property(property="is_active", type="integer", example=1)
-     *                         )
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
      *                     ),
      *                     @OA\Property(
      *                         property="platform",
-     *                         type="array",
-     *                         @OA\Items(
-     *                             @OA\Property(property="id", type="integer", example=1),
-     *                             @OA\Property(property="nama", type="string", example="Website")
-     *                         )
-     *                     ),
-     *                     @OA\Property(
-     *                         property="status",
-     *                         type="array",
-     *                         @OA\Items(
-     *                             @OA\Property(property="id", type="integer", example=102),
-     *                             @OA\Property(property="nama", type="string", example="Customer")
-     *                         )
+     *                         type="object",
+     *                         @OA\Property(property="id", type="integer"),
+     *                         @OA\Property(property="nama", type="string")
      *                     )
-     *                 ),
-     *                 @OA\Property(
-     *                     property="customers",
-     *                     type="array",
-     *                     description="Daftar customer yang sudah difilter",
-     *                     @OA\Items(
-     *                         @OA\Property(property="id", type="integer", example=1),
-     *                         @OA\Property(property="ro", type="string", example="RO-2025-001"),
-     *                         @OA\Property(property="crm", type="string", example="CRM-2025-001"),
-     *                         @OA\Property(property="nama_perusahaan", type="string", example="PT. Contoh Indonesia"),
-     *                         @OA\Property(property="pic", type="string", example="John Doe"),
-     *                         @OA\Property(property="no_telp", type="string", example="08123456789"),
-     *                         @OA\Property(property="email", type="string", example="john@example.com"),
-     *                         @OA\Property(property="tgl", type="string", example="2 Oktober 2025"),
-     *                         @OA\Property(property="sales", type="string", example="Ahmad Salesman"),
-     *                         @OA\Property(property="status_name", type="string", example="Customer"),
-     *                         @OA\Property(property="branch_name", type="string", example="Jakarta"),
-     *                         @OA\Property(property="platform_name", type="string", example="Website"),
-     *                         @OA\Property(property="warna_background", type="string", example="#28a745"),
-     *                         @OA\Property(property="warna_font", type="string", example="#ffffff"),
-     *                         @OA\Property(property="can_view", type="boolean", example=true),
-     *                         @OA\Property(property="aksi", type="string", example="view")
-     *                     )
-     *                 ),
-     *                 @OA\Property(
-     *                     property="applied_filters",
-     *                     type="object",
-     *                     description="Filter yang sedang digunakan",
-     *                     @OA\Property(property="branch", type="integer", example=2),
-     *                     @OA\Property(property="platform", type="integer", example=1),
-     *                     @OA\Property(property="status", type="integer", example=102),
-     *                     @OA\Property(property="tgl_dari", type="string", example="2025-07-02"),
-     *                     @OA\Property(property="tgl_sampai", type="string", example="2025-10-02")
-     *                 ),
-     *                 @OA\Property(property="error", type="string", nullable=true, example=null)
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="pagination",
+     *                 type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=75),
+     *                 @OA\Property(property="from", type="integer", example=1),
+     *                 @OA\Property(property="to", type="integer", example=15)
      *             )
      *         )
      *     ),
@@ -157,115 +154,123 @@ class CustomerController extends Controller
      *     ),
      *     @OA\Response(
      *         response=500,
-     *         description="Internal server error",
+     *         description="Internal Server Error",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Internal server error")
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: Error message")
      *         )
      *     )
      * )
      */
-    public function list(Request $request): JsonResponse
+    public function list(Request $request)
     {
         try {
-            $tglDari = $request->tgl_dari ?: Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
-            $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
-
-            $ctglDari = Carbon::parse($tglDari);
-            $ctglSampai = Carbon::parse($tglSampai);
-
-            if ($ctglDari->gt($ctglSampai)) {
-                $tglDari = Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
-                $error = 'Tanggal dari tidak boleh melebihi tanggal sampai';
-            }
-
-            // Query base dengan role-based filtering dan relasi yang diperlukan
-            $query = Leads::with([
-                'statusLeads:id,nama,warna_background,warna_font',
-                'branch:id,name',
-                'platform:id,nama',
-                'timSalesD:id,nama'
+            $query = Leads::select([
+                'id',
+                'nomor',
+                'branch_id',
+                'tgl_leads',
+                'tim_sales_d_id',
+                'nama_perusahaan',
+                'telp_perusahaan',
+                'provinsi',
+                'kota',
+                'no_telp',
+                'email',
+                'status_leads_id',
+                'platform_id',
+                'created_by',
+                'notes',
+                'created_at'
             ])
-                ->filterByUserRole()
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name',
+                    'platform:id,nama',
+                    'timSalesD:id,nama',
+                    'kebutuhan' => function ($q) {
+                        $q->select('m_kebutuhan.id', 'm_kebutuhan.nama'); // sesuaikan nama tabel kebutuhan
+                    },
+                    'leadsKebutuhan.timSalesD:id,nama'
+                ])
                 ->whereNull('customer_id')
-                ->where('status_leads_id', 102)
-                ->orderBy('id', 'desc');
+                ->where('status_leads_id', 102);
 
-            // Apply filters
-            if ($request->branch) {
-                $query->where('branch_id', $request->branch);
-            }
-            if ($request->platform) {
-                $query->where('platform_id', $request->platform);
-            }
-            if ($request->status) {
-                $query->where('status_leads_id', $request->status);
-            }
-
-            // Apply role-based filtering menggunakan scope dari model
+            // ✅ Gunakan scope yang sudah ada di model Leads.php
             $query->filterByUserRole();
 
-            // Get data dan mapping sesuai kebutuhan
-            $customers = $query->get()->map(function ($item) {
+            // ✅ Optimasi Search dengan Fulltext
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
+                if (str_contains($searchTerm, ' ')) {
+                    $searchTerm = '"' . $searchTerm . '"';
+                } else {
+                    $searchTerm = $searchTerm . '*';
+                }
+
+                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+            } else {
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
+            }
+
+            // Filter tambahan
+            if ($request->filled('branch'))
+                $query->where('branch_id', $request->branch);
+            if ($request->filled('platform'))
+                $query->where('platform_id', $request->platform);
+            if ($request->filled('status'))
+                $query->where('status_leads_id', $request->status);
+
+            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+
+            $transformedData = $data->getCollection()->transform(function ($item) {
                 return [
-                    // ID untuk referensi
                     'id' => $item->id,
-
-                    // Data utama list
                     'nomor' => $item->nomor,
-                    'branch_name' => $item->branch->name ?? '-',
+                    'wilayah' => $item->branch->name ?? null,
+                    'wilayah_id' => $item->branch_id,
                     'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'sales' => $item->timSalesD->nama ?? null,
                     'nama_perusahaan' => $item->nama_perusahaan,
-                    'telp_perusahaan' => $item->telp_perusahaan ?? '-',
-                    'provinsi' => $item->provinsi ?? '-',
-                    'kota' => $item->kota ?? '-',
-                    'telp_pic' => $item->no_telp ?? '-',
-                    'email_pic' => $item->email ?? '-',
-                    'status' => $item->statusLeads->nama ?? '-',
-                    'platform' => $item->platform->nama ?? '-',
-                    'created_by' => $item->created_by ?? '-',
-                    'notes' => $item->notes ?? '-',
-
-                    // Data tambahan untuk UI
-                    'pic' => $item->pic ?? '-',
-                    'kebutuhan' => $item->kebutuhan->map(function ($kebutuhan) {
+                    'telp_perusahaan' => $item->telp_perusahaan,
+                    'provinsi' => $item->provinsi,
+                    'kota' => $item->kota,
+                    'no_telp' => $item->no_telp,
+                    'email' => $item->email,
+                    'status_leads' => $item->statusLeads->nama ?? null,
+                    'status_leads_id' => $item->status_leads_id,
+                    'sumber_leads' => $item->platform->nama ?? null,
+                    'sumber_leads_id' => $item->platform_id,
+                    'created_by' => $item->created_by,
+                    'notes' => $item->notes,
+                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
                         return [
-                            'id' => $kebutuhan->id,
-                            'nama' => $kebutuhan->nama,
-                            'tim_sales_id' => $kebutuhan->pivot->tim_sales_id,
-                            'tim_sales_d_id' => $kebutuhan->pivot->tim_sales_d_id,
-                            'sales_name' => optional(TimSalesDetail::find($kebutuhan->pivot->tim_sales_d_id))->nama
+                            'id' => $lk->kebutuhan_id,
+                            'nama' => $lk->kebutuhan->nama ?? null,
+                            'tim_sales_d_id' => $lk->tim_sales_d_id,
+                            'sales_name' => $lk->timSalesD->nama ?? null
                         ];
-                    })->toArray()
+                    })
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'customers' => $customers,
-                    // 'total' => $customers->count(),
-                    // 'filters' => [
-                    //     'tgl_dari' => $tglDari,
-                    //     'tgl_sampai' => $tglSampai,
-                    //     'branch' => $request->branch,
-                    //     'platform' => $request->platform,
-                    //     'status' => $request->status,
-                    // ]
-                ],
-                'message' => 'Data berhasil diambil'
+                'message' => 'Data leads berhasil diambil',
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ]
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Customer API List Error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
 
@@ -424,7 +429,7 @@ class CustomerController extends Controller
                 'data' => array_merge([
                     'customer' => $data,
                     'activity' => $activity
-                ], )
+                ])
             ]);
 
         } catch (\Exception $e) {

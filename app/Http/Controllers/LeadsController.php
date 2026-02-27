@@ -90,6 +90,13 @@ class LeadsController extends Controller
      *         @OA\Schema(type="string", example="PT ABC")
      *     ),
      *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Column to search in (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Jumlah data per halaman untuk pagination (default: 15)",
@@ -207,23 +214,40 @@ class LeadsController extends Controller
             // ✅ Gunakan scope yang sudah ada di model Leads.php
             $query->filterByUserRole();
 
-            // ✅ Optimasi Search dengan Fulltext
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Jika mengandung spasi (kalimat), bungkus dengan tanda kutip untuk pencarian 'exact phrase'
-                if (str_contains($searchTerm, ' ')) {
-                    $searchTerm = '"' . $searchTerm . '"';
-                } else {
-                    $searchTerm = $searchTerm . '*';
-                }
+                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
 
-                $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                if ($searchBy === 'nama_perusahaan') {
+                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+
+                } else {
+                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
+                    if (in_array($searchBy, $allowedColumns)) {
+
+                        if ($searchBy === 'kebutuhan') {
+                            // Kebutuhan adalah relasi, gunakan whereHas
+                            $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
+                                $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                            });
+                        } else {
+                            $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                        }
+                    }
+                }
             } else {
+                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
-
             // Filter tambahan
             if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
@@ -234,32 +258,32 @@ class LeadsController extends Controller
 
             $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->map(function ($item) {
+            $transformedData = $data->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
-                    'wilayah' => $item->branch->name ?? '-',
+                    'wilayah' => $item->branch->name ?? null,
                     'wilayah_id' => $item->branch_id,
                     'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
-                    'sales' => $item->timSalesD->nama ?? '-',
+                    'sales' => $item->timSalesD->nama ?? null,
                     'nama_perusahaan' => $item->nama_perusahaan,
                     'telp_perusahaan' => $item->telp_perusahaan,
                     'provinsi' => $item->provinsi,
                     'kota' => $item->kota,
                     'no_telp' => $item->no_telp,
                     'email' => $item->email,
-                    'status_leads' => $item->statusLeads->nama ?? '-',
+                    'status_leads' => $item->statusLeads->nama ?? null,
                     'status_leads_id' => $item->status_leads_id,
-                    'sumber_leads' => $item->platform->nama ?? '-',
+                    'sumber_leads' => $item->platform->nama ?? null,
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
                     'notes' => $item->notes,
                     'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
                         return [
                             'id' => $lk->kebutuhan_id,
-                            'nama' => $lk->kebutuhan->nama ?? '-',
+                            'nama' => $lk->kebutuhan->nama ?? null,
                             'tim_sales_d_id' => $lk->tim_sales_d_id,
-                            'sales_name' => $lk->timSalesD->nama ?? '-'
+                            'sales_name' => $lk->timSalesD->nama ?? null
                         ];
                     })
                 ];
@@ -609,7 +633,7 @@ class LeadsController extends Controller
 
             // PROSES ASSIGNMENT SALES
             // CASE 1: Auto assign jika user adalah sales (role 29)
-            if (Auth::user()->cais_role_id == 29) {
+            if (in_array(Auth::user()->cais_role_id, [29, 31, 32, 33])) {
                 $assignmentResults = $this->autoAssignSalesToKebutuhan($lead, $request->kebutuhan);
             }
             // CASE 2: Manual assignment dari user yang berwenang
@@ -2385,14 +2409,14 @@ class LeadsController extends Controller
                 // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
                 $assignedKebutuhan = [];
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
-                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
+                    $leadsKebutuhan = LeadsKebutuhan::firstOrCreate(
                         [
                             'leads_id' => $lead->id,
-                            'kebutuhan_id' => $kebutuhan_id
+                            'kebutuhan_id' => $kebutuhan_id,
+                            'tim_sales_d_id' => $timSalesD->id
                         ],
                         [
-                            'tim_sales_id' => $timSalesD->tim_sales_id,
-                            'tim_sales_d_id' => $timSalesD->id
+                            'tim_sales_id' => $timSalesD->tim_sales_id
                         ]
                     );
 
@@ -2916,7 +2940,7 @@ class LeadsController extends Controller
         $user = Auth::user();
         $assignmentResults = [];
 
-        if ($user->cais_role_id == 29) {
+        if (in_array($user->cais_role_id, [29, 31, 32, 33])) {
             $timSalesD = TimSalesDetail::where('user_id', $user->id)->first();
 
             if ($timSalesD) {

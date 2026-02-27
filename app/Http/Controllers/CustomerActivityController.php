@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 
 use App\Mail\CustomerActivityEmail;
+use App\Models\LeadsKebutuhan;
+use App\Models\SalesActivity;
 use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -84,6 +86,34 @@ class CustomerActivityController extends Controller
      *         required=false,
      *         @OA\Schema(type="string", example="Telepon")
      *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Jumlah data per halaman untuk pagination (default: 15)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Nomor halaman untuk pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Kolom yang akan dicari (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "kebutuhan"}, example="nama_perusahaan")
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Success - Data aktivitas customer berhasil diambil",
@@ -156,43 +186,76 @@ class CustomerActivityController extends Controller
     public function list(Request $request): JsonResponse
     {
         try {
+            // 1. Inisialisasi Tanggal
             $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
             $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            if ($request->tgl_dari && $request->tgl_sampai) {
-                if (Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'
-                    ], 422);
-                }
+            // Validasi Tanggal
+            if ($request->tgl_dari && $request->tgl_sampai && Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
+                return response()->json(['success' => false, 'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'], 422);
             }
 
+            // 2. Subquery untuk mengambil ID activity terbaru per leads_id
+            $latestActivityIds = CustomerActivity::select(DB::raw('MAX(id)'))
+                ->whereNull('deleted_at')
+                ->groupBy('leads_id');
+
+            // 3. Base Query dengan Eager Loading
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
-                'leads.kebutuhan:m_kebutuhan.id,m_kebutuhan.nama',
+                'leads.kebutuhan:id,nama',
                 'timSalesDetail:id,nama'
-            ])->whereNull('deleted_at')
-            ->whereHas('leads', function ($q) {
-                $q->filterByUserRole();
-            });
+            ])
+                ->whereIn('id', $latestActivityIds);
 
-            if ($request->tgl_dari || $request->tgl_sampai) {
+            // 4. Logika Pencarian (Search)
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    // Formatting untuk Boolean Mode
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+
+                    // Search ke tabel Leads menggunakan MATCH AGAINST
+                    $query->whereHas('leads', function ($q) use ($searchTerm) {
+                        $q->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                    });
+                } else {
+                    $allowedColumns = ['nomor'];
+
+                    if ($searchBy === 'kebutuhan') {
+                        // Search ke relasi kebutuhan
+                        $query->whereHas('leads.kebutuhan', function ($q) use ($searchTerm) {
+                            $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                        });
+                    } elseif (in_array($searchBy, $allowedColumns)) {
+                        // Search ke kolom di tabel activity sendiri (misal: nomor activity)
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Jika tidak ada search, gunakan filter tanggal default
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
-            if ($request->filled('branch')) {
-                $query->whereHas('leads', function ($q) use ($request) {
+            // 5. Filter Tambahan (Branch, Tipe, User)
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->filterByUserRole(); // Gunakan scope dari model Leads
+                if ($request->filled('branch')) {
                     $q->where('branch_id', $request->branch);
-                });
-            }
-
-            if ($request->filled('kebutuhan')) {
-                $query->whereHas('leads.kebutuhan', function ($q) use ($request) {
-                    $q->where('m_kebutuhan.id', $request->kebutuhan);
-                });
-            }
+                }
+                if ($request->filled('kebutuhan')) {
+                    $q->whereHas('kebutuhan', function ($sq) use ($request) {
+                        $sq->where('m_kebutuhan.id', $request->kebutuhan);
+                    });
+                }
+            });
 
             if ($request->filled('tipe')) {
                 $query->where('tipe', $request->tipe);
@@ -202,10 +265,13 @@ class CustomerActivityController extends Controller
                 $query->where('user_id', $request->user);
             }
 
-            $activities = $query->orderBy('created_at', 'desc')
-                ->get();
+            // 6. Execution & Pagination
+            $activities = $query->orderBy('tgl_activity', 'desc')
+                ->orderBy('id', 'desc')
+                ->paginate($request->get('per_page', 15));
 
-            $mappedActivities = $activities->unique('leads_id')->values()->map(function ($activity) {
+            // 7. Transformasi Data
+            $activities->getCollection()->transform(function ($activity) {
                 return [
                     'id' => $activity->id,
                     'nomor' => $activity->nomor,
@@ -214,30 +280,33 @@ class CustomerActivityController extends Controller
                     'notes' => $activity->notes,
                     'status_leads_id' => $activity->status_leads_id,
                     'created_at' => $activity->getRawOriginal('created_at'),
-                    'nama_perusahaan' => $activity->leads?->nama_perusahaan,
-                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray(),
-                    'branch' => $activity->leads?->branch?->name,
-                    'sales' => $activity->timSalesDetail?->nama,
+                    'nama_perusahaan' => $activity->leads?->nama_perusahaan ?? '-',
+                    'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray() ?? [],
+                    'branch' => $activity->leads?->branch?->name ?? '-',
+                    'sales' => $activity->timSalesDetail?->nama ?? '-',
                     'leads_id' => $activity->leads_id,
                     'quotation_id' => $activity->quotation_id,
                     'spk_id' => $activity->spk_id,
                     'pks_id' => $activity->pks_id
                 ];
             });
-            
+
+            // 8. Final Response
             return response()->json([
                 'success' => true,
-                'data' => $mappedActivities,
+                'message' => 'Data aktivitas berhasil diambil',
+                'data' => $activities->items(),
+                'pagination' => [
+                    'current_page' => $activities->currentPage(),
+                    'last_page' => $activities->lastPage(),
+                    'total' => $activities->total(),
+                    'per_page' => $activities->perPage(),
+                ],
                 'meta' => [
-                    'total' => $mappedActivities->count(),
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
-                    'filters_applied' => [
-                        'branch' => $request->branch,
-                        'kebutuhan' => $request->kebutuhan,
-                        'tipe' => $request->tipe,
-                        'user' => $request->user
-                    ]
+                    'search_applied' => $request->search,
+                    'search_by' => $request->get('search_by', 'nama_perusahaan')
                 ]
             ]);
 
@@ -245,7 +314,7 @@ class CustomerActivityController extends Controller
             \Log::error('Error in CustomerActivityController@list: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1003,122 +1072,256 @@ class CustomerActivityController extends Controller
     /**
      * @OA\Post(
      *     path="/api/customer-activities/send-email",
-     *     summary="Send email notification with dynamic SMTP configuration",
-     *     description="Mengirim email notifikasi menggunakan konfigurasi SMTP user yang sedang login. 
-     *                 Jika user memiliki konfigurasi email, akan digunakan. 
-     *                 Jika tidak, akan menggunakan konfigurasi default dari .env",
+     *     summary="Send email notification with attachments using dynamic SMTP",
+     *     description="Mengirim email notifikasi dengan attachment menggunakan konfigurasi SMTP user yang sedang login. Sistem akan otomatis membuat customer activity baru dengan tipe 'Email' dan menyimpan file attachment ke storage. Email menggunakan template profesional dengan branding perusahaan.",
      *     tags={"Customer Activity"},
      *     security={{"bearerAuth":{}}},
+     *     
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
-     *             required={"subject", "body", "recipients", "leads_id"},
-     *             @OA\Property(
-     *                 property="subject", 
-     *                 type="string", 
-     *                 example="Update Customer Activity",
-     *                 description="Subject email"
-     *             ),
-     *             @OA\Property(
-     *                 property="body", 
-     *                 type="string", 
-     *                 example="Customer activity telah diupdate. Berikut detailnya:\n\nNama Perusahaan: PT ABC\nTanggal: 2024-12-09\nTipe: Meeting\nCatatan: Follow up penawaran produk",
-     *                 description="Isi email (mendukung line breaks)"
-     *             ),
-     *             @OA\Property(
-     *                 property="leads_id", 
-     *                 type="integer", 
-     *                 example=1,
-     *                 description="ID leads untuk membuat activity baru"
-     *             ),
-     *             @OA\Property(
-     *                 property="recipients", 
-     *                 type="array", 
-     *                 description="Array email penerima",
-     *                 @OA\Items(
-     *                     type="string", 
-     *                     format="email",
-     *                     example="customer@example.com"
-     *                 )
-     *             ),
-     *             @OA\Property(
-     *                 property="cc", 
-     *                 type="array", 
-     *                 description="Optional: CC recipients",
-     *                 @OA\Items(type="string", format="email")
-     *             ),
-     *             @OA\Property(
-     *                 property="bcc", 
-     *                 type="array", 
-     *                 description="Optional: BCC recipients",
-     *                 @OA\Items(type="string", format="email")
-     *             ),
-     *             @OA\Property(
-     *                 property="attachments", 
-     *                 type="array", 
-     *                 description="Optional: File attachments",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="name", type="string", example="document.pdf"),
-     *                     @OA\Property(property="content", type="string", description="Base64 encoded file content"),
-     *                     @OA\Property(property="mime", type="string", example="application/pdf")
+     *         description="Email data dengan support untuk multiple attachments (max 10MB per file)",
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"subject", "body", "leads_id", "recipients[]"},
+     *                 
+     *                 @OA\Property(
+     *                     property="subject",
+     *                     type="string",
+     *                     maxLength=255,
+     *                     description="Subject email",
+     *                     example="Penawaran Kerja Sama - PT Shelter Indonesia"
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="body",
+     *                     type="string",
+     *                     description="Isi email (plain text atau dengan line breaks)",
+     *                     example="Kepada Yth. Bapak/Ibu,\n\nBersama ini kami sampaikan penawaran kerja sama untuk layanan Laboratory Service.\n\nMohon dapat ditinjau dokumen terlampir.\n\nTerima kasih."
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="leads_id",
+     *                     type="integer",
+     *                     description="ID leads yang terkait dengan email ini",
+     *                     example=1
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="recipients[]",
+     *                     type="array",
+     *                     description="Array email penerima (minimal 1). Gunakan recipients[0], recipients[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="client@example.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="cc[]",
+     *                     type="array",
+     *                     description="Array email CC (opsional). Gunakan cc[0], cc[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="supervisor@shelter.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="bcc[]",
+     *                     type="array",
+     *                     description="Array email BCC (opsional). Gunakan bcc[0], bcc[1], dst.",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="email",
+     *                         example="archive@shelter.com"
+     *                     )
+     *                 ),
+     *                 
+     *                 @OA\Property(
+     *                     property="attachments[]",
+     *                     type="array",
+     *                     description="Array file attachment (opsional, max 10MB per file). Format: pdf, doc, docx, xls, xlsx, jpg, jpeg, png",
+     *                     @OA\Items(
+     *                         type="string",
+     *                         format="binary"
+     *                     )
      *                 )
      *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=201,
-     *         description="Email berhasil dikirim dan activity baru dibuat",
+     *         description="Success - Email berhasil dikirim ke semua penerima dan customer activity baru telah dibuat",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 3 penerima dan activity baru telah dibuat"),
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="string",
+     *                 example="Email berhasil dikirim ke 2 penerima dan activity baru telah dibuat"
+     *             ),
      *             @OA\Property(
      *                 property="data",
      *                 type="object",
-     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
-     *                 @OA\Property(property="sender", type="string", example="John Doe <john@example.com>"),
-     *                 @OA\Property(property="recipients_count", type="integer", example=3),
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp", description="SMTP mailer yang digunakan"),
+     *                 @OA\Property(property="config_source", type="string", example="user_custom", description="Sumber konfigurasi: user_custom, user_default, atau system_default"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@shelter.com>", description="Pengirim email"),
+     *                 @OA\Property(property="recipients_count", type="integer", example=2, description="Jumlah penerima yang berhasil"),
+     *                 @OA\Property(
+     *                     property="recipients",
+     *                     type="array",
+     *                     description="List email penerima yang berhasil",
+     *                     @OA\Items(type="string"),
+     *                     example={"client@example.com", "manager@example.com"}
+     *                 ),
+     *                 @OA\Property(property="attachments_count", type="integer", example=2, description="Jumlah file attachment"),
+     *                 @OA\Property(
+     *                     property="attachments",
+     *                     type="array",
+     *                     description="List nama file attachment",
+     *                     @OA\Items(type="string"),
+     *                     example={"proposal.pdf", "price_list.xlsx"}
+     *                 ),
      *                 @OA\Property(
      *                     property="activity",
      *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=123),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-122024-00001"),
-     *                     @OA\Property(property="tipe", type="string", example="Email")
+     *                     description="Customer activity yang dibuat",
+     *                     @OA\Property(property="id", type="integer", example=456),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-022025-00123"),
+     *                     @OA\Property(property="tipe", type="string", example="Email"),
+     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2025-02-13"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time", example="2025-02-13T10:30:00.000000Z")
      *                 ),
      *                 @OA\Property(
-     *                     property="config_source",
-     *                     type="string",
-     *                     example="user_custom",
-     *                     description="user_custom, user_default, or system_default"
+     *                     property="cc",
+     *                     type="array",
+     *                     description="List email CC",
+     *                     @OA\Items(type="string"),
+     *                     example={"supervisor@shelter.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="bcc",
+     *                     type="array",
+     *                     description="List email BCC",
+     *                     @OA\Items(type="string"),
+     *                     example={"archive@shelter.com"}
      *                 )
      *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=207,
-     *         description="Multi-Status - Beberapa email berhasil, beberapa gagal",
+     *         description="Multi-Status - Beberapa email berhasil dikirim, beberapa gagal",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Email berhasil dikirim ke 2 dari 3 penerima dan activity baru telah dibuat"),
      *             @OA\Property(property="partial_success", type="boolean", example=true),
-     *             @OA\Property(property="failed_recipients", type="array", @OA\Items(type="string"))
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="mailer_used", type="string", example="user_123_smtp"),
+     *                 @OA\Property(property="config_source", type="string", example="user_custom"),
+     *                 @OA\Property(property="sender", type="string", example="John Doe <john@shelter.com>"),
+     *                 @OA\Property(
+     *                     property="success_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"client@example.com", "manager@example.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="failed_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"invalid@example.com"}
+     *                 ),
+     *                 @OA\Property(property="attachments_count", type="integer", example=2),
+     *                 @OA\Property(
+     *                     property="attachments",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"proposal.pdf", "price_list.xlsx"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="activity",
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=456),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/LS/LS001-022025-00123"),
+     *                     @OA\Property(property="tipe", type="string", example="Email"),
+     *                     @OA\Property(property="tgl_activity", type="string", format="date", example="2025-02-13"),
+     *                     @OA\Property(property="created_at", type="string", format="date-time")
+     *                 ),
+     *                 @OA\Property(property="success_count", type="integer", example=2),
+     *                 @OA\Property(property="failed_count", type="integer", example=1)
+     *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
      *         response=422,
-     *         description="Validation Error",
+     *         description="Validation Error - Data tidak valid",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Validasi gagal"),
-     *             @OA\Property(property="errors", type="object")
+     *             @OA\Property(
+     *                 property="message",
+     *                 type="object",
+     *                 description="Object berisi error validation",
+     *                 example={
+     *                     "subject": {"Subject email wajib diisi"},
+     *                     "recipients": {"Minimal harus ada 1 penerima email"},
+     *                     "attachments.0": {"File harus berformat: pdf, doc, docx, xls, xlsx, jpg, jpeg, atau png"},
+     *                     "attachments.1": {"Ukuran file maksimal 10MB"}
+     *                 }
+     *             )
      *         )
      *     ),
+     *     
      *     @OA\Response(
-     *         response=500,
-     *         description="Server Error",
+     *         response=401,
+     *         description="Unauthorized - Token tidak valid atau tidak ada",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=404,
+     *         description="Not Found - Leads tidak ditemukan",
      *         @OA\JsonContent(
      *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Gagal mengirim email: SMTP connection failed")
+     *             @OA\Property(property="message", type="string", example="Leads dengan ID tersebut tidak ditemukan")
+     *         )
+     *     ),
+     *     
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server Error - Gagal mengirim email atau error sistem",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan sistem: SMTP connection failed"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 description="Detail error jika semua email gagal",
+     *                 @OA\Property(property="mailer_used", type="string", example="smtp"),
+     *                 @OA\Property(property="config_source", type="string", example="system_default"),
+     *                 @OA\Property(property="sender", type="string", example="system@shelter.com"),
+     *                 @OA\Property(
+     *                     property="failed_recipients",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"client1@example.com", "client2@example.com"}
+     *                 ),
+     *                 @OA\Property(
+     *                     property="errors",
+     *                     type="array",
+     *                     @OA\Items(type="string"),
+     *                     example={"Connection timeout", "Authentication failed"}
+     *                 )
+     *             )
      *         )
      *     )
      * )
@@ -1128,10 +1331,25 @@ class CustomerActivityController extends Controller
         set_time_limit(0);
 
         try {
-            DB::beginTransaction();
+            // === AMBIL DAN BERSIHKAN INPUT UNTUK RECIPIENTS, CC, BCC ===
+            $data = $request->all();
 
-            // === VALIDASI REQUEST ===
-            $validator = Validator::make($request->all(), [
+            foreach (['recipients', 'cc', 'bcc'] as $field) {
+                if (isset($data[$field]) && is_array($data[$field])) {
+                    // Hapus elemen null atau string kosong
+                    $data[$field] = array_filter($data[$field], function ($value) {
+                        return !is_null($value) && trim($value) !== '';
+                    });
+
+                    // Jika setelah filter kosong, set ke null (kecuali recipients akan dicek required)
+                    if (empty($data[$field])) {
+                        $data[$field] = null;
+                    }
+                }
+            }
+
+            // === VALIDASI REQUEST DENGAN DATA YANG SUDAH DIBERSIHKAN ===
+            $validator = Validator::make($data, [
                 'subject' => 'required|string|max:255',
                 'body' => 'required|string',
                 'leads_id' => 'required|exists:sl_leads,id',
@@ -1142,6 +1360,13 @@ class CustomerActivityController extends Controller
                 'bcc' => 'nullable|array',
                 'bcc.*' => 'email',
                 'attachments' => 'nullable|array',
+                'attachments.*' => 'file|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png|max:10240',
+            ], [
+                // Custom messages (optional, bisa disesuaikan)
+                'recipients.required' => 'Minimal harus ada 1 penerima email.',
+                'recipients.*.email' => 'Format email penerima tidak valid.',
+                'cc.*.email' => 'Format email CC tidak valid.',
+                'bcc.*.email' => 'Format email BCC tidak valid.',
             ]);
 
             if ($validator->fails()) {
@@ -1170,16 +1395,21 @@ class CustomerActivityController extends Controller
             $nomor = $this->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
-            // Gabungkan recipients untuk disimpan di notes
-            $recipientsList = implode(', ', $request->recipients);
+            // Gabungkan recipients (sudah terfilter) untuk disimpan di notes
+            $recipientsList = implode(', ', $data['recipients'] ?? []);
             $notes = "Email dikirim ke: {$recipientsList}\nSubject: {$request->subject}\n\n{$request->body}";
 
-            if ($request->cc) {
-                $notes .= "\nCC: " . implode(', ', $request->cc);
+            if (!empty($data['cc'])) {
+                $notes .= "\nCC: " . implode(', ', $data['cc']);
+            }
+            if (!empty($data['bcc'])) {
+                $notes .= "\nBCC: " . implode(', ', $data['bcc']);
             }
 
-            if ($request->bcc) {
-                $notes .= "\nBCC: " . implode(', ', $request->bcc);
+            // Tambahkan info attachments jika ada
+            if ($request->hasFile('attachments')) {
+                $attachmentCount = count($request->file('attachments'));
+                $notes .= "\nAttachments: {$attachmentCount} file(s)";
             }
 
             // Buat activity baru
@@ -1194,48 +1424,73 @@ class CustomerActivityController extends Controller
                 'created_by' => $user->full_name,
                 'created_at' => $current_date_time
             ];
+            if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+                // Untuk Sales, buat SalesActivity
+                $activity = $this->createSalesActivity($request->leads_id, $notes);
+            } else {
+                // Untuk non-Sales, buat CustomerActivity
+                $activity = CustomerActivity::create($activityData);
+            }
 
-            $activity = CustomerActivity::create($activityData);
+            // === HANDLE ATTACHMENTS ===
+            $attachmentFiles = [];
+            $attachmentNames = [];
+
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    try {
+                        // Simpan file ke storage
+                        $fileName = $this->storeActivityFile($activity->id, $file);
+
+                        // Simpan file object untuk dikirim via email
+                        $attachmentFiles[] = $file;
+                        $attachmentNames[] = $file->getClientOriginalName();
+
+                        Log::info('File attached for email:', [
+                            'activity_id' => $activity->id,
+                            'filename' => $file->getClientOriginalName(),
+                            'size' => $file->getSize()
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to process attachment:', [
+                            'filename' => $file->getClientOriginalName(),
+                            'error' => $e->getMessage()
+                        ]);
+                        // Lanjutkan dengan file lain meskipun ada yang gagal
+                    }
+                }
+            }
 
             // === PREPARE EMAIL CONTENT ===
             $fullBody = $request->body;
-
-            // // Tambahkan info activity ke body email
-            // $activityInfo = "\n\n--- DETAIL ACTIVITY ---\n";
-            // $activityInfo .= "Nomor Activity: " . $activity->nomor . "\n";
-            // $activityInfo .= "Perusahaan: " . ($leads->nama_perusahaan ?? '-') . "\n";
-            // $activityInfo .= "Tanggal: " . $activity->tgl_activity . "\n";
-            // $activityInfo .= "Tipe: " . $activity->tipe . "\n";
-
-            // $fullBody .= $activityInfo;
 
             // === SEND EMAILS ===
             $sentCount = 0;
             $failedRecipients = [];
             $successRecipients = [];
+            $totalRecipients = count($data['recipients'] ?? []);
 
-            $totalRecipients = count($request->recipients);
-
-            foreach ($request->recipients as $index => $recipient) {
+            foreach (($data['recipients'] ?? []) as $index => $recipient) {
                 $attempt = $index + 1;
 
                 try {
-                    // Buat email instance
+                    // Buat email instance dengan attachments
                     $email = new CustomerActivityEmail(
-                        subject: $request->subject,
-                        body: $fullBody,
-                        fromAddress: $fromConfig['address'],
-                        fromName: $fromConfig['name']
+                        $request->subject,
+                        $fullBody,
+                        $fromConfig['address'],
+                        $fromConfig['name'],
+                        $attachmentFiles
                     );
 
-                    // Tambahkan CC jika ada
-                    if (!empty($request->cc)) {
-                        $email->cc($request->cc);
+                    // Tambahkan CC jika ada (sudah terfilter)
+                    if (!empty($data['cc'])) {
+                        $email->cc($data['cc']);
                     }
 
-                    // Tambahkan BCC jika ada
-                    if (!empty($request->bcc)) {
-                        $email->bcc($request->bcc);
+                    // Tambahkan BCC jika ada (sudah terfilter)
+                    if (!empty($data['bcc'])) {
+                        $email->bcc($data['bcc']);
                     }
 
                     // Kirim email menggunakan mailer dinamis
@@ -1244,7 +1499,19 @@ class CustomerActivityController extends Controller
                     $sentCount++;
                     $successRecipients[] = $recipient;
 
+                    Log::info('Email sent successfully:', [
+                        'recipient' => $recipient,
+                        'attempt' => $attempt,
+                        'attachments_count' => count($attachmentFiles)
+                    ]);
+
                 } catch (\Exception $e) {
+                    Log::error('Failed to send email:', [
+                        'recipient' => $recipient,
+                        'attempt' => $attempt,
+                        'error' => $e->getMessage()
+                    ]);
+
                     $failedRecipients[] = [
                         'email' => $recipient,
                         'error' => $e->getMessage(),
@@ -1271,6 +1538,8 @@ class CustomerActivityController extends Controller
                         'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
                         'recipients_count' => $sentCount,
                         'recipients' => $successRecipients,
+                        'attachments_count' => count($attachmentFiles),
+                        'attachments' => $attachmentNames,
                         'activity' => [
                             'id' => $activity->id,
                             'nomor' => $activity->nomor,
@@ -1278,8 +1547,8 @@ class CustomerActivityController extends Controller
                             'tgl_activity' => $activity->tgl_activity,
                             'created_at' => $activity->created_at
                         ],
-                        'cc' => $request->cc ?? [],
-                        'bcc' => $request->bcc ?? []
+                        'cc' => $data['cc'] ?? [],
+                        'bcc' => $data['bcc'] ?? []
                     ]
                 ], 201);
             } elseif ($sentCount > 0) {
@@ -1293,6 +1562,8 @@ class CustomerActivityController extends Controller
                         'sender' => "{$fromConfig['name']} <{$fromConfig['address']}>",
                         'success_recipients' => $successRecipients,
                         'failed_recipients' => array_column($failedRecipients, 'email'),
+                        'attachments_count' => count($attachmentFiles),
+                        'attachments' => $attachmentNames,
                         'activity' => [
                             'id' => $activity->id,
                             'nomor' => $activity->nomor,
@@ -2297,5 +2568,32 @@ class CustomerActivityController extends Controller
             Log::error('Error storing activity file: ' . $e->getMessage());
             throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
         }
+    }
+    private function createSalesActivity($leadsId, $notulen) // Hapus :void
+    {
+        $user = Auth::user();
+        $leadsKebutuhanList = LeadsKebutuhan::where('leads_id', $leadsId)
+            ->whereNotNull('tim_sales_d_id')
+            ->get();
+
+        $firstActivity = null;
+
+        foreach ($leadsKebutuhanList as $leadsKebutuhan) {
+            $activity = SalesActivity::create([
+                'leads_id' => $leadsId,
+                'leads_kebutuhan_id' => $leadsKebutuhan->id,
+                'tgl_activity' => Carbon::now(),
+                'jenis_activity' => 'Email',
+                'notulen' => $notulen,
+                'created_by' => $user->full_name
+            ]);
+
+            // Simpan activity pertama sebagai referensi lampiran
+            if (!$firstActivity) {
+                $firstActivity = $activity;
+            }
+        }
+
+        return $firstActivity;
     }
 }

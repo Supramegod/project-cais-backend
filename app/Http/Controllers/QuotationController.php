@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\QuotationDetailHpp;
@@ -83,9 +84,37 @@ class QuotationController extends Controller
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
-     *         description="Status filter",
+     *         description="Status quotation ID filter",
      *         required=false,
-     *         @OA\Schema(type="string", example="approved")
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         description="Search by company name (uses fulltext search)",
+     *         required=false,
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Number of items per page",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number for pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         description="Column to search in (default: nama_perusahaan)",
+     *         required=false,
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -110,6 +139,12 @@ class QuotationController extends Controller
      *                     )
      *                 )
      *             ),
+     *             @OA\Property(property="pagination", type="object",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=5),
+     *                 @OA\Property(property="total", type="integer", example=100),
+     *                 @OA\Property(property="total_per_page", type="integer", example=15)
+     *             ),
      *             @OA\Property(property="message", type="string", example="Quotations retrieved successfully")
      *         )
      *     ),
@@ -127,7 +162,7 @@ class QuotationController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $quotations = Quotation::select([
+            $query = Quotation::select([
                 'id',
                 'nomor',
                 'step',
@@ -143,19 +178,54 @@ class QuotationController extends Controller
             ])
                 ->with([
                     'quotationSites:id,quotation_id,nama_site',
-                    'statusQuotation:id,nama'// Hanya ambil nama_site dari sites
+                    'statusQuotation:id,nama'
                 ])
                 ->byUserRole()
-                ->dateRange($request->tgl_dari, $request->tgl_sampai)
-                ->byCompany($request->company)
-                ->byKebutuhan($request->kebutuhan_id)
-                ->byStatus($request->status)
                 ->notDeleted()
-                ->orderBy('created_at', 'desc')
-                ->get();
+                ->orderBy('created_at', 'desc');
 
-            // Map data ke format yang diinginkan
-            $data = $quotations->map(function ($quotation) {
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
+                    if (str_contains($searchTerm, ' ')) {
+                        $searchTerm = '"' . $searchTerm . '"';
+                    } else {
+                        $searchTerm = $searchTerm . '*';
+                    }
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+
+                } else {
+                    $allowedColumns = ['nomor', 'kebutuhan','created_by'];
+                    if (in_array($searchBy, $allowedColumns)) {
+                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                    }
+                }
+            } else {
+                // Filter tanggal default (hanya jalan kalau tidak sedang search)
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
+                $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
+            }
+
+            // Filter tambahan
+            if ($request->filled('branch'))
+                $query->where('branch_id', $request->branch);
+            if ($request->filled('platform'))
+                $query->where('platform_id', $request->platform);
+            if ($request->filled('status'))
+                $query->where('status_quotation_id', $request->status);
+            if ($request->filled('company'))
+                $query->where('company_id', $request->company);
+            if ($request->filled('kebutuhan_id'))
+                $query->where('kebutuhan_id', $request->kebutuhan_id);
+
+            $data = $query->paginate($request->get('per_page', 15));
+
+            $transformedData = $data->getCollection()->transform(function ($quotation) {
                 return [
                     'id' => $quotation->id,
                     'nomor' => $quotation->nomor,
@@ -181,7 +251,13 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $data,
+                'data' => $transformedData,
+                'pagination' => [
+                    'current_page' => $data->currentPage(),
+                    'last_page' => $data->lastPage(),
+                    'total' => $data->total(),
+                    'total_per_page' => $data->count(),
+                ],
                 'message' => 'Quotations retrieved successfully'
             ]);
 
@@ -207,7 +283,7 @@ class QuotationController extends Controller
      *         in="path",
      *         required=true,
      *         description="Type of quotation",
-     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="baru")
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak","addendum"}, example="baru")
      *     ),
      *     @OA\RequestBody(
      *         required=true,
@@ -359,39 +435,28 @@ class QuotationController extends Controller
      *     )
      * )
      */
+
     public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
-        set_time_limit(0); // Set time limit to 5 minutes
+        set_time_limit(0);
         try {
             $user = Auth::user();
 
-            // Validasi tipe_quotation dari URL parameter
-            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak'])) {
+            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
                 throw new \Exception('Tipe quotation tidak valid');
             }
 
-            // Merge tipe_quotation ke request untuk validasi
-            $request->merge(['tipe_quotation' => $tipe_quotation]);
-
-            // ✅ PERUBAHAN 1: Validasi quotation referensi berdasarkan tipe
-            if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
-                // Untuk revisi dan rekontrak, quotation_referensi_id wajib
+            if (in_array($tipe_quotation, ['revisi', 'rekontrak', 'addendum'])) {
                 if (!$request->has('quotation_referensi_id') || !$request->quotation_referensi_id) {
                     throw new \Exception('Quotation referensi wajib dipilih untuk ' . $tipe_quotation);
                 }
             }
-            // Untuk 'baru', quotation_referensi_id opsional
 
-            // Prepare basic data
             $quotationData = $this->quotationBusinessService->prepareQuotationData($request);
 
-            // ✅ PERUBAHAN 2: Handle quotation referensi untuk SEMUA tipe jika ada
             $quotationReferensi = null;
-
-            // Cek apakah ada quotation_referensi_id dalam request (berlaku untuk semua tipe)
             if ($request->has('quotation_referensi_id') && $request->quotation_referensi_id) {
-                // ✅ PASTIKAN SEMUA RELASI DIMUAT
                 $quotationReferensi = Quotation::with([
                     'quotationDetails.quotationDetailHpps',
                     'quotationDetails.quotationDetailCosses',
@@ -412,16 +477,8 @@ class QuotationController extends Controller
                 ])->findOrFail($request->quotation_referensi_id);
 
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
-
-                \Log::info('Reference quotation loaded with relations', [
-                    'quotation_id' => $quotationReferensi->id,
-                    'tipe_quotation' => $tipe_quotation,
-                    'kaporlap_count' => $quotationReferensi->quotationKaporlaps->count(),
-                    'details_count' => $quotationReferensi->quotationDetails->count()
-                ]);
             }
 
-            // Generate nomor berdasarkan tipe dari URL parameter
             $quotationData['nomor'] = $this->quotationBusinessService->generateNomorByType(
                 $request->perusahaan_id,
                 $request->entitas,
@@ -432,190 +489,63 @@ class QuotationController extends Controller
             $quotationData['created_by'] = $user->full_name;
             $quotationData['tipe_quotation'] = $tipe_quotation;
 
-            // ✅ CREATE QUOTATION BARU
             $quotation = Quotation::create($quotationData);
 
-            \Log::info('New Quotation created', [
+            Log::info('New Quotation created', [
                 'id' => $quotation->id,
                 'nomor' => $quotation->nomor,
                 'tipe' => $tipe_quotation,
-                'has_referensi' => $quotationReferensi !== null
-            ]);
-
-            // ✅ PERUBAHAN 3: Cek apakah ada request site baru
-            $hasNewSiteRequest = false;
-            $hasExistingSite = false;
-
-            if ($request->jumlah_site == "Multi Site") {
-                if ($request->has('multisite') && !empty($request->multisite)) {
-                    // Cek setiap site apakah sudah existing
-                    foreach ($request->multisite as $key => $namaSite) {
-                        $isExisting = $this->checkSiteExists(
-                            $request->perusahaan_id,
-                            $namaSite,
-                            $request->provinsi_multi[$key] ?? null,
-                            $request->kota_multi[$key] ?? null
-                        );
-
-                        if ($isExisting) {
-                            $hasExistingSite = true;
-                            \Log::info('Site sudah existing', [
-                                'nama_site' => $namaSite,
-                                'perusahaan_id' => $request->perusahaan_id
-                            ]);
-                        } else {
-                            $hasNewSiteRequest = true;
-                        }
-                    }
-                }
-            } else {
-                if ($request->has('nama_site') && !empty($request->nama_site)) {
-                    $isExisting = $this->checkSiteExists(
-                        $request->perusahaan_id,
-                        $request->nama_site,
-                        $request->provinsi,
-                        $request->kota
-                    );
-
-                    if ($isExisting) {
-                        $hasExistingSite = true;
-                        \Log::info('Site sudah existing', [
-                            'nama_site' => $request->nama_site,
-                            'perusahaan_id' => $request->perusahaan_id
-                        ]);
-                    } else {
-                        $hasNewSiteRequest = true;
-                    }
-                }
-            }
-
-            \Log::info('Site request check', [
-                'jumlah_site' => $request->jumlah_site,
-                'has_new_site_request' => $hasNewSiteRequest,
-                'has_existing_site' => $hasExistingSite,
                 'has_referensi' => $quotationReferensi !== null,
-                'tipe_quotation' => $tipe_quotation
             ]);
 
-            // ✅ PERUBAHAN: LOGIC BERDASARKAN ADA/TIDAKNYA REFERENSI DAN STATUS SITE
-// Di dalam try-catch block, setelah $hasNewSiteRequest dan $hasExistingSite dihitung:
+            if ($tipe_quotation === 'baru' && $quotationReferensi === null) {
+                $this->quotationBusinessService->createQuotationSites(
+                    $quotation,
+                    $request,
+                    $user->full_name
+                );
 
-            // ✅ LOGIC BERDASARKAN STATUS SITE
-            if ($quotationReferensi) {
-                \Log::info('Starting duplication process from reference for ' . $tipe_quotation, [
-                    'has_new_site_request' => $hasNewSiteRequest,
-                    'has_existing_site' => $hasExistingSite,
-                    'ref_site_count' => $quotationReferensi->quotationSites->count()
+                Log::info('Sites created synchronously', [
+                    'quotation_id' => $quotation->id,
+                    'sites_count' => $quotation->quotationSites()->count(),
                 ]);
-
-                if (!$hasNewSiteRequest && !$hasExistingSite) {
-                    // ✅ KASUS 1: TIDAK ADA SITE BARU & TIDAK ADA SITE EXISTING
-                    // Copy semua data termasuk sites dari referensi
-                    $this->quotationDuplicationService->duplicateQuotationData($quotation, $quotationReferensi);
-                    \Log::info('Copied ALL data including sites from reference quotation');
-
-                } elseif ($hasExistingSite && !$hasNewSiteRequest) {
-                    // ✅ KASUS 2: ADA SITE EXISTING, TIDAK ADA SITE BARU
-                    // Link ke site existing yang sudah ada
-                    $this->linkExistingSites($quotation, $request, $user->full_name);
-                    // Copy data lain (tapi JANGAN copy site dari referensi)
-                    $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                    \Log::info('Linked to existing sites and copied other data');
-
-                } else {
-                    // ✅ KASUS 3: ADA SITE BARU (dengan atau tanpa existing site)
-                    // BUAT SITE BARU SAJA (skip yang existing)
-                    $this->createNewSitesOnly($quotation, $request, $user->full_name);
-
-                    // Tentukan jumlah site
-                    $jumlahSiteRequest = 0;
-                    if ($request->jumlah_site == "Multi Site") {
-                        $jumlahSiteRequest = is_array($request->multisite) ? count($request->multisite) : 0;
-                    } else {
-                        $jumlahSiteRequest = 1;
-                    }
-
-                    $jumlahSiteReferensi = $quotationReferensi->quotationSites->count();
-
-                    \Log::info('Site comparison for new sites', [
-                        'jumlah_site_request' => $jumlahSiteRequest,
-                        'jumlah_site_referensi' => $jumlahSiteReferensi,
-                        'has_existing_site' => $hasExistingSite
-                    ]);
-
-                    // ✅ LOGIC DUPLIKASI DATA KE SITE BARU
-                    if ($jumlahSiteRequest === $jumlahSiteReferensi && !$hasExistingSite) {
-                        // ✅ JUMLAH SITE SAMA & TIDAK ADA EXISTING: Mapping per site
-                        $this->quotationDuplicationService->duplicateQuotationWithSiteMapping($quotation, $quotationReferensi);
-                        \Log::info('Copied data with site mapping (same count, no existing)');
-                    } else {
-                        // ✅ JUMLAH SITE BERBEDA ATAU ADA EXISTING: Duplikasi semua detail ke semua site baru
-                        $this->quotationDuplicationService->duplicateQuotationWithoutSites($quotation, $quotationReferensi);
-                        \Log::info('Copied all data to new sites (different count or with existing)');
-                    }
-                }
-            } else {
-                // ✅ KASUS 4: TIDAK ADA REFERENSI (hanya untuk tipe 'baru')
-                \Log::info('Creating quotation WITHOUT reference (brand new)');
-
-                // Validasi: wajib ada data site untuk quotation baru tanpa referensi
-                if (!$hasNewSiteRequest && !$hasExistingSite) {
-                    throw new \Exception('Data site wajib diisi untuk quotation baru tanpa referensi');
-                }
-
-                // Buat hanya site baru (yang belum existing)
-                $this->createNewSitesOnly($quotation, $request, $user->full_name);
-
-                // Buat PIC awal dari leads
-                $this->quotationBusinessService->createInitialPic($quotation, $request, $user->full_name);
             }
 
-
-            // Create initial activity berdasarkan tipe quotation
-            if ($tipe_quotation === 'revisi') {
-                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'revisi', $quotationReferensi);
-            } elseif ($tipe_quotation === 'rekontrak') {
-                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'rekontrak', $quotationReferensi);
-            } elseif ($tipe_quotation === 'baru' && $quotationReferensi) {
-                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'baru_dengan_referensi', $quotationReferensi);
-            } else {
-                $this->quotationBusinessService->createInitialActivity($quotation, $user->full_name, $user->id, 'baru');
-            }
+            QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
 
             DB::commit();
 
-            // ✅ RELOAD DENGAN RELASI UNTUK RESPONSE
+            // Reload untuk response
             $quotation->load([
                 'quotationSites',
                 'quotationPics',
                 'quotationDetails',
-                'statusQuotation'
+                'statusQuotation',
             ]);
-            $newSitesCount = $quotation->quotationSites()->count();
-            $existingSitesCount = $hasExistingSite;
+
+            $newSitesCount = $quotation->quotationSites->count();
+
             return response()->json([
                 'success' => true,
                 'data' => new QuotationResource($quotation),
                 'message' => 'Quotation ' . $tipe_quotation . ' created successfully',
                 'metadata' => [
                     'sites_created' => $newSitesCount,
-                    'sites_existing' => $existingSitesCount,
-                    'has_new_sites' => $hasNewSiteRequest,
-                    'has_existing_sites' => $hasExistingSite
-                ]
+                    'tipe_quotation' => $tipe_quotation,
+                ],
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to create quotation', [
+            Log::error('Failed to create quotation', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create quotation',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -655,7 +585,7 @@ class QuotationController extends Controller
      */
     // Di QuotationController
     public function show($id)
-    {
+    { set_time_limit(0);
         try {
             // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
@@ -740,13 +670,13 @@ class QuotationController extends Controller
             $user = Auth::user();
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
-            // Use business service to soft delete relations
+            // Soft delete relations first
             $this->quotationBusinessService->softDeleteQuotationRelations($quotation, $user->full_name);
 
-            $quotation->update([
-                'deleted_at' => Carbon::now(),
-                'deleted_by' => $user->full_name
-            ]);
+            // Update quotation without reloading
+            $quotation->deleted_at = Carbon::now();
+            $quotation->deleted_by = $user->full_name;
+            $quotation->save();
 
             DB::commit();
 
@@ -1037,7 +967,7 @@ class QuotationController extends Controller
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
-                'alasan' => 'nullable|string'
+                'notes' => 'nullable|string'
             ]);
 
             if ($validator->fails()) {
@@ -1051,7 +981,7 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => $result['success'],
-                'message' => $result['success'] 
+                'message' => $result['success']
                     ? ($request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully')
                     : $result['message']
             ]);
@@ -1413,10 +1343,10 @@ class QuotationController extends Controller
     {
         try {
             // Validasi parameter tipe_quotation
-            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak'])) {
+            if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, atau rekontrak'
+                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum'
                 ], 400);
             }
 
@@ -1512,7 +1442,7 @@ class QuotationController extends Controller
      *         in="query",
      *         description="Type of quotation to filter references",
      *         required=true,
-     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak"}, example="revisi")
+     *         @OA\Schema(type="string", enum={"baru", "revisi", "rekontrak", "addendum"}, example="revisi")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -1566,7 +1496,7 @@ class QuotationController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'tipe_quotation' => 'required|in:baru,revisi,rekontrak'
+                'tipe_quotation' => 'required|in:baru,revisi,rekontrak,addendum'
             ]);
 
             if ($validator->fails()) {
