@@ -29,9 +29,20 @@ use App\DTO\DetailCalculation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Services\QuotationNotificationService;
+
 
 class QuotationService
 {
+    protected $quotationNotificationService;
+
+    public function __construct(
+
+        QuotationNotificationService $quotationNotificationService
+    ) {
+
+        $this->quotationNotificationService = $quotationNotificationService;
+    }
     // ============================ MAIN CALCULATION FLOW ============================
 
     /**
@@ -173,7 +184,7 @@ class QuotationService
             try {
                 $this->processSingleDetail($detail, $quotation, $daftarTunjangan, $jumlahHc, $result);
             } catch (\Exception $e) {
-                            // Skip this detail but continue with others
+                // Skip this detail but continue with others
             }
         });
     }
@@ -706,7 +717,7 @@ class QuotationService
             // Reset arrays
             $siteHcHpp = [];
             $siteHcCoss = [];
-            
+
             $firstDetail = $quotation->quotation_detail->first();
             $primarySiteId = $firstDetail->quotation_site_id ?? null;
             $primaryDetailId = $firstDetail->id ?? null;
@@ -718,7 +729,7 @@ class QuotationService
                     $siteHcHpp[$siteId] = 0;
                     $siteHcCoss[$siteId] = 0;
                 }
-        
+
                 if (!isset($det->jumlah_hc_hpp)) {
                     $det->jumlah_hc_hpp = $det->jumlah_hc;
                 }
@@ -748,16 +759,16 @@ class QuotationService
                 'coss_field' => 'provisi_seragam',
                 'model' => QuotationKaporlap::class,
                 'detail_id' => $detail->id,
-                'is_general' => false,  
-                'site_specific' => false, 
+                'is_general' => false,
+                'site_specific' => false,
                 'special' => 'kaporlap'
             ],
             'devices' => [
                 'hpp_field' => 'provisi_peralatan',
                 'coss_field' => 'provisi_peralatan',
                 'model' => QuotationDevices::class,
-                'is_general' => true,   
-                'site_specific' => true, 
+                'is_general' => true,
+                'site_specific' => true,
                 'site_field' => 'quotation_site_id',
                 'special' => 'device'
             ],
@@ -765,8 +776,8 @@ class QuotationService
                 'hpp_field' => 'provisi_ohc',
                 'coss_field' => 'provisi_ohc',
                 'model' => QuotationOhc::class,
-                'is_general' => true,   
-                'site_specific' => true, 
+                'is_general' => true,
+                'site_specific' => true,
                 'site_field' => 'quotation_site_id',
                 'special' => null
             ],
@@ -931,9 +942,9 @@ class QuotationService
         $query = $model::whereNull('deleted_at');
 
         // Logic routing query Hybrid (v1 & v2 support)
-        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+        $query->where(function ($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
             // 1. Ambil data spesifik (Apps v2 logic)
-            $q->where(function($q2) use ($detailId, $siteId) {
+            $q->where(function ($q2) use ($detailId, $siteId) {
                 if ($detailId) {
                     $q2->where('quotation_detail_id', $detailId);
                 } elseif ($siteId !== null) {
@@ -946,10 +957,10 @@ class QuotationService
             // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
             // Hanya jika ini site/detail utama, ambil data yang site/detail-nya NULL
             if ($includeLegacy) {
-                $q->orWhere(function($q2) use ($quotationId) {
+                $q->orWhere(function ($q2) use ($quotationId) {
                     $q2->where('quotation_id', $quotationId)
-                       ->whereNull('quotation_detail_id')
-                       ->whereNull('quotation_site_id');
+                        ->whereNull('quotation_detail_id')
+                        ->whereNull('quotation_site_id');
                 });
             }
         });
@@ -987,9 +998,9 @@ class QuotationService
         $query = $model::whereNull('deleted_at');
 
         // Logic routing query Hybrid (v1 & v2 support)
-        $query->where(function($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
+        $query->where(function ($q) use ($quotationId, $detailId, $siteId, $includeLegacy) {
             // 1. Ambil data spesifik (Apps v2 logic)
-            $q->where(function($q2) use ($detailId, $siteId) {
+            $q->where(function ($q2) use ($detailId, $siteId) {
                 if ($detailId) {
                     $q2->where('quotation_detail_id', $detailId);
                 } elseif ($siteId !== null) {
@@ -1001,10 +1012,10 @@ class QuotationService
 
             // 2. ATAU Ambil data Global/Legacy (Apps v1 logic)
             if ($includeLegacy) {
-                $q->orWhere(function($q2) use ($quotationId) {
+                $q->orWhere(function ($q2) use ($quotationId) {
                     $q2->where('quotation_id', $quotationId)
-                       ->whereNull('quotation_detail_id')
-                       ->whereNull('quotation_site_id');
+                        ->whereNull('quotation_detail_id')
+                        ->whereNull('quotation_site_id');
                 });
             }
         });
@@ -1709,8 +1720,7 @@ class QuotationService
         $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $currentDateTime = Carbon::now();
         $tingkat = 1;
-
-        if ($user->cais_role_id == 96) {
+        if ($user->cais_role_id == 96) { // Direktur Sales
             $updateData = [
                 'ot1' => $user->full_name,
                 'updated_at' => $currentDateTime->toDateTimeString(),
@@ -1718,17 +1728,33 @@ class QuotationService
             ];
 
             if ($isApproved) {
-                $needsLevel2 = ($quotation->top == "Lebih Dari 7 Hari");
+                $isTopMoreThan7 = ($quotation->top == "Lebih Dari 7 Hari");
+
+                $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+                    $thr = strtolower(trim($detail->wage->thr ?? ''));
+                    // Jika THR bukan 'diprovisikan', maka dianggap perlu level 2
+                    return $thr !== 'diprovisikan';
+                });
+
+                // Quotation butuh level 2 jika TOP > 7 hari ATAU ada THR tidak diprovisikan
+                $needsLevel2 = ($isTopMoreThan7 || $hasNonProvisionalThr);
+
                 $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
                 $updateData['is_aktif'] = $needsLevel2 ? 0 : 1;
             } else {
-                $updateData['status_quotation_id'] = 8;
+                $updateData['status_quotation_id'] = 8; // Rejected
                 $updateData['is_aktif'] = 0;
             }
             $tingkat = 1;
         } elseif ($user->cais_role_id == 97) {
-            if ($quotation->status_quotation_id != 2 || empty($quotation->ot1)) {
-                return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
+            $isNotApprovedBySales = (int) $quotation->status_quotation_id !== 2;
+            $isOt1Empty = empty($quotation->ot1) || strlen(trim($quotation->ot1)) === 0;
+
+            if ($isNotApprovedBySales || $isOt1Empty) {
+                return [
+                    'success' => false,
+                    'message' => 'Quotation belum disetujui oleh Direktur Sales (Status: ' . $quotation->status_quotation_id . ')'
+                ];
             }
 
             $updateData = [
@@ -1745,6 +1771,9 @@ class QuotationService
 
         $quotation->update($updateData);
 
+        if ($user->cais_role_id == 96 && $isApproved && $needsLevel2) {
+            $this->notifyDirKeu($quotation->fresh(), $currentDateTime);
+        }
         // Log approval
         LogApproval::create([
             'tabel' => 'quotation',
@@ -1790,6 +1819,50 @@ class QuotationService
         }
 
         return ['success' => true, 'data' => $quotation->fresh()];
+    }
+    // 2. Di submitForApproval ketika Dir Sales approve
+    private function notifyDirKeu(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirKeu = [27928, 16986, 127823];
+
+        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+            $thr = strtolower(trim($detail->wage->thr ?? ''));
+            return $thr !== 'diprovisikan';
+        });
+
+        if (!($quotation->top == 'Lebih Dari 7 Hari' || $hasNonProvisionalThr)) {
+            return;
+        }
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah disetujui Direktur Sales dan membutuhkan persetujuan Direktur Keuangan.";
+
+        foreach ($dirKeu as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        // notifyDirKeu
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+        );
     }
 
     /**

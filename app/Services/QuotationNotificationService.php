@@ -12,29 +12,27 @@ use Illuminate\Support\Facades\Mail;
 class QuotationNotificationService
 {
     const DIR_SALES = [
-        // ['name' => 'Nino', 'email' => 'nino@shelterindonesia.id', 'role' => 'Dir. Sales'],
         ['name' => 'jalu pradipta', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [
-        // ['name' => 'Alivian', 'email' => 'alivian@shelterindonesia.id', 'role' => 'Dir. Keuangan'],
         ['name' => 'zamzam akabar', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
 
-    const DIR_UMUM = [];
-
     public function __construct(
         private readonly DynamicMailerService $dynamicMailer
-    ) {}
+    ) {
+    }
 
     public function sendApprovalNotification(
         Quotation $quotation,
         string $creatorName,
         string $approvalUrl = '#',
-        ?User $senderUser = null
+        ?User $senderUser = null,
+        ?array $overrideRecipients = null
     ): void {
-        $recipients    = $this->resolveRecipients($quotation);
-        $approvalStage = $this->resolveStageLabel($quotation);
+        $recipients = $overrideRecipients ?? $this->resolveRecipients($quotation);
+        $approvalStage = $this->resolveStageLabel($overrideRecipients);
 
         if (empty($recipients)) {
             Log::info('QuotationNotificationService: no recipients for this stage', [
@@ -52,44 +50,45 @@ class QuotationNotificationService
                 'error' => $e->getMessage(),
             ]);
             $mailerConfig = [
-                'name'          => 'smtp',
-                'config'        => [
+                'name' => 'smtp',
+                'config' => [
                     'address' => config('mail.from.address'),
-                    'name'    => config('mail.from.name'),
+                    'name' => config('mail.from.name'),
                 ],
                 'config_source' => 'fallback',
             ];
         }
 
         $fromAddress = $mailerConfig['config']['address'];
-        $fromName    = $mailerConfig['config']['name'];
+        $fromName = $mailerConfig['config']['name'];
 
         foreach ($recipients as $recipient) {
             try {
                 Mail::mailer($mailerConfig['name'])
                     ->to($recipient['email'])
                     ->send(new QuotationApprovalEmail(
-                        recipientName:   $recipient['name'],
-                        recipientRole:   $recipient['role'],
+                        recipientName: $recipient['name'],
+                        recipientRole: $recipient['role'],
                         quotationNumber: $quotation->nomor,
-                        creatorName:     $creatorName,
-                        approvalStage:   $approvalStage,
-                        approvalUrl:     $approvalUrl,
-                        top:             $quotation->top ?? null,
-                        fromAddress:     $fromAddress,
-                        fromName:        $fromName,
+                        creatorName: $creatorName,
+                        approvalStage: $approvalStage,
+                        approvalUrl: $approvalUrl,
+                        top: $quotation->top ?? null,
+                        fromAddress: $fromAddress,
+                        fromName: $fromName,
+                        namaPerusahaan: $quotation->nama_perusahaan ?? null,
                     ));
 
                 Log::info('QuotationNotificationService: email sent', [
                     'quotation_number' => $quotation->nomor,
-                    'recipient'        => $recipient['email'],
-                    'mailer'           => $mailerConfig['name'],
+                    'recipient' => $recipient['email'],
+                    'mailer' => $mailerConfig['name'],
                 ]);
             } catch (\Exception $e) {
                 Log::error('QuotationNotificationService: failed to send email', [
                     'quotation_number' => $quotation->nomor,
-                    'recipient'        => $recipient['email'],
-                    'error'            => $e->getMessage(),
+                    'recipient' => $recipient['email'],
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -101,29 +100,28 @@ class QuotationNotificationService
             return self::DIR_SALES;
         }
 
-        if (empty($quotation->ot2) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return self::DIR_KEU;
-        }
+        if (empty($quotation->ot2)) {
+            $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+                $thr = strtolower(trim($detail->wage->thr ?? ''));
+                return $thr !== 'diprovisikan';
+            });
 
-        if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return self::DIR_UMUM;
+            if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
+                return self::DIR_KEU;
+            }
         }
 
         return [];
     }
 
-    private function resolveStageLabel(Quotation $quotation): string
+    private function resolveStageLabel(?array $recipients): string
     {
-        if (empty($quotation->ot1)) {
+        if ($recipients === self::DIR_SALES) {
             return 'Persetujuan Direktur Sales';
         }
 
-        if (empty($quotation->ot2) && $quotation->top === 'Lebih Dari 7 Hari') {
+        if ($recipients === self::DIR_KEU) {
             return 'Persetujuan Direktur Keuangan';
-        }
-
-        if (empty($quotation->ot3) && $quotation->top === 'Lebih Dari 7 Hari') {
-            return 'Persetujuan Direktur Umum';
         }
 
         return 'Selesai';
