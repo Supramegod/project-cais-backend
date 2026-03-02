@@ -132,7 +132,7 @@ class QuotationStepService
 
             case 2:
                 $roleId = Auth::user()->cais_role_id;
-                $data['additional_data']['salary_rules'] = in_array($roleId, [29, 30, 31, 32, 33]) 
+                $data['additional_data']['salary_rules'] = in_array($roleId, [29, 30, 31, 32, 33])
                     ? SalaryRule::whereIn('id', [1, 2])->get()
                     : SalaryRule::all();
                 $data['additional_data']['top_list'] = Top::orderBy('nama', 'asc')->get();
@@ -2538,37 +2538,21 @@ class QuotationStepService
     private function syncTunjanganData(Quotation $quotation, array $tunjanganData, Carbon $currentDateTime, string $user): void
     {
         try {
-            \Log::info("Starting tunjangan data sync", [
-                'quotation_id' => $quotation->id,
-                'detail_count' => count($tunjanganData)
-            ]);
-
-            // Get all existing details for this quotation
             $allDetails = QuotationDetail::where('quotation_id', $quotation->id)
                 ->whereNull('deleted_at')
                 ->pluck('id')
                 ->toArray();
 
-            // Track which details are processed
             $processedDetailIds = array_keys($tunjanganData);
-
-            // Delete tunjangan for details not in request
             $detailsToDeleteTunjangan = array_diff($allDetails, $processedDetailIds);
+
             if (!empty($detailsToDeleteTunjangan)) {
                 QuotationDetailTunjangan::whereIn('quotation_detail_id', $detailsToDeleteTunjangan)
                     ->whereNull('deleted_at')
-                    ->update([
-                        'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
-                    ]);
-
-                \Log::debug("Deleted tunjangan for details not in request", [
-                    'detail_ids' => $detailsToDeleteTunjangan
-                ]);
+                    ->update(['deleted_at' => $currentDateTime, 'deleted_by' => $user]);
             }
 
             foreach ($tunjanganData as $detailId => $tunjangans) {
-                // Verify detail belongs to this quotation
                 $detail = QuotationDetail::where('id', $detailId)
                     ->where('quotation_id', $quotation->id)
                     ->whereNull('deleted_at')
@@ -2577,120 +2561,86 @@ class QuotationStepService
                 if (!$detail) {
                     \Log::warning("Quotation detail not found or deleted", [
                         'detail_id' => $detailId,
-                        'quotation_id' => $quotation->id
+                        'quotation_id' => $quotation->id,
                     ]);
                     continue;
                 }
 
-                // Get existing tunjangan for this detail
+                if (empty($tunjangans)) {
+                    QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
+                        ->whereNull('deleted_at')
+                        ->update(['deleted_at' => $currentDateTime, 'deleted_by' => $user]);
+                    continue;
+                }
+
                 $existingTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
                     ->whereNull('deleted_at')
                     ->get()
                     ->keyBy('nama_tunjangan');
 
-                // Track which tunjangan to keep
-                $processedTunjanganNames = [];
+                // ✅ Dedupe di awal — ambil item terakhir jika nama sama dalam 1 request
+                $uniqueTunjangans = [];
+                foreach ($tunjangans as $item) {
+                    $nama = trim($item['nama_tunjangan'] ?? '');
+                    if (!empty($nama)) {
+                        $uniqueTunjangans[$nama] = $item; // key by nama → otomatis overwrite duplikat
+                    }
+                }
 
-                // If tunjangans is null or empty, delete all existing tunjangan for this detail
-                if (is_null($tunjangans) || empty($tunjangans)) {
-                    if ($existingTunjangan->isNotEmpty()) {
-                        QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
-                            ->whereNull('deleted_at')
-                            ->update([
-                                'deleted_at' => $currentDateTime,
-                                'deleted_by' => $user
-                            ]);
+                $processedNames = [];
 
-                        \Log::debug("Deleted all tunjangan for detail (null/empty data)", [
-                            'detail_id' => $detailId
+                foreach ($uniqueTunjangans as $namaTunjangan => $item) {
+                    $nominal = $this->parseNominal($item['nominal'] ?? 0);
+                    $nominalCoss = $this->parseNominal($item['nominal_coss'] ?? 0);
+
+                    $processedNames[] = $namaTunjangan;
+
+                    if ($existingTunjangan->has($namaTunjangan)) {
+                        $existingTunjangan->get($namaTunjangan)->update([
+                            'nominal' => $nominal,
+                            'nominal_coss' => $nominalCoss,
+                            'updated_at' => $currentDateTime,
+                            'updated_by' => $user,
+                        ]);
+                    } else {
+                        QuotationDetailTunjangan::create([
+                            'quotation_id' => $quotation->id,
+                            'quotation_detail_id' => $detailId,
+                            'nama_tunjangan' => $namaTunjangan,
+                            'nominal' => $nominal,
+                            'nominal_coss' => $nominalCoss,
+                            'created_at' => $currentDateTime,
+                            'created_by' => $user,
                         ]);
                     }
-                    continue;
                 }
 
-                // Process incoming tunjangan data
-                if (is_array($tunjangans)) {
-                    foreach ($tunjangans as $tunjanganData) {
-                        $namaTunjangan = trim($tunjanganData['nama_tunjangan'] ?? '');
-                        $nominal = $tunjanganData['nominal'] ?? 0;
-                        $nominalCoss = $tunjanganData['nominal_coss'] ?? 0;
-
-                        // Skip empty names
-                        if (empty($namaTunjangan)) {
-                            continue;
-                        }
-
-                        // Convert string nominal to float if needed
-                        if (is_string($nominal)) {
-                            $nominal = (float) str_replace(['.', ','], ['', '.'], $nominal);
-                        }
-
-                        // Convert string nominal_coss to float if needed
-                        if (is_string($nominalCoss)) {
-                            $nominalCoss = (float) str_replace(['.', ','], ['', '.'], $nominalCoss);
-                        }
-
-                        // Pastikan nilai numerik
-                        $nominal = is_numeric($nominal) ? (float) $nominal : 0.0;
-                        $nominalCoss = is_numeric($nominalCoss) ? (float) $nominalCoss : 0.0;
-
-                        $processedTunjanganNames[] = $namaTunjangan;
-
-                        // Update or create
-                        if ($existingTunjangan->has($namaTunjangan)) {
-                            // Update existing
-                            $existing = $existingTunjangan->get($namaTunjangan);
-                            $existing->update([
-                                'nominal' => $nominal,
-                                'nominal_coss' => $nominalCoss,
-                                'updated_at' => $currentDateTime,
-                                'updated_by' => $user
-                            ]);
-                        } else {
-                            // Create new
-                            QuotationDetailTunjangan::create([
-                                'quotation_id' => $quotation->id,
-                                'quotation_detail_id' => $detailId,
-                                'nama_tunjangan' => $namaTunjangan,
-                                'nominal' => $nominal,
-                                'nominal_coss' => $nominalCoss,
-                                'created_at' => $currentDateTime,
-                                'created_by' => $user
-                            ]);
-                        }
-                    }
-                }
-
-                // Soft delete tunjangan that are no longer in the list
-                $tunjanganToDelete = $existingTunjangan->keys()->diff($processedTunjanganNames);
-                if ($tunjanganToDelete->isNotEmpty()) {
+                // Soft delete yang tidak ada di request
+                $toDelete = $existingTunjangan->keys()->diff($processedNames);
+                if ($toDelete->isNotEmpty()) {
                     QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
-                        ->whereIn('nama_tunjangan', $tunjanganToDelete->toArray())
+                        ->whereIn('nama_tunjangan', $toDelete->toArray())
                         ->whereNull('deleted_at')
-                        ->update([
-                            'deleted_at' => $currentDateTime,
-                            'deleted_by' => $user
-                        ]);
-
-                    \Log::debug("Soft deleted tunjangan", [
-                        'detail_id' => $detailId,
-                        'deleted_names' => $tunjanganToDelete->toArray()
-                    ]);
+                        ->update(['deleted_at' => $currentDateTime, 'deleted_by' => $user]);
                 }
             }
-
-            \Log::info("Tunjangan data sync completed", [
-                'quotation_id' => $quotation->id
-            ]);
 
         } catch (\Exception $e) {
             \Log::error("Error syncing tunjangan data", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
             throw $e;
         }
+    }
+
+    // ✅ Extract helper — hindari konversi nominal berulang
+    private function parseNominal(mixed $value): float
+    {
+        if (is_string($value)) {
+            $value = str_replace(['.', ','], ['', '.'], $value);
+        }
+        return is_numeric($value) ? (float) $value : 0.0;
     }
 
 

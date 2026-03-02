@@ -3,8 +3,6 @@
 namespace App\Http\Resources;
 
 use App\Models\JabatanPic;
-use App\Models\QuotationDetailCoss;
-use App\Models\QuotationDetailHpp;
 use App\Models\SalaryRule;
 use App\Models\Umk;
 use App\Services\QuotationService;
@@ -470,7 +468,7 @@ class QuotationResource extends JsonResource
 
                     $lemburHppValue = $hpp->lembur ?? $detail->lembur ?? 0;
                     $lemburCossValue = $coss->lembur ?? $detail->lembur ?? 0;
-        
+
                     $tunjanganHolidayHppValue = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
                     $tunjanganHolidayCossValue = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
 
@@ -608,192 +606,138 @@ class QuotationResource extends JsonResource
                 ],
                 'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
                     $wage = $detail->wage ?? null;
-                    $potonganBpu = $detail->potongan_bpu ?? 0;
-                    $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-                    $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
                     $site = $detail->quotationSite ?? null;
 
-                    $bpjsJkk = $detail->bpjs_jkk ?? 0;
-                    $bpjsJkm = $detail->bpjs_jkm ?? 0;
-                    $bpjsJht = $detail->bpjs_jht ?? 0;
-                    $bpjsJp = $detail->bpjs_jp ?? 0;
-                    $bpjsKes = $detail->bpjs_kes ?? 0;
-                    $bpjsKetenagakerjaan = $bpjsJkk + $bpjsJkm + $bpjsJht + $bpjsJp;
+                    $detailCalc = $this->calculatedQuotation->detail_calculations[$detail->id] ?? null;
+                    $hppData = $detailCalc?->hpp_data ?? [];
+                    $cossData = $detailCalc?->coss_data ?? [];
 
-                    $bpjsKesehatan = 0;
-                    if ($detail->penjamin_kesehatan === 'BPJS' || $detail->penjamin_kesehatan === 'BPJS Kesehatan') {
-                        $bpjsKesehatan = $bpjsKes;
-                    } else if ($detail->penjamin_kesehatan === 'Asuransi Swasta' || $detail->penjamin_kesehatan === 'Takaful') {
-                        $bpjsKesehatan = $detail->nominal_takaful ?? 0;
-                    } else if ($detail->penjamin_kesehatan === 'BPU') {
-                        $bpjsKesehatan = 0;
-                    }
+                    $tunjanganData = $detail->relationLoaded('quotationDetailTunjangans')
+                        ? $detail->quotationDetailTunjangans->map(fn($t) => [
+                            'nama_tunjangan' => $t->nama_tunjangan,
+                            'nominal' => $t->nominal,
+                            'nominal_coss' => $t->nominal_coss,
+                        ])->toArray()
+                        : [];
 
-                    $tunjanganData = [];
-                    if ($detail->relationLoaded('quotationDetailTunjangans')) {
-                        $tunjanganData = $detail->quotationDetailTunjangans->map(function ($tunjangan) {
-                            return [
-                                'nama_tunjangan' => $tunjangan->nama_tunjangan,
-                                'nominal' => $tunjangan->nominal,
-                                'nominal_coss' => $tunjangan->nominal_coss,
-                            ];
-                        })->toArray();
-                    }
-
-                    $getTunjanganDisplayForBoth = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkanTerpisah = null) {
+                    $getTunjanganDisplay = function ($wage, string $jenisField, $hppValue, $cossValue, ?string $fieldDitagihkanTerpisah = null) {
                         if (!$wage) {
                             return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                         }
 
-                        $jenisValue = $wage->$jenisField ?? null;
-                        $jenisValueString = is_string($jenisValue) ? strtolower(trim($jenisValue)) : '';
+                        $jenisValueString = is_string($wage->$jenisField ?? null) ? strtolower(trim($wage->$jenisField)) : '';
+                        $ditagihkanValueString = '';
 
                         if ($fieldDitagihkanTerpisah && isset($wage->$fieldDitagihkanTerpisah)) {
-                            $ditagihkanValue = $wage->$fieldDitagihkanTerpisah;
-                            $ditagihkanValueString = is_string($ditagihkanValue) ? strtolower(trim($ditagihkanValue)) : '';
+                            $ditagihkanRaw = $wage->$fieldDitagihkanTerpisah;
+                            $ditagihkanValueString = is_string($ditagihkanRaw) ? strtolower(trim($ditagihkanRaw)) : '';
 
-                            if ($ditagihkanValueString == 'ditagihkan terpisah') {
+                            if ($ditagihkanValueString === 'ditagihkan terpisah') {
                                 return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
                             }
-                            if ($ditagihkanValueString == 'diberikan langsung' || $ditagihkanValueString == 'diberikan langsung oleh client') {
+                            if (in_array($ditagihkanValueString, ['diberikan langsung', 'diberikan langsung oleh client'])) {
                                 return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
                             }
                         }
 
-                        if ($jenisValueString == 'normatif' || $jenisValueString == 'ditagihkan') {
+                        if (in_array($jenisValueString, ['normatif', 'ditagihkan'])) {
                             return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
-                        } elseif ($jenisValueString == 'flat' || $jenisValueString == 'diprovisikan') {
-                            $hppDisplay = $hppValue > 0 ? $hppValue : 'Tidak Ada';
-                            $cossDisplay = $cossValue > 0 ? $cossValue : 'Tidak Ada';
-                            return ['hpp' => $hppDisplay, 'coss' => $cossDisplay];
-                        } elseif ($jenisValueString == 'diberikan langsung' || $jenisValueString == 'diberikan langsung oleh client') {
-                            return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
-                        } else {
-                            return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                         }
+                        if (in_array($jenisValueString, ['flat', 'diprovisikan'])) {
+                            return [
+                                'hpp' => $hppValue > 0 ? $hppValue : 'Tidak Ada',
+                                'coss' => $cossValue > 0 ? $cossValue : 'Tidak Ada',
+                            ];
+                        }
+                        if (in_array($jenisValueString, ['diberikan langsung', 'diberikan langsung oleh client'])) {
+                            return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
+                        }
+                        return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     };
 
-                    $tunjanganHariRayaHpp = $hpp->tunjangan_hari_raya ?? $detail->tunjangan_hari_raya_hpp ?? 0;
-                    $tunjanganHariRayaCoss = $coss->tunjangan_hari_raya ?? $detail->tunjangan_hari_raya_coss ?? 0;
-
-                    $kompensasiHpp = $hpp->kompensasi ?? $detail->kompensasi_hpp ?? 0;
-                    $kompensasiCoss = $coss->kompensasi ?? $detail->kompensasi_coss ?? 0;
-
-                    $lemburHpp = $hpp->lembur ?? $detail->lembur ?? 0;
-                    $lemburCoss = $coss->lembur ?? $detail->lembur ?? 0;
-                    // \log::info('Le mbur HPP: ' . $lemburHpp . ', Lembur COSS: ' . $lemburCoss);
-        
-                    $tunjanganHolidayHpp = $hpp->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
-                    $tunjanganHolidayCoss = $coss->tunjangan_hari_libur_nasional ?? $detail->tunjangan_holiday ?? 0;
-
-                    // **PERUBAHAN: Gunakan fungsi baru yang mendukung HPP dan COSS**
-                    $thrDisplay = $getTunjanganDisplayForBoth(
-                        $wage,
-                        'thr',
-                        $tunjanganHariRayaHpp,
-                        $tunjanganHariRayaCoss
-                    );
-
-                    $kompensasiDisplay = $getTunjanganDisplayForBoth(
-                        $wage,
-                        'kompensasi',
-                        $kompensasiHpp,
-                        $kompensasiCoss
-                    );
-
-                    $lemburDisplay = $getTunjanganDisplayForBoth(
-                        $wage,
-                        'lembur',
-                        $lemburHpp,
-                        $lemburCoss,
-                        'lembur_ditagihkan'
-                    );
-
-                    $tunjanganHolidayDisplay = $getTunjanganDisplayForBoth(
-                        $wage,
-                        'tunjangan_holiday',
-                        $tunjanganHolidayHpp,
-                        $tunjanganHolidayCoss
-                    );
+                    $thrDisplay = $getTunjanganDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
+                    $kompDisplay = $getTunjanganDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
+                    $lemburDisplay = $getTunjanganDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
+                    $holidayDisplay = $getTunjanganDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
 
                     return [
                         'id' => $detail->id,
                         'position_name' => $detail->jabatan_kebutuhan,
-                        'jumlah_hc_hpp' => $hpp->jumlah_hc ?? $detail->jumlah_hc ?? 0,
-                        'jumlah_hc_coss' => $coss->jumlah_hc ?? $detail->jumlah_hc ?? 0,
+                        'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
+                        'jumlah_hc_coss' => $cossData['jumlah_hc'] ?? 0,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
-                        'kota' => $site ? $site->kota : null,
+                        'kota' => $site?->kota,
                         'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                         'tunjangan_data' => $tunjanganData,
-                        'upah' => $wage ? $wage->upah : 0,
+                        'upah' => $wage?->upah ?? 0,
+
                         'hpp' => [
-                            'nominal_upah' => $detail->nominal_upah,
-                            'total_tunjangan' => $detail->total_tunjangan ?? 0,
-                            'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
-                            'bpjs_kesehatan' => $bpjsKesehatan,
-                            'bpjs_jkk' => $bpjsJkk,
-                            'bpjs_jkm' => $bpjsJkm,
-                            'bpjs_jht' => $bpjsJht,
-                            'bpjs_jp' => $bpjsJp,
-                            'bpjs_kes' => $bpjsKes,
-                            'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
-                            'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
-                            'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
-                            'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
-                            'persen_bpjs_kes' => $detail->persen_bpjs_kes ?? 0,
-                            'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
-                            'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
-                            'potongan_bpu' => $potonganBpu,
+                            'nominal_upah' => $hppData['gaji_pokok'] ?? 0,
+                            'total_tunjangan' => $hppData['total_tunjangan'] ?? 0,
+                            'bpjs_ketenagakerjaan' => ($hppData['bpjs_jkk'] ?? 0) + ($hppData['bpjs_jkm'] ?? 0) + ($hppData['bpjs_jht'] ?? 0) + ($hppData['bpjs_jp'] ?? 0),
+                            'bpjs_kesehatan' => $hppData['bpjs_ks'] ?? 0,
+                            'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 0,
+                            'bpjs_jkm' => $hppData['bpjs_jkm'] ?? 0,
+                            'bpjs_jht' => $hppData['bpjs_jht'] ?? 0,
+                            'bpjs_jp' => $hppData['bpjs_jp'] ?? 0,
+                            'bpjs_kes' => $hppData['bpjs_ks'] ?? 0,
+                            'persen_bpjs_jkk' => $hppData['persen_bpjs_jkk'] ?? 0,
+                            'persen_bpjs_jkm' => $hppData['persen_bpjs_jkm'] ?? 0,
+                            'persen_bpjs_jht' => $hppData['persen_bpjs_jht'] ?? 0,
+                            'persen_bpjs_jp' => $hppData['persen_bpjs_jp'] ?? 0,
+                            'persen_bpjs_kes' => $hppData['persen_bpjs_ks'] ?? 0,
+                            'persen_bpjs_ketenagakerjaan' => ($hppData['persen_bpjs_jkk'] ?? 0) + ($hppData['persen_bpjs_jkm'] ?? 0) + ($hppData['persen_bpjs_jht'] ?? 0) + ($hppData['persen_bpjs_jp'] ?? 0),
+                            'persen_bpjs_kesehatan' => $hppData['persen_bpjs_ks'] ?? 0,
+                            'potongan_bpu' => $hppData['potongan_bpu'] ?? 0,
                             'tunjangan_hari_raya' => $thrDisplay['hpp'],
-                            'kompensasi' => $kompensasiDisplay['hpp'],
+                            'kompensasi' => $kompDisplay['hpp'],
                             'lembur' => $lemburDisplay['hpp'],
-                            'tunjangan_holiday' => $tunjanganHolidayDisplay['hpp'],
-                            'bunga_bank' => $detail->bunga_bank ?? 0,
-                            'insentif' => $detail->insentif ?? 0,
-                            'personil_kaporlap' => $detail->personil_kaporlap ?? 0,
-                            'personil_devices' => $detail->personil_devices ?? 0,
-                            'personil_ohc' => $detail->personil_ohc ?? 0,
-                            'personil_chemical' => $detail->personil_chemical ?? 0,
-                            'total_personil' => $detail->total_personil ?? 0,
-                            'sub_total_personil' => $detail->sub_total_personil ?? 0,
-                            'total_base_manpower' => $detail->total_base_manpower ?? 0,
-                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-
+                            'tunjangan_holiday' => $holidayDisplay['hpp'],
+                            'bunga_bank' => $hppData['bunga_bank'] ?? 0,
+                            'insentif' => $hppData['insentif'] ?? 0,
+                            'personil_kaporlap' => $hppData['provisi_seragam'] ?? 0,
+                            'personil_devices' => $hppData['provisi_peralatan'] ?? 0,
+                            'personil_ohc' => $hppData['provisi_ohc'] ?? 0,
+                            'personil_chemical' => $hppData['provisi_chemical'] ?? 0,
+                            'total_personil' => $hppData['total_biaya_per_personil'] ?? 0,
+                            'sub_total_personil' => $hppData['total_biaya_all_personil'] ?? 0,
+                            'total_base_manpower' => $hppData['total_biaya_per_personil'] ?? 0,
+                            'total_exclude_base_manpower' => 0,
                         ],
-                        'coss' => [
-                            'nominal_upah' => $detail->nominal_upah,
-                            'total_tunjangan' => $detail->total_tunjangan_coss ?? 0,
-                            'bpjs_ketenagakerjaan' => $bpjsKetenagakerjaan,
-                            'bpjs_kesehatan' => $bpjsKesehatan,
-                            'bpjs_jkk' => $bpjsJkk,
-                            'bpjs_jkm' => $bpjsJkm,
-                            'bpjs_jht' => $bpjsJht,
-                            'bpjs_jp' => $bpjsJp,
-                            'bpjs_kes' => $bpjsKes,
-                            'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
-                            'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
-                            'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
-                            'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
-                            'persen_bpjs_kes' => $detail->persen_bpjs_kes ?? 0,
-                            'persen_bpjs_ketenagakerjaan' => $detail->persen_bpjs_ketenagakerjaan ?? 0,
-                            'persen_bpjs_kesehatan' => $detail->persen_bpjs_kesehatan ?? 0,
-                            'potongan_bpu' => $potonganBpu,
-                            'tunjangan_hari_raya' => $thrDisplay['coss'],
-                            'kompensasi' => $kompensasiDisplay['coss'],
-                            'lembur' => $lemburDisplay['coss'],
-                            'tunjangan_holiday' => $tunjanganHolidayDisplay['coss'],
-                            'bunga_bank' => $detail->bunga_bank ?? 0,
-                            'insentif' => $detail->insentif ?? 0,
-                            'personil_kaporlap_coss' => $detail->personil_kaporlap_coss ?? 0,
-                            'personil_devices_coss' => $detail->personil_devices_coss ?? 0,
-                            'personil_ohc_coss' => $detail->personil_ohc_coss ?? 0,
-                            'personil_chemical_coss' => $detail->personil_chemical_coss ?? 0,
-                            'total_personil' => $detail->total_personil_coss ?? 0,
-                            'sub_total_personil' => $detail->sub_total_personil_coss ?? 0,
-                            'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
-                            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
 
+                        'coss' => [
+                            'nominal_upah' => $cossData['gaji_pokok'] ?? 0,
+                            'total_tunjangan' => $cossData['total_tunjangan'] ?? 0,
+                            'bpjs_ketenagakerjaan' => ($cossData['bpjs_jkk'] ?? 0) + ($cossData['bpjs_jkm'] ?? 0) + ($cossData['bpjs_jht'] ?? 0) + ($cossData['bpjs_jp'] ?? 0),
+                            'bpjs_kesehatan' => $cossData['bpjs_ks'] ?? 0,
+                            'bpjs_jkk' => $cossData['bpjs_jkk'] ?? 0,
+                            'bpjs_jkm' => $cossData['bpjs_jkm'] ?? 0,
+                            'bpjs_jht' => $cossData['bpjs_jht'] ?? 0,
+                            'bpjs_jp' => $cossData['bpjs_jp'] ?? 0,
+                            'bpjs_kes' => $cossData['bpjs_ks'] ?? 0,
+                            'persen_bpjs_jkk' => $cossData['persen_bpjs_jkk'] ?? 0,
+                            'persen_bpjs_jkm' => $cossData['persen_bpjs_jkm'] ?? 0,
+                            'persen_bpjs_jht' => $cossData['persen_bpjs_jht'] ?? 0,
+                            'persen_bpjs_jp' => $cossData['persen_bpjs_jp'] ?? 0,
+                            'persen_bpjs_kes' => $cossData['persen_bpjs_ks'] ?? 0,
+                            'persen_bpjs_ketenagakerjaan' => ($cossData['persen_bpjs_jkk'] ?? 0) + ($cossData['persen_bpjs_jkm'] ?? 0) + ($cossData['persen_bpjs_jht'] ?? 0) + ($cossData['persen_bpjs_jp'] ?? 0),
+                            'persen_bpjs_kesehatan' => $cossData['persen_bpjs_ks'] ?? 0,
+                            'potongan_bpu' => $cossData['potongan_bpu'] ?? 0,
+                            'tunjangan_hari_raya' => $thrDisplay['coss'],
+                            'kompensasi' => $kompDisplay['coss'],
+                            'lembur' => $lemburDisplay['coss'],
+                            'tunjangan_holiday' => $holidayDisplay['coss'],
+                            'bunga_bank' => $cossData['bunga_bank'] ?? 0,
+                            'insentif' => $cossData['insentif'] ?? 0,
+                            'personil_kaporlap_coss' => $cossData['provisi_seragam'] ?? 0,
+                            'personil_devices_coss' => $cossData['provisi_peralatan'] ?? 0,
+                            'personil_ohc_coss' => $cossData['provisi_ohc'] ?? 0,
+                            'personil_chemical_coss' => $cossData['provisi_chemical'] ?? 0,
+                            'total_personil' => 0,
+                            'sub_total_personil' => 0,
+                            'total_base_manpower' => $cossData['total_base_manpower'] ?? 0,
+                            'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,
                         ],
                     ];
                 })->toArray()
@@ -855,7 +799,7 @@ class QuotationResource extends JsonResource
                     $site = $this->quotationSites->firstWhere('id', $siteId);
                     $totalHc = $this->quotationDetails->where('quotation_site_id', $siteId)->sum('jumlah_hc');
                     $jabatanKebutuhan = $this->quotationDetails->where('quotation_site_id', $siteId)->pluck('jabatan_kebutuhan')->unique()->implode(', ');
-                    
+
                     if (!$site && !$siteId) {
                         $namaSite = 'Legacy/Global Data';
                         $jabatanKebutuhan = $jabatanKebutuhan ?: 'Unassigned Site';
