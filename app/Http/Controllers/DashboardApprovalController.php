@@ -462,13 +462,16 @@ class DashboardApprovalController extends Controller
         $this->applyMenungguAndaFilter($qMenungguAnda, $user);
         $countMenungguAnda = $qMenungguAnda->count();
 
-        // menunggu-approval → step 100 + belum ada approval sama sekali (ot1, ot2, ot3 masih NULL)
-        $countMenungguApproval = $baseQuery()
-            ->where('step', 100)
-            ->whereNull('ot1')
-            ->whereNull('ot2')
-            // ->whereNull('ot3')
-            ->count();
+        // menunggu-approval → total semua quotation yang menunggu approval (dir-sales + dir-keu)
+        $baseConditions = $baseQuery()
+            ->where('is_aktif', 0)
+            ->where('status_quotation_id', 2)
+            ->where('step', 100);
+
+        $countDirSales = (clone $baseConditions)->whereNull('ot1')->count();
+        $countDirKeu = (clone $baseConditions)->whereNull('ot2')->where('top', 'Lebih Dari 7 Hari')->count();
+
+        $countMenungguApproval = $countDirSales + $countDirKeu;
 
         // quotation-belum-lengkap → step belum 100
         $countBelumLengkap = $baseQuery()
