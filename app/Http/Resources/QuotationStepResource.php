@@ -28,6 +28,7 @@ use App\Models\JabatanPic;
 use App\Services\QuotationBarangService;
 use App\Services\QuotationService;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -719,11 +720,15 @@ class QuotationStepResource extends JsonResource
                 ];
 
             case 2:
+                $roleId = Auth::user()->cais_role_id;
+                $salaryRules = in_array($roleId, [29, 30, 31, 32, 33]) 
+                    ? SalaryRule::whereIn('id', [1, 2])->get()
+                    : SalaryRule::all();
+                    
                 return [
-                    'salary_rules' => SalaryRule::all(),
+                    'salary_rules' => $salaryRules,
                     'top_list' => Top::orderBy('nama', 'asc')->get(),
                     'pengiriman_invoice' => Quotation::distinct()->pluck('pengiriman_invoice'),
-
                 ];
 
             case 3:

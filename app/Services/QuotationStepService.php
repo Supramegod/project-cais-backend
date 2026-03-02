@@ -131,7 +131,10 @@ class QuotationStepService
                 break;
 
             case 2:
-                $data['additional_data']['salary_rules'] = SalaryRule::all();
+                $roleId = Auth::user()->cais_role_id;
+                $data['additional_data']['salary_rules'] = in_array($roleId, [29, 30, 31, 32, 33]) 
+                    ? SalaryRule::whereIn('id', [1, 2])->get()
+                    : SalaryRule::all();
                 $data['additional_data']['top_list'] = Top::orderBy('nama', 'asc')->get();
                 break;
 
@@ -989,7 +992,7 @@ class QuotationStepService
                 'keterangan_kunjungan_operasional' => $request->keterangan_kunjungan_operasional,
                 'keterangan_kunjungan_tim_crm' => $request->keterangan_kunjungan_tim_crm,
                 'training' => $request->training,
-                'persen_bunga_bank' => $request->persen_bunga_bank ?: 1.3,
+                // 'persen_bunga_bank' => $request->persen_bunga_bank ?: 1.3,
                 'updated_by' => Auth::user()->full_name
             ]);
 

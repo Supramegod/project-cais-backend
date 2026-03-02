@@ -293,7 +293,7 @@
                 <tbody>
                     @if($namaPerusahaan)
                         <tr>
-                            <td class="label">Perusahaan</td>
+                            <td class="label">Nama Perusahaan</td>
                             <td class="value"><strong>{{ $namaPerusahaan }}</strong></td>
                         </tr>
                     @endif

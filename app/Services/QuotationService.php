@@ -415,12 +415,12 @@ class QuotationService
             return;
         }
 
-        // PERBAIKAN: Gunakan kondisi yang lebih akurat
         $programBpjs = $quotation->program_bpjs ?? '';
         $isBpjsProgram = (stripos($programBpjs, 'BPJS') !== false)
             || ($programBpjs == 'Ya')
             || ($programBpjs == '1')
-            || ($programBpjs == true);
+            || ($programBpjs == true)
+            || ($programBpjs === '' || $programBpjs === null); // Support legacy: empty flag means active if not explicitly turned off
 
         if ($isBpjsProgram) {
 
@@ -485,8 +485,9 @@ class QuotationService
 
                     // Jika nilai adalah string "tidak" atau boolean/numeric false/0
                     if (
-                        $optValue === "0" || $optValue === 0 || $optValue === false ||
-                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak')
+                        ($optValue === "0" || $optValue === 0 || $optValue === false ||
+                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                        && !($key === 'kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
                     ) {
                         $isOptOut = true;
                     }
@@ -1469,11 +1470,14 @@ class QuotationService
                 $optValue = $detail->{$optField};
 
                 // Handle berbagai format nilai opt-out
-                if ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false") {
+                if (
+                    ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false" ||
+                    (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                    && !($optField === 'is_bpjs_kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
+                ) {
                     $isOptOut = true;
-                } elseif (is_string($optValue) && strtolower(trim($optValue)) === 'tidak') {
-                    $isOptOut = true;
-                } elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
+                }
+ elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
                     $isOptOut = false;
                 }
             }
