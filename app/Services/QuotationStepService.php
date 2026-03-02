@@ -131,7 +131,10 @@ class QuotationStepService
                 break;
 
             case 2:
-                $data['additional_data']['salary_rules'] = SalaryRule::all();
+                $roleId = Auth::user()->cais_role_id;
+                $data['additional_data']['salary_rules'] = in_array($roleId, [29, 30, 31, 32, 33]) 
+                    ? SalaryRule::whereIn('id', [1, 2])->get()
+                    : SalaryRule::all();
                 $data['additional_data']['top_list'] = Top::orderBy('nama', 'asc')->get();
                 break;
 
