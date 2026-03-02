@@ -467,7 +467,7 @@ class DashboardApprovalController extends Controller
             ->where('step', 100)
             ->whereNull('ot1')
             ->whereNull('ot2')
-            ->whereNull('ot3')
+            // ->whereNull('ot3')
             ->count();
 
         // quotation-belum-lengkap → step belum 100
@@ -500,8 +500,8 @@ class DashboardApprovalController extends Controller
             ->count();
 
         return [
-            'dir-sales' => $role96Count,
-            'dir-keu' => $role9740Count,
+            'dir_sales' => $role96Count,
+            'dir_keu' => $role9740Count,
         ];
     }
 
