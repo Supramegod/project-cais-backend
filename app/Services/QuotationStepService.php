@@ -989,7 +989,7 @@ class QuotationStepService
                 'keterangan_kunjungan_operasional' => $request->keterangan_kunjungan_operasional,
                 'keterangan_kunjungan_tim_crm' => $request->keterangan_kunjungan_tim_crm,
                 'training' => $request->training,
-                'persen_bunga_bank' => $request->persen_bunga_bank ?: 1.3,
+                // 'persen_bunga_bank' => $request->persen_bunga_bank ?: 1.3,
                 'updated_by' => Auth::user()->full_name
             ]);
 
