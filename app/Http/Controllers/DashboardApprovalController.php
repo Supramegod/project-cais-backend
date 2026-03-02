@@ -153,11 +153,20 @@ class DashboardApprovalController extends Controller
                 break;
 
             case 'menunggu-approval':
-                $query->where('step', 100);
+                $query->where('step', 100)
+                    ->where('is_aktif', 0)
+                    ->where('status_quotation_id', 2)
+                    ->where(function ($q) {
+                        $q->whereNull('ot1')
+                            ->orWhere(function ($subQ) {
+                                $subQ->whereNull('ot2')
+                                    ->where('top', 'Lebih Dari 7 Hari');
+                            });
+                    });
                 break;
-
             case 'quotation-belum-lengkap':
-                $query->where('step', '!=', 100);
+                $query->where('step', '!=', 100)
+                    ->where('status_quotation_id', 1);
                 break;
 
             // default: tidak ada filter tambahan, ambil semua dari base query
@@ -473,9 +482,10 @@ class DashboardApprovalController extends Controller
 
         $countMenungguApproval = $countDirSales + $countDirKeu;
 
-        // quotation-belum-lengkap → step belum 100
+        // quotation-belum-lengkap → step belum 100 + status belum lengkap
         $countBelumLengkap = $baseQuery()
             ->where('step', '!=', 100)
+            ->where('status_quotation_id', 1)
             ->count();
 
         return [
