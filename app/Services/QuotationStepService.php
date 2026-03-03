@@ -2655,59 +2655,36 @@ class QuotationStepService
             $user = Auth::user()->full_name;
             $currentDateTime = Carbon::now();
 
-            \Log::info("=== UPDATE ALL QUOTATION DATA ===", [
-                'quotation_id' => $quotation->id,
-                'request_keys' => array_keys($request->all()),
-                'has_wage_data' => $request->has('wage_data'),
-                'has_hpp_editable_data' => $request->has('hpp_editable_data'),
-                'has_coss_data' => $request->has('coss_data'),
-            ]);
-
-            // =====================================================
-            // 1. SIMPAN DATA BASIS (yang mempengaruhi kalkulasi)
-            // =====================================================
-
-            // A. Update nominal upah & wage settings dari user
             if ($request->has('wage_data') && is_array($request->wage_data)) {
                 foreach ($request->wage_data as $detailId => $wageFields) {
                     $this->updateSingleWageData($detailId, $wageFields, $user, $currentDateTime, $quotation->id);
                 }
             }
 
-            // B. Update detail data (nominal upah, dll)
             if ($request->has('detail_data') && is_array($request->detail_data)) {
                 $this->updateQuotationDetailData($quotation, $request->detail_data, $user, $currentDateTime);
             }
 
-            // C. Sync tunjangan data
             if ($request->has('tunjangan_data') && is_array($request->tunjangan_data)) {
                 $this->syncTunjanganData($quotation, $request->tunjangan_data, $currentDateTime, $user);
             }
 
-            // =====================================================
-            // 2. SYNC WAGE DATA DARI STEP 4 (isi THR/kompensasi jika belum ada)
-            // =====================================================
-            $this->syncWageDataForStep11($quotation, $user, $currentDateTime);
+            foreach (['hpp_editable_data' => QuotationDetailHpp::class, 'coss_data' => QuotationDetailCoss::class] as $key => $model) {
+                if ($request->has($key) && is_array($request->$key)) {
+                    foreach ($request->$key as $detailId => $data) {
+                        if (isset($data['jumlah_hc'])) {
+                            $model::where('quotation_detail_id', $detailId)->update(['jumlah_hc' => $data['jumlah_hc']]);
+                        }
+                    }
+                }
+            }
 
-            // =====================================================
-            // 3. RESET NILAI KALKULASI AGAR DIHITUNG ULANG
-            // =====================================================
+            $this->syncWageDataForStep11($quotation, $user, $currentDateTime);
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
 
-            // =====================================================
-            // 4. JALANKAN PERHITUNGAN ULANG
-            // =====================================================
             $calculationResult = $this->quotationService->calculateQuotation($quotation);
-
-            // =====================================================
-            // 5. SIMPAN HASIL PERHITUNGAN KE HPP & COSS
-            // =====================================================
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
 
-            // =====================================================
-            // 6. APPLY OVERRIDE USER SETELAH KALKULASI
-            //    (hpp_editable_data & coss_data menimpa hasil kalkulasi)
-            // =====================================================
             if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
                 $this->updateAllHppEditableData($quotation, $request, $user, $currentDateTime);
             }
@@ -2718,47 +2695,20 @@ class QuotationStepService
                 }
             }
 
-            // =====================================================
-            // 7. FORCE SYNC HPP & COSS UNTUK FIELD YANG HARUS SAMA
-            // =====================================================
-            $this->forceSyncHppAndCossValues($quotation, $calculationResult, $user, $currentDateTime);
-
-            // =====================================================
-            // 8. UPDATE BPJS KS NOMINAL (jika ada dari request)
-            // =====================================================
             if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
                 $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
             }
 
-            // =====================================================
-            // 9. UPDATE QUOTATION GLOBAL DATA
-            // =====================================================
             $quotationData = $this->prepareQuotationDataForUpdate($quotation, $request, $user, $currentDateTime);
             $this->cleanQuotationAttributes($quotation);
 
-            DB::table('sl_quotation')
-                ->where('id', $quotation->id)
-                ->update($quotationData);
-
-            // =====================================================
-            // 10. GENERATE KERJASAMA
-            // =====================================================
+            DB::table('sl_quotation')->where('id', $quotation->id)->update($quotationData);
             $this->generateKerjasama($quotation);
 
             DB::commit();
-
-            \Log::info("=== UPDATE ALL QUOTATION DATA COMPLETED ===", [
-                'quotation_id' => $quotation->id,
-                'step' => 11,
-            ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("Error in updateAllQuotationData", [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            \Log::error("Error in updateAllQuotationData: " . $e->getMessage());
             throw $e;
         }
     }
@@ -2984,7 +2934,7 @@ class QuotationStepService
      */
     private function updateSingleWageData($detailId, array $wageFields, string $user, Carbon $currentDateTime, $quotationId): void
     {
-        // Verifikasi detail belongs to quotation
+        // 1. Verifikasi detail belongs to quotation
         $detail = QuotationDetail::where('id', $detailId)
             ->where('quotation_id', $quotationId)
             ->first();
@@ -3006,7 +2956,7 @@ class QuotationStepService
 
         $updateData = [];
 
-        // Field yang diizinkan untuk diupdate di Step 11
+        // Field yang diizinkan untuk diupdate
         $allowedWageFields = [
             'upah',
             'hitungan_upah',
@@ -3022,40 +2972,38 @@ class QuotationStepService
         ];
 
         foreach ($allowedWageFields as $field) {
+            // Hanya proses jika KEY ada di dalam JSON yang dikirim FE
             if (array_key_exists($field, $wageFields)) {
                 $value = $wageFields[$field];
 
-                // Handle null values
-                if ($value === null || (is_string($value) && trim($value) === '')) {
+                if ($value === '' || (is_string($value) && trim($value) === '')) {
+                    continue;
+                }
+
+                if ($value === null) {
                     $updateData[$field] = null;
                     continue;
                 }
 
-                // Konversi nilai numerik
+                // Konversi nilai numerik (biar aman dari format ribuan/titik-koma)
                 if (in_array($field, ['nominal_lembur', 'nominal_tunjangan_holiday', 'jam_per_bulan_lembur'])) {
                     $updateData[$field] = $this->convertToFloat($value);
                 } else {
                     $updateData[$field] = $value;
                 }
-
-                \Log::info("Setting wage field", [
-                    'detail_id' => $detailId,
-                    'field' => $field,
-                    'value' => $value
-                ]);
             }
         }
 
+        // Eksekusi Update jika ada data yang berubah
         if (!empty($updateData)) {
             $updateData['updated_by'] = $user;
             $updateData['updated_at'] = $currentDateTime;
 
             $wage->update($updateData);
 
-            \Log::info("Updated wage data from request", [
+            \Log::info("Successfully patched wage data", [
                 'detail_id' => $detailId,
-                'wage_id' => $wage->id,
-                'update_data' => $updateData
+                'fields_updated' => array_keys($updateData)
             ]);
         }
     }

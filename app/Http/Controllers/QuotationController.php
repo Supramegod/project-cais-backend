@@ -1412,9 +1412,6 @@ class QuotationController extends Controller
                     'status_leads_id' => $lead->status_leads_id,
                     'status_leads' => $lead->statusLeads->nama ?? 'Unknown',
                     'customer_id' => $lead->customer_id,
-                    'telp_perusahaan' => $lead->telp_perusahaan,
-                    'email' => $lead->email,
-                    'created_at' => $lead->created_at,
                 ];
             });
 
