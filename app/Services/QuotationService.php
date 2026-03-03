@@ -486,7 +486,7 @@ class QuotationService
                     // Jika nilai adalah string "tidak" atau boolean/numeric false/0
                     if (
                         ($optValue === "0" || $optValue === 0 || $optValue === false ||
-                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                            (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
                         && !($key === 'kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
                     ) {
                         $isOptOut = true;
@@ -1177,25 +1177,34 @@ class QuotationService
     {
         $summary = $result->calculation_summary;
 
-        $persenBungaBank = $quotation->top != "Non TOP" ? $quotation->persen_bunga_bank : 0;
+        // Pastikan persen_bunga_bank sebagai float
+        $persenBungaBank = (float) $quotation->persen_bunga_bank;
+        if ($quotation->top == "Non TOP") {
+            $persenBungaBank = 0;
+        }
 
-        $summary->bunga_bank_total = $persenBungaBank ?
-            $summary->total_sebelum_management_fee * ($persenBungaBank / 100) / $jumlahHc : 0;
+        $summary->bunga_bank_total = $persenBungaBank > 0
+            ? $summary->total_sebelum_management_fee * ($persenBungaBank / 100) / $jumlahHc
+            : 0;
 
-        $summary->insentif_total = $quotation->persen_insentif ?
-            $summary->nominal_management_fee_coss * ($quotation->persen_insentif / 100) / $jumlahHc : 0;
+        // Pastikan persen_insentif sebagai float
+        $persenInsentif = (float) $quotation->persen_insentif;
+        $summary->insentif_total = $persenInsentif > 0
+            ? $summary->nominal_management_fee_coss * ($persenInsentif / 100) / $jumlahHc
+            : 0;
     }
 
     private function updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
 
-
-        $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan) {
+        // ✅ Tambahkan $result ke use()
+        $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan, $result) {
             $detail->bunga_bank = $summary->bunga_bank_total;
             $detail->insentif = $summary->insentif_total;
+            \Log::info("Updating detail {$detail->id} with gross-up values: bunga_bank={$detail->bunga_bank}, insentif={$detail->insentif}");
 
-            // **PERBAIKAN: Recalculate total_personil setelah bunga_bank di-update**
+            // Recalculate totals
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
             $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
 
@@ -1205,9 +1214,16 @@ class QuotationService
             ];
 
             $this->calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss);
+
+            // ✅ TAMBAHKAN INI: Update hpp_data dan coss_data di DetailCalculation
+            if (isset($result->detail_calculations[$detail->id])) {
+                $result->detail_calculations[$detail->id]->hpp_data['bunga_bank'] = $detail->bunga_bank;
+                $result->detail_calculations[$detail->id]->hpp_data['insentif'] = $detail->insentif;
+                $result->detail_calculations[$detail->id]->coss_data['bunga_bank'] = $detail->bunga_bank;
+                $result->detail_calculations[$detail->id]->coss_data['insentif'] = $detail->insentif;
+            }
         });
     }
-
     // ============================ HPP & COSS CALCULATIONS ============================
     private function calculateHpp(&$quotation, $jumlahHc, $provisi, QuotationCalculationResult $result): void
     {
@@ -1472,12 +1488,11 @@ class QuotationService
                 // Handle berbagai format nilai opt-out
                 if (
                     ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false" ||
-                    (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
                     && !($optField === 'is_bpjs_kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
                 ) {
                     $isOptOut = true;
-                }
- elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
+                } elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
                     $isOptOut = false;
                 }
             }
