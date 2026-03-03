@@ -494,8 +494,18 @@ class QuotationStepResource extends JsonResource
                                 $wage = $detail->wage ?? null;
 
                                 $detailCalc = $calculatedQuotation->detail_calculations[$detail->id] ?? null;
-                                $hppData = $detailCalc?->hpp_data ?? [];
-                                $cossData = $detailCalc?->coss_data ?? [];
+                                if ($detailCalc) {
+                                    $hppData = $detailCalc->hpp_data ?? [];
+                                    $cossData = $detailCalc->coss_data ?? [];
+                                } else {
+                                    // fallback ke database
+                                    $hpp = $detail->quotationDetailHpps->first();
+                                    $coss = $detail->quotationDetailCosses->first();
+                                    $hppData = $hpp ? $hpp->toArray() : [];
+                                    $cossData = $coss ? $coss->toArray() : [];
+                                }
+
+                                // ✅ Ambil nilai bunga_bank dan insentif dari properti detail (hasil kalkulasi
 
                                 $tunjanganData = $detail->quotationDetailTunjangans
                                     ->map(fn($t) => [
@@ -517,7 +527,8 @@ class QuotationStepResource extends JsonResource
                                 $kompDisplay = $getTunjanganDisplayForBoth($wage, 'kompensasi', $kompHpp, $kompCoss);
                                 $lemburDisplay = $getTunjanganDisplayForBoth($wage, 'lembur', $lemburHpp, $lemburCoss, 'lembur_ditagihkan');
                                 $holidayDisplay = $getTunjanganDisplayForBoth($wage, 'tunjangan_holiday', $holidayHpp, $holidayCoss);
-
+                                \Log::info("in get method detail {$detail->id}  insntif coss: " . ($cossData['insentif'] ?? 0) . " insentif hpp: " . ($hppData['insentif'] ?? 0));
+                                \log::info("in get method detail {$detail->id}  bunga bank coss: " . ($cossData['bunga_bank'] ?? 0) . " bunga bank hpp: " . ($hppData['bunga_bank'] ?? 0));
                                 return [
                                     'id' => $detail->id,
                                     'position_name' => $detail->jabatan_kebutuhan,
