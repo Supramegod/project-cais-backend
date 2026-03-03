@@ -3612,9 +3612,9 @@ class QuotationStepService
         }
 
         // Hapus relations yang mungkin terbawa
-        $quotation->setRelation('quotation_detail', null);
-        $quotation->setRelation('quotation_site', null);
-        $quotation->setRelation('quotation_detail_wage', null);
+        $quotation->unsetRelation('quotationDetails');
+        $quotation->unsetRelation('quotationSites');
+        $quotation->unsetRelation('wage');
     }
     /**
      * Sync wage data from step 4 to ensure THR and Kompensasi are calculated
