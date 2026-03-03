@@ -2706,6 +2706,7 @@ class QuotationStepService
             $this->generateKerjasama($quotation);
 
             DB::commit();
+            $quotation->refresh();
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error("Error in updateAllQuotationData: " . $e->getMessage());

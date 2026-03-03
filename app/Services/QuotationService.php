@@ -35,11 +35,6 @@ use App\Services\QuotationNotificationService;
 class QuotationService
 {
     protected $quotationNotificationService;
-    private array $siteHcHpp = [];
-    private array $siteHcCoss = [];
-    private bool $siteTotalsCalculated = false;
-    private mixed $primarySiteId = null;
-    private mixed $primaryDetailId = null;
 
     public function __construct(
 
@@ -56,12 +51,6 @@ class QuotationService
     public function calculateQuotation($quotation): QuotationCalculationResult
     {
         try {
-
-            $this->siteHcHpp = [];
-            $this->siteHcCoss = [];
-            $this->siteTotalsCalculated = false;
-            $this->primarySiteId = null;
-            $this->primaryDetailId = null;
             $result = new QuotationCalculationResult($quotation);
 
             $this->initializeQuotation($quotation);
@@ -497,7 +486,7 @@ class QuotationService
                     // Jika nilai adalah string "tidak" atau boolean/numeric false/0
                     if (
                         ($optValue === "0" || $optValue === 0 || $optValue === false ||
-                            (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
                         && !($key === 'kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
                     ) {
                         $isOptOut = true;
@@ -717,20 +706,29 @@ class QuotationService
     // ============================ ITEM CALCULATIONS ============================
     private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
-        // ✅ FIX: Gunakan instance properties, bukan static
-        if (!$this->siteTotalsCalculated) {
-            $this->siteHcHpp = [];
-            $this->siteHcCoss = [];
+        // **PERBAIKAN: Hitung total HC per site SEKALI di awal, bukan per detail**
+        static $siteTotalsCalculated = false;
+        static $siteHcHpp = [];
+        static $siteHcCoss = [];
+        static $primarySiteId = null;
+        static $primaryDetailId = null;
+
+        // Hitung total HC per site hanya sekali untuk quotation ini
+        if (!$siteTotalsCalculated) {
+            // Reset arrays
+            $siteHcHpp = [];
+            $siteHcCoss = [];
 
             $firstDetail = $quotation->quotation_detail->first();
-            $this->primarySiteId = $firstDetail->quotation_site_id ?? null;
-            $this->primaryDetailId = $firstDetail->id ?? null;
+            $primarySiteId = $firstDetail->quotation_site_id ?? null;
+            $primaryDetailId = $firstDetail->id ?? null;
 
+            // Kelompokkan jumlah HC per site dari SEMUA detail
             foreach ($quotation->quotation_detail as $det) {
                 $siteId = $det->quotation_site_id;
-                if (!isset($this->siteHcHpp[$siteId])) {
-                    $this->siteHcHpp[$siteId] = 0;
-                    $this->siteHcCoss[$siteId] = 0;
+                if (!isset($siteHcHpp[$siteId])) {
+                    $siteHcHpp[$siteId] = 0;
+                    $siteHcCoss[$siteId] = 0;
                 }
 
                 if (!isset($det->jumlah_hc_hpp)) {
@@ -740,22 +738,22 @@ class QuotationService
                     $det->jumlah_hc_original = $det->jumlah_hc;
                 }
 
-                $this->siteHcHpp[$siteId] += $det->jumlah_hc_hpp;
-                $this->siteHcCoss[$siteId] += $det->jumlah_hc_original;
+                $siteHcHpp[$siteId] += $det->jumlah_hc_hpp;
+                $siteHcCoss[$siteId] += $det->jumlah_hc_original;
             }
 
-            $this->siteTotalsCalculated = true;
+            $siteTotalsCalculated = true;
 
             \Log::info("=== SITE HC TOTALS CALCULATED ===", [
                 'quotation_id' => $quotation->id,
-                'site_hc_hpp' => $this->siteHcHpp,
-                'site_hc_coss' => $this->siteHcCoss,
+                'site_hc_hpp' => $siteHcHpp,
+                'site_hc_coss' => $siteHcCoss,
+                'total_details' => $quotation->quotation_detail->count()
             ]);
         }
-
         $currentSiteId = $detail->quotation_site_id;
-        $totalJumlahHcHppSite = $this->siteHcHpp[$currentSiteId] ?? 0;
-        $totalJumlahHcCossSite = $this->siteHcCoss[$currentSiteId] ?? 0;
+        $totalJumlahHcHppSite = $siteHcHpp[$currentSiteId] ?? 0;
+        $totalJumlahHcCossSite = $siteHcCoss[$currentSiteId] ?? 0;
         $items = [
             'kaporlap' => [
                 'hpp_field' => 'provisi_seragam',
@@ -1474,11 +1472,12 @@ class QuotationService
                 // Handle berbagai format nilai opt-out
                 if (
                     ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false" ||
-                        (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
+                    (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
                     && !($optField === 'is_bpjs_kes' && $detail->penjamin_kesehatan === 'BPJS') // FIX: Force active if explicitly BPJS Kesehatan
                 ) {
                     $isOptOut = true;
-                } elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
+                }
+ elseif (is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
                     $isOptOut = false;
                 }
             }
