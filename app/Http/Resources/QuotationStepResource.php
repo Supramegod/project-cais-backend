@@ -365,20 +365,20 @@ class QuotationStepResource extends JsonResource
                 if ($calculatedQuotation && isset($calculatedQuotation->calculation_summary)) {
                     $summary = $calculatedQuotation->calculation_summary;
 
-                    $persenBpjsTotalHpp = $summary->persen_bpjs_ketenagakerjaan ?? 0;
+                    $persenBpjsTotalHpp = round($summary->persen_bpjs_ketenagakerjaan ?? 0, 2);
                     $persenBpjsBreakdownHpp = [
-                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk ?? 0,
-                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm ?? 0,
-                        'persen_bpjs_jht' => $summary->persen_bpjs_jht ?? 0,
-                        'persen_bpjs_jp' => $summary->persen_bpjs_jp ?? 0,
+                        'persen_bpjs_jkk' => round($summary->persen_bpjs_jkk ?? 0, 2),
+                        'persen_bpjs_jkm' => round($summary->persen_bpjs_jkm ?? 0, 2),
+                        'persen_bpjs_jht' => round($summary->persen_bpjs_jht ?? 0, 2),
+                        'persen_bpjs_jp' => round($summary->persen_bpjs_jp ?? 0, 2),
                     ];
 
-                    $persenBpjsTotalCoss = $summary->persen_bpjs_ketenagakerjaan_coss ?? 0;
+                    $persenBpjsTotalCoss = round($summary->persen_bpjs_ketenagakerjaan_coss ?? 0, 2);
                     $persenBpjsBreakdownCoss = [
-                        'persen_bpjs_jkk' => $summary->persen_bpjs_jkk_coss ?? 0,
-                        'persen_bpjs_jkm' => $summary->persen_bpjs_jkm_coss ?? 0,
-                        'persen_bpjs_jht' => $summary->persen_bpjs_jht_coss ?? 0,
-                        'persen_bpjs_jp' => $summary->persen_bpjs_jp_coss ?? 0,
+                        'persen_bpjs_jkk' => round($summary->persen_bpjs_jkk_coss ?? 0, 2),
+                        'persen_bpjs_jkm' => round($summary->persen_bpjs_jkm_coss ?? 0, 2),
+                        'persen_bpjs_jht' => round($summary->persen_bpjs_jht_coss ?? 0, 2),
+                        'persen_bpjs_jp' => round($summary->persen_bpjs_jp_coss ?? 0, 2),
                     ];
                 }
 
@@ -506,7 +506,7 @@ class QuotationStepResource extends JsonResource
                                 }
 
                                 // ✅ Ambil nilai bunga_bank dan insentif dari properti detail (hasil kalkulasi
-
+            
                                 $tunjanganData = $detail->quotationDetailTunjangans
                                     ->map(fn($t) => [
                                         'nama_tunjangan' => $t->nama_tunjangan,
@@ -527,8 +527,6 @@ class QuotationStepResource extends JsonResource
                                 $kompDisplay = $getTunjanganDisplayForBoth($wage, 'kompensasi', $kompHpp, $kompCoss);
                                 $lemburDisplay = $getTunjanganDisplayForBoth($wage, 'lembur', $lemburHpp, $lemburCoss, 'lembur_ditagihkan');
                                 $holidayDisplay = $getTunjanganDisplayForBoth($wage, 'tunjangan_holiday', $holidayHpp, $holidayCoss);
-                                \Log::info("in get method detail {$detail->id}  insntif coss: " . ($cossData['insentif'] ?? 0) . " insentif hpp: " . ($hppData['insentif'] ?? 0));
-                                \log::info("in get method detail {$detail->id}  bunga bank coss: " . ($cossData['bunga_bank'] ?? 0) . " bunga bank hpp: " . ($hppData['bunga_bank'] ?? 0));
                                 return [
                                     'id' => $detail->id,
                                     'position_name' => $detail->jabatan_kebutuhan,

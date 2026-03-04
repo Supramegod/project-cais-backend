@@ -789,7 +789,7 @@ class QuotationService
                 'coss_field' => 'provisi_chemical',
                 'model' => QuotationChemical::class,
                 'special' => 'chemical',
-                'is_general' => false,  // Chemical punya rumus khusus
+                'is_general' => true,  // Chemical punya rumus khusus
                 'site_specific' => true, // Filter berdasarkan site
                 'site_field' => 'quotation_site_id',
                 'detail_id' => null // Chemical tidak terkait langsung dengan detail
