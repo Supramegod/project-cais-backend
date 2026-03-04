@@ -2681,6 +2681,12 @@ class QuotationStepService
 
             $this->syncWageDataForStep11($quotation, $user, $currentDateTime);
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
+            if ($request->filled('persen_insentif')) {
+                $quotation->persen_insentif = (float) str_replace(['.', ','], ['', '.'], $request->persen_insentif);
+            }
+            if ($request->filled('persen_bunga_bank')) {
+                $quotation->persen_bunga_bank = (float) str_replace(['.', ','], ['', '.'], $request->persen_bunga_bank);
+            }
 
             $calculationResult = $this->quotationService->calculateQuotation($quotation);
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
