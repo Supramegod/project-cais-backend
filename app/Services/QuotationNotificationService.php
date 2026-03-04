@@ -5,67 +5,49 @@ namespace App\Services;
 use App\Mail\QuotationApprovalEmail;
 use App\Models\Quotation;
 use App\Models\User;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class QuotationNotificationService
 {
     const DIR_SALES = [
-        ['name' => 'jalu pradipta', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
+        // ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino.shelter@gmail.com', 'role' => 'Direktur Sales'],
+        ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [
-        ['name' => 'zamzam akabar', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
+        // ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'alivian.shelter@gmail.com', 'role' => 'Direktur Keuangan'],
+        ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
 
-    public function __construct(
-        private readonly DynamicMailerService $dynamicMailer
-    ) {
+    // ✅ Constructor tidak perlu DynamicMailerService lagi
+    public function __construct()
+    {
     }
 
     public function sendApprovalNotification(
         Quotation $quotation,
         string $creatorName,
         string $approvalUrl = '#',
-        ?User $senderUser = null,
+        ?User $senderUser = null,       // ✅ parameter ini tidak dipakai lagi, tapi dibiarkan agar tidak breaking change
         ?array $overrideRecipients = null
     ): void {
-        $recipients = $overrideRecipients ?? $this->resolveRecipients($quotation);
-        $approvalStage = $this->resolveStageLabel($overrideRecipients);
-
-        if (empty($recipients)) {
-            Log::info('QuotationNotificationService: no recipients for this stage', [
-                'quotation_id' => $quotation->id,
-            ]);
-            return;
-        }
-
-        $sender = $senderUser ?? Auth::user();
-
         try {
-            $mailerConfig = $this->dynamicMailer->setupMailer($sender);
-        } catch (\Exception $e) {
-            Log::error('QuotationNotificationService: mailer setup failed, using fallback', [
-                'error' => $e->getMessage(),
-            ]);
-            $mailerConfig = [
-                'name' => 'smtp',
-                'config' => [
-                    'address' => config('mail.from.address'),
-                    'name' => config('mail.from.name'),
-                ],
-                'config_source' => 'fallback',
-            ];
-        }
+            $recipients = $overrideRecipients ?? $this->resolveRecipients($quotation);
+            $approvalStage = $this->resolveStageLabel($overrideRecipients);
 
-        $fromAddress = $mailerConfig['config']['address'];
-        $fromName = $mailerConfig['config']['name'];
-
-        foreach ($recipients as $recipient) {
-            try {
-                Mail::mailer($mailerConfig['name'])
-                    ->to($recipient['email'])
+            if (empty($recipients)) {
+                Log::info('QuotationNotificationService: no recipients for this stage', [
+                    'quotation_id' => $quotation->id,
+                ]);
+                return;
+            }
+            // ✅ Ambil from address & name langsung dari .env / config/mail.php
+            $fromAddress = config('mail.from.address');
+            $fromName = config('mail.from.name');
+            foreach ($recipients as $recipient) {
+                // ✅ Tidak perlu ->mailer(...), langsung pakai default mailer dari .env
+                Mail::to($recipient['email'])
                     ->send(new QuotationApprovalEmail(
                         recipientName: $recipient['name'],
                         recipientRole: $recipient['role'],
@@ -77,25 +59,28 @@ class QuotationNotificationService
                         fromAddress: $fromAddress,
                         fromName: $fromName,
                         namaPerusahaan: $quotation->nama_perusahaan ?? null,
+                        jumlahHariInvoice: $quotation->jumlah_hari_invoice ?? null,
+                        tipeHariInvoice: $quotation->tipe_hari_invoice ?? null,
                     ));
 
                 Log::info('QuotationNotificationService: email sent', [
                     'quotation_number' => $quotation->nomor,
                     'recipient' => $recipient['email'],
-                    'mailer' => $mailerConfig['name'],
-                ]);
-            } catch (\Exception $e) {
-                Log::error('QuotationNotificationService: failed to send email', [
-                    'quotation_number' => $quotation->nomor,
-                    'recipient' => $recipient['email'],
-                    'error' => $e->getMessage(),
+                    'mailer' => config('mail.default'),
                 ]);
             }
+        } catch (\Exception $e) {
+            Log::error('QuotationNotificationService: failed to send email', [
+                'quotation_number' => $quotation->nomor,
+                'recipient' => $recipient['email'],
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
     private function resolveRecipients(Quotation $quotation): array
     {
+        // tidak ada perubahan di sini
         if (empty($quotation->ot1)) {
             return self::DIR_SALES;
         }
@@ -116,6 +101,7 @@ class QuotationNotificationService
 
     private function resolveStageLabel(?array $recipients): string
     {
+        // tidak ada perubahan di sini
         if ($recipients === self::DIR_SALES) {
             return 'Persetujuan Direktur Sales';
         }
