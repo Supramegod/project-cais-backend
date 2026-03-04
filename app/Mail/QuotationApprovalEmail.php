@@ -23,6 +23,8 @@ class QuotationApprovalEmail extends Mailable
     public string $fromAddress;
     public string $fromName;
     public ?string $namaPerusahaan;
+    public ?int $jumlahHariInvoice;
+    public ?string $tipeHariInvoice;
 
     public function __construct(
         string $recipientName,
@@ -35,6 +37,8 @@ class QuotationApprovalEmail extends Mailable
         string $fromAddress = '',
         string $fromName = '',
         ?string $namaPerusahaan = null,
+        ?int $jumlahHariInvoice = null,
+        ?string $tipeHariInvoice = null,
     ) {
         $this->recipientName = $recipientName;
         $this->recipientRole = $recipientRole;
@@ -46,6 +50,8 @@ class QuotationApprovalEmail extends Mailable
         $this->fromAddress = $fromAddress ?: config('mail.from.address');
         $this->fromName = $fromName ?: config('mail.from.name');
         $this->namaPerusahaan = $namaPerusahaan;
+        $this->jumlahHariInvoice = $jumlahHariInvoice;
+        $this->tipeHariInvoice = $tipeHariInvoice;
     }
 
     public function envelope(): Envelope
@@ -72,6 +78,8 @@ class QuotationApprovalEmail extends Mailable
                 'fromName' => $this->fromName,
                 'sentAt' => now(),
                 'namaPerusahaan' => $this->namaPerusahaan,
+                'jumlahHariInvoice' => $this->jumlahHariInvoice,
+                'tipeHariInvoice' => $this->tipeHariInvoice,
             ]
         );
     }
