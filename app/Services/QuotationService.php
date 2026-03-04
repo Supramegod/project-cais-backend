@@ -976,9 +976,11 @@ class QuotationService
         $total = 0;
         foreach ($items as $item) {
             if ($special === 'chemical') {
-                // Untuk chemical: total dibagi jumlah HC detail ini
+                // 1. Hitung total biaya bulanan
                 $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
-                $perPerson = $itemTotal / max($jumlahHc, 1);
+
+                $perPerson = $itemTotal / max($divider, 1);
+
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
@@ -1032,7 +1034,7 @@ class QuotationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
-                $perPerson = $itemTotal / max($jumlahHc, 1);
+                $perPerson = $itemTotal / max($divider, 1);
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
