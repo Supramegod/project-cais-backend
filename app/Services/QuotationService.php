@@ -352,6 +352,8 @@ class QuotationService
             'provisi_peralatan' => $detail->personil_devices_coss ?? 0,
             'provisi_chemical' => $detail->personil_chemical_coss ?? 0,
             'provisi_ohc' => $detail->personil_ohc_coss ?? 0,
+            'total_personil_coss' => $detail->total_personil_coss ?? 0,
+            'sub_total_personil_coss' => $detail->sub_total_personil_coss ?? 0,
             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
@@ -1198,11 +1200,9 @@ class QuotationService
     {
         $summary = $result->calculation_summary;
 
-        // ✅ Tambahkan $result ke use()
         $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan, $result) {
             $detail->bunga_bank = $summary->bunga_bank_total;
             $detail->insentif = $summary->insentif_total;
-            \Log::info("Updating detail {$detail->id} with gross-up values: bunga_bank={$detail->bunga_bank}, insentif={$detail->insentif}");
 
             // Recalculate totals
             $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
@@ -1215,12 +1215,21 @@ class QuotationService
 
             $this->calculateFinalTotals($detail, $quotation, $totalTunjanganResult, $hpp, $coss);
 
-            // ✅ TAMBAHKAN INI: Update hpp_data dan coss_data di DetailCalculation
+            // ✅ PERBARUI DTO DENGAN NILAI TERBARU
             if (isset($result->detail_calculations[$detail->id])) {
-                $result->detail_calculations[$detail->id]->hpp_data['bunga_bank'] = $detail->bunga_bank;
-                $result->detail_calculations[$detail->id]->hpp_data['insentif'] = $detail->insentif;
-                $result->detail_calculations[$detail->id]->coss_data['bunga_bank'] = $detail->bunga_bank;
-                $result->detail_calculations[$detail->id]->coss_data['insentif'] = $detail->insentif;
+                $dto = $result->detail_calculations[$detail->id];
+
+                // Update HPP data
+                $dto->hpp_data['bunga_bank'] = $detail->bunga_bank;
+                $dto->hpp_data['insentif'] = $detail->insentif;
+                $dto->hpp_data['total_biaya_per_personil'] = $detail->total_personil;
+                $dto->hpp_data['total_biaya_all_personil'] = $detail->sub_total_personil;
+
+                // Update COSS data
+                $dto->coss_data['bunga_bank'] = $detail->bunga_bank;
+                $dto->coss_data['insentif'] = $detail->insentif;
+                $dto->coss_data['total_personil_coss'] = $detail->total_personil_coss ?? 0;
+                $dto->coss_data['sub_total_personil_coss'] = $detail->sub_total_personil_coss ?? 0;
             }
         });
     }

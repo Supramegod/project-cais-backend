@@ -168,6 +168,7 @@
             line-height: 1.7;
         }
 
+        /* ===== FOOTER ===== */
         .footer {
             background: #1e293b;
             padding: 28px 40px;
@@ -187,30 +188,46 @@
         }
 
         .footer-contacts {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 16px;
             margin-bottom: 16px;
         }
 
         .footer-contact-item {
-            flex: 1 1 180px;
-            min-width: 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #2d3f55;
         }
 
-        .contact-label {
-            display: block;
+        .footer-contact-item:last-child {
+            border-bottom: none;
+        }
+
+        .contact-role-badge {
+            flex-shrink: 0;
+            background: #2d3f55;
+            color: #94a3b8;
             font-size: 10px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .5px;
-            color: #475569;
-            margin-bottom: 2px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-top: 2px;
+            width: 110px;
+            text-align: center;
+        }
+
+        .contact-info {
+            min-width: 0;
         }
 
         .contact-name {
             display: block;
-            font-size: 11px;
-            color: #94a3b8;
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+            overflow-wrap: break-word;
             word-break: break-word;
             margin-bottom: 2px;
         }
@@ -218,7 +235,7 @@
         .contact-val {
             display: block;
             font-size: 12px;
-            color: #94a3b8;
+            color: #64748b;
             word-break: break-all;
         }
 
@@ -252,6 +269,11 @@
             .footer {
                 padding-left: 20px;
                 padding-right: 20px;
+            }
+
+            .contact-role-badge {
+                width: 90px;
+                font-size: 9px;
             }
         }
     </style>
@@ -312,7 +334,15 @@
                     @if($top)
                         <tr>
                             <td class="label">Terms of Payment</td>
-                            <td class="value">{{ $top }}</td>
+                            <td class="value">
+                                {{ $top }}
+                                @if($top === 'Lebih Dari 7 Hari' && $jumlahHariInvoice)
+                                    <br>
+                                    <span style="font-size:12px; color:#64748b; font-weight:400;">
+                                        {{ $jumlahHariInvoice }} Hari {{ $tipeHariInvoice ?? '' }}
+                                    </span>
+                                @endif
+                            </td>
                         </tr>
                     @endif
                     <tr>
@@ -337,21 +367,25 @@
             <div class="footer-tag">Sistem Manajemen Hubungan Pelanggan Terpadu</div>
             <div class="footer-contacts">
                 <div class="footer-contact-item">
-                    <span class="contact-label">Direktur Sales</span>
-                    <span class="contact-name">MUHAMMAD NINO MAYVI DIAN</span>
-                    <span class="contact-val">nino@shelterindonesia.id</span>
+                    <span class="contact-role-badge">Direktur Sales</span>
+                    <div class="contact-info">
+                        <span class="contact-name">Muhammad Nino Mayvi Dian</span>
+                        <span class="contact-val">nino@shelterindonesia.id</span>
+                    </div>
                 </div>
                 <div class="footer-contact-item">
-                    <span class="contact-label">Direktur Keuangan</span>
-                    <span class="contact-name">ALIVIAN PRANATYAS HENING LAZUARDI</span>
-                    <span class="contact-val">alivian@shelterindonesia.id</span>
+                    <span class="contact-role-badge">Direktur Keuangan</span>
+                    <div class="contact-info">
+                        <span class="contact-name">Alivian Pranatyas Hening Lazuardi</span>
+                        <span class="contact-val">alivian@shelterindonesia.id</span>
+                    </div>
                 </div>
             </div>
-            <div class="footer-hr"></div>
-            <div class="footer-legal">Email ini bersifat rahasia dan ditujukan hanya untuk penerima yang disebutkan di
-                atas.</div>
-            <div class="copyright">&copy; {{ date('Y') }} Cais Shelter. All rights reserved.</div>
         </div>
+        <div class="footer-hr"></div>
+        <div class="footer-legal">Email ini bersifat rahasia dan ditujukan hanya untuk penerima yang disebutkan di
+            atas.</div>
+        <div class="copyright">&copy; {{ date('Y') }} Cais Shelter. All rights reserved.</div>
 
     </div>
 </body>
