@@ -352,6 +352,8 @@ class QuotationService
             'provisi_peralatan' => $detail->personil_devices_coss ?? 0,
             'provisi_chemical' => $detail->personil_chemical_coss ?? 0,
             'provisi_ohc' => $detail->personil_ohc_coss ?? 0,
+            'total_personil_coss' => $detail->total_personil_coss ?? 0,
+            'sub_total_personil_coss' => $detail->sub_total_personil_coss ?? 0,
             'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
             'bunga_bank' => $detail->bunga_bank ?? 0,
             'insentif' => $detail->insentif ?? 0,
@@ -1217,10 +1219,15 @@ class QuotationService
 
             // ✅ TAMBAHKAN INI: Update hpp_data dan coss_data di DetailCalculation
             if (isset($result->detail_calculations[$detail->id])) {
-                $result->detail_calculations[$detail->id]->hpp_data['bunga_bank'] = $detail->bunga_bank;
-                $result->detail_calculations[$detail->id]->hpp_data['insentif'] = $detail->insentif;
-                $result->detail_calculations[$detail->id]->coss_data['bunga_bank'] = $detail->bunga_bank;
-                $result->detail_calculations[$detail->id]->coss_data['insentif'] = $detail->insentif;
+                $dto = $result->detail_calculations[$detail->id];
+                $dto->hpp_data['bunga_bank'] = $detail->bunga_bank;
+                $dto->hpp_data['insentif'] = $detail->insentif;
+                $dto->coss_data['bunga_bank'] = $detail->bunga_bank;
+                $dto->coss_data['insentif'] = $detail->insentif;
+
+                // TAMBAHKAN INI
+                $dto->coss_data['total_personil_coss'] = $detail->total_personil_coss ?? 0;
+                $dto->coss_data['sub_total_personil_coss'] = $detail->sub_total_personil_coss ?? 0;
             }
         });
     }
