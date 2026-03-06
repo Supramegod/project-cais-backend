@@ -1232,7 +1232,9 @@ class QuotationStepController extends Controller
      * Estimasi: 30–80ms
      */
     private function buildAdditionalDataStep10(Quotation $quotation): array
-    {  
+    {   $listJenis = JenisBarang::whereIn('id', [6, 7, 8])
+            ->select('id', 'nama')
+            ->get();
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
