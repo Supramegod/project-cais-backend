@@ -984,30 +984,31 @@ class QuotationStepController extends Controller
                 ];
             }
         }
+                // Hitung jumlah HC per site
+        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
+        if (!$quotation->relationLoaded('quotationSites')) {
+            $quotation->load([
+                'quotationSites' => function ($query) {
+                    $query->whereNull('deleted_at'); 
+                }
+            ]);
+        }
+
+        // 2. Ambil data HC per site
+        $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
+            ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
+            ->groupBy('quotation_site_id')
+            ->pluck('total_hc', 'quotation_site_id')
+            ->toArray();
 
         return [
-            'management_fees' => ManagementFee::all(),
-            'upah_options' => ['UMP', 'UMK', 'Custom'],
-            'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
-            'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
-            'lembur_options' => ['Tidak', 'Flat'],
-            'kompensasi_options' => ['Tidak', 'Diprovisikan'],
-            'thr_options' => ['Tidak', 'Diprovisikan'],
-            'tunjangan_holiday_options' => ['Tidak', 'Flat'],
-            'lembur_ditagihkan_options' => ['Tidak Ditagihkan', 'Ditagihkan Terpisah'],
-            'is_ppn_options' => ['Ya', 'Tidak'],
-            'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'],
+            'management_fees' => ManagementFee::select('id', 'nama')->get(),
             'umk_per_site' => $umkPerSite,
             'ump_per_site' => $umpPerSite,
-            'quotation_details' => $quotation->relationLoaded('quotationDetails')
-                ? $quotation->quotationDetails->map(fn($d) => [
-                    'id' => $d->id,
-                    'position_id' => $d->position_id,
-                    'position_name' => $d->jabatan_kebutuhan,
-                    'site_id' => $d->quotation_site_id,
-                    'site_name' => $d->nama_site,
-                    'jumlah_hc' => $d->jumlah_hc,
-                    'nominal_upah' => $d->nominal_upah,
+          'quotation_sites' => $quotation->relationLoaded('quotationSites')
+                ? $quotation->quotationSites->map(fn($site) => [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
                 ])->toArray()
                 : [],
         ];
@@ -1020,10 +1021,9 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep5(Quotation $quotation): array
     {
         return [
-            'jenis_perusahaan' => JenisPerusahaan::select('id', 'nama', 'resiko')->get(),
-            'bidang_perusahaan' => BidangPerusahaan::select('id', 'nama')->get(),
-            'resiko_options' => ['Rendah', 'Sedang', 'Tinggi'],
-            'program_bpjs_options' => ['Asuransi swasta', 'BPJS', 'BPU'],
+            'jenis_perusahaan_list' => JenisPerusahaan::select('id', 'nama', 'resiko')->get(),
+            'bidang_perusahaan_list' => BidangPerusahaan::select('id', 'nama')->get(),
+
         ];
     }
 
@@ -1095,7 +1095,7 @@ class QuotationStepController extends Controller
         }
 
         return [
-            'jenis_barang' => $listJenis,
+            'jenis_barang_list' => $listJenis,
             'kaporlap_list' => $listKaporlap,
             'quotation_details' => $quotation->relationLoaded('quotationDetails')
                 ? $quotation->quotationDetails
@@ -1112,12 +1112,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 8 — Master devices: jenis_barang, devices_items
-     * Mereplikasi Resource::getDevicesData() persis.
-     * N+1 diperbaiki: BarangDefaultQty & QuotationDevices di-preload dengan whereIn.
-     * Estimasi: 20–60ms
-     */
     private function buildAdditionalDataStep8(Quotation $quotation): array
     {
         $listJenis = JenisBarang::whereIn('id', [9, 10, 11, 12, 17])
@@ -1157,21 +1151,32 @@ class QuotationStepController extends Controller
             }
         }
         // Hitung jumlah HC per site
+        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
+        if (!$quotation->relationLoaded('quotationSites')) {
+            $quotation->load([
+                'quotationSites' => function ($query) {
+                    $query->whereNull('deleted_at');
+                }
+            ]);
+        }
+
+        // 2. Ambil data HC per site
         $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
             ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
             ->groupBy('quotation_site_id')
-            ->pluck('total_hc', 'quotation_site_id');
+            ->pluck('total_hc', 'quotation_site_id')
+            ->toArray();
 
         return [
-            'jenis_barang' => $listJenis,
+            'jenis_barang_list' => $listJenis,
             'devices_list' => $listDevices,
-            'quotation_sites' => $quotation->relationLoaded('quotationSites')
-                ? $quotation->quotationSites->map(fn($site) => [
+            'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
+                return [
                     'id' => $site->id,
-                    'nama_site' => $site->nama_site,
-                    'jumlah_hc' => $hcPerSite[$site->id] ?? 0,
-                ])->toArray()
-                : [],
+                    'nama_site' => $site->nama_site, // Diambil dari fillable sl_quotation_site
+                    'jumlah_hc' => isset($hcPerSite[$site->id]) ? (int) $hcPerSite[$site->id] : 0,
+                ];
+            })->values()->toArray(),
         ];
     }
 
@@ -1195,9 +1200,32 @@ class QuotationStepController extends Controller
 
                 return $chemical;
             });
+        // Hitung jumlah HC per site
+        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
+        if (!$quotation->relationLoaded('quotationSites')) {
+            $quotation->load([
+                'quotationSites' => function ($query) {
+                    $query->whereNull('deleted_at');
+                }
+            ]);
+        }
+
+        // 2. Ambil data HC per site
+        $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
+            ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
+            ->groupBy('quotation_site_id')
+            ->pluck('total_hc', 'quotation_site_id')
+            ->toArray();
 
         return [
-            'chemicals_list' => $chemicalList,
+            'chemical_list' => $chemicalList,
+            'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'jumlah_hc' => isset($hcPerSite[$site->id]) ? (int) $hcPerSite[$site->id] : 0,
+                ];
+            })->values()->toArray(),
         ];
     }
 
@@ -1206,7 +1234,21 @@ class QuotationStepController extends Controller
      * Estimasi: 30–80ms
      */
     private function buildAdditionalDataStep10(Quotation $quotation): array
-    {
+    {  
+        if (!$quotation->relationLoaded('quotationSites')) {
+            $quotation->load([
+                'quotationSites' => function ($query) {
+                    $query->whereNull('deleted_at');
+                }
+            ]);
+        }
+
+        // 2. Ambil data HC per site
+        $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
+            ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
+            ->groupBy('quotation_site_id')
+            ->pluck('total_hc', 'quotation_site_id')
+            ->toArray();
         return [
             'ohc_list' => Barang::whereIn('jenis_barang_id', [6, 7, 8])
                 ->select('id', 'nama', 'harga', 'jenis_barang_id', 'urutan') // Pilih kolom yang diperlukan saja
@@ -1217,19 +1259,21 @@ class QuotationStepController extends Controller
                     $ohc->harga_formatted = number_format($ohc->harga, 0, ',', '.');
                     return $ohc;
                 }),
+            'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'jumlah_hc' => isset($hcPerSite[$site->id]) ? (int) $hcPerSite[$site->id] : 0,
+                ];
+            })->values()->toArray(),
 
-            'trainings' => Training::select('id', 'nama','jenis' )->get(), // Hindari all() untuk performa lebih baik
+
+            'training_list' => Training::select('id', 'nama', 'jenis')->get(), // Hindari all() untuk performa lebih baik
             'bulan_tahun_options' => ['Bulan', 'Tahun'],
             'ada_training_options' => ['Ada', 'Tidak Ada'],
         ];
     }
 
-    /**
-     * Step 11 — Kalkulasi penuh HPP + COSS + master training + tunjangan
-     * Estimasi: 500ms–3000ms ⚠️
-     * Hasil disimpan di $additionalData dan dipakai oleh buildStepDataStep11
-     * sehingga calculateQuotation hanya dipanggil SEKALI.
-     */
     private function buildAdditionalDataStep11(Quotation $quotation): array
     {
         $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
