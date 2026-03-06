@@ -41,12 +41,18 @@ class Kebutuhan extends Model
     {
         return $this->hasMany(Position::class, 'layanan_id');
     }
+    // app/Models/Kebutuhan.php
+
+    public function quotations()
+    {
+        return $this->hasMany(Quotation::class, 'kebutuhan_id');
+    }
 
     public function requirements()
     {
         return $this->hasMany(RequirementPosisi::class, 'kebutuhan_id');
     }
-     public function leads()
+    public function leads()
     {
         // Ini adalah relasi custom karena kebutuhan_id disimpan sebagai string comma separated
         return; // Tidak ada relasi langsung
@@ -77,7 +83,7 @@ class Kebutuhan extends Model
         });
 
     }
-     public function getCreatedAtAttribute($value)
+    public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
