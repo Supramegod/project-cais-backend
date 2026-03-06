@@ -938,14 +938,12 @@ class QuotationStepController extends Controller
             'positions' => Position::where('is_active', 1)
                 ->where('layanan_id', $quotation->kebutuhan_id)
                 ->orderBy('name', 'asc')
+                ->select('id', 'name')
                 ->get(),
             'quotation_sites' => $quotation->relationLoaded('quotationSites')
                 ? $quotation->quotationSites->map(fn($site) => [
                     'id' => $site->id,
                     'nama_site' => $site->nama_site,
-                    'provinsi' => $site->provinsi,
-                    'kota' => $site->kota,
-                    'penempatan' => $site->penempatan,
                 ])->toArray()
                 : [],
         ];
@@ -1034,7 +1032,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep6(Quotation $quotation): array
     {
         return [
-            'aplikasi_pendukung' => AplikasiPendukung::select('id', 'nama', 'harga', 'link_icon')->get(),
+            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'harga', 'link_icon')->get(),
         ];
     }
 
