@@ -1266,8 +1266,7 @@ class QuotationStepController extends Controller
                     'jumlah_hc' => isset($hcPerSite[$site->id]) ? (int) $hcPerSite[$site->id] : 0,
                 ];
             })->values()->toArray(),
-
-
+            'jenis_barang_list' => $listJenis,
             'training_list' => Training::select('id', 'nama', 'jenis')->get(), // Hindari all() untuk performa lebih baik
             'bulan_tahun_options' => ['Bulan', 'Tahun'],
             'ada_training_options' => ['Ada', 'Tidak Ada'],
