@@ -425,32 +425,27 @@ class QuotationService
             || ($programBpjs === '' || $programBpjs === null); // Support legacy: empty flag means active if not explicitly turned off
 
         if ($isBpjsProgram) {
-
-            $upahBpjs = $this->calculateUpahBpjs(
-                $detail->nominal_upah,
-                $detail->quotationSite->umk ?? 0,
-                $detail->quotationSite->ump ?? 0
-            );
-            // Konfigurasi BPJS dengan nilai default
             $umk = $detail->quotationSite->umk ?? 0;
+            $ump = $detail->quotationSite->ump ?? 0;
             $nominalUpah = $detail->nominal_upah;
 
-            // Tentukan base untuk BPJS Kesehatan
-            $baseKes = ($nominalUpah > $umk) ? $nominalUpah : $umk;
+            // Base untuk BPJS Ketenagakerjaan: jika upah < UMP gunakan UMP, selain itu gunakan nominal upah
+            $baseKetenagakerjaan = ($nominalUpah < $ump) ? $ump : $nominalUpah;
+
+            // Base untuk BPJS Kesehatan: selalu gunakan UMK
+            $baseKesehatan = $umk;
 
             $bpjsConfig = [
-                'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko)],
-                'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30],
-                'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70],
-                'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00],
-                'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKes]
+                'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
+                'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
+                'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
+                'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
+                'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKesehatan]
             ];
 
             foreach ($bpjsConfig as $key => $config) {
-                // Tentukan persentase dengan logika PRIORITAS YANG DIPERBAIKI
-
                 $persentase = 0;
-                $base = $config['base'] ?? $upahBpjs;
+                $base = $config['base'];
 
                 // **PERBAIKAN KRITIS: JIKA NILAI DARI HPP ADALAH 0, GUNAKAN DEFAULT**
 
@@ -789,7 +784,7 @@ class QuotationService
                 'coss_field' => 'provisi_chemical',
                 'model' => QuotationChemical::class,
                 'special' => 'chemical',
-                'is_general' => false,  // Chemical punya rumus khusus
+                'is_general' => true,  // Chemical punya rumus khusus
                 'site_specific' => true, // Filter berdasarkan site
                 'site_field' => 'quotation_site_id',
                 'detail_id' => null // Chemical tidak terkait langsung dengan detail
@@ -976,9 +971,11 @@ class QuotationService
         $total = 0;
         foreach ($items as $item) {
             if ($special === 'chemical') {
-                // Untuk chemical: total dibagi jumlah HC detail ini
+                // 1. Hitung total biaya bulanan
                 $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
-                $perPerson = $itemTotal / max($jumlahHc, 1);
+
+                $perPerson = $itemTotal / max($divider, 1);
+
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
@@ -1032,7 +1029,7 @@ class QuotationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
-                $perPerson = $itemTotal / max($jumlahHc, 1);
+                $perPerson = $itemTotal / max($divider, 1);
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
