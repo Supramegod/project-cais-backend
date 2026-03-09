@@ -254,6 +254,7 @@ class QuotationDuplicationService
             // Management fee
             'management_fee_id' => $quotationReferensi->management_fee_id,
             'persentase' => $quotationReferensi->persentase,
+            'materai' => $quotationReferensi->materai,
 
             // Allowances
             'thr' => $quotationReferensi->thr,
