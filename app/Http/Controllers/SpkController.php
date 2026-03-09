@@ -42,6 +42,15 @@ use App\Models\Company;
  */
 class SpkController extends Controller
 {
+    
+    protected QuotationService $quotationService;
+
+    public function __construct(
+        QuotationService $quotationService
+    ) {
+
+        $this->quotationService = $quotationService;
+    }
     /**
      * @OA\Get(
      *     path="/api/spk/list",
@@ -613,7 +622,7 @@ class SpkController extends Controller
                 // Calculate quotation using service
                 $calculatedQuotation = null;
                 try {
-                    $quotationService = new QuotationService();
+                    $quotationService = $this->quotationService;
                     $calculatedQuotation = $quotationService->calculateQuotation($quotation);
                 } catch (\Exception $e) {
                     \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());

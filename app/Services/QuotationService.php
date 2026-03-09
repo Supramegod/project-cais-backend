@@ -38,10 +38,12 @@ class QuotationService
 
     public function __construct(
 
-        QuotationNotificationService $quotationNotificationService
+        QuotationNotificationService $quotationNotificationService,
+        QuotationStepService $quotationStepService
     ) {
 
         $this->quotationNotificationService = $quotationNotificationService;
+        $this->quotationStepService = $quotationStepService;
     }
     // ============================ MAIN CALCULATION FLOW ============================
 
@@ -1745,40 +1747,39 @@ class QuotationService
         $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
         $currentDateTime = Carbon::now();
         $tingkat = 1;
-        if ($user->cais_role_id == 96) { // Direktur Sales
+        $updateData = [];
+
+        // --- LOGIKA DIREKTUR SALES (LEVEL 1) ---
+        if ($user->cais_role_id == 96) {
             $updateData = [
                 'ot1' => $user->full_name,
-                'updated_at' => $currentDateTime->toDateTimeString(),
+                'updated_at' => $currentDateTime,
                 'updated_by' => $user->full_name
             ];
 
             if ($isApproved) {
-                $isTopMoreThan7 = ($quotation->top == "Lebih Dari 7 Hari");
+                // Cek kondisi final menggunakan fungsi utama
+                $finalCheck = $this->quotationStepService->calculateFinalStatus($quotation);
 
-                $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
-                    $thr = strtolower(trim($detail->wage->thr ?? ''));
-                    // Jika THR bukan 'diprovisikan', maka dianggap perlu level 2
-                    return $thr !== 'diprovisikan';
-                });
+                // Jika butuh Level 2, status tetap 2 (menunggu Keuangan). Jika tidak, langsung 3 (Aktif).
+                $updateData['status_quotation_id'] = $finalCheck['needs_level_2'] ? 2 : 3;
+                $updateData['is_aktif'] = $finalCheck['needs_level_2'] ? 0 : 1;
 
-                // Quotation butuh level 2 jika TOP > 7 hari ATAU ada THR tidak diprovisikan
-                $needsLevel2 = ($isTopMoreThan7 || $hasNonProvisionalThr);
-
-                $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
-                $updateData['is_aktif'] = $needsLevel2 ? 0 : 1;
+                $needsLevel2 = $finalCheck['needs_level_2']; // Untuk trigger notifikasi nanti
             } else {
                 $updateData['status_quotation_id'] = 8; // Rejected
                 $updateData['is_aktif'] = 0;
+                $needsLevel2 = false;
             }
             $tingkat = 1;
-        } elseif ($user->cais_role_id == 97) {
-            $isNotApprovedBySales = (int) $quotation->status_quotation_id !== 2;
-            $isOt1Empty = empty($quotation->ot1) || strlen(trim($quotation->ot1)) === 0;
 
-            if ($isNotApprovedBySales || $isOt1Empty) {
+            // --- LOGIKA DIREKTUR KEUANGAN (LEVEL 2) ---
+        } elseif ($user->cais_role_id == 97) {
+            // Validasi: Keuangan tidak bisa approve jika Sales belum isi OT1
+            if (empty($quotation->ot1)) {
                 return [
                     'success' => false,
-                    'message' => 'Quotation belum disetujui oleh Direktur Sales (Status: ' . $quotation->status_quotation_id . ')'
+                    'message' => 'Quotation belum disetujui oleh Direktur Sales.'
                 ];
             }
 
@@ -1786,20 +1787,26 @@ class QuotationService
                 'ot2' => $user->full_name,
                 'status_quotation_id' => $isApproved ? 3 : 8,
                 'is_aktif' => $isApproved ? 1 : 0,
-                'updated_at' => $currentDateTime->toDateTimeString(),
+                'updated_at' => $currentDateTime,
                 'updated_by' => $user->full_name
             ];
             $tingkat = 2;
+            $needsLevel2 = false; // Sudah di level terakhir
         } else {
             return ['success' => false, 'message' => 'User tidak memiliki akses approval.'];
         }
 
+        // Eksekusi Update
         $quotation->update($updateData);
 
+        // --- AFTER APPROVAL LOGIC ---
+
+        // 1. Notifikasi ke Direktur Keuangan jika Sales baru approve dan butuh Level 2
         if ($user->cais_role_id == 96 && $isApproved && $needsLevel2) {
             $this->notifyDirKeu($quotation->fresh(), $currentDateTime);
         }
-        // Log approval
+
+        // 2. Log Approval
         LogApproval::create([
             'tabel' => 'quotation',
             'doc_id' => $quotation->id,
@@ -1812,35 +1819,13 @@ class QuotationService
             'created_by' => $user->full_name
         ]);
 
-        // Log notification untuk sales dari leads kebutuhan
-        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
-            ->where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->first();
+        // 3. Notifikasi ke Sales (Pembuat Quotation)
+        $this->sendNotificationToSales($quotation, $user, $isApproved, $data['notes'] ?? null);
 
-        if ($leadsKebutuhan && $leadsKebutuhan->timSalesD) {
-            $quotationNumber = $quotation->nomor;
-            $approverName = $user->full_name;
-            $reason = $data['notes'] ?? null;
-
-            $msg = $isApproved
-                ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
-                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" . ($reason ? " dengan alasan: {$reason}" : "");
-
-            LogNotification::create([
-                'user_id' => $leadsKebutuhan->timSalesD->user_id,
-                'doc_id' => $quotation->id,
-                'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
-                'pesan' => $msg,
-                'is_read' => 0,
-                'created_at' => $currentDateTime,
-                'created_by' => $user->full_name
-            ]);
-        }
-        if ($isApproved && $quotation->tipe_quotation == 'addendum') {
+        // 4. Proses Addendum jika sudah benar-benar Final (Status 3)
+        if ($isApproved && $quotation->fresh()->status_quotation_id == 3 && $quotation->tipe_quotation == 'addendum') {
             $addendumService = app(AddendumService::class);
-            $addendumResult = $addendumService->process($quotation);
+            $addendumService->process($quotation);
         }
 
         return ['success' => true, 'data' => $quotation->fresh()];

@@ -1377,9 +1377,9 @@ class QuotationStepService
         }
     }
 
-    private function calculateFinalStatus(Quotation $quotation): array
+    public function calculateFinalStatus(Quotation $quotation): array
     {
-        // 1. Cek BPJS (Tetap sama)
+        // 1. Cek BPJS
         $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
             $query->where('is_bpjs_jkk', 0)
                 ->orWhere('is_bpjs_jkm', 0)
@@ -1387,15 +1387,14 @@ class QuotationStepService
                 ->orWhere('is_bpjs_jp', 0);
         })->exists();
 
-        // 2. Cek Kompensasi & THR (DIPERBARUI)
+        // 2. Cek Kompensasi & THR (Gunakan strtolower/trim agar lebih aman)
         $hasUnconventionalBenefits = $quotation->quotationDetails()->whereHas('wage', function ($query) {
             $query->where('kompensasi', 'Tidak Ada')
                 ->orWhere('thr', 'Tidak Ada')
-                // RULES BARU: Jika THR bukan 'Diprovisikan', maka butuh Level 2
                 ->orWhere('thr', '!=', 'Diprovisikan');
         })->exists();
 
-        // 3. Cek Upah Custom < 85% UMK (Tetap sama)
+        // 3. Cek Upah Custom < 85% UMK
         $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
@@ -1409,21 +1408,22 @@ class QuotationStepService
             return (float) $wage->nominal_upah < ((float) $umkData->umk * 0.85);
         });
 
-        // 4. Cek Persentase (Dinamis)
+        // 4. Cek Persentase
         $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
         $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
 
-        // 5. Evaluasi Akhir
+        // 5. Evaluasi Apakah Butuh Level 2 (Direktur Keuangan)
         $needsApprovalLevel2 = (
             $hasMissingBpjs ||
-            $hasUnconventionalBenefits || // Menggunakan variabel yang sudah diupdate
+            $hasUnconventionalBenefits ||
             $isUnderMinimumWage ||
             $isLowPercentage ||
             $quotation->company_id == 17 ||
-            $quotation->top == "Lebih Dari 7 Hari" // Tambahan jika TOP juga jadi penentu
+            $quotation->top == "Lebih Dari 7 Hari"
         );
 
         return [
+            'needs_level_2' => $needsApprovalLevel2,
             'is_aktif' => $needsApprovalLevel2 ? 0 : 1,
             'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
         ];
