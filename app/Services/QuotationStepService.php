@@ -49,18 +49,25 @@ use Carbon\Carbon;
 class QuotationStepService
 {
 
-    protected $quotationService;
     protected $quotationBarangService;
     protected $quotationNotificationService;
 
     public function __construct(
-        QuotationService $quotationService,
         QuotationBarangService $quotationBarangService,
         QuotationNotificationService $quotationNotificationService
     ) {
-        $this->quotationService = $quotationService;
+        // QuotationService TIDAK di-inject di constructor
+        // karena QuotationService juga inject QuotationStepService → circular dependency
         $this->quotationBarangService = $quotationBarangService;
         $this->quotationNotificationService = $quotationNotificationService;
+    }
+
+    /**
+     * Lazy resolve QuotationService untuk menghindari circular dependency
+     */
+    private function getQuotationService(): QuotationService
+    {
+        return app(QuotationService::class);
     }
 
     /**
@@ -266,7 +273,7 @@ class QuotationStepService
                 break;
 
             case 11:
-                $data['additional_data']['calculated_quotation'] = $this->quotationService->calculateQuotation($quotation);
+                $data['additional_data']['calculated_quotation'] = $this->getQuotationService()->calculateQuotation($quotation);
 
                 // Ambil data HPP untuk setiap detail untuk memastikan kompensasi ada
                 $data['additional_data']['hpp_details'] = [];
@@ -1366,7 +1373,7 @@ class QuotationStepService
         ]);
 
         // Generate perjanjian kerjasama berdasarkan business logic
-        $arrPerjanjian = $this->quotationService->generateKerjasamaContent($quotation);
+        $arrPerjanjian = $this->getQuotationService()->generateKerjasamaContent($quotation);
 
         foreach ($arrPerjanjian as $perjanjian) {
             QuotationKerjasama::create([
@@ -2138,43 +2145,31 @@ class QuotationStepService
     {
         try {
             $existingHpp = QuotationDetailHpp::where('quotation_detail_id', $detailCalculation->detail_id)->first();
-            $hppData = $detailCalculation->hpp_data;
+            $hppData = $detailCalculation->hpp_data; // data hasil kalkulasi
 
             // ============================
-            // HORMATI HANYA bpjs_persentase_data DARI REQUEST
+            // 1. TERAPKAN NILAI DARI REQUEST (hpp_editable_data)
             // ============================
-            // 1. Hormati HPP data (thr, kompensasi, insentif)
-            if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
-                $userHppData = $request->hpp_data[$detailCalculation->detail_id];
+            $allowedHppFields = [
+                'jumlah_hc',
+                'tunjangan_hari_raya',
+                'kompensasi',
+                'tunjangan_hari_libur_nasional',
+                'lembur',
+                'provisi_seragam',
+                'provisi_peralatan',
+                'provisi_chemical',
+                'provisi_ohc',
+                'bunga_bank',
+                'insentif',
+                'potongan_bpu',
+            ];
 
-                $userEditableFields = ['tunjangan_hari_raya', 'kompensasi', 'jumlah_hc'];
-
-                foreach ($userEditableFields as $field) {
-                    if (array_key_exists($field, $userHppData)) {
-                        $userValue = $userHppData[$field];
-
-                        if ($userValue === null) {
-                            $hppData[$field] = null;
-                        } elseif ($userValue === 0 || $userValue === "0") {
-                            $hppData[$field] = 0;
-                        } else {
-                            if (is_string($userValue) && !is_numeric($userValue)) {
-                                $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
-                            }
-                            $hppData[$field] = (float) $userValue;
-                        }
-                    }
-                }
-            }
             if ($request && $request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailCalculation->detail_id])) {
                 $userHppData = $request->hpp_editable_data[$detailCalculation->detail_id];
-
-                $userEditableFields = ['kompensasi', 'jumlah_hc', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional',];
-
-                foreach ($userEditableFields as $field) {
+                foreach ($allowedHppFields as $field) {
                     if (array_key_exists($field, $userHppData)) {
                         $userValue = $userHppData[$field];
-
                         if ($userValue === null) {
                             $hppData[$field] = null;
                         } elseif ($userValue === 0 || $userValue === "0") {
@@ -2189,10 +2184,34 @@ class QuotationStepService
                 }
             }
 
+            // ============================
+            // 2. (Opsional) Backward compatibility untuk field 'hpp_data'
+            // ============================
+            if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
+                $userHppData = $request->hpp_data[$detailCalculation->detail_id];
+                $legacyFields = ['tunjangan_hari_raya', 'kompensasi', 'jumlah_hc'];
+                foreach ($legacyFields as $field) {
+                    if (array_key_exists($field, $userHppData)) {
+                        $userValue = $userHppData[$field];
+                        if ($userValue === null) {
+                            $hppData[$field] = null;
+                        } elseif ($userValue === 0 || $userValue === "0") {
+                            $hppData[$field] = 0;
+                        } else {
+                            if (is_string($userValue) && !is_numeric($userValue)) {
+                                $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
+                            }
+                            $hppData[$field] = (float) $userValue;
+                        }
+                    }
+                }
+            }
 
+            // ============================
+            // 3. PROSES BPJS PERSENTASE (dari request)
+            // ============================
             if ($request && $request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
                 $userBpjsData = $request->bpjs_persentase_data[$detailCalculation->detail_id];
-
                 $bpjsPercentFields = [
                     'persen_bpjs_jkk' => 'jkk',
                     'persen_bpjs_jkm' => 'jkm',
@@ -2200,7 +2219,6 @@ class QuotationStepService
                     'persen_bpjs_jp' => 'jp',
                     'persen_bpjs_kes' => 'kes'
                 ];
-
                 foreach ($bpjsPercentFields as $hppField => $requestField) {
                     if (isset($userBpjsData[$requestField])) {
                         $userValue = $userBpjsData[$requestField];
@@ -2208,21 +2226,15 @@ class QuotationStepService
                             $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
                         }
                         $hppData[$hppField] = (float) $userValue;
-
-                        \Log::info("Using user input for BPJS persentase", [
-                            'detail_id' => $detailCalculation->detail_id,
-                            'field' => $hppField,
-                            'user_value' => $userValue
-                        ]);
                     }
                 }
             }
+
             // ============================
-            // **PERBAIKAN TAMBAHAN**: PASTIKAN PERSENTASE BPJS DARI DETAIL MASUK KE HPP
+            // 4. COPY PERSENTASE DARI DETAIL (jika belum diisi)
             // ============================
             $detail = QuotationDetail::find($detailCalculation->detail_id);
             if ($detail) {
-                // Copy persentase dari detail ke HPP
                 $persentaseFields = [
                     'persen_bpjs_jkk',
                     'persen_bpjs_jkm',
@@ -2230,21 +2242,15 @@ class QuotationStepService
                     'persen_bpjs_jp',
                     'persen_bpjs_kes'
                 ];
-
                 foreach ($persentaseFields as $field) {
-                    if (property_exists($detail, $field) && $detail->{$field} !== null) {
+                    if (property_exists($detail, $field) && $detail->{$field} !== null && !isset($hppData[$field])) {
                         $hppData[$field] = (float) $detail->{$field};
-                        \Log::info("Copying persentase from detail to HPP", [
-                            'detail_id' => $detailCalculation->detail_id,
-                            'field' => $field,
-                            'value' => $detail->{$field}
-                        ]);
                     }
                 }
             }
 
             // ============================
-            // PERBAIKAN: Konversi field string ke numerik
+            // 5. KONVERSI SEMUA FIELD NUMERIK
             // ============================
             $numericFields = [
                 'kompensasi',
@@ -2283,7 +2289,9 @@ class QuotationStepService
                 }
             }
 
-            // Tambahkan field tambahan
+            // ============================
+            // 6. TAMBAHKAN FIELD SUMMARY
+            // ============================
             $hppData = array_merge($hppData, [
                 'management_fee' => $calculationResult->calculation_summary->nominal_management_fee ?? 0,
                 'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
@@ -2297,37 +2305,10 @@ class QuotationStepService
                 'updated_at' => $currentDateTime
             ]);
 
-            // Jika existing data ada, update. Jika tidak, create baru
+            // ============================
+            // 7. SIMPAN KE DATABASE
+            // ============================
             if ($existingHpp) {
-                // Field BPJS persentase yang harus dipertahankan jika user sudah input
-                $userEditableFields = ['kompensasi', 'jumlah_hc', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional',];
-
-                $bpjsPercentFields = ['persen_bpjs_jkk', 'persen_bpjs_jkm', 'persen_bpjs_jht', 'persen_bpjs_jp', 'persen_bpjs_kes'];
-
-                // Cek apakah ada input BPJS dari user
-                $hasUserInput = false;
-                if ($request) {
-                    if ($request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
-                        $hasUserInput = true;
-                    }
-                    if ($request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
-                        $hasUserInput = true;
-                    }
-                    if ($request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailCalculation->detail_id])) {
-                        $hasUserInput = true;
-                    }
-                }
-
-                // Jika ada input user, gunakan nilai dari user (sudah di-set di atas)
-                // Jika tidak ada input user, pertahankan nilai existing (dari perhitungan)
-                if (!$hasUserInput) {
-                    foreach (array_merge($userEditableFields, $bpjsPercentFields) as $field) {
-                        if ($existingHpp->$field !== null) {
-                            $hppData[$field] = $existingHpp->$field;
-                        }
-                    }
-                }
-
                 $existingHpp->update($hppData);
             } else {
                 $hppData['created_by'] = $user;
@@ -2337,9 +2318,7 @@ class QuotationStepService
 
             \Log::info("Saved HPP data from calculation", [
                 'detail_id' => $detailCalculation->detail_id,
-                'kompensasi' => $hppData['kompensasi'] ?? 0,
-                'tunjangan_hari_raya' => $hppData['tunjangan_hari_raya'] ?? 0,
-                'tunjangan_hari_libur_nasional' => $hppData['tunjangan_hari_libur_nasional'] ?? 0
+                'updated_fields' => array_keys($hppData)
             ]);
 
         } catch (\Exception $e) {
@@ -2353,6 +2332,7 @@ class QuotationStepService
     /**
      * Simpan data COSS dari DetailCalculation DTO
      */
+
     private function saveCossDataFromCalculation(DetailCalculation $detailCalculation, QuotationCalculationResult $calculationResult, $user, $currentDateTime, $request = null): void
     {
         try {
@@ -2360,36 +2340,23 @@ class QuotationStepService
             $cossData = $detailCalculation->coss_data;
 
             // ============================
-            // HORMATI HANYA bpjs_persentase_data DARI REQUEST
+            // TERAPKAN NILAI DARI REQUEST (coss_data) UNTUK SEMUA FIELD YANG DIKIRIM
             // ============================
+            $allowedCossFields = [
+                'provisi_seragam',
+                'provisi_peralatan',
+                'provisi_chemical',
+                'provisi_ohc',
+                'lembur',
+                'tunjangan_hari_raya',
+                'tunjangan_hari_libur_nasional',
+                'kompensasi',
+            ];
 
-            if ($request && $request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
-                $userBpjsData = $request->bpjs_persentase_data[$detailCalculation->detail_id];
-
-                $bpjsPercentFields = [
-                    'persen_bpjs_jkk' => 'jkk',
-                    'persen_bpjs_jkm' => 'jkm',
-                    'persen_bpjs_jht' => 'jht',
-                    'persen_bpjs_jp' => 'jp',
-                    'persen_bpjs_kes' => 'kes'
-                ];
-
-                foreach ($bpjsPercentFields as $cossField => $requestField) {
-                    if (isset($userBpjsData[$requestField])) {
-                        $userValue = $userBpjsData[$requestField];
-                        if (is_string($userValue) && !is_numeric($userValue)) {
-                            $userValue = (float) str_replace(['.', ','], ['', '.'], $userValue);
-                        }
-                        $cossData[$cossField] = (float) $userValue;
-                    }
-                }
-            }
             if ($request && $request->has('coss_data') && isset($request->coss_data[$detailCalculation->detail_id])) {
                 $userCossData = $request->coss_data[$detailCalculation->detail_id];
 
-                $userEditableFields = ['kompensasi', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional', 'lembur',];
-
-                foreach ($userEditableFields as $field) {
+                foreach ($allowedCossFields as $field) {
                     if (array_key_exists($field, $userCossData)) {
                         $userValue = $userCossData[$field];
 
@@ -2408,7 +2375,7 @@ class QuotationStepService
             }
 
             // ============================
-            // PERBAIKAN: Konversi field string ke numerik
+            // KONVERSI FIELD STRING KE NUMERIK (jika masih ada yang tersisa)
             // ============================
             $numericFields = [
                 'kompensasi',
@@ -2443,7 +2410,7 @@ class QuotationStepService
                 }
             }
 
-            // Tambahkan field tambahan dari calculation summary
+            // Tambahkan field summary dari calculation result
             $cossData = array_merge($cossData, [
                 'management_fee' => $calculationResult->calculation_summary->nominal_management_fee_coss ?? 0,
                 'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
@@ -2457,31 +2424,8 @@ class QuotationStepService
                 'updated_at' => $currentDateTime
             ]);
 
-            // Jika existing data ada, update. Jika tidak, create baru
+            // Simpan atau update
             if ($existingCoss) {
-                // Field BPJS persentase yang harus dipertahankan jika user sudah input
-                $bpjsPercentFields = ['persen_bpjs_jkk', 'persen_bpjs_jkm', 'persen_bpjs_jht', 'persen_bpjs_jp', 'persen_bpjs_kes'];
-                $userEditableFields = ['kompensasi', 'tunjangan_hari_raya', 'tunjangan_hari_libur_nasional', 'lembur',];
-
-                // Cek apakah ada input BPJS dari user
-                $hasBpjsUserInput = false;
-                if ($request && $request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailCalculation->detail_id])) {
-                    $hasBpjsUserInput = true;
-                }
-                if ($request && $request->has('coss_data') && isset($request->coss_data[$detailCalculation->detail_id])) {
-                    $hasBpjsUserInput = true;
-                }
-
-                // Jika ada input user, gunakan nilai dari user (sudah di-set di atas)
-                // Jika tidak ada input user, pertahankan nilai existing (dari perhitungan)
-                if (!$hasBpjsUserInput) {
-                    foreach (array_merge($bpjsPercentFields, $userEditableFields) as $field) {
-                        if ($existingCoss->$field !== null) {
-                            $cossData[$field] = $existingCoss->$field;
-                        }
-                    }
-                }
-
                 $existingCoss->update($cossData);
             } else {
                 $cossData['created_by'] = $user;
@@ -2688,18 +2632,18 @@ class QuotationStepService
                 $quotation->persen_bunga_bank = (float) str_replace(['.', ','], ['', '.'], $request->persen_bunga_bank);
             }
 
-            $calculationResult = $this->quotationService->calculateQuotation($quotation);
+            $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
 
-            if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
-                $this->updateAllHppEditableData($quotation, $request, $user, $currentDateTime);
-            }
+            // if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
+            //     $this->updateAllHppEditableData($quotation, $request, $user, $currentDateTime);
+            // }
 
-            if ($request->has('coss_data') && is_array($request->coss_data)) {
-                foreach ($request->coss_data as $detailId => $cossFields) {
-                    $this->updateCossDataFromRequest($detailId, $cossFields, $user, $currentDateTime, $quotation->id);
-                }
-            }
+            // if ($request->has('coss_data') && is_array($request->coss_data)) {
+            //     foreach ($request->coss_data as $detailId => $cossFields) {
+            //         $this->updateCossDataFromRequest($detailId, $cossFields, $user, $currentDateTime, $quotation->id);
+            //     }
+            // }
 
             if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
                 $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
