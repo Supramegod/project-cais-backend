@@ -704,7 +704,7 @@ class QuotationController extends Controller
         }
     }
 
-   
+
 
     /**
      * @OA\Post(
@@ -1298,11 +1298,20 @@ class QuotationController extends Controller
     /** Cek apakah butuh eskalasi ke Direktur Keuangan */
     private function requiresLevel2Approval(Quotation $quotation): bool
     {
-        $hasNonProvisionalThr = $quotation->quotationDetails->contains(
-            fn($detail) => !in_array(strtolower(trim($detail->wage->thr ?? '')), ['diprovisikan', 'tidak ada'])
-        );
+        // 1. Pastikan relasi sudah di-load agar pengecekan THR akurat
+        $quotation->loadMissing('quotationDetails.wage');
 
-        return $quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr;
+
+        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+            $thr = strtolower(trim($detail->wage->thr ?? ''));
+            return !empty($thr) && !in_array($thr, ['diprovisikan', 'tidak ada']);
+        });
+
+        $isLongTop = trim($quotation->top) === 'Lebih Dari 7 Hari';
+
+    
+
+        return $isLongTop || $hasNonProvisionalThr;
     }
 
     /** Proses akhir setelah approve: notif sales + addendum */
@@ -1438,7 +1447,7 @@ class QuotationController extends Controller
             overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
         );
     }
-        public function reset_Approval(Quotation $quotation, User $user)
+    public function reset_Approval(Quotation $quotation, User $user)
     {
         // Cek role - tambahkan role lain yang boleh reset
         $allowedRoles = [2, 96, 97]; // Admin, OT1, OT2

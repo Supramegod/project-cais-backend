@@ -986,9 +986,9 @@ class QuotationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 // 1. Hitung total biaya bulanan
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
+                $itemTotal =(($item->jumlah * $item->harga) / $item->masa_pakai) ;
 
-                $perPerson = $itemTotal / max($divider, 1);
+                $perPerson = ($itemTotal / max($divider, 1))/ $provisi;
 
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
