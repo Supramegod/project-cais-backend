@@ -134,13 +134,30 @@ class QuotationService
         $quotationDetails = QuotationDetail::with(['wage', 'quotationDetailTunjangans'])
             ->where('quotation_id', $quotation->id)->get();
 
+        $detailIds = $quotationDetails->pluck('id')->all();
+
+        // Preload HPP dan COSS sekaligus (1 query masing-masing, bukan N query per detail)
+        // Di-index by quotation_detail_id agar lookup O(1) di dalam loop
+        $quotation->_hpp_map  = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)
+            ->get()->keyBy('quotation_detail_id');
+
+        $quotation->_coss_map = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)
+            ->get()->keyBy('quotation_detail_id');
+
         $quotationSites = QuotationSite::where('quotation_id', $quotation->id)->get();
+
+        // Index sites by ID agar QuotationSite::find() tidak dipanggil per-detail di loop
+        $quotation->_sites_map = $quotationSites->keyBy('id');
 
         // Calculate site details count
         $quotationSites->each(function ($site) use ($quotationDetails) {
             $site->jumlah_detail = $quotationDetails
                 ->where('quotation_site_id', $site->id)->count();
         });
+
+        // Preload daftar tunjangan sekali — dipakai di calculateFirstPass DAN recalculateWithGrossUp
+        $quotation->_daftar_tunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
+            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
 
         // Get management fee
         $managementFee = ManagementFee::find($quotation->management_fee_id);
@@ -155,8 +172,8 @@ class QuotationService
     // ============================ CORE CALCULATION METHODS ============================
     private function calculateFirstPass($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
-            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
+        // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
+        $daftarTunjangan = $quotation->_daftar_tunjangan;
 
         $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
         $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
@@ -168,8 +185,8 @@ class QuotationService
     }
     private function recalculateWithGrossUp($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
-            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
+        // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
+        $daftarTunjangan = $quotation->_daftar_tunjangan;
 
         $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
         $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
@@ -196,9 +213,10 @@ class QuotationService
         try {
             $detailCalculation = new DetailCalculation($detail->id);
 
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
-            $site = QuotationSite::find($detail->quotation_site_id);
+            // Gunakan preloaded map dari loadQuotationData() — tidak ada query per-detail
+            $hpp  = $quotation->_hpp_map->get($detail->id);
+            $coss = $quotation->_coss_map->get($detail->id);
+            $site = $quotation->_sites_map->get($detail->quotation_site_id);
             $wage = $detail->wage;
 
             // Jika wage null, buat object kosong untuk menghindari error
@@ -370,7 +388,8 @@ class QuotationService
         $totalTunjangan = 0;
         $totalTunjanganCoss = 0;
         foreach ($daftarTunjangan as $tunjangan) {
-            $dtTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)
+            // Gunakan relasi yang sudah di-eager load — tidak ada query DB per-tunjangan
+            $dtTunjangan = $detail->quotationDetailTunjangans
                 ->where('nama_tunjangan', $tunjangan->nama)->first();
 
             // ============================================
@@ -1203,9 +1222,9 @@ class QuotationService
             $detail->bunga_bank = $summary->bunga_bank_total;
             $detail->insentif = $summary->insentif_total;
 
-            // Recalculate totals
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+            // Gunakan preloaded map — tidak ada query DB per-detail
+            $hpp  = $quotation->_hpp_map->get($detail->id);
+            $coss = $quotation->_coss_map->get($detail->id);
 
             $totalTunjanganResult = [
                 'total' => $detail->total_tunjangan ?? 0,
