@@ -138,7 +138,7 @@ class QuotationService
 
         // Preload HPP dan COSS sekaligus (1 query masing-masing, bukan N query per detail)
         // Di-index by quotation_detail_id agar lookup O(1) di dalam loop
-        $quotation->_hpp_map  = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)
+        $quotation->_hpp_map = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)
             ->get()->keyBy('quotation_detail_id');
 
         $quotation->_coss_map = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)
@@ -214,7 +214,7 @@ class QuotationService
             $detailCalculation = new DetailCalculation($detail->id);
 
             // Gunakan preloaded map dari loadQuotationData() — tidak ada query per-detail
-            $hpp  = $quotation->_hpp_map->get($detail->id);
+            $hpp = $quotation->_hpp_map->get($detail->id);
             $coss = $quotation->_coss_map->get($detail->id);
             $site = $quotation->_sites_map->get($detail->quotation_site_id);
             $wage = $detail->wage;
@@ -321,8 +321,8 @@ class QuotationService
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_hpp ?? 0,
             'kompensasi' => $detail->kompensasi_hpp ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
-            'lembur' => $detail->lembur ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_hpp ?? 0,
+            'lembur' => $detail->lembur_hpp ?? 0,
             'takaful' => $detail->nominal_takaful ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
             'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
@@ -356,8 +356,8 @@ class QuotationService
             'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_coss ?? 0,
             'kompensasi' => $detail->kompensasi_coss ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
-            'lembur' => $detail->lembur ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_coss ?? 0,
+            'lembur' => $detail->lembur_coss ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
             'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
             'bpjs_jht' => $detail->bpjs_jht ?? 0,
@@ -559,88 +559,81 @@ class QuotationService
     private function calculateExtras($detail, $quotation, $hpp, $coss, $wage): void
     {
         try {
-            // 1. TUNJANGAN HARI RAYA (THR) - Prioritaskan dari HPP (step 11)
+            // TUNJANGAN HARI RAYA (THR)
             $tunjanganHariRayaHpp = $hpp ? (float) ($hpp->tunjangan_hari_raya ?? 0) : 0;
             $tunjanganHariRayaCoss = $coss ? (float) ($coss->tunjangan_hari_raya ?? 0) : 0;
 
-            // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
                 $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
-                    // Hitung THR berdasarkan upah bulanan (1/12 dari gaji)
                     $tunjanganHariRayaHpp = ($detail->nominal_upah ?? 0) / 12;
                     $tunjanganHariRayaCoss = ($detail->nominal_upah ?? 0) / 12;
-
-                } else if ($thrWageValue == 'ditagihkan' || $thrWageValue == 'diberikan langsung' || $thrWageValue == 'tidak ada') {
-                    $tunjanganHariRayaHpp = 0;
-                    $tunjanganHariRayaCoss = 0;
                 }
             }
 
-            // 2. KOMPENSASI - Prioritaskan dari HPP (step 11)
+            // KOMPENSASI
             $kompensasiHpp = $hpp ? (float) ($hpp->kompensasi ?? 0) : 0;
             $kompensasiCoss = $coss ? (float) ($coss->kompensasi ?? 0) : 0;
 
-            // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
                 $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak Ada'));
                 if (in_array($kompensasiWageValue, ['diprovisikan'])) {
-                    // Tentukan nilai kompensasi default (10% dari gaji)
                     $kompensasiDefault = ($detail->nominal_upah ?? 0) / 12;
                     $kompensasiHpp = $kompensasiDefault;
                     $kompensasiCoss = $kompensasiDefault;
-                } else if ($kompensasiWageValue == 'ditagihkan' || $kompensasiWageValue == 'tidak ada') {
-                    $kompensasiHpp = 0;
-                    $kompensasiCoss = 0;
                 }
             }
 
-            // 3. TUNJANGAN HOLIDAY (LIBUR NASIONAL) - UTAMAKAN WAGE (step 4) DAN JANGAN OVERRIDE DENGAN HPP
-            $tunjanganHoliday = 0;
+            // TUNJANGAN HOLIDAY (LIBUR NASIONAL)
+            $tunjanganHolidayHpp = $hpp ? (float) ($hpp->tunjangan_hari_libur_nasional ?? 0) : 0;
+            $tunjanganHolidayCoss = $coss ? (float) ($coss->tunjangan_hari_libur_nasional ?? 0) : 0;
 
-            // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
-            if ($wage && isset($wage->tunjangan_holiday)) {
+            if ($tunjanganHolidayHpp == 0 && $wage && isset($wage->tunjangan_holiday)) {
                 $tunjanganHolidayValue = strtolower(trim($wage->tunjangan_holiday ?? 'Tidak Ada'));
-
                 if (str_contains($tunjanganHolidayValue, 'flat')) {
-                    $tunjanganHoliday = $this->calculateTunjanganHolidayFromWage($wage);
-                } else if ($tunjanganHolidayValue == 'normatif' || $tunjanganHolidayValue == 'tidak ada') {
-                    $tunjanganHoliday = 0;
+                    $calculated = $this->calculateTunjanganHolidayFromWage($wage);
+                    $tunjanganHolidayHpp = $calculated;
+                    $tunjanganHolidayCoss = $calculated;
                 }
-            } else {
-                // Fallback ke HPP hanya jika tidak ada data wage sama sekali
-                $tunjanganHoliday = $hpp ? (float) ($hpp->tunjangan_hari_libur_nasional ?? 0) : 0;
             }
 
-            // 4. LEMBUR - UTAMAKAN WAGE (step 4) DAN JANGAN OVERRIDE DENGAN HPP
-            $lembur = 0;
+            // LEMBUR
+            $lemburHpp = $hpp ? (float) ($hpp->lembur ?? 0) : 0;
+            $lemburCoss = $coss ? (float) ($coss->lembur ?? 0) : 0;
 
-            // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
-            if ($wage && isset($wage->lembur)) {
+            if ($lemburHpp == 0 && $wage && isset($wage->lembur)) {
                 $lemburValue = strtolower(trim($wage->lembur ?? 'Tidak Ada'));
                 $lemburditagihkanValue = strtolower(trim($wage->lembur_ditagihkan ?? null));
-
                 if (str_contains($lemburValue, 'flat')) {
-                    $lembur = $this->calculateLemburFromWage($wage);
-                } else if ($lemburditagihkanValue == 'ditagihkan terpisah' || $lemburValue == 'tidak ada') {
-                    $lembur = 0;
+                    $calculated = $this->calculateLemburFromWage($wage);
+                    $lemburHpp = $calculated;
+                    $lemburCoss = $calculated;
                 }
-            } else {
-                // Fallback ke HPP hanya jika tidak ada data wage sama sekali
-                $lembur = $hpp ? (float) ($hpp->lembur ?? 0) : 0;
             }
 
-            // 5. INSENTIF - Ambil dari HPP (step 11)
+            // INSENTIF
             $insentifHpp = $hpp ? (float) ($hpp->insentif ?? 0) : 0;
+            $insentifCoss = $coss ? (float) ($coss->insentif ?? 0) : 0;
 
-            // Assign nilai ke detail object
+            // Assign ke detail dengan prefix HPP/COSS
             $detail->tunjangan_hari_raya_hpp = round($tunjanganHariRayaHpp, 2);
             $detail->tunjangan_hari_raya_coss = round($tunjanganHariRayaCoss, 2);
             $detail->kompensasi_hpp = round($kompensasiHpp, 2);
             $detail->kompensasi_coss = round($kompensasiCoss, 2);
-            $detail->tunjangan_holiday = round($tunjanganHoliday, 2);
-            $detail->lembur = round($lembur, 2);
+            $detail->tunjangan_holiday_hpp = round($tunjanganHolidayHpp, 2);
+            $detail->tunjangan_holiday_coss = round($tunjanganHolidayCoss, 2);
+            $detail->lembur_hpp = round($lemburHpp, 2);
+            $detail->lembur_coss = round($lemburCoss, 2);
             $detail->insentif_hpp = round($insentifHpp, 2);
+            $detail->insentif_coss = round($insentifCoss, 2);
+
+            // Untuk backward compatibility
+            $detail->tunjangan_hari_raya = $tunjanganHariRayaHpp;
+            $detail->kompensasi = $kompensasiHpp;
+            $detail->tunjangan_holiday = $tunjanganHolidayHpp;
+            $detail->lembur = $lemburHpp;
+            $detail->insentif = $insentifHpp;
+
         } catch (\Exception $e) {
             \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
             throw $e;
@@ -1097,9 +1090,12 @@ class QuotationService
             $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
             $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
             $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
-            $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
             $nominalUpah = (float) ($detail->nominal_upah ?? 0);
-            $lembur = (float) ($detail->lembur ?? 0);
+            ;
+            $tunjanganHoliday = (float) ($detail->tunjangan_holiday_hpp ?? 0);
+            $lembur = (float) ($detail->lembur_hpp ?? 0);
+            $tunjanganHolidayCoss = (float) ($detail->tunjangan_holiday_coss ?? 0);
+            $lemburCoss = (float) ($detail->lembur_coss ?? 0);
 
             // BPJS - karena persentase sudah di-set di Step 11
             $bpjsJkk = (float) ($detail->bpjs_jkk ?? 0);
@@ -1167,8 +1163,8 @@ class QuotationService
             $detail->total_exclude_base_manpower = round(
                 $tunjanganHariRayaCoss
                 + $kompensasiCoss
-                + $tunjanganHoliday
-                + $lembur
+                + $tunjanganHolidayCoss
+                + $lemburCoss
                 + $biayaKesehatanCoss
                 + $bpjsKetenagakerjaanCoss
                 + $personilKaporlapCoss
@@ -1223,7 +1219,7 @@ class QuotationService
             $detail->insentif = $summary->insentif_total;
 
             // Gunakan preloaded map — tidak ada query DB per-detail
-            $hpp  = $quotation->_hpp_map->get($detail->id);
+            $hpp = $quotation->_hpp_map->get($detail->id);
             $coss = $quotation->_coss_map->get($detail->id);
 
             $totalTunjanganResult = [

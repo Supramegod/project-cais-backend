@@ -2635,15 +2635,17 @@ class QuotationStepService
             $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
 
-            // if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
-            //     $this->updateAllHppEditableData($quotation, $request, $user, $currentDateTime);
-            // }
 
-            // if ($request->has('coss_data') && is_array($request->coss_data)) {
-            //     foreach ($request->coss_data as $detailId => $cossFields) {
-            //         $this->updateCossDataFromRequest($detailId, $cossFields, $user, $currentDateTime, $quotation->id);
-            //     }
-            // }
+            if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
+                foreach ($request->hpp_editable_data as $detailId => $data) {
+                    $this->updateHppDataFromRequest($detailId, $data, $user, $currentDateTime, $quotation->id);
+                }
+            }
+            if ($request->has('coss_data') && is_array($request->coss_data)) {
+                foreach ($request->coss_data as $detailId => $data) {
+                    $this->updateCossDataFromRequest($detailId, $data, $user, $currentDateTime, $quotation->id);
+                }
+            }
 
             if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
                 $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
@@ -3680,6 +3682,66 @@ class QuotationStepService
                 'detail_id' => $detailId,
                 'nominal' => $nominalBpjsKs
             ]);
+        }
+    }
+    private function updateHppDataFromRequest($detailId, array $hppFields, string $user, Carbon $currentDateTime, $quotationId): void
+    {
+        $detail = QuotationDetail::where('id', $detailId)
+            ->where('quotation_id', $quotationId)
+            ->first();
+
+        if (!$detail) {
+            \Log::warning("Detail not found for HPP update", ['detail_id' => $detailId]);
+            return;
+        }
+
+        $hpp = QuotationDetailHpp::where('quotation_detail_id', $detailId)->first();
+        if (!$hpp) {
+            $hpp = QuotationDetailHpp::create([
+                'quotation_detail_id' => $detailId,
+                'quotation_id' => $quotationId,
+                'leads_id' => $detail->quotation->leads_id,
+                'position_id' => $detail->position_id,
+                'jumlah_hc' => $detail->jumlah_hc,
+                'created_by' => $user,
+                'created_at' => $currentDateTime,
+            ]);
+        }
+
+        $allowedHppFields = [
+            'jumlah_hc',
+            'tunjangan_hari_raya',
+            'kompensasi',
+            'tunjangan_hari_libur_nasional',
+            'lembur',
+            'provisi_seragam',
+            'provisi_peralatan',
+            'provisi_chemical',
+            'provisi_ohc',
+            'bunga_bank',
+            'insentif',
+            'potongan_bpu',
+        ];
+
+        $updateData = [];
+        foreach ($allowedHppFields as $field) {
+            if (isset($hppFields[$field])) {
+                $value = $hppFields[$field];
+                if ($value === null || trim($value) === '') {
+                    $updateData[$field] = null;
+                } elseif (is_string($value) && !is_numeric($value)) {
+                    $updateData[$field] = (float) str_replace(['.', ','], ['', '.'], $value);
+                } else {
+                    $updateData[$field] = (float) $value;
+                }
+            }
+        }
+
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+            $hpp->update($updateData);
+            \Log::info("Updated HPP data from request", ['detail_id' => $detailId, 'fields' => array_keys($updateData)]);
         }
     }
 }
