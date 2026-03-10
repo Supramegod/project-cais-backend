@@ -1384,7 +1384,7 @@ class QuotationStepService
         }
     }
 
-    public function calculateFinalStatus(Quotation $quotation): array
+     public function calculateFinalStatus(Quotation $quotation): array
     {
         // 1. Cek BPJS
         $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
@@ -1420,7 +1420,7 @@ class QuotationStepService
         $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
 
         // 5. Evaluasi Apakah Butuh Level 2 (Direktur Keuangan)
-        $needsApprovalLevel2 = (
+        $needsApproval = (
             $hasMissingBpjs ||
             $hasUnconventionalBenefits ||
             $isUnderMinimumWage ||
@@ -1429,10 +1429,10 @@ class QuotationStepService
             $quotation->top == "Lebih Dari 7 Hari"
         );
 
+        // 'needs_level_2' tidak disertakan karena kolom ini tidak ada di tabel sl_quotation
         return [
-            'needs_level_2' => $needsApprovalLevel2,
-            'is_aktif' => $needsApprovalLevel2 ? 0 : 1,
-            'status_quotation_id' => $needsApprovalLevel2 ? 2 : 3
+            'is_aktif' => $needsApproval ? 0 : 1,
+            'status_quotation_id' => $needsApproval ? 2 : 3
         ];
     }
     // 1. Di updateStep12
