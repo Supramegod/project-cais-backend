@@ -1075,6 +1075,108 @@ class QuotationStepService
     // ============================
     // HELPER METHODS
     // ============================
+      /**
+     * Generate konten perjanjian kerjasama
+     */
+    public function generateKerjasamaContent(Quotation $quotation)
+    {
+        $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
+
+        // Get salary rule data
+        $salaryRuleQ = SalaryRule::select('cutoff', 'pengiriman_invoice', 'rilis_payroll')
+            ->whereNull('deleted_at')
+            ->where('id', $quotation->salary_rule_id)
+            ->first();
+
+        // Build salary schedule table
+        $tableSalary = '<table class="table table-bordered" style="width:100%">
+                  <thead>
+                    <tr>
+                      <th class="text-center"><b>No.</b></th>
+                      <th class="text-center"><b>Schedule Plan</b></th>
+                      <th class="text-center"><b>Periode</b></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="text-center">1</td>
+                      <td>Cut Off</td>
+                      <td>' . $salaryRuleQ->cutoff . '</td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">2</td>
+                      <td>Pengiriman <i>Invoice</i></td>
+                      <td>' . ($quotation->pengiriman_invoice ?: $salaryRuleQ->pengiriman_invoice) . '</td>
+                    </tr>
+                    <tr>
+                      <td class="text-center">3</td>
+                      <td>Rilis <i>Payroll</i> / Gaji</td>
+                      <td>' . $salaryRuleQ->rilis_payroll . '</td>
+                    </tr>
+                  </tbody>
+                </table>';
+
+        // Build kunjungan operasional text
+        $kunjunganOperasional = "";
+        if ($quotation->kunjungan_operasional != null) {
+            $kunjunganParts = explode(" ", $quotation->kunjungan_operasional);
+            if (count($kunjunganParts) >= 2) {
+                $kunjunganOperasional = $kunjunganParts[0] . " kali dalam 1 " . $kunjunganParts[1];
+            }
+        }
+
+        // Get aplikasi pendukung
+        $appPendukung = QuotationAplikasi::select('aplikasi_pendukung')
+            ->whereNull('deleted_at')
+            ->where('quotation_id', $quotation->id)
+            ->get();
+
+        $sAppPendukung = "<b>";
+        foreach ($appPendukung as $kduk => $dukung) {
+            if ($kduk != 0) {
+                $sAppPendukung .= ", ";
+            }
+            $sAppPendukung .= $dukung->aplikasi_pendukung;
+        }
+        $sAppPendukung .= "</b>";
+
+        // Build perjanjian array
+        $perjanjian = [];
+
+        $perjanjian[] = "Penawaran harga ini berlaku 30 hari sejak tanggal diterbitkan.";
+
+        $perjanjian[] = "Akan dilakukan <i>survey</i> area untuk kebutuhan " . $kebutuhanPerjanjian . " sebagai tahapan <i>assesment</i> area untuk memastikan efektifitas pekerjaan.";
+
+        $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
+
+
+        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian dengan skema sebagai berikut: <br>" . $tableSalary;
+
+        $catatanKaki = "<i><br>*Rilis gaji adalah talangan.";
+
+        // Jika bukan Non TOP, tampilkan detail maksimal pembayaran
+        if ($quotation->top !== 'Non TOP') {
+            $topValue = ($quotation->top === 'Lebih Dari 7 Hari')
+                ? $quotation->jumlah_hari_invoice
+                : $quotation->top;
+
+            $catatanKaki .= "<br>*Maksimal pembayaran invoice " . $topValue . " hari " . $quotation->tipe_hari_invoice . " setelah invoice";
+        }
+
+        $catatanKaki .= "</i>";
+        $perjanjian[] = $perjanjianContent . $catatanKaki;
+
+        $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
+
+        $perjanjian[] = "Tim operasional bersifat <i>on call</i> apabila terjadi <i>case</i> atau insiden yang terjadi yang mengharuskan untuk datang ke lokasi kerja Pihak Pertama.";
+
+        $perjanjian[] = "Pemenuhan kandidat dilakukan dengan 2 tahap <i>screening</i> :<br>a. Tahap ke -1 : dilakukan oleh tim rekrutmen <b>Pihak Kedua</b> untuk memastikan bahwa kandidat sudah sesuai dengan kualifikasi <b>dari Pihak Pertama</b>.<br>b. Tahap ke -2 : dilakukan oleh user <b>Pihak Pertama</b>, dan dijadwalkan setelah adanya <i>report</i> hasil <i>screening</i> dari <b>Pihak Kedua</b>.";
+
+        $perjanjian[] = "<i>Support</i> aplikasi digital :" . $sAppPendukung . ".";
+
+        return $perjanjian;
+    }
+
 
     private function validateStep2(Request $request): void
     {
@@ -1373,7 +1475,7 @@ class QuotationStepService
         ]);
 
         // Generate perjanjian kerjasama berdasarkan business logic
-        $arrPerjanjian = $this->getQuotationService()->generateKerjasamaContent($quotation);
+        $arrPerjanjian = $this->generateKerjasamaContent($quotation);
 
         foreach ($arrPerjanjian as $perjanjian) {
             QuotationKerjasama::create([
