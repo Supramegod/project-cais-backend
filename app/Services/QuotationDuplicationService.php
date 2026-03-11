@@ -255,6 +255,7 @@ class QuotationDuplicationService
             'management_fee_id' => $quotationReferensi->management_fee_id,
             'persentase' => $quotationReferensi->persentase,
 
+
             // Allowances
             'thr' => $quotationReferensi->thr,
             'kompensasi' => $quotationReferensi->kompensasi,
@@ -313,6 +314,7 @@ class QuotationDuplicationService
             'revisi' => 0,
             'alasan_revisi' => null,
             'step' => 1,
+            'materai' => in_array($newQuotation->tipe_quotation, ['addendum', 'rekontrak']) ? $quotationReferensi->materai : $newQuotation->materai,
         ]);
     }
 

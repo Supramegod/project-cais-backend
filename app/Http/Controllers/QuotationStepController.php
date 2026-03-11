@@ -233,7 +233,7 @@ class QuotationStepController extends Controller
         try {
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
-            // Delegasi sepenuhnya ke service — logika update tidak diubah
+
             $this->quotationStepService->$updateMethod($quotation, $request);
 
             if ($quotation->step < 12) {
@@ -277,22 +277,8 @@ class QuotationStepController extends Controller
         return self::STEP_RELATIONS[$step] ?? [];
     }
 
-    // =========================================================================
-    // PRIVATE — STEP DATA PREPARER
-    //
-    // Menggantikan QuotationStepService::prepareStepData().
-    // Format output identik — QuotationStepResource tidak perlu diubah strukturnya,
-    // hanya perlu tambah shortcut di getStepSpecificData() (lihat komentar di atas).
-    //
-    // Urutan eksekusi:
-    //   1. buildAdditionalDataStep{N} — siapkan master data / lookup
-    //   2. buildStepDataStep{N}       — siapkan data utama step (bisa pakai additional_data)
-    // =========================================================================
-
     private function prepareStepData(Quotation $quotation, int $step): array
     {
-        // additional_data dibangun lebih dulu karena step_data step 11 & 12
-        // membutuhkan calculated_quotation dari sana (menghindari double compute)
         $additionalDataMethod = 'buildAdditionalDataStep' . $step;
         $additionalData = method_exists($this, $additionalDataMethod)
             ? $this->$additionalDataMethod($quotation)
@@ -306,8 +292,8 @@ class QuotationStepController extends Controller
         return [
             'quotation' => $quotation,
             'step' => $step,
-            'step_data' => $stepData,       // dibaca via $this['step_data'] di Resource
-            'additional_data' => $additionalData, // dibaca via $this['additional_data'] di Resource
+            'step_data' => $stepData,       
+            'additional_data' => $additionalData,
             'metadata' => [
                 'actual_step' => $quotation->step,
                 'is_final' => $quotation->step >= 100,
@@ -315,21 +301,6 @@ class QuotationStepController extends Controller
             ],
         ];
     }
-
-    // =========================================================================
-    // PRIVATE — STEP DATA BUILDERS  (buildStepDataStep{N})
-    //
-    // Tanggung jawab : membangun isi `step_data` yang dikembalikan Resource.
-    //                  Memindahkan logika dari Resource::getStepSpecificData().
-    // Signature      : (Quotation $quotation, array $additionalData): array
-    //                  $additionalData tersedia untuk step yang membutuhkan
-    //                  data kalkulasi dari buildAdditionalDataStep{N}.
-    // =========================================================================
-
-    /**
-     * Step 1 — Jenis Kontrak
-     * Estimasi: < 20ms
-     */
     private function buildStepDataStep1(Quotation $quotation, array $additionalData): array
     {
         return [
@@ -339,10 +310,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 2 — Detail Kontrak
-     * Estimasi: < 20ms (semua dari kolom quotation)
-     */
     private function buildStepDataStep2(Quotation $quotation, array $additionalData): array
     {
         return [
@@ -374,45 +341,13 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 3 — Detail Posisi per Site (requirements + tunjangan)
-     * Estimasi: 30–80ms
-     */
     private function buildStepDataStep3(Quotation $quotation, array $additionalData): array
     {
         $quotationDetails = [];
 
         if ($quotation->relationLoaded('quotationDetails')) {
             $quotationDetails = $quotation->quotationDetails->map(function ($detail) {
-                // Requirements
-                // $requirements = [];
-                // if ($detail->relationLoaded('quotationDetailRequirements')) {
-                //     $requirements = $detail->quotationDetailRequirements->pluck('requirement')->toArray();
-                // } else {
-                //     try {
-                //         $requirements = $detail->quotationDetailRequirements()->pluck('requirement')->toArray();
-                //     } catch (\Exception $e) {
-                //         $requirements = [];
-                //     }
-                // }
 
-                // // Tunjangan
-                // $tunjangans = [];
-                // if ($detail->relationLoaded('quotationDetailTunjangans')) {
-                //     $tunjangans = $detail->quotationDetailTunjangans->map(fn($t) => [
-                //         'nama_tunjangan' => $t->nama_tunjangan,
-                //         'nominal' => $t->nominal,
-                //     ])->toArray();
-                // } else {
-                //     try {
-                //         $tunjangans = $detail->quotationDetailTunjangans()->get()->map(fn($t) => [
-                //             'nama_tunjangan' => $t->nama_tunjangan,
-                //             'nominal' => $t->nominal,
-                //         ])->toArray();
-                //     } catch (\Exception $e) {
-                //         $tunjangans = [];
-                //     }
-                // }
 
                 return [
                     'id' => $detail->id,
@@ -422,8 +357,6 @@ class QuotationStepController extends Controller
                     'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nominal_upah' => $detail->nominal_upah,
-                    // 'requirements' => $requirements,
-                    // 'tunjangans' => $tunjangans,
                 ];
             })->toArray();
         }
@@ -433,10 +366,7 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 4 — Data Upah per Posisi (wage + keterangan UMK)
-     * Estimasi: 50–150ms (query UMK per detail)
-     */
+
     private function buildStepDataStep4(Quotation $quotation, array $additionalData): array
     {
         $positionData = [];
@@ -500,10 +430,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 5 — BPJS per Posisi + Data Perusahaan
-     * Estimasi: 20–50ms (semua dari relasi yang sudah dimuat)
-     */
     private function buildStepDataStep5(Quotation $quotation, array $additionalData): array
     {
         $bpjsPerPosition = [];
@@ -535,10 +461,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 6 — Aplikasi Pendukung (yang sudah dipilih)
-     * Estimasi: < 20ms
-     */
     private function buildStepDataStep6(Quotation $quotation, array $additionalData): array
     {
         return [
@@ -548,10 +470,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 7 — Kaporlap (data aktual quotation)
-     * Estimasi: 50–120ms
-     */
     private function buildStepDataStep7(Quotation $quotation, array $additionalData): array
     {
         $kaporlapData = $this->quotationBarangService->prepareBarangData($quotation, 'kaporlap');
@@ -562,10 +480,7 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 8 — Devices (data aktual quotation)
-     * Estimasi: 50–120ms
-     */
+
     private function buildStepDataStep8(Quotation $quotation, array $additionalData): array
     {
         $devicesData = $this->quotationBarangService->prepareBarangData($quotation, 'devices');
@@ -576,10 +491,7 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 9 — Chemicals (data aktual quotation)
-     * Estimasi: 30–80ms
-     */
+
     private function buildStepDataStep9(Quotation $quotation, array $additionalData): array
     {
         $chemicalData = $this->quotationBarangService->prepareBarangData($quotation, 'chemicals');
@@ -590,16 +502,10 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 10 — OHC, Training, Kunjungan
-     * Estimasi: 30–80ms
-     */
     private function buildStepDataStep10(Quotation $quotation, array $additionalData): array
     {
-        // Parse kunjungan_operasional: "jumlah periode"
         [$jumlahOps, $periodeOps] = $this->parseKunjungan($quotation->kunjungan_operasional ?? '');
 
-        // Parse kunjungan_tim_crm: "jumlah periode"
         [$jumlahCrm, $periodeCrm] = $this->parseKunjungan($quotation->kunjungan_tim_crm ?? '');
 
         $quotationTrainings = $quotation->relationLoaded('quotationTrainings')
@@ -623,14 +529,6 @@ class QuotationStepController extends Controller
             'quotation_trainings' => $quotationTrainings,
         ];
     }
-
-    /**
-     * Step 11 — Review & Kalkulasi Akhir (HPP + COSS)
-     * Estimasi: 500ms–3000ms ⚠️ Step terberat
-     *
-     * $additionalData['calculated_quotation'] sudah disiapkan oleh
-     * buildAdditionalDataStep11 — tidak ada double compute di sini.
-     */
     private function buildStepDataStep11(Quotation $quotation, array $additionalData): array
     {
         try {
@@ -649,7 +547,6 @@ class QuotationStepController extends Controller
             $calculatedQuotation = null;
         }
 
-        // Hitung persentase BPJS dari calculation_summary
         $persenBpjsTotalHpp = 0;
         $persenBpjsTotalCoss = 0;
         $persenBpjsBreakdownHpp = [];
@@ -674,8 +571,6 @@ class QuotationStepController extends Controller
                 'persen_bpjs_jp' => round($summary->persen_bpjs_jp_coss ?? 0, 2),
             ];
         }
-
-        // Pastikan relasi detail termuat untuk kalkulasi
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             $calculatedQuotation->quotation->quotationDetails->loadMissing([
                 'quotationDetailHpps',
@@ -847,13 +742,6 @@ class QuotationStepController extends Controller
             ] : null,
         ];
     }
-
-    /**
-     * Step 12 — Finalisasi & Kerjasama
-     * Estimasi: 100–500ms
-     *
-     * $additionalData['calculated_quotation'] dari buildAdditionalDataStep12.
-     */
     private function buildStepDataStep12(Quotation $quotation, array $additionalData): array
     {
         $calculatedQuotation = $additionalData['calculated_quotation'] ?? null;
@@ -897,23 +785,13 @@ class QuotationStepController extends Controller
         return $finalData;
     }
 
-    // =========================================================================
-    // PRIVATE — ADDITIONAL DATA BUILDERS  (buildAdditionalDataStep{N})
-    //
-    // Tanggung jawab : menyiapkan master data, lookup, dan opsi dropdown.
-    //                  Memindahkan logika dari Resource::getAdditionalData().
-    // =========================================================================
 
-    /** Step 1 — tidak ada additional_data */
     private function buildAdditionalDataStep1(Quotation $quotation): array
     {
         return [];
     }
 
-    /**
-     * Step 2 — Salary rules (filter role), TOP list, pengiriman invoice
-     * Estimasi: 20–50ms
-     */
+
     private function buildAdditionalDataStep2(Quotation $quotation): array
     {
         $roleId = Auth::user()->cais_role_id;
@@ -928,10 +806,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 3 — Daftar posisi aktif + quotation sites
-     * Estimasi: 30–80ms
-     */
     private function buildAdditionalDataStep3(Quotation $quotation): array
     {
         return [
@@ -949,10 +823,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 4 — UMK/UMP per site, management fees, opsi dropdown
-     * Estimasi: 80–200ms (query UMK + UMP per site)
-     */
     private function buildAdditionalDataStep4(Quotation $quotation): array
     {
         $umkPerSite = [];
@@ -982,28 +852,20 @@ class QuotationStepController extends Controller
                 ];
             }
         }
-                // Hitung jumlah HC per site
-        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
-                    $query->whereNull('deleted_at'); 
+                    $query->whereNull('deleted_at');
                 }
             ]);
         }
 
-        // 2. Ambil data HC per site
-        $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
-            ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
-            ->groupBy('quotation_site_id')
-            ->pluck('total_hc', 'quotation_site_id')
-            ->toArray();
 
         return [
             'management_fees' => ManagementFee::select('id', 'nama')->get(),
             'umk_per_site' => $umkPerSite,
             'ump_per_site' => $umpPerSite,
-          'quotation_sites' => $quotation->relationLoaded('quotationSites')
+            'quotation_sites' => $quotation->relationLoaded('quotationSites')
                 ? $quotation->quotationSites->map(fn($site) => [
                     'id' => $site->id,
                     'nama_site' => $site->nama_site,
@@ -1012,10 +874,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 5 — Master jenis & bidang perusahaan, opsi BPJS
-     * Estimasi: 20–50ms
-     */
     private function buildAdditionalDataStep5(Quotation $quotation): array
     {
         return [
@@ -1025,10 +883,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 6 — Master semua aplikasi pendukung
-     * Estimasi: < 20ms
-     */
     private function buildAdditionalDataStep6(Quotation $quotation): array
     {
         return [
@@ -1036,16 +890,9 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 7 — Master kaporlap: jenis_barang, kaporlap_items, quotation_details
-     * Mereplikasi Resource::getKaporlapData() persis.
-     * N+1 diperbaiki: BarangDefaultQty & QuotationKaporlap di-preload dengan whereIn.
-     * Estimasi: 30–80ms
-     */
     private function buildAdditionalDataStep7(Quotation $quotation): array
     {
         $arrKaporlap = $quotation->kebutuhan_id != 1 ? [5] : [1, 2, 3, 4, 5];
-        // Menggunakan select() untuk mengambil kolom tertentu
         $listJenis = JenisBarang::whereIn('id', $arrKaporlap)
             ->select('id', 'nama')
             ->get();
@@ -1060,7 +907,6 @@ class QuotationStepController extends Controller
             : [];
 
         if ($quotation->revisi == 0) {
-            // Preload semua qty default dalam 1 query
             $defaultQtyMap = BarangDefaultQty::where('layanan_id', $quotation->kebutuhan_id)
                 ->whereIn('barang_id', $barangIds)
                 ->get()
@@ -1075,7 +921,6 @@ class QuotationStepController extends Controller
                 }
             }
         } else {
-            // Preload semua existing kaporlap dalam 1 query
             $existingMap = QuotationKaporlap::whereIn('barang_id', $barangIds)
                 ->whereIn('quotation_detail_id', $detailIds)
                 ->get()
@@ -1124,7 +969,6 @@ class QuotationStepController extends Controller
         $barangIds = $listDevices->pluck('id')->toArray();
 
         if ($quotation->revisi == 0) {
-            // Preload semua qty default dalam 1 query
             $defaultQtyMap = BarangDefaultQty::where('layanan_id', $quotation->kebutuhan_id)
                 ->whereIn('barang_id', $barangIds)
                 ->get()
@@ -1136,7 +980,6 @@ class QuotationStepController extends Controller
                     : 0;
             }
         } else {
-            // Preload semua existing devices dalam 1 query
             $existingMap = QuotationDevices::where('quotation_id', $quotation->id)
                 ->whereIn('barang_id', $barangIds)
                 ->get()
@@ -1148,8 +991,7 @@ class QuotationStepController extends Controller
                     : 0;
             }
         }
-        // Hitung jumlah HC per site
-        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
+
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
@@ -1158,7 +1000,6 @@ class QuotationStepController extends Controller
             ]);
         }
 
-        // 2. Ambil data HC per site
         $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
             ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
             ->groupBy('quotation_site_id')
@@ -1171,25 +1012,20 @@ class QuotationStepController extends Controller
             'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
                 return [
                     'id' => $site->id,
-                    'nama_site' => $site->nama_site, // Diambil dari fillable sl_quotation_site
+                    'nama_site' => $site->nama_site,
                     'jumlah_hc' => isset($hcPerSite[$site->id]) ? (int) $hcPerSite[$site->id] : 0,
                 ];
             })->values()->toArray(),
         ];
     }
 
-    /**
-     * Step 9 — Master chemicals dengan nilai default form
-     * Estimasi: 30–80ms
-     */
     private function buildAdditionalDataStep9(Quotation $quotation): array
     {
         $chemicalList = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->select('id', 'nama', 'harga') // Hanya ambil kolom yang diproses
+            ->select('id', 'nama', 'harga')
             ->ordered()
             ->get()
             ->map(function ($chemical) {
-                // Tambahkan properti tambahan untuk frontend
                 $chemical->harga_formatted = number_format($chemical->harga, 0, ',', '.');
                 $chemical->jumlah = 0;
                 $chemical->masa_pakai = $chemical->masa_pakai ?? 12;
@@ -1198,8 +1034,7 @@ class QuotationStepController extends Controller
 
                 return $chemical;
             });
-        // Hitung jumlah HC per site
-        // 1. Pastikan relasi loaded, jika tidak, muat secara manual
+
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
@@ -1208,7 +1043,6 @@ class QuotationStepController extends Controller
             ]);
         }
 
-        // 2. Ambil data HC per site
         $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
             ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
             ->groupBy('quotation_site_id')
@@ -1227,14 +1061,12 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 10 — Master OHC, training, opsi statis
-     * Estimasi: 30–80ms
-     */
     private function buildAdditionalDataStep10(Quotation $quotation): array
-    {   $listJenis = JenisBarang::whereIn('id', [6, 7, 8])
+    {
+        $listJenis = JenisBarang::whereIn('id', [6, 7, 8])
             ->select('id', 'nama')
             ->get();
+
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
@@ -1243,15 +1075,15 @@ class QuotationStepController extends Controller
             ]);
         }
 
-        // 2. Ambil data HC per site
         $hcPerSite = QuotationDetail::where('quotation_id', $quotation->id)
             ->selectRaw('quotation_site_id, SUM(jumlah_hc) as total_hc')
             ->groupBy('quotation_site_id')
             ->pluck('total_hc', 'quotation_site_id')
             ->toArray();
+
         return [
             'ohc_list' => Barang::whereIn('jenis_barang_id', [6, 7, 8])
-                ->select('id', 'nama', 'harga', 'jenis_barang_id', 'urutan') // Pilih kolom yang diperlukan saja
+                ->select('id', 'nama', 'harga', 'jenis_barang_id', 'urutan')
                 ->orderBy('urutan', 'asc')
                 ->orderBy('nama', 'asc')
                 ->get()
@@ -1267,7 +1099,7 @@ class QuotationStepController extends Controller
                 ];
             })->values()->toArray(),
             'jenis_barang_list' => $listJenis,
-            'training_list' => Training::select('id', 'nama', 'jenis')->get(), // Hindari all() untuk performa lebih baik
+            'training_list' => Training::select('id', 'nama', 'jenis')->get(),
             'bulan_tahun_options' => ['Bulan', 'Tahun'],
             'ada_training_options' => ['Ada', 'Tidak Ada'],
         ];
@@ -1281,26 +1113,11 @@ class QuotationStepController extends Controller
         ];
     }
 
-    /**
-     * Step 12 —summary kalkulasi akhir untuk konfirmasi final
-     * Estimasi: 100–500ms
-     * Hasil disimpan di $additionalData dan dipakai oleh buildStepDataStep12.
-     */
     private function buildAdditionalDataStep12(Quotation $quotation): array
     {
-        return [
-            // 'calculated_quotation' => $this->quotationService->calculateQuotation($quotation),
-        ];
+        return [];
     }
 
-    // =========================================================================
-    // PRIVATE — HELPERS
-    // =========================================================================
-
-    /**
-     * Tentukan nilai display tunjangan (HPP & COSS) berdasarkan jenis wage.
-     * Memindahkan closure $getTunjanganDisplayForBoth dari Resource ke sini.
-     */
     private function resolveTunjanganDisplay(
         $wage,
         string $jenisField,
@@ -1345,10 +1162,6 @@ class QuotationStepController extends Controller
         return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
     }
 
-    /**
-     * Parse string kunjungan "jumlah periode" menjadi array [jumlah, periode].
-     * Contoh: "3 Bulan" → ['3', 'Bulan']
-     */
     private function parseKunjungan(string $value): array
     {
         if (empty($value)) {
@@ -1359,9 +1172,6 @@ class QuotationStepController extends Controller
         return [$parts[0] ?? '', $parts[1] ?? ''];
     }
 
-    /**
-     * Hitung selisih waktu dalam milidetik sejak $startTime.
-     */
     private function elapsedMs(float $startTime): string
     {
         return round((microtime(true) - $startTime) * 1000, 2) . 'ms';

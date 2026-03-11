@@ -38,10 +38,12 @@ class QuotationService
 
     public function __construct(
 
-        QuotationNotificationService $quotationNotificationService
+        QuotationNotificationService $quotationNotificationService,
+        QuotationStepService $quotationStepService
     ) {
 
         $this->quotationNotificationService = $quotationNotificationService;
+        $this->quotationStepService = $quotationStepService;
     }
     // ============================ MAIN CALCULATION FLOW ============================
 
@@ -132,13 +134,30 @@ class QuotationService
         $quotationDetails = QuotationDetail::with(['wage', 'quotationDetailTunjangans'])
             ->where('quotation_id', $quotation->id)->get();
 
+        $detailIds = $quotationDetails->pluck('id')->all();
+
+        // Preload HPP dan COSS sekaligus (1 query masing-masing, bukan N query per detail)
+        // Di-index by quotation_detail_id agar lookup O(1) di dalam loop
+        $quotation->_hpp_map = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)
+            ->get()->keyBy('quotation_detail_id');
+
+        $quotation->_coss_map = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)
+            ->get()->keyBy('quotation_detail_id');
+
         $quotationSites = QuotationSite::where('quotation_id', $quotation->id)->get();
+
+        // Index sites by ID agar QuotationSite::find() tidak dipanggil per-detail di loop
+        $quotation->_sites_map = $quotationSites->keyBy('id');
 
         // Calculate site details count
         $quotationSites->each(function ($site) use ($quotationDetails) {
             $site->jumlah_detail = $quotationDetails
                 ->where('quotation_site_id', $site->id)->count();
         });
+
+        // Preload daftar tunjangan sekali — dipakai di calculateFirstPass DAN recalculateWithGrossUp
+        $quotation->_daftar_tunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
+            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
 
         // Get management fee
         $managementFee = ManagementFee::find($quotation->management_fee_id);
@@ -153,8 +172,8 @@ class QuotationService
     // ============================ CORE CALCULATION METHODS ============================
     private function calculateFirstPass($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
-            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
+        // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
+        $daftarTunjangan = $quotation->_daftar_tunjangan;
 
         $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
         $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
@@ -166,8 +185,8 @@ class QuotationService
     }
     private function recalculateWithGrossUp($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
-        $daftarTunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
-            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
+        // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
+        $daftarTunjangan = $quotation->_daftar_tunjangan;
 
         $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
         $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
@@ -194,9 +213,10 @@ class QuotationService
         try {
             $detailCalculation = new DetailCalculation($detail->id);
 
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
-            $site = QuotationSite::find($detail->quotation_site_id);
+            // Gunakan preloaded map dari loadQuotationData() — tidak ada query per-detail
+            $hpp = $quotation->_hpp_map->get($detail->id);
+            $coss = $quotation->_coss_map->get($detail->id);
+            $site = $quotation->_sites_map->get($detail->quotation_site_id);
             $wage = $detail->wage;
 
             // Jika wage null, buat object kosong untuk menghindari error
@@ -301,8 +321,8 @@ class QuotationService
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_hpp ?? 0,
             'kompensasi' => $detail->kompensasi_hpp ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
-            'lembur' => $detail->lembur ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_hpp ?? 0,
+            'lembur' => $detail->lembur_hpp ?? 0,
             'takaful' => $detail->nominal_takaful ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
             'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
@@ -336,8 +356,8 @@ class QuotationService
             'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_coss ?? 0,
             'kompensasi' => $detail->kompensasi_coss ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday ?? 0,
-            'lembur' => $detail->lembur ?? 0,
+            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_coss ?? 0,
+            'lembur' => $detail->lembur_coss ?? 0,
             'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
             'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
             'bpjs_jht' => $detail->bpjs_jht ?? 0,
@@ -368,7 +388,8 @@ class QuotationService
         $totalTunjangan = 0;
         $totalTunjanganCoss = 0;
         foreach ($daftarTunjangan as $tunjangan) {
-            $dtTunjangan = QuotationDetailTunjangan::where('quotation_detail_id', $detail->id)
+            // Gunakan relasi yang sudah di-eager load — tidak ada query DB per-tunjangan
+            $dtTunjangan = $detail->quotationDetailTunjangans
                 ->where('nama_tunjangan', $tunjangan->nama)->first();
 
             // ============================================
@@ -538,88 +559,81 @@ class QuotationService
     private function calculateExtras($detail, $quotation, $hpp, $coss, $wage): void
     {
         try {
-            // 1. TUNJANGAN HARI RAYA (THR) - Prioritaskan dari HPP (step 11)
+            // TUNJANGAN HARI RAYA (THR)
             $tunjanganHariRayaHpp = $hpp ? (float) ($hpp->tunjangan_hari_raya ?? 0) : 0;
             $tunjanganHariRayaCoss = $coss ? (float) ($coss->tunjangan_hari_raya ?? 0) : 0;
 
-            // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
                 $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
-                    // Hitung THR berdasarkan upah bulanan (1/12 dari gaji)
                     $tunjanganHariRayaHpp = ($detail->nominal_upah ?? 0) / 12;
                     $tunjanganHariRayaCoss = ($detail->nominal_upah ?? 0) / 12;
-
-                } else if ($thrWageValue == 'ditagihkan' || $thrWageValue == 'diberikan langsung' || $thrWageValue == 'tidak ada') {
-                    $tunjanganHariRayaHpp = 0;
-                    $tunjanganHariRayaCoss = 0;
                 }
             }
 
-            // 2. KOMPENSASI - Prioritaskan dari HPP (step 11)
+            // KOMPENSASI
             $kompensasiHpp = $hpp ? (float) ($hpp->kompensasi ?? 0) : 0;
             $kompensasiCoss = $coss ? (float) ($coss->kompensasi ?? 0) : 0;
 
-            // Jika HPP null atau 0, coba ambil dari wage (step 4)
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
                 $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak Ada'));
                 if (in_array($kompensasiWageValue, ['diprovisikan'])) {
-                    // Tentukan nilai kompensasi default (10% dari gaji)
                     $kompensasiDefault = ($detail->nominal_upah ?? 0) / 12;
                     $kompensasiHpp = $kompensasiDefault;
                     $kompensasiCoss = $kompensasiDefault;
-                } else if ($kompensasiWageValue == 'ditagihkan' || $kompensasiWageValue == 'tidak ada') {
-                    $kompensasiHpp = 0;
-                    $kompensasiCoss = 0;
                 }
             }
 
-            // 3. TUNJANGAN HOLIDAY (LIBUR NASIONAL) - UTAMAKAN WAGE (step 4) DAN JANGAN OVERRIDE DENGAN HPP
-            $tunjanganHoliday = 0;
+            // TUNJANGAN HOLIDAY (LIBUR NASIONAL)
+            $tunjanganHolidayHpp = $hpp ? (float) ($hpp->tunjangan_hari_libur_nasional ?? 0) : 0;
+            $tunjanganHolidayCoss = $coss ? (float) ($coss->tunjangan_hari_libur_nasional ?? 0) : 0;
 
-            // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
-            if ($wage && isset($wage->tunjangan_holiday)) {
+            if ($tunjanganHolidayHpp == 0 && $wage && isset($wage->tunjangan_holiday)) {
                 $tunjanganHolidayValue = strtolower(trim($wage->tunjangan_holiday ?? 'Tidak Ada'));
-
                 if (str_contains($tunjanganHolidayValue, 'flat')) {
-                    $tunjanganHoliday = $this->calculateTunjanganHolidayFromWage($wage);
-                } else if ($tunjanganHolidayValue == 'normatif' || $tunjanganHolidayValue == 'tidak ada') {
-                    $tunjanganHoliday = 0;
+                    $calculated = $this->calculateTunjanganHolidayFromWage($wage);
+                    $tunjanganHolidayHpp = $calculated;
+                    $tunjanganHolidayCoss = $calculated;
                 }
-            } else {
-                // Fallback ke HPP hanya jika tidak ada data wage sama sekali
-                $tunjanganHoliday = $hpp ? (float) ($hpp->tunjangan_hari_libur_nasional ?? 0) : 0;
             }
 
-            // 4. LEMBUR - UTAMAKAN WAGE (step 4) DAN JANGAN OVERRIDE DENGAN HPP
-            $lembur = 0;
+            // LEMBUR
+            $lemburHpp = $hpp ? (float) ($hpp->lembur ?? 0) : 0;
+            $lemburCoss = $coss ? (float) ($coss->lembur ?? 0) : 0;
 
-            // **PERBAIKAN KRITIKAL: Ambil dari wage terlebih dahulu, JANGAN override dengan HPP**
-            if ($wage && isset($wage->lembur)) {
+            if ($lemburHpp == 0 && $wage && isset($wage->lembur)) {
                 $lemburValue = strtolower(trim($wage->lembur ?? 'Tidak Ada'));
                 $lemburditagihkanValue = strtolower(trim($wage->lembur_ditagihkan ?? null));
-
                 if (str_contains($lemburValue, 'flat')) {
-                    $lembur = $this->calculateLemburFromWage($wage);
-                } else if ($lemburditagihkanValue == 'ditagihkan terpisah' || $lemburValue == 'tidak ada') {
-                    $lembur = 0;
+                    $calculated = $this->calculateLemburFromWage($wage);
+                    $lemburHpp = $calculated;
+                    $lemburCoss = $calculated;
                 }
-            } else {
-                // Fallback ke HPP hanya jika tidak ada data wage sama sekali
-                $lembur = $hpp ? (float) ($hpp->lembur ?? 0) : 0;
             }
 
-            // 5. INSENTIF - Ambil dari HPP (step 11)
+            // INSENTIF
             $insentifHpp = $hpp ? (float) ($hpp->insentif ?? 0) : 0;
+            $insentifCoss = $coss ? (float) ($coss->insentif ?? 0) : 0;
 
-            // Assign nilai ke detail object
+            // Assign ke detail dengan prefix HPP/COSS
             $detail->tunjangan_hari_raya_hpp = round($tunjanganHariRayaHpp, 2);
             $detail->tunjangan_hari_raya_coss = round($tunjanganHariRayaCoss, 2);
             $detail->kompensasi_hpp = round($kompensasiHpp, 2);
             $detail->kompensasi_coss = round($kompensasiCoss, 2);
-            $detail->tunjangan_holiday = round($tunjanganHoliday, 2);
-            $detail->lembur = round($lembur, 2);
+            $detail->tunjangan_holiday_hpp = round($tunjanganHolidayHpp, 2);
+            $detail->tunjangan_holiday_coss = round($tunjanganHolidayCoss, 2);
+            $detail->lembur_hpp = round($lemburHpp, 2);
+            $detail->lembur_coss = round($lemburCoss, 2);
             $detail->insentif_hpp = round($insentifHpp, 2);
+            $detail->insentif_coss = round($insentifCoss, 2);
+
+            // Untuk backward compatibility
+            $detail->tunjangan_hari_raya = $tunjanganHariRayaHpp;
+            $detail->kompensasi = $kompensasiHpp;
+            $detail->tunjangan_holiday = $tunjanganHolidayHpp;
+            $detail->lembur = $lemburHpp;
+            $detail->insentif = $insentifHpp;
+
         } catch (\Exception $e) {
             \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
             throw $e;
@@ -972,9 +986,9 @@ class QuotationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 // 1. Hitung total biaya bulanan
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
+                $itemTotal = (($item->jumlah * $item->harga) / $item->masa_pakai);
 
-                $perPerson = $itemTotal / max($divider, 1);
+                $perPerson =$itemTotal / max($divider, 1);
 
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
@@ -1028,7 +1042,7 @@ class QuotationService
         $total = 0;
         foreach ($items as $item) {
             if ($special === 'chemical') {
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai));
                 $perPerson = $itemTotal / max($divider, 1);
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
@@ -1076,9 +1090,12 @@ class QuotationService
             $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
             $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
             $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
-            $tunjanganHoliday = (float) ($detail->tunjangan_holiday ?? 0);
             $nominalUpah = (float) ($detail->nominal_upah ?? 0);
-            $lembur = (float) ($detail->lembur ?? 0);
+            ;
+            $tunjanganHoliday = (float) ($detail->tunjangan_holiday_hpp ?? 0);
+            $lembur = (float) ($detail->lembur_hpp ?? 0);
+            $tunjanganHolidayCoss = (float) ($detail->tunjangan_holiday_coss ?? 0);
+            $lemburCoss = (float) ($detail->lembur_coss ?? 0);
 
             // BPJS - karena persentase sudah di-set di Step 11
             $bpjsJkk = (float) ($detail->bpjs_jkk ?? 0);
@@ -1146,8 +1163,8 @@ class QuotationService
             $detail->total_exclude_base_manpower = round(
                 $tunjanganHariRayaCoss
                 + $kompensasiCoss
-                + $tunjanganHoliday
-                + $lembur
+                + $tunjanganHolidayCoss
+                + $lemburCoss
                 + $biayaKesehatanCoss
                 + $bpjsKetenagakerjaanCoss
                 + $personilKaporlapCoss
@@ -1201,9 +1218,9 @@ class QuotationService
             $detail->bunga_bank = $summary->bunga_bank_total;
             $detail->insentif = $summary->insentif_total;
 
-            // Recalculate totals
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+            // Gunakan preloaded map — tidak ada query DB per-detail
+            $hpp = $quotation->_hpp_map->get($detail->id);
+            $coss = $quotation->_coss_map->get($detail->id);
 
             $totalTunjanganResult = [
                 'total' => $detail->total_tunjangan ?? 0,
@@ -1547,549 +1564,5 @@ class QuotationService
         return $bpuAmount;
     }
 
-    public function copyQuotationData(Quotation $sourceQuotation, Quotation $targetQuotation, User $user)
-    {
-        DB::beginTransaction();
-        try {
-            // Copy quotation sites
-            foreach ($sourceQuotation->quotationSites as $site) {
-                $targetQuotation->quotationSites()->create([
-                    'leads_id' => $targetQuotation->leads_id,
-                    'nama_site' => $site->nama_site,
-                    'provinsi_id' => $site->provinsi_id,
-                    'provinsi' => $site->provinsi,
-                    'kota_id' => $site->kota_id,
-                    'kota' => $site->kota,
-                    'ump' => $site->ump,
-                    'umk' => $site->umk,
-                    'nominal_upah' => $site->nominal_upah,
-                    'penempatan' => $site->penempatan,
-                    'created_by' => $user->full_name
-                ]);
-            }
 
-            // Copy quotation details and related data
-            foreach ($sourceQuotation->quotationDetails as $detail) {
-                $newDetail = $targetQuotation->quotationDetails()->create([
-                    'quotation_site_id' => $this->getMappedSiteId($targetQuotation, $detail->quotation_site_id),
-                    'position_id' => $detail->position_id,
-                    'position' => $detail->position,
-                    'jumlah_hc' => $detail->jumlah_hc,
-                    'nominal_upah' => $detail->nominal_upah,
-                    'penjamin_kesehatan' => $detail->penjamin_kesehatan,
-                    'is_bpjs_jkk' => $detail->is_bpjs_jkk,
-                    'is_bpjs_jkm' => $detail->is_bpjs_jkm,
-                    'is_bpjs_jht' => $detail->is_bpjs_jht,
-                    'is_bpjs_jp' => $detail->is_bpjs_jp,
-                    'nominal_takaful' => $detail->nominal_takaful,
-                    'created_by' => $user->full_name
-                ]);
-
-                // Copy related data
-                $this->copyDetailRelatedData($detail, $newDetail, $user);
-            }
-
-            // Copy other quotation data
-            $this->copyOtherQuotationData($sourceQuotation, $targetQuotation, $user);
-
-            DB::commit();
-            return $targetQuotation;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    private function copyDetailRelatedData($sourceDetail, $targetDetail, $user)
-    {
-        // Copy tunjangan
-        foreach ($sourceDetail->quotationDetailTunjangans as $tunjangan) {
-            $targetDetail->quotationDetailTunjangans()->create([
-                'nama_tunjangan' => $tunjangan->nama_tunjangan,
-                'nominal' => $tunjangan->nominal,
-                'created_by' => $user->full_name
-            ]);
-        }
-
-        // Copy HPP
-        if ($sourceDetail->quotationDetailHpp) {
-            $targetDetail->quotationDetailHpp()->create(
-                $this->getHppData($sourceDetail->quotationDetailHpp, $user)
-            );
-        }
-
-        // Copy COSS
-        if ($sourceDetail->quotationDetailCoss) {
-            $targetDetail->quotationDetailCoss()->create(
-                $this->getCossData($sourceDetail->quotationDetailCoss, $user)
-            );
-        }
-    }
-
-    private function copyOtherQuotationData($sourceQuotation, $targetQuotation, $user)
-    {
-        $relations = [
-            'quotationAplikasis' => ['aplikasi_pendukung_id', 'aplikasi_pendukung', 'harga'],
-            'quotationKaporlaps' => ['quotation_detail_id', 'barang_id', 'jumlah', 'harga', 'nama', 'jenis_barang_id', 'jenis_barang'],
-            'quotationDevices' => ['barang_id', 'jumlah', 'harga', 'nama', 'jenis_barang_id', 'jenis_barang'],
-            'quotationChemicals' => ['barang_id', 'jumlah', 'harga', 'nama', 'jenis_barang_id', 'jenis_barang', 'masa_pakai'],
-            'quotationOhcs' => ['barang_id', 'jumlah', 'harga', 'nama', 'jenis_barang_id', 'jenis_barang'],
-            'quotationTrainings' => ['training_id', 'nama'],
-            'quotationKerjasamas' => ['perjanjian']
-        ];
-
-        foreach ($relations as $relation => $fields) {
-            foreach ($sourceQuotation->$relation as $item) {
-                $data = array_combine($fields, array_map(fn($field) => $item->$field, $fields));
-                $data['created_by'] = $user->full_name;
-
-                if ($relation === 'quotationKaporlaps') {
-                    $data['quotation_detail_id'] = $this->getMappedDetailId($targetQuotation, $data['quotation_detail_id']);
-                }
-
-                $targetQuotation->$relation()->create($data);
-            }
-        }
-    }
-
-    private function getHppData($hpp, $user)
-    {
-        return [
-            'gaji_pokok' => $hpp->gaji_pokok,
-            'tunjangan_hari_raya' => $hpp->tunjangan_hari_raya,
-            'kompensasi' => $hpp->kompensasi,
-            'tunjangan_hari_libur_nasional' => $hpp->tunjangan_hari_libur_nasional,
-            'lembur' => $hpp->lembur,
-            'takaful' => $hpp->takaful,
-            'bpjs_jkm' => $hpp->bpjs_jkm,
-            'bpjs_jkk' => $hpp->bpjs_jkk,
-            'bpjs_jht' => $hpp->bpjs_jht,
-            'bpjs_jp' => $hpp->bpjs_jp,
-            'bpjs_ks' => $hpp->bpjs_ks,
-            'persen_bpjs_jkm' => $hpp->persen_bpjs_jkm,
-            'persen_bpjs_jkk' => $hpp->persen_bpjs_jkk,
-            'persen_bpjs_jht' => $hpp->persen_bpjs_jht,
-            'persen_bpjs_jp' => $hpp->persen_bpjs_jp,
-            'persen_bpjs_ks' => $hpp->persen_bpjs_ks,
-            'provisi_seragam' => $hpp->provisi_seragam,
-            'provisi_peralatan' => $hpp->provisi_peralatan,
-            'provisi_chemical' => $hpp->provisi_chemical,
-            'provisi_ohc' => $hpp->provisi_ohc,
-            'bunga_bank' => $hpp->bunga_bank,
-            'insentif' => $hpp->insentif,
-            'ppn' => $hpp->ppn,
-            'pph' => $hpp->pph,
-            'created_by' => $user->full_name
-        ];
-    }
-
-    private function getCossData($coss, $user)
-    {
-        return [
-            'provisi_seragam' => $coss->provisi_seragam,
-            'provisi_peralatan' => $coss->provisi_peralatan,
-            'provisi_chemical' => $coss->provisi_chemical,
-            'provisi_ohc' => $coss->provisi_ohc,
-            'ppn' => $coss->ppn,
-            'pph' => $coss->pph,
-            'created_by' => $user->full_name
-        ];
-    }
-
-    /**
-     * Resubmit quotation dengan membuat quotation baru
-     */
-    public function resubmitQuotation(Quotation $originalQuotation, string $alasan, User $user)
-    {
-        DB::beginTransaction();
-        try {
-            $newNomor = $this->generateResubmitNomor($originalQuotation->nomor);
-
-            $newQuotation = Quotation::create([
-                'nomor' => $newNomor,
-                'tgl_quotation' => Carbon::now()->toDateString(),
-                'leads_id' => $originalQuotation->leads_id,
-                'nama_perusahaan' => $originalQuotation->nama_perusahaan,
-                'kebutuhan_id' => $originalQuotation->kebutuhan_id,
-                'kebutuhan' => $originalQuotation->kebutuhan,
-                'company_id' => $originalQuotation->company_id,
-                'company' => $originalQuotation->company,
-                'jumlah_site' => $originalQuotation->jumlah_site,
-                'step' => 1,
-                'status_quotation_id' => 1,
-                'is_aktif' => 1,
-                'alasan_resubmit' => $alasan,
-                'quotation_sebelumnya_id' => $originalQuotation->id,
-                'created_by' => $user->full_name
-            ]);
-
-            $this->copyQuotationData($originalQuotation, $newQuotation, $user);
-
-            $originalQuotation->update([
-                'is_aktif' => 0,
-                'updated_by' => $user->full_name
-            ]);
-
-            DB::commit();
-            return $newQuotation;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    public function submitForApproval(Quotation $quotation, array $data, User $user)
-    {
-        $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $currentDateTime = Carbon::now();
-        $tingkat = 1;
-        if ($user->cais_role_id == 96) { // Direktur Sales
-            $updateData = [
-                'ot1' => $user->full_name,
-                'updated_at' => $currentDateTime->toDateTimeString(),
-                'updated_by' => $user->full_name
-            ];
-
-            if ($isApproved) {
-                $isTopMoreThan7 = ($quotation->top == "Lebih Dari 7 Hari");
-
-                $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
-                    $thr = strtolower(trim($detail->wage->thr ?? ''));
-                    // Jika THR bukan 'diprovisikan', maka dianggap perlu level 2
-                    return $thr !== 'diprovisikan';
-                });
-
-                // Quotation butuh level 2 jika TOP > 7 hari ATAU ada THR tidak diprovisikan
-                $needsLevel2 = ($isTopMoreThan7 || $hasNonProvisionalThr);
-
-                $updateData['status_quotation_id'] = $needsLevel2 ? 2 : 3;
-                $updateData['is_aktif'] = $needsLevel2 ? 0 : 1;
-            } else {
-                $updateData['status_quotation_id'] = 8; // Rejected
-                $updateData['is_aktif'] = 0;
-            }
-            $tingkat = 1;
-        } elseif ($user->cais_role_id == 97) {
-            $isNotApprovedBySales = (int) $quotation->status_quotation_id !== 2;
-            $isOt1Empty = empty($quotation->ot1) || strlen(trim($quotation->ot1)) === 0;
-
-            if ($isNotApprovedBySales || $isOt1Empty) {
-                return [
-                    'success' => false,
-                    'message' => 'Quotation belum disetujui oleh Direktur Sales (Status: ' . $quotation->status_quotation_id . ')'
-                ];
-            }
-
-            $updateData = [
-                'ot2' => $user->full_name,
-                'status_quotation_id' => $isApproved ? 3 : 8,
-                'is_aktif' => $isApproved ? 1 : 0,
-                'updated_at' => $currentDateTime->toDateTimeString(),
-                'updated_by' => $user->full_name
-            ];
-            $tingkat = 2;
-        } else {
-            return ['success' => false, 'message' => 'User tidak memiliki akses approval.'];
-        }
-
-        $quotation->update($updateData);
-
-        if ($user->cais_role_id == 96 && $isApproved && $needsLevel2) {
-            $this->notifyDirKeu($quotation->fresh(), $currentDateTime);
-        }
-        // Log approval
-        LogApproval::create([
-            'tabel' => 'quotation',
-            'doc_id' => $quotation->id,
-            'tingkat' => $tingkat,
-            'is_approve' => $isApproved,
-            'note' => $data['notes'] ?? null,
-            'user_id' => $user->id,
-            'approval_date' => $currentDateTime,
-            'created_at' => $currentDateTime,
-            'created_by' => $user->full_name
-        ]);
-
-        // Log notification untuk sales dari leads kebutuhan
-        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
-            ->where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->first();
-
-        if ($leadsKebutuhan && $leadsKebutuhan->timSalesD) {
-            $quotationNumber = $quotation->nomor;
-            $approverName = $user->full_name;
-            $reason = $data['notes'] ?? null;
-
-            $msg = $isApproved
-                ? "Quotation dengan nomor: {$quotationNumber} di approve oleh {$approverName}"
-                : "Quotation dengan nomor: {$quotationNumber} di reject oleh {$approverName}" . ($reason ? " dengan alasan: {$reason}" : "");
-
-            LogNotification::create([
-                'user_id' => $leadsKebutuhan->timSalesD->user_id,
-                'doc_id' => $quotation->id,
-                'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
-                'pesan' => $msg,
-                'is_read' => 0,
-                'created_at' => $currentDateTime,
-                'created_by' => $user->full_name
-            ]);
-        }
-        if ($isApproved && $quotation->tipe_quotation == 'addendum') {
-            $addendumService = app(AddendumService::class);
-            $addendumResult = $addendumService->process($quotation);
-        }
-
-        return ['success' => true, 'data' => $quotation->fresh()];
-    }
-    // 2. Di submitForApproval ketika Dir Sales approve
-    private function notifyDirKeu(Quotation $quotation, Carbon $currentDateTime): void
-    {
-        $dirKeu = [27928, 16986, 127823];
-
-        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
-            $thr = strtolower(trim($detail->wage->thr ?? ''));
-            return $thr !== 'diprovisikan';
-        });
-
-        if (!($quotation->top == 'Lebih Dari 7 Hari' || $hasNonProvisionalThr)) {
-            return;
-        }
-
-        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
-            ->where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->first();
-
-        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
-        $msg = "Quotation dengan nomor: {$quotation->nomor} telah disetujui Direktur Sales dan membutuhkan persetujuan Direktur Keuangan.";
-
-        foreach ($dirKeu as $userId) {
-            LogNotification::create([
-                'user_id' => $userId,
-                'doc_id' => $quotation->id,
-                'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
-                'pesan' => $msg,
-                'is_read' => 0,
-                'created_at' => $currentDateTime,
-                'created_by' => $creatorName
-            ]);
-        }
-
-        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
-        // notifyDirKeu
-        $this->quotationNotificationService->sendApprovalNotification(
-            quotation: $quotation,
-            creatorName: $creatorName,
-            approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
-        );
-    }
-
-    /**
-     * Generate activity nomor
-     */
-    private function generateActivityNomor($leadsId): string
-    {
-        $now = Carbon::now();
-        $count = DB::table('customer_activities')
-            ->where('leads_id', $leadsId)
-            ->whereYear('tgl_activity', $now->year)
-            ->count();
-
-        return 'ACT/' . $leadsId . '/' . $now->year . '/' . sprintf('%04d', $count + 1);
-    }
-
-    public function resetApproval(Quotation $quotation, User $user)
-    {
-        // Cek role - tambahkan role lain yang boleh reset
-        $allowedRoles = [2, 96, 97]; // Admin, OT1, OT2
-        if (!in_array($user->cais_role_id, $allowedRoles)) {
-            return ['success' => false, 'message' => 'Anda tidak memiliki akses untuk reset approval. Role: ' . $user->cais_role_id];
-        }
-
-        $quotation->update([
-            'status_quotation_id' => 2,
-            'is_aktif' => 0,
-            'ot1' => null,
-            'ot2' => null,
-            'updated_at' => Carbon::now()->toDateTimeString(),
-            'updated_by' => $user->full_name
-        ]);
-
-        \Log::info('Reset approval success', [
-            'quotation_id' => $quotation->id,
-            'reset_by' => $user->full_name
-        ]);
-
-        return ['success' => true, 'data' => $quotation->fresh()];
-    }
-
-    // ============================ HELPER METHODS (tambahan jika diperlukan) ============================
-
-
-
-    /**
-     * Generate konten perjanjian kerjasama
-     */
-    public function generateKerjasamaContent(Quotation $quotation)
-    {
-        $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
-
-        // Get salary rule data
-        $salaryRuleQ = SalaryRule::select('cutoff', 'pengiriman_invoice', 'rilis_payroll')
-            ->whereNull('deleted_at')
-            ->where('id', $quotation->salary_rule_id)
-            ->first();
-
-        // Build salary schedule table
-        $tableSalary = '<table class="table table-bordered" style="width:100%">
-                  <thead>
-                    <tr>
-                      <th class="text-center"><b>No.</b></th>
-                      <th class="text-center"><b>Schedule Plan</b></th>
-                      <th class="text-center"><b>Periode</b></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td class="text-center">1</td>
-                      <td>Cut Off</td>
-                      <td>' . $salaryRuleQ->cutoff . '</td>
-                    </tr>
-                    <tr>
-                      <td class="text-center">2</td>
-                      <td>Pengiriman <i>Invoice</i></td>
-                      <td>' . ($quotation->pengiriman_invoice ?: $salaryRuleQ->pengiriman_invoice) . '</td>
-                    </tr>
-                    <tr>
-                      <td class="text-center">3</td>
-                      <td>Rilis <i>Payroll</i> / Gaji</td>
-                      <td>' . $salaryRuleQ->rilis_payroll . '</td>
-                    </tr>
-                  </tbody>
-                </table>';
-
-        // Build kunjungan operasional text
-        $kunjunganOperasional = "";
-        if ($quotation->kunjungan_operasional != null) {
-            $kunjunganParts = explode(" ", $quotation->kunjungan_operasional);
-            if (count($kunjunganParts) >= 2) {
-                $kunjunganOperasional = $kunjunganParts[0] . " kali dalam 1 " . $kunjunganParts[1];
-            }
-        }
-
-        // Get aplikasi pendukung
-        $appPendukung = QuotationAplikasi::select('aplikasi_pendukung')
-            ->whereNull('deleted_at')
-            ->where('quotation_id', $quotation->id)
-            ->get();
-
-        $sAppPendukung = "<b>";
-        foreach ($appPendukung as $kduk => $dukung) {
-            if ($kduk != 0) {
-                $sAppPendukung .= ", ";
-            }
-            $sAppPendukung .= $dukung->aplikasi_pendukung;
-        }
-        $sAppPendukung .= "</b>";
-
-        // Build perjanjian array
-        $perjanjian = [];
-
-        $perjanjian[] = "Penawaran harga ini berlaku 30 hari sejak tanggal diterbitkan.";
-
-        $perjanjian[] = "Akan dilakukan <i>survey</i> area untuk kebutuhan " . $kebutuhanPerjanjian . " sebagai tahapan <i>assesment</i> area untuk memastikan efektifitas pekerjaan.";
-
-        $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
-
-
-        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian dengan skema sebagai berikut: <br>" . $tableSalary;
-
-        $catatanKaki = "<i><br>*Rilis gaji adalah talangan.";
-
-        // Jika bukan Non TOP, tampilkan detail maksimal pembayaran
-        if ($quotation->top !== 'Non TOP') {
-            $topValue = ($quotation->top === 'Lebih Dari 7 Hari')
-                ? $quotation->jumlah_hari_invoice
-                : $quotation->top;
-
-            $catatanKaki .= "<br>*Maksimal pembayaran invoice " . $topValue . " hari " . $quotation->tipe_hari_invoice . " setelah invoice";
-        }
-
-        $catatanKaki .= "</i>";
-        $perjanjian[] = $perjanjianContent . $catatanKaki;
-
-        $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
-
-        $perjanjian[] = "Tim operasional bersifat <i>on call</i> apabila terjadi <i>case</i> atau insiden yang terjadi yang mengharuskan untuk datang ke lokasi kerja Pihak Pertama.";
-
-        $perjanjian[] = "Pemenuhan kandidat dilakukan dengan 2 tahap <i>screening</i> :<br>a. Tahap ke -1 : dilakukan oleh tim rekrutmen <b>Pihak Kedua</b> untuk memastikan bahwa kandidat sudah sesuai dengan kualifikasi <b>dari Pihak Pertama</b>.<br>b. Tahap ke -2 : dilakukan oleh user <b>Pihak Pertama</b>, dan dijadwalkan setelah adanya <i>report</i> hasil <i>screening</i> dari <b>Pihak Kedua</b>.";
-
-        $perjanjian[] = "<i>Support</i> aplikasi digital :" . $sAppPendukung . ".";
-
-        return $perjanjian;
-    }
-
-
-    // ============================ HELPER METHODS ============================
-
-    /**
-     * Get mapped site ID for copying
-     */
-    private function getMappedSiteId(Quotation $targetQuotation, $originalSiteId)
-    {
-        $targetSites = $targetQuotation->quotationSites;
-        return $targetSites->first()->id; // Simplifikasi, asumsi urutan sama
-    }
-
-    /**
-     * Get mapped detail ID for copying
-     */
-    private function getMappedDetailId(Quotation $targetQuotation, $originalDetailId)
-    {
-        $targetDetails = $targetQuotation->quotationDetails;
-        return $targetDetails->first()->id; // Simplifikasi, asumsi urutan sama
-    }
-
-    /**
-     * Generate nomor untuk resubmit
-     */
-    public function generateResubmitNomor($originalNomor)
-    {
-        $base = explode('-', $originalNomor)[0];
-        $now = Carbon::now();
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-
-        $count = Quotation::where('nomor', 'like', $base . $month . $now->year . "-%")
-            ->where('nomor', 'like', '%/RESUB/%')
-            ->count();
-
-        $urutan = sprintf("%05d", $count + 1);
-        return $base . $month . $now->year . "-" . $urutan . "/RESUB/" . ($count + 1);
-    }
-
-    /**
-     * Get site locations for kerjasama content
-     */
-    private function getSiteLocations(Quotation $quotation)
-    {
-        $locations = [];
-        foreach ($quotation->quotationSites as $site) {
-            $locations[] = $site->nama_site . " - " . $site->kota;
-        }
-        return implode(", ", $locations);
-    }
-
-    /**
-     * Method untuk QuotationStepService agar bisa mendapatkan calculated values
-     */
-    public function getCalculatedValues(Quotation $quotation): QuotationCalculationResult
-    {
-        return $this->calculateQuotation($quotation);
-    }
 }
