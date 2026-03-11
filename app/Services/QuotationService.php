@@ -986,9 +986,9 @@ class QuotationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 // 1. Hitung total biaya bulanan
-                $itemTotal =(($item->jumlah * $item->harga) / $item->masa_pakai) ;
+                $itemTotal = (($item->jumlah * $item->harga) / $item->masa_pakai);
 
-                $perPerson = ($itemTotal / max($divider, 1))/ $provisi;
+                $perPerson = ($itemTotal / max($divider, 1)) / $provisi;
 
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
@@ -1042,8 +1042,8 @@ class QuotationService
         $total = 0;
         foreach ($items as $item) {
             if ($special === 'chemical') {
-                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai) / $provisi);
-                $perPerson = $itemTotal / max($divider, 1);
+                $itemTotal = ((($item->jumlah * $item->harga) / $item->masa_pakai));
+                $perPerson = ($itemTotal / max($divider, 1)) / $provisi;
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
                 // Untuk kaporlap: dikali dengan HC, bukan dibagi
@@ -1564,169 +1564,5 @@ class QuotationService
         return $bpuAmount;
     }
 
-   
-    
 
-    /**
-     * Generate activity nomor
-     */
-    private function generateActivityNomor($leadsId): string
-    {
-        $now = Carbon::now();
-        $count = DB::table('customer_activities')
-            ->where('leads_id', $leadsId)
-            ->whereYear('tgl_activity', $now->year)
-            ->count();
-
-        return 'ACT/' . $leadsId . '/' . $now->year . '/' . sprintf('%04d', $count + 1);
-    }
-
-
-
-    // ============================ HELPER METHODS (tambahan jika diperlukan) ============================
-
-
-
-    /**
-     * Generate konten perjanjian kerjasama
-     */
-    public function generateKerjasamaContent(Quotation $quotation)
-    {
-        $kebutuhanPerjanjian = "<b>" . $quotation->kebutuhan . "</b>";
-
-        // Get salary rule data
-        $salaryRuleQ = SalaryRule::select('cutoff', 'pengiriman_invoice', 'rilis_payroll')
-            ->whereNull('deleted_at')
-            ->where('id', $quotation->salary_rule_id)
-            ->first();
-
-        // Build salary schedule table
-        $tableSalary = '<table class="table table-bordered" style="width:100%">
-                  <thead>
-                    <tr>
-                      <th class="text-center"><b>No.</b></th>
-                      <th class="text-center"><b>Schedule Plan</b></th>
-                      <th class="text-center"><b>Periode</b></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td class="text-center">1</td>
-                      <td>Cut Off</td>
-                      <td>' . $salaryRuleQ->cutoff . '</td>
-                    </tr>
-                    <tr>
-                      <td class="text-center">2</td>
-                      <td>Pengiriman <i>Invoice</i></td>
-                      <td>' . ($quotation->pengiriman_invoice ?: $salaryRuleQ->pengiriman_invoice) . '</td>
-                    </tr>
-                    <tr>
-                      <td class="text-center">3</td>
-                      <td>Rilis <i>Payroll</i> / Gaji</td>
-                      <td>' . $salaryRuleQ->rilis_payroll . '</td>
-                    </tr>
-                  </tbody>
-                </table>';
-
-        // Build kunjungan operasional text
-        $kunjunganOperasional = "";
-        if ($quotation->kunjungan_operasional != null) {
-            $kunjunganParts = explode(" ", $quotation->kunjungan_operasional);
-            if (count($kunjunganParts) >= 2) {
-                $kunjunganOperasional = $kunjunganParts[0] . " kali dalam 1 " . $kunjunganParts[1];
-            }
-        }
-
-        // Get aplikasi pendukung
-        $appPendukung = QuotationAplikasi::select('aplikasi_pendukung')
-            ->whereNull('deleted_at')
-            ->where('quotation_id', $quotation->id)
-            ->get();
-
-        $sAppPendukung = "<b>";
-        foreach ($appPendukung as $kduk => $dukung) {
-            if ($kduk != 0) {
-                $sAppPendukung .= ", ";
-            }
-            $sAppPendukung .= $dukung->aplikasi_pendukung;
-        }
-        $sAppPendukung .= "</b>";
-
-        // Build perjanjian array
-        $perjanjian = [];
-
-        $perjanjian[] = "Penawaran harga ini berlaku 30 hari sejak tanggal diterbitkan.";
-
-        $perjanjian[] = "Akan dilakukan <i>survey</i> area untuk kebutuhan " . $kebutuhanPerjanjian . " sebagai tahapan <i>assesment</i> area untuk memastikan efektifitas pekerjaan.";
-
-        $perjanjian[] = "Komponen dan nilai dalam penawaran harga ini berdasarkan kesepakatan para pihak dalam pengajuan harga awal, apabila ada perubahan, pengurangan maupun penambahan pada komponen dan nilai pada penawaran, maka <b>para pihak</b> sepakat akan melanjutkan ke tahap negosiasi selanjutnya.";
-
-
-        $perjanjianContent = "Skema cut-off, pengiriman <i>invoice</i>, pembayaran <i>invoice</i> dan penggajian dengan skema sebagai berikut: <br>" . $tableSalary;
-
-        $catatanKaki = "<i><br>*Rilis gaji adalah talangan.";
-
-        // Jika bukan Non TOP, tampilkan detail maksimal pembayaran
-        if ($quotation->top !== 'Non TOP') {
-            $topValue = ($quotation->top === 'Lebih Dari 7 Hari')
-                ? $quotation->jumlah_hari_invoice
-                : $quotation->top;
-
-            $catatanKaki .= "<br>*Maksimal pembayaran invoice " . $topValue . " hari " . $quotation->tipe_hari_invoice . " setelah invoice";
-        }
-
-        $catatanKaki .= "</i>";
-        $perjanjian[] = $perjanjianContent . $catatanKaki;
-
-        $perjanjian[] = "Kunjungan tim operasional " . $kunjunganOperasional . ", untuk monitoring dan supervisi dengan karyawan dan wajib bertemu dengan pic <b>Pihak Pertama</b> untuk koordinasi.";
-
-        $perjanjian[] = "Tim operasional bersifat <i>on call</i> apabila terjadi <i>case</i> atau insiden yang terjadi yang mengharuskan untuk datang ke lokasi kerja Pihak Pertama.";
-
-        $perjanjian[] = "Pemenuhan kandidat dilakukan dengan 2 tahap <i>screening</i> :<br>a. Tahap ke -1 : dilakukan oleh tim rekrutmen <b>Pihak Kedua</b> untuk memastikan bahwa kandidat sudah sesuai dengan kualifikasi <b>dari Pihak Pertama</b>.<br>b. Tahap ke -2 : dilakukan oleh user <b>Pihak Pertama</b>, dan dijadwalkan setelah adanya <i>report</i> hasil <i>screening</i> dari <b>Pihak Kedua</b>.";
-
-        $perjanjian[] = "<i>Support</i> aplikasi digital :" . $sAppPendukung . ".";
-
-        return $perjanjian;
-    }
-
-
-    // ============================ HELPER METHODS ============================
-
- 
-    /**
-     * Generate nomor untuk resubmit
-     */
-    public function generateResubmitNomor($originalNomor)
-    {
-        $base = explode('-', $originalNomor)[0];
-        $now = Carbon::now();
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-
-        $count = Quotation::where('nomor', 'like', $base . $month . $now->year . "-%")
-            ->where('nomor', 'like', '%/RESUB/%')
-            ->count();
-
-        $urutan = sprintf("%05d", $count + 1);
-        return $base . $month . $now->year . "-" . $urutan . "/RESUB/" . ($count + 1);
-    }
-
-    /**
-     * Get site locations for kerjasama content
-     */
-    private function getSiteLocations(Quotation $quotation)
-    {
-        $locations = [];
-        foreach ($quotation->quotationSites as $site) {
-            $locations[] = $site->nama_site . " - " . $site->kota;
-        }
-        return implode(", ", $locations);
-    }
-
-    /**
-     * Method untuk QuotationStepService agar bisa mendapatkan calculated values
-     */
-    public function getCalculatedValues(Quotation $quotation): QuotationCalculationResult
-    {
-        return $this->calculateQuotation($quotation);
-    }
 }
