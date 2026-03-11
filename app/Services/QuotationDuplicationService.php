@@ -314,12 +314,8 @@ class QuotationDuplicationService
             'revisi' => 0,
             'alasan_revisi' => null,
             'step' => 1,
+            'materai' => in_array($newQuotation->tipe_quotation, ['addendum', 'rekontrak']) ? $quotationReferensi->materai : $newQuotation->materai,
         ]);
-
-        if (in_array($newQuotation->tipe_quotation, ['addendum', 'rekontrak',]))
-            [
-               'materai' => $quotationReferensi->materai,
-            ];
     }
 
     /**
