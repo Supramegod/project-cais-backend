@@ -175,6 +175,10 @@ class QuotationService
         // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
         $daftarTunjangan = $quotation->_daftar_tunjangan;
 
+        // ✅ PERBAIKAN: Initialize semua detail TERLEBIH DAHULU sebelum calculateAllItems
+        // Ini memastikan jumlah_hc_hpp dari HPP sudah di-set sebelum loop di calculateAllItems()
+        $this->initializeAllDetails($quotation);
+
         $this->processAllDetails($quotation, $daftarTunjangan, $jumlahHc, $result);
         $this->calculateHpp($quotation, $jumlahHc, $quotation->provisi, $result);
         $this->calculateCoss($quotation, $jumlahHc, $quotation->provisi, $result);
@@ -187,6 +191,9 @@ class QuotationService
     {
         // Gunakan _daftar_tunjangan yang sudah di-preload di loadQuotationData()
         $daftarTunjangan = $quotation->_daftar_tunjangan;
+
+        // ✅ PERBAIKAN: Ensure semua detail sudah re-initialize dengan nilai HPP terbaru
+        $this->initializeAllDetails($quotation);
 
         $this->calculateBankInterestAndIncentive($quotation, $jumlahHc, $result);
         $this->updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, $result);
@@ -247,13 +254,33 @@ class QuotationService
         }
     }
 
+    /**
+     * ✅ PERBAIKAN: Initialize semua detail SEKALIGUS di awal
+     * Ini memastikan jumlah_hc_hpp dari HPP sudah di-set sebelum calculateAllItems() loop
+     */
+    private function initializeAllDetails($quotation): void
+    {
+        foreach ($quotation->quotation_detail as $detail) {
+            $hpp = $quotation->_hpp_map->get($detail->id);
+
+            // PERBAIKAN: Jumlah HC untuk HPP ambil dari HPP (Step 11 input)
+            // Tapi untuk detail object, tetap gunakan yang dari detail (untuk COSS)
+            $detail->jumlah_hc_original = $detail->jumlah_hc; // Simpan nilai asli untuk COSS
+            $detail->jumlah_hc_hpp = $hpp && $hpp->jumlah_hc !== null ? (int) $hpp->jumlah_hc : $detail->jumlah_hc;
+
+            \Log::debug('Initialized detail', [
+                'detail_id' => $detail->id,
+                'jumlah_hc_original' => $detail->jumlah_hc_original,
+                'jumlah_hc_hpp' => $detail->jumlah_hc_hpp,
+                'hpp_jumlah_hc_from_db' => $hpp?->jumlah_hc
+            ]);
+        }
+    }
+
     private function initializeDetail($detail, $hpp, $site, $wage)
     {
-
-        // PERBAIKAN: Jumlah HC untuk HPP ambil dari HPP (Step 11 input)
-        // Tapi untuk detail object, tetap gunakan yang dari detail (untuk COSS)
-        $detail->jumlah_hc_original = $detail->jumlah_hc; // Simpan nilai asli untuk COSS
-        $detail->jumlah_hc_hpp = $hpp && $hpp->jumlah_hc !== null ? (int) $hpp->jumlah_hc : $detail->jumlah_hc;
+        // ✅ PERBAIKAN: jumlah_hc_hpp sudah di-set di initializeAllDetails()
+        // Di sini hanya set properties lainnya
 
         $detail->nominal_upah = $detail->nominal_upah ?? $hpp->gaji_pokok ?? $site->nominal_upah;
         $detail->umk = $site->umk ?? 0;
@@ -717,24 +744,27 @@ class QuotationService
     // ============================ ITEM CALCULATIONS ============================
     private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
-        // **PERBAIKAN: Hitung total HC per site SEKALI di awal, bukan per detail**
-        static $siteTotalsCalculated = false;
+        // **PERBAIKAN: Precompute HC totals per site SEKALI saja (cached dalam quotation)
+        // Gunakan jumlah_hc_hpp dan jumlah_hc_original yang SUDAH di-set di initializeAllDetails()
+        static $quotationIdProcessed = null;
         static $siteHcHpp = [];
         static $siteHcCoss = [];
         static $primarySiteId = null;
         static $primaryDetailId = null;
 
-        // Hitung total HC per site hanya sekali untuk quotation ini
-        if (!$siteTotalsCalculated) {
-            // Reset arrays
+        // ✅ Hitung total HC per site HANYA SEKALI per quotation
+        if ($quotationIdProcessed !== $quotation->id) {
+            // Reset untuk quotation baru
             $siteHcHpp = [];
             $siteHcCoss = [];
+            $quotationIdProcessed = $quotation->id;
 
             $firstDetail = $quotation->quotation_detail->first();
             $primarySiteId = $firstDetail->quotation_site_id ?? null;
             $primaryDetailId = $firstDetail->id ?? null;
 
-            // Kelompokkan jumlah HC per site dari SEMUA detail
+            // ✅ Kelompokkan jumlah HC PER SITE dari SEMUA detail
+            // Nilai jumlah_hc_hpp dan jumlah_hc_original SUDAH di-set di initializeAllDetails()
             foreach ($quotation->quotation_detail as $det) {
                 $siteId = $det->quotation_site_id;
                 if (!isset($siteHcHpp[$siteId])) {
@@ -742,26 +772,20 @@ class QuotationService
                     $siteHcCoss[$siteId] = 0;
                 }
 
-                if (!isset($det->jumlah_hc_hpp)) {
-                    $det->jumlah_hc_hpp = $det->jumlah_hc;
-                }
-                if (!isset($det->jumlah_hc_original)) {
-                    $det->jumlah_hc_original = $det->jumlah_hc;
-                }
-
+                // ✅ JANGAN override nilai yang sudah di-set!
+                // Hanya tambahkan ke total site
                 $siteHcHpp[$siteId] += $det->jumlah_hc_hpp;
                 $siteHcCoss[$siteId] += $det->jumlah_hc_original;
             }
 
-            $siteTotalsCalculated = true;
-
-            \Log::info("=== SITE HC TOTALS CALCULATED ===", [
+            \Log::info("=== SITE HC TOTALS PRECOMPUTED ===", [
                 'quotation_id' => $quotation->id,
                 'site_hc_hpp' => $siteHcHpp,
                 'site_hc_coss' => $siteHcCoss,
                 'total_details' => $quotation->quotation_detail->count()
             ]);
         }
+
         $currentSiteId = $detail->quotation_site_id;
         $totalJumlahHcHppSite = $siteHcHpp[$currentSiteId] ?? 0;
         $totalJumlahHcCossSite = $siteHcCoss[$currentSiteId] ?? 0;
@@ -988,7 +1012,7 @@ class QuotationService
                 // 1. Hitung total biaya bulanan
                 $itemTotal = (($item->jumlah * $item->harga) / $item->masa_pakai);
 
-                $perPerson =$itemTotal / max($divider, 1);
+                $perPerson = $itemTotal / max($divider, 1);
 
                 $total += $perPerson;
             } elseif ($special === 'kaporlap') {
