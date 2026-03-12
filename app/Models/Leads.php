@@ -161,7 +161,8 @@ class Leads extends Model
      */
     public function leadsKebutuhan()
     {
-        return $this->hasMany(LeadsKebutuhan::class, 'leads_id');
+        return $this->hasMany(LeadsKebutuhan::class, 'leads_id')
+            ->whereNull('deleted_at'); // Filter soft deleted records
     }
     // Tambahkan di dalam class Leads di file App\Models\Leads.php
 
@@ -270,11 +271,14 @@ class Leads extends Model
     /**
      * Scope untuk leads yang tersedia untuk aktivitas
      */
+    // ✅ SESUDAH — berikan logika pembeda agar scope ini punya alasan exist
     public function scopeAvailableForActivity($query, $user = null)
     {
         $user = $user ?: Auth::user();
 
-        // Panggil scope filter role
+        // Contoh: activity hanya untuk leads yang belum menjadi customer
+        $query->whereNull('customer_id');
+
         return $this->scopeFilterByUserRole($query, $user);
     }
 
