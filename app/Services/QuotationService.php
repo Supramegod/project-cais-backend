@@ -473,8 +473,11 @@ class QuotationService
             || ($programBpjs === '' || $programBpjs === null); // Support legacy: empty flag means active if not explicitly turned off
 
         if ($isBpjsProgram) {
-            $umk = $detail->quotationSite->umk ?? 0;
-            $ump = $detail->quotationSite->ump ?? 0;
+            // FIX N+1: Gunakan $detail->umk / $detail->ump yang sudah di-set di initializeDetail()
+            // dari preloaded _sites_map. Jangan akses $detail->quotationSite karena
+            // itu lazy-load → 1 query DB per detail dalam loop!
+            $umk = $detail->umk ?? 0;
+            $ump = $detail->ump ?? 0;
             $nominalUpah = $detail->nominal_upah;
 
             // Base untuk BPJS Ketenagakerjaan: jika upah < UMP gunakan UMP, selain itu gunakan nominal upah
@@ -744,51 +747,44 @@ class QuotationService
     // ============================ ITEM CALCULATIONS ============================
     private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss)
     {
-        // **PERBAIKAN: Precompute HC totals per site SEKALI saja (cached dalam quotation)
-        // Gunakan jumlah_hc_hpp dan jumlah_hc_original yang SUDAH di-set di initializeAllDetails()
-        static $quotationIdProcessed = null;
-        static $siteHcHpp = [];
-        static $siteHcCoss = [];
-        static $primarySiteId = null;
-        static $primaryDetailId = null;
+        // FIX: Ganti `static` variables dengan instance property (_site_hc_cache).
+        // `static` variables bertahan sepanjang proses PHP (shared antar request pada
+        // server long-lived seperti FPM/Octane), menyebabkan cache stale untuk quotation
+        // berbeda jika dipanggil dalam 1 siklus yang sama.
 
-        // ✅ Hitung total HC per site HANYA SEKALI per quotation
-        if ($quotationIdProcessed !== $quotation->id) {
-            // Reset untuk quotation baru
+        if (!isset($this->_site_hc_cache) || $this->_site_hc_cache['quotation_id'] !== $quotation->id) {
             $siteHcHpp = [];
             $siteHcCoss = [];
-            $quotationIdProcessed = $quotation->id;
 
-            $firstDetail = $quotation->quotation_detail->first();
-            $primarySiteId = $firstDetail->quotation_site_id ?? null;
-            $primaryDetailId = $firstDetail->id ?? null;
-
-            // ✅ Kelompokkan jumlah HC PER SITE dari SEMUA detail
-            // Nilai jumlah_hc_hpp dan jumlah_hc_original SUDAH di-set di initializeAllDetails()
             foreach ($quotation->quotation_detail as $det) {
                 $siteId = $det->quotation_site_id;
-                if (!isset($siteHcHpp[$siteId])) {
-                    $siteHcHpp[$siteId] = 0;
-                    $siteHcCoss[$siteId] = 0;
-                }
-
-                // ✅ JANGAN override nilai yang sudah di-set!
-                // Hanya tambahkan ke total site
-                $siteHcHpp[$siteId] += $det->jumlah_hc_hpp;
-                $siteHcCoss[$siteId] += $det->jumlah_hc_original;
+                $siteHcHpp[$siteId] = ($siteHcHpp[$siteId] ?? 0) + $det->jumlah_hc_hpp;
+                $siteHcCoss[$siteId] = ($siteHcCoss[$siteId] ?? 0) + $det->jumlah_hc_original;
             }
+
+            $firstDetail = $quotation->quotation_detail->first();
+            $this->_site_hc_cache = [
+                'quotation_id' => $quotation->id,
+                'site_hc_hpp' => $siteHcHpp,
+                'site_hc_coss' => $siteHcCoss,
+                'primary_site_id' => $firstDetail->quotation_site_id ?? null,
+                'primary_detail_id' => $firstDetail->id ?? null,
+            ];
 
             \Log::info("=== SITE HC TOTALS PRECOMPUTED ===", [
                 'quotation_id' => $quotation->id,
                 'site_hc_hpp' => $siteHcHpp,
                 'site_hc_coss' => $siteHcCoss,
-                'total_details' => $quotation->quotation_detail->count()
+                'total_details' => $quotation->quotation_detail->count(),
             ]);
         }
 
+        $cache = $this->_site_hc_cache;
         $currentSiteId = $detail->quotation_site_id;
-        $totalJumlahHcHppSite = $siteHcHpp[$currentSiteId] ?? 0;
-        $totalJumlahHcCossSite = $siteHcCoss[$currentSiteId] ?? 0;
+        $primarySiteId = $cache['primary_site_id'];
+        $primaryDetailId = $cache['primary_detail_id'];
+        $totalJumlahHcHppSite = $cache['site_hc_hpp'][$currentSiteId] ?? 0;
+        $totalJumlahHcCossSite = $cache['site_hc_coss'][$currentSiteId] ?? 0;
         $items = [
             'kaporlap' => [
                 'hpp_field' => 'provisi_seragam',
@@ -1229,8 +1225,10 @@ class QuotationService
 
         // Pastikan persen_insentif sebagai float
         $persenInsentif = (float) $quotation->persen_insentif;
+        // insentif_total disimpan tanpa dibagi HC — pembagian per jumlah_hc_hpp
+        // dilakukan di updateDetailsWithGrossUp karena tiap detail bisa beda HC-nya.
         $summary->insentif_total = $persenInsentif > 0
-            ? $summary->nominal_management_fee_coss * ($persenInsentif / 100) / $jumlahHc
+            ? $summary->nominal_management_fee * ($persenInsentif / 100)
             : 0;
     }
 
@@ -1240,7 +1238,10 @@ class QuotationService
 
         $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan, $result) {
             $detail->bunga_bank = $summary->bunga_bank_total;
-            $detail->insentif = $summary->insentif_total;
+            $jumlahHcDetail = max((int) ($detail->jumlah_hc_hpp ?? $detail->jumlah_hc), 1);
+            $detail->insentif = $summary->insentif_total > 0
+                ? round($summary->insentif_total / $jumlahHcDetail, 10)
+                : 0;
 
             // Gunakan preloaded map — tidak ada query DB per-detail
             $hpp = $quotation->_hpp_map->get($detail->id);
@@ -1402,25 +1403,10 @@ class QuotationService
     private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
-
-        // Calculate existing taxes
         $summary->{"ppn{$suffix}"} = 0;
         $summary->{"pph{$suffix}"} = 0;
-        $grandTotal = $summary->{"grand_total_sebelum_pajak{$suffix}"};
-        $maxReasonableTax = $grandTotal * 0.5;
 
-        if ($summary->{"ppn{$suffix}"} > $maxReasonableTax) {
-            $summary->{"ppn{$suffix}"} = 0;
-        }
-
-        if ($summary->{"pph{$suffix}"} > $maxReasonableTax) {
-            $summary->{"pph{$suffix}"} = 0;
-        }
-
-        // Calculate taxes if not set
-        if ($summary->{"ppn{$suffix}"} == 0 || $summary->{"pph{$suffix}"} == 0) {
-            $this->calculateDefaultTaxes($quotation, $suffix, $result);
-        }
+        $this->calculateDefaultTaxes($quotation, $suffix, $result);
     }
     private function calculateDefaultTaxes(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
@@ -1472,7 +1458,10 @@ class QuotationService
         $summary->{"total_invoice{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} +
             $summary->{"ppn{$suffix}"} + $summary->{"pph{$suffix}"};
         $summary->{"pembulatan{$suffix}"} = ceil($summary->{"total_invoice{$suffix}"} / 1000) * 1000;
+
+
         $summary->{"margin{$suffix}"} = $summary->{"grand_total_sebelum_pajak{$suffix}"} - $summary->total_sebelum_management_fee;
+
         if ($summary->{"grand_total_sebelum_pajak{$suffix}"} != 0) {
             $summary->{"gpm{$suffix}"} = $summary->{"margin{$suffix}"} / $summary->{"grand_total_sebelum_pajak{$suffix}"} * 100;
         } else {
