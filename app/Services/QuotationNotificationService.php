@@ -19,7 +19,15 @@ class QuotationNotificationService
         // ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'alivian.shelter@gmail.com', 'role' => 'Direktur Keuangan'],
         ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
+    const GM_OPERASIONAL = [
+        // ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
+        ['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
+    ];
 
+    const GM_HRM = [
+        // ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
+        ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HRM'],
+    ];
     // ✅ Constructor tidak perlu DynamicMailerService lagi
     public function __construct()
     {
@@ -100,16 +108,12 @@ class QuotationNotificationService
     }
 
     private function resolveStageLabel(?array $recipients): string
-    {
-        // tidak ada perubahan di sini
-        if ($recipients === self::DIR_SALES) {
-            return 'Persetujuan Direktur Sales';
-        }
+{
+    if ($recipients === self::GM_OPERASIONAL) return 'Persetujuan General Manager Operasional';
+    if ($recipients === self::GM_HRM)         return 'Persetujuan General Manager HRM';
+    if ($recipients === self::DIR_SALES)      return 'Persetujuan Direktur Sales';
+    if ($recipients === self::DIR_KEU)        return 'Persetujuan Direktur Keuangan';
 
-        if ($recipients === self::DIR_KEU) {
-            return 'Persetujuan Direktur Keuangan';
-        }
-
-        return 'Selesai';
-    }
+    return 'Selesai';
+}
 }

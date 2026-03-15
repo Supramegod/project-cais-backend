@@ -89,14 +89,11 @@ class QuotationStepController extends Controller
             'quotationDetails.wage',
             'quotationDetails.quotationDetailTunjangans',
             'quotationDetails.quotationSite',
-            // Relasi site level — dibutuhkan calculateQuotation untuk UMK/UMP
             'quotationSites',
-            // Relasi barang — dibutuhkan calculateQuotation untuk provisi
             'quotationKaporlaps',
             'quotationDevices',
             'quotationChemicals',
             'quotationOhcs',
-            // Relasi lainnya
             'quotationPics',
             'managementFee',
             'jenisPerusahaan',
