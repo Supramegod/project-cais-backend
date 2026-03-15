@@ -566,7 +566,7 @@ class SpkController extends Controller
                 'spkSites.quotation.quotationPics.jabatan',  // Relasi ke PIC dengan jabatan
                 'spkSites.quotation.company',                // Relasi ke company untuk alamat
                 'spkSites.quotation.quotationDetails',       // Relasi ke details untuk HC
-                'spkSites.quotation.quotationDetailCosses',  // Relasi ke details untuk HC
+                'spkSites.quotation.wage',  // Relasi ke details untuk HC
                 'spkSites.quotation.quotationTrainings',     // Relasi ke training
                 'spkSites.quotation.salaryRule',             // Eager load agar tidak lazy load di loop
                 'spkSites.quotation.ruleThr',                // Eager load agar tidak lazy load di loop
@@ -654,7 +654,7 @@ class SpkController extends Controller
                 // $picKuasa = $quotation->quotationPics->where('is_kuasa', 1)->first();
                 $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
                 // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
-                $cossdata = $quotation->quotationDetailCosses->first();
+                $wagedata = $quotation->wage->first();
 
                 // Get first detail for BPJS percentages
                 $firstDetail = $quotation->quotationDetails->first();
@@ -692,9 +692,9 @@ class SpkController extends Controller
                     'persen_bpjs_jht' => $persenBpjsBreakdown['persen_bpjs_jht'],
                     'persen_bpjs_jp' => $persenBpjsBreakdown['persen_bpjs_jp'],
                     'persen_bpjs_kesehatan' => $persenBpjsBreakdown['persen_bpjs_kesehatan'],
-                    'kompensasi' => $cossdata ? $cossdata->kompensasi ?? null : null,
-                    'lembur' => $cossdata ? $cossdata->lembur ?? null : null,
-                    'thr' => $cossdata ? $cossdata->tunjangan_hari_raya ?? null : null,
+                    'kompensasi' => $wagedata ? $wagedata->kompensasi ?? null : null,
+                    'lembur' => $wagedata ? $wagedata->lembur ?? null : null,
+                    'thr' => $wagedata ? $wagedata->thr ?? null : null,
                     'joker_reliever' => $quotation->joker_reliever ?? null,
                     'syarat_invoice' => $quotation->syarat_invoice ?? null,
                     'top' => $quotation->top ?? null,

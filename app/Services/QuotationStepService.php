@@ -1052,7 +1052,10 @@ class QuotationStepService
             // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
             // Create notification untuk Dir Sales dan Dir Keu
-            $this->notifyDirSales($quotation, $currentDateTime);
+
+            if ($statusData['status_quotation_id'] == 2) {
+                $this->notifyGM($quotation, $currentDateTime);
+            }
 
             DB::commit();
 
@@ -1075,7 +1078,7 @@ class QuotationStepService
     // ============================
     // HELPER METHODS
     // ============================
-      /**
+    /**
      * Generate konten perjanjian kerjasama
      */
     public function generateKerjasamaContent(Quotation $quotation)
@@ -1177,6 +1180,49 @@ class QuotationStepService
         return $perjanjian;
     }
 
+    private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $gmUserIds = [127824, 127926];
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan GM.";
+
+        foreach ($gmUserIds as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName,
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+
+        // Email ke GM Operasional
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::GM_OPERASIONAL
+        );
+
+        // Email ke GM HRM
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::GM_HRM
+        );
+    }
 
     private function validateStep2(Request $request): void
     {
@@ -1486,7 +1532,7 @@ class QuotationStepService
         }
     }
 
-     public function calculateFinalStatus(Quotation $quotation): array
+    public function calculateFinalStatus(Quotation $quotation): array
     {
         // 1. Cek BPJS
         $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
@@ -1536,40 +1582,6 @@ class QuotationStepService
             'is_aktif' => $needsApproval ? 0 : 1,
             'status_quotation_id' => $needsApproval ? 2 : 3
         ];
-    }
-    // 1. Di updateStep12
-    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
-    {
-        $dirSales = [27927, 127822];
-
-        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
-            ->where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->first();
-
-        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
-        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur Sales.";
-
-        foreach ($dirSales as $userId) {
-            LogNotification::create([
-                'user_id' => $userId,
-                'doc_id' => $quotation->id,
-                'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
-                'pesan' => $msg,
-                'is_read' => 0,
-                'created_at' => $currentDateTime,
-                'created_by' => $creatorName
-            ]);
-        }
-
-        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
-        $this->quotationNotificationService->sendApprovalNotification(
-            quotation: $quotation,
-            creatorName: $creatorName,
-            approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
-        );
     }
 
     private function insertRequirements(Quotation $quotation): void
