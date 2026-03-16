@@ -155,53 +155,62 @@ class SpkController extends Controller
             $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
-            // Load relasi yang dibutuhkan: leads, statusSpk, dan spkSites
-            $query = Spk::with(['leads:id,nama_perusahaan', 'statusSpk:id,nama', 'spkSites:id,spk_id,nama_site'])
-                ->select('id', 'nomor', 'tgl_spk', 'nama_perusahaan', 'status_spk_id', 'created_by', 'created_at')
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc');
+            $query = Spk::select([
+                'sl_spk.id',
+                'sl_spk.leads_id',      // ✅ WAJIB untuk eager load leads
+                'sl_spk.nomor',
+                'sl_spk.tgl_spk',
+                'sl_spk.nama_perusahaan',
+                'sl_spk.status_spk_id',
+                'sl_spk.created_by',
+                'sl_spk.created_at',
+            ])
+                ->with([
+                    'leads:id,nama_perusahaan',
+                    'statusSpk:id,nama',
+                    'spkSites:id,spk_id,nama_site',
+                ])
+                ->orderBy('sl_spk.created_at', 'desc');
 
+            // ✅ Selalu JOIN leads (dipakai untuk filter branch maupun tidak)
+            $query->leftJoin('sl_leads', 'sl_spk.leads_id', '=', 'sl_leads.id');
+
+            // Search
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
-                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                } else {
-                    $allowedColumns = ['nomor', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
+                    $query->whereRaw("MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $query->where("sl_spk.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                $query->whereBetween('tgl_spk', [$tglDari, $tglSampai]);
+                $query->whereBetween('sl_spk.tgl_spk', [$tglDari, $tglSampai]);
             }
 
-            // Filter tambahan (Branch diambil dari relasi Leads)
+            // ✅ Filter branch via JOIN — tidak perlu EXISTS
             if ($request->filled('branch')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('branch_id', $request->branch);
-                });
+                $query->where('sl_leads.branch_id', $request->branch);
             }
 
             if ($request->filled('status')) {
-                $query->where('status_spk_id', $request->status);
+                $query->where('sl_spk.status_spk_id', $request->status);
             }
 
-            // Eksekusi dengan Paginate agar performa terjaga
-            // $data = $query->paginate($request->get('per_page', 15));
-            $data = $query->paginate(15);
+            $data = $query->paginate($request->get('per_page', 15));
 
             $data->getCollection()->transform(function ($spk) {
                 return [
                     'id' => $spk->id,
                     'nomor_spk' => $spk->nomor,
-                    'tgl_spk' => $spk->tgl_spk,
+                    // ✅ Format di sini, bukan via accessor model
+                    'tgl_spk' => Carbon::parse($spk->getRawOriginal('tgl_spk'))
+                        ->locale('id')
+                        ->isoFormat('D MMMM Y'),
                     'nama_perusahaan' => $spk->leads->nama_perusahaan ?? $spk->nama_perusahaan,
                     'nama_site' => $spk->spkSites->pluck('nama_site')->toArray(),
                     'status' => $spk->statusSpk->nama ?? '-',
@@ -216,7 +225,7 @@ class SpkController extends Controller
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {

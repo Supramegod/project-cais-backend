@@ -172,6 +172,7 @@ class QuotationController extends Controller
         try {
             $query = Quotation::select([
                 'id',
+                'leads_id',            // ✅ WAJIB — untuk byUserRole dan eager load
                 'nomor',
                 'step',
                 'jumlah_site',
@@ -180,50 +181,39 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
-                'status_quotation_id',
+                'status_quotation_id', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
                 'created_by',
             ])
                 ->with([
                     'quotationSites:id,quotation_id,nama_site',
-                    'statusQuotation:id,nama'
+                    'statusQuotation:id,nama',
                 ])
                 ->byUserRole()
-                ->notDeleted()
                 ->orderBy('created_at', 'desc');
 
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-
-                } else {
-                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by'])) {
+                    $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
             }
 
-            // Filter tambahan
             if ($request->filled('branch'))
-                $query->where('branch_id', $request->branch);
+                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));
             if ($request->filled('platform'))
-                $query->where('platform_id', $request->platform);
+                $query->whereHas('leads', fn($q) => $q->where('platform_id', $request->platform));
             if ($request->filled('status'))
                 $query->where('status_quotation_id', $request->status);
             if ($request->filled('company'))
@@ -233,7 +223,7 @@ class QuotationController extends Controller
 
             $data = $query->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->transform(function ($quotation) {
+            $data->getCollection()->transform(function ($quotation) {
                 return [
                     'id' => $quotation->id,
                     'nomor' => $quotation->nomor,
@@ -243,37 +233,34 @@ class QuotationController extends Controller
                     'company' => $quotation->company,
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
-                    'tgl_quotation' => $quotation->tgl_quotation,
+                    'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
                     'created_by' => $quotation->created_by,
-                    'status_quotation' => $quotation->statusQuotation ? [
-                        'id' => $quotation->statusQuotation->id,
-                        'nama' => $quotation->statusQuotation->nama
-                    ] : null,
-                    'sl_quotation_site' => $quotation->quotationSites->map(function ($site) {
-                        return [
-                            'nama_site' => $site->nama_site
-                        ];
-                    })
+                    'status_quotation' => $quotation->statusQuotation
+                        ? ['id' => $quotation->statusQuotation->id, 'nama' => $quotation->statusQuotation->nama]
+                        : null,
+                    'sl_quotation_site' => $quotation->quotationSites->map(fn($site) => [
+                        'nama_site' => $site->nama_site,
+                    ]),
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $transformedData,
+                'data' => $data->items(),
                 'pagination' => [
                     'current_page' => $data->currentPage(),
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
                 ],
-                'message' => 'Quotations retrieved successfully'
+                'message' => 'Quotations retrieved successfully',
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve quotations',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -913,10 +900,11 @@ class QuotationController extends Controller
             $user = auth()->user();
 
             // Base query dengan relasi yang diperlukan
-            $query = Leads::with([
-                'statusLeads:id,nama',
-                'branch:id,name'
-            ])
+            $query = Leads::select('id', 'nama_perusahaan', 'pic', 'status_leads_id', 'branch_id', 'customer_id')
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name'
+                ])
                 ->filterByUserRole();
 
             // Filter berdasarkan tipe quotation menggunakan switch case
@@ -1064,26 +1052,14 @@ class QuotationController extends Controller
                 ], 422);
             }
 
-            // Cek apakah leads exists dan memiliki quotation
-            $leads = Leads::withoutTrashed()->findOrFail($leadsId);
+            // ✅ 1 query — cukup untuk validasi leads exists
+            Leads::withoutTrashed()->findOrFail($leadsId);
 
-            $totalQuotations = Quotation::where('leads_id', $leadsId)
-                ->withoutTrashed()
-                ->count();
-
-            \Log::info("Leads {$leadsId} has {$totalQuotations} quotations");
-
-            $quotations = $this->quotationBusinessService->getFilteredQuotations($leadsId, $request->tipe_quotation);
+            $quotations = $this->getFilteredQuotations($leadsId, $request->tipe_quotation);
 
             return response()->json([
                 'success' => true,
                 'data' => $quotations,
-                'debug' => [ // Tambahkan debug info
-                    'leads_id' => $leadsId,
-                    'tipe_quotation' => $request->tipe_quotation,
-                    'total_quotations' => $totalQuotations,
-                    'filtered_count' => count($quotations)
-                ],
                 'message' => 'Quotation references retrieved successfully'
             ]);
 
@@ -1582,5 +1558,144 @@ class QuotationController extends Controller
         ]);
 
         return ['success' => true, 'data' => $quotation->fresh()];
+    }
+
+
+    public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
+    {
+        $query = Quotation::select([
+            'id',
+            'nomor',
+            'nama_perusahaan',
+            'tgl_quotation',
+            'kebutuhan_id',
+            'kebutuhan',       
+            'company',        
+            'mulai_kontrak',  
+            'kontrak_selesai',
+            'jumlah_site',
+            'step',
+            'is_aktif',
+            'status_quotation_id',
+            'tipe_quotation',
+        ])
+            ->where('leads_id', $leadsId) // ✅ cukup sekali di sini
+            ->with([
+                // ✅ Batasi kolom — kurangi data yang ditarik
+                'statusQuotation:id,nama',
+                'pks:id,quotation_id,nomor,tgl_pks,kontrak_awal,kontrak_akhir,is_aktif',
+                'quotationSites:id,quotation_id,nama_site,provinsi,provinsi_id,kota,kota_id,penempatan,ump,umk',
+            ])
+            ->withoutTrashed();
+
+        switch ($tipeQuotation) {
+            case 'baru':
+                $query
+                    // Bukan revisi
+                    ->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8])
+                    // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
+                    ->whereDoesntHave('pks', function ($q) {
+                        $q->where('is_aktif', 1)
+                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                    });
+                break;
+
+            case 'revisi':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+
+                break;
+            case 'addendum':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+                // ->where(function ($q) {
+                //     $q->whereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereHas('pks', function ($pksQuery) {
+                //             $pksQuery->where('is_aktif', 1)
+                //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
+                //         });
+                //     })
+                //     ->orWhereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereNull('pks_id');
+                //     });
+                // });
+                break;
+
+            case 'rekontrak':
+                $query->where('leads_id', $leadsId)
+                    ->where(function ($q) {
+                        $q->where('status_quotation_id', 3)
+                            ->orWhereNotNull('ot1');
+                    });
+                // ->whereHas('sites', function ($siteQuery) {
+                //     $siteQuery->whereHas('pks', function ($pksQuery) {
+                //         $pksQuery->where('is_aktif', 1)
+                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                //     });
+                // });
+                break;
+        }
+
+        return $query->latest('created_at')
+            ->get()
+            ->map(fn(Quotation $quotation) => $this->formatQuotationData($quotation, $tipeQuotation));
+    }
+
+    /**
+     * Format quotation data for response
+     */
+    public function formatQuotationData(Quotation $quotation, string $tipeQuotation): array
+    {
+        $data = [
+            'id' => $quotation->id,
+            'nomor' => $quotation->nomor,
+            'nama_perusahaan' => $quotation->nama_perusahaan,
+            'mulai_kontrak' => $quotation->mulai_kontrak,
+            'kontrak_selesai' => $quotation->kontrak_selesai,
+            'tgl_quotation' => $quotation->tgl_quotation,
+            'kebutuhan_id' => $quotation->kebutuhan_id,
+            'jumlah_site' => $quotation->jumlah_site,
+            'step' => $quotation->step,
+            'is_aktif' => $quotation->is_aktif,
+            'status_quotation_id' => $quotation->status_quotation_id,
+            'status_quotation' => $quotation->statusQuotation->nama ?? 'Unknown',
+            'tipe_quotation' => $quotation->tipe_quotation,
+            'kebutuhan' => $quotation->kebutuhan,
+            'company' => $quotation->company,
+            'source' => 'quotation',
+            // Menampilkan semua site dalam bentuk array
+            'sites' => $quotation->quotationSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'provinsi' => $site->provinsi,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'provinsi_id' => $site->provinsi_id,
+                    'kota_id' => $site->kota_id,
+                    'ump' => $site->ump,
+                    'umk' => $site->umk
+                ];
+            })->toArray()
+        ];
+
+        // Untuk kompatibilitas dengan kode yang sudah ada, tetap sertakan site pertama
+        // (opsional, bisa dihapus jika tidak diperlukan)
+        $data['site'] = $quotation->quotationSites->first()->nama_site ?? null;
+
+        // Add PKS data for recontract
+        if ($tipeQuotation === 'rekontrak' && $quotation->pks) {
+            $data['pks_data'] = [
+                'id' => $quotation->pks->id,
+                'nomor' => $quotation->pks->nomor,
+                'tgl_pks' => $quotation->pks->tgl_pks,
+                'kontrak_awal' => $quotation->pks->kontrak_awal,
+                'kontrak_akhir' => $quotation->pks->kontrak_akhir,
+                'is_aktif' => $quotation->pks->is_aktif
+            ];
+        }
+
+        return $data;
     }
 }

@@ -181,6 +181,7 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
+            // ✅ Flatten eager load — jangan nesting lebih dari 2 level
             $query = Leads::select([
                 'id',
                 'nomor',
@@ -197,56 +198,43 @@ class LeadsController extends Controller
                 'platform_id',
                 'created_by',
                 'notes',
-                'created_at'
+                'created_at',
             ])
                 ->with([
                     'statusLeads:id,nama',
                     'branch:id,name',
                     'platform:id,nama',
                     'timSalesD:id,nama',
+                    'leadsKebutuhan:id,leads_id,kebutuhan_id,tim_sales_d_id',
                     'leadsKebutuhan.timSalesD:id,nama',
                     'leadsKebutuhan.kebutuhan:id,nama',
                 ])
-                ->where('status_leads_id', '!=', 102);
+                ->where('status_leads_id', '!=', 102)
+                ->filterByUserRole();
 
-            // ✅ Gunakan scope yang sudah ada di model Leads.php
-            $query->filterByUserRole();
-
+            // Search / filter tanggal (tidak berubah)
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-
-                } else {
-                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-
-                        if ($searchBy === 'kebutuhan') {
-                            // Kebutuhan adalah relasi, gunakan whereHas
-                            $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
-                                $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
-                            });
-                        } else {
-                            $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                        }
-                    }
+                } elseif ($searchBy === 'kebutuhan') {
+                    $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
+                        $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                    });
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $query->where("{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
-            // Filter tambahan
+
             if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
             if ($request->filled('platform'))
@@ -254,9 +242,10 @@ class LeadsController extends Controller
             if ($request->filled('status'))
                 $query->where('status_leads_id', $request->status);
 
-            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+            $data = $query->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->transform(function ($item) {
+            $data->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
@@ -276,27 +265,25 @@ class LeadsController extends Controller
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
                     'notes' => $item->notes,
-                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
-                        return [
-                            'id' => $lk->kebutuhan_id,
-                            'nama' => $lk->kebutuhan->nama ?? null,
-                            'tim_sales_d_id' => $lk->tim_sales_d_id,
-                            'sales_name' => $lk->timSalesD->nama ?? null
-                        ];
-                    })
+                    'kebutuhan' => $item->leadsKebutuhan->map(fn($lk) => [
+                        'id' => $lk->kebutuhan_id,
+                        'nama' => $lk->kebutuhan->nama ?? null,
+                        'tim_sales_d_id' => $lk->tim_sales_d_id,
+                        'sales_name' => $lk->timSalesD->nama ?? null,
+                    ]),
                 ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads berhasil diambil',
-                'data' => $transformedData,
+                'data' => $data->items(),
                 'pagination' => [
                     'current_page' => $data->currentPage(),
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -2873,7 +2860,7 @@ class LeadsController extends Controller
                     $chars[$i] = (string) ($current + 1);
                     break;
                 } else {
-                    $chars[$i] = 'A'; 
+                    $chars[$i] = 'A';
                     break;
                 }
             }
