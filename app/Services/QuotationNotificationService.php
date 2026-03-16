@@ -20,13 +20,13 @@ class QuotationNotificationService
         //['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
     const GM_OPERASIONAL = [
-        // ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
-        ['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
+        ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
+        //['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
     ];
 
     const GM_HRM = [
-        // ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
-        ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HRD'],
+        ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
+        // ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HRD'],
     ];
     // ✅ Constructor tidak perlu DynamicMailerService lagi
     public function __construct()
