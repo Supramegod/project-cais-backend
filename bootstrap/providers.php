@@ -3,4 +3,5 @@
 return [
     App\Providers\AppServiceProvider::class,
     App\Providers\SanctumServiceProvider::class,
+    App\Providers\TelescopeServiceProvider::class,
 ];

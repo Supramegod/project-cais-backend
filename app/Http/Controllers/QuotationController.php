@@ -1217,7 +1217,8 @@ class QuotationController extends Controller
             }
         }
     }
-    // Konstanta Role ID (idealnya di Model/Enum)
+    private const ROLE_GM_1 = 10;
+    private const ROLE_GM_2 = 53;
     private const ROLE_DIREKTUR_SALES = 96;
     private const ROLE_DIREKTUR_KEUANGAN = 97;
 
@@ -1228,10 +1229,80 @@ class QuotationController extends Controller
         $notes = $data['notes'] ?? null;
 
         return match ($user->cais_role_id) {
+            self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_SALES => $this->handleSalesApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_KEUANGAN => $this->handleKeuanganApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             default => ['success' => false, 'message' => 'User tidak memiliki akses approval.'],
         };
+    }
+
+    // ============================================================
+// LEVEL 3 - GM 1
+// ============================================================
+    private function handleGM1Approval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+
+        $quotation->update([
+            'ot3' => $isApproved ? $user->full_name : null,
+            'status_quotation_id' => $isApproved ? 2 : 8,
+            'is_aktif' => 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+
+        $freshQuotation = $quotation->fresh();
+        if (!empty($freshQuotation->ot4)) {
+            $this->notifyDirSales($freshQuotation, $now);
+        }
+
+        // Jika reject, notifikasi sales agar tahu quotation ditolak
+        if (!$isApproved) {
+            $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
+        }
+
+        return ['success' => true, 'data' => $quotation->fresh()];
+    }
+
+    // ============================================================
+// LEVEL 4 - GM 2
+// ============================================================
+    private function handleGM2Approval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+        $quotation->update([
+            'ot4' => $isApproved ? $user->full_name : null,
+            'status_quotation_id' => $isApproved ? 2 : 8,  // sama
+            'is_aktif' => 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+
+        $freshQuotation = $quotation->fresh();
+        if (!empty($freshQuotation->ot3)) {
+            $this->notifyDirSales($freshQuotation, $now);
+        }
+
+
+        // Jika reject, notifikasi sales agar tahu quotation ditolak
+        if (!$isApproved) {
+            $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
+        }
+
+        return ['success' => true, 'data' => $quotation->fresh()];
     }
 
     // ============================================================
@@ -1244,6 +1315,14 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
+        // Guard clause — pastikan kedua GM sudah approve terlebih dahulu
+        if (empty($quotation->ot3) || empty($quotation->ot4)) {
+            return [
+                'success' => false,
+                'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
+            ];
+        }
+
         $needsLevel2 = $isApproved && $this->requiresLevel2Approval($quotation);
 
         $quotation->update([
@@ -1254,7 +1333,7 @@ class QuotationController extends Controller
             'updated_by' => $user->full_name,
         ]);
 
-        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 2, now: $now);
 
         if ($needsLevel2) {
             $this->notifyDirKeu($quotation->fresh(), $now);
@@ -1264,7 +1343,7 @@ class QuotationController extends Controller
     }
 
     // ============================================================
-// LEVEL 2 - Direktur Keuangan
+// LEVEL 2 - Direktur Keuangan  (tidak ada perubahan)
 // ============================================================
     private function handleKeuanganApproval(
         Quotation $quotation,
@@ -1273,7 +1352,6 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
-        // Guard clause — lebih clean dari nested if
         if (empty($quotation->ot1)) {
             return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
         }
@@ -1286,10 +1364,11 @@ class QuotationController extends Controller
             'updated_by' => $user->full_name,
         ]);
 
-        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 2, now: $now);
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 3, now: $now);
 
         return $this->finalizeApproval($quotation, $user, $isApproved, $notes);
     }
+
 
     // ============================================================
 // HELPERS
@@ -1309,7 +1388,7 @@ class QuotationController extends Controller
 
         $isLongTop = trim($quotation->top) === 'Lebih Dari 7 Hari';
 
-    
+
 
         return $isLongTop || $hasNonProvisionalThr;
     }
@@ -1445,6 +1524,39 @@ class QuotationController extends Controller
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
             overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+        );
+    }
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirSales = [27927, 127822];
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
+
+        foreach ($dirSales as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
         );
     }
     public function reset_Approval(Quotation $quotation, User $user)

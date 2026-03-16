@@ -253,6 +253,7 @@ class QuotationResource extends JsonResource
             'ppn_pph_dipotong' => $this->ppn_pph_dipotong,
             'jumlah_hari_invoice' => $this->jumlah_hari_invoice,
             'tipe_hari_invoice' => $this->tipe_hari_invoice,
+            'note_harga_jual' => $this->note_harga_jual,
 
             // Allowance details
             'thr' => $this->thr,
@@ -316,6 +317,8 @@ class QuotationResource extends JsonResource
             'ot1' => $this->ot1,
             'ot2' => $this->ot2,
             'ot3' => $this->ot3,
+            'ot4' => $this->ot4,
+            'ot5' => $this->ot5,
 
             // Timestamps
             'created_at' => $this->created_at,
