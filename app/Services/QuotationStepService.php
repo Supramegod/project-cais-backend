@@ -1182,7 +1182,7 @@ class QuotationStepService
 
     private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
     {
-        $gmUserIds = [127824, 127926];
+        $gmUserIds = [127824, 16932, 16991];
 
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
