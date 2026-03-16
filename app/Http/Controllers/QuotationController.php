@@ -1551,7 +1551,7 @@ class QuotationController extends Controller
             ]);
         }
 
-        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
         $this->quotationNotificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
