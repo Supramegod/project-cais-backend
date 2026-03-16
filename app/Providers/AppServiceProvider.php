@@ -27,6 +27,10 @@ class AppServiceProvider extends ServiceProvider
                 $app->make(DynamicMailerService::class)
             );
         });
+
+        if (class_exists(\Laravel\Telescope\TelescopeApplicationServiceProvider::class)) {
+            $this->app->register(TelescopeServiceProvider::class);
+        }
     }
 
     /**

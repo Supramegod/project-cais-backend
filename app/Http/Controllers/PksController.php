@@ -172,69 +172,76 @@ class PksController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            // 1. Inisialisasi Tanggal & Filter Dasar
             $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(6)->toDateString();
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
-            // 2. Query Base dengan Eager Loading (Leads & Sites ditambahkan)
-            $query = Pks::with(['statusPks', 'leads', 'sites'])
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc');
+            $query = Pks::select([
+                'sl_pks.id',
+                'sl_pks.leads_id',      // ✅ WAJIB untuk eager load leads
+                'sl_pks.nomor',
+                'sl_pks.nama_perusahaan',
+                'sl_pks.tgl_pks',
+                'sl_pks.kontrak_awal',
+                'sl_pks.kontrak_akhir',
+                'sl_pks.status_pks_id', // ✅ WAJIB untuk eager load statusPks
+                'sl_pks.created_at',
+                'sl_pks.created_by',
+            ])
+                ->with([
+                    // ✅ Batasi kolom — jangan load semua
+                    'statusPks:id,nama',
+                    'sites:id,pks_id,nama_site',
+                ])
+                // ✅ JOIN leads sekali — dipakai untuk filter branch
+                ->leftJoin('sl_leads', 'sl_pks.leads_id', '=', 'sl_leads.id')
+                // ✅ Hapus whereNull deleted_at — SoftDeletes sudah handle
+                ->orderBy('sl_pks.created_at', 'desc');
 
-            // 3. Logika Search (Pola sama dengan Leads & SPK)
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
-                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                } else {
-                    $allowedColumns = ['nomor', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
+                    $query->whereRaw("MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $query->where("sl_pks.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Filter tanggal hanya jika tidak sedang search
-                $query->whereBetween('tgl_pks', [$tglDari, $tglSampai]);
+                $query->whereBetween('sl_pks.tgl_pks', [$tglDari, $tglSampai]);
             }
 
-            // 4. Filter Tambahan (Status & Branch)
             if ($request->filled('status')) {
-                $query->where('status_pks_id', $request->status);
+                $query->where('sl_pks.status_pks_id', $request->status);
             }
 
+            // ✅ Pakai JOIN bukan whereHas — sudah JOIN di atas
             if ($request->filled('branch')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('branch_id', $request->branch);
-                });
+                $query->where('sl_leads.branch_id', $request->branch);
             }
 
-            // 5. Eksekusi dengan Paginate (Lebih efisien untuk data banyak)
             $pksList = $query->paginate($request->get('per_page', 15));
 
-            // 6. Transformasi Data (Menggunakan getCollection agar info pagination tidak hilang)
             $pksList->getCollection()->transform(function ($pks) {
                 return [
                     'id' => $pks->id,
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
-                    'tgl_pks' => $pks->tgl_pks,
-                    'nama_site' => $pks->sites->pluck('nama_site')->toArray(), // Array nama site sesuai permintaan
-                    'kontrak_awal' => $pks->kontrak_awal,
-                    'kontrak_akhir' => $pks->kontrak_akhir,
-                    'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
-                    'formatted_kontrak_akhir' => Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y'),
+                    // ✅ getRawOriginal karena ada accessor getTglPksAttribute di model
+                    'tgl_pks' => Carbon::parse($pks->getRawOriginal('tgl_pks'))
+                        ->locale('id')->isoFormat('D MMMM Y'),
+                    'nama_site' => $pks->sites->pluck('nama_site')->toArray(),
+                    'kontrak_awal' => $pks->getRawOriginal('kontrak_awal'),
+                    'kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir'),
+                    'formatted_kontrak_awal' => Carbon::parse($pks->getRawOriginal('kontrak_awal'))->locale('id')->isoFormat('D MMMM Y'),
+                    'formatted_kontrak_akhir' => Carbon::parse($pks->getRawOriginal('kontrak_akhir'))->locale('id')->isoFormat('D MMMM Y'),
                     'status' => $pks->statusPks->nama ?? '-',
-                    'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->kontrak_akhir),
-                    'status_berlaku' => $this->getStatusBerlaku($pks->kontrak_akhir),
-                    'created_at' => $pks->getRawOriginal('created_at'), // Mengambil format asli DB jika ada accessor
-                    'created_by' => $pks->created_by
+                    'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->getRawOriginal('kontrak_akhir')),
+                    'status_berlaku' => $this->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir')),
+                    'created_at' => $pks->getRawOriginal('created_at'),
+                    'created_by' => $pks->created_by,
                 ];
             });
 
@@ -248,10 +255,7 @@ class PksController extends Controller
                     'total' => $pksList->total(),
                     'total_per_page' => $pksList->count(),
                 ],
-                'meta' => [
-                    'tgl_dari' => $tglDari,
-                    'tgl_sampai' => $tglSampai
-                ]
+                'meta' => ['tgl_dari' => $tglDari, 'tgl_sampai' => $tglSampai],
             ]);
 
         } catch (\Exception $e) {
@@ -259,7 +263,7 @@ class PksController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS list',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
