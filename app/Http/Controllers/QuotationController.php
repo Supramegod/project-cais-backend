@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
+use App\Jobs\EscalateQuotationJob;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\LogApproval;
@@ -762,8 +763,9 @@ class QuotationController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to process approval',
-                'error' => $e->getMessage()
+                'message' => 'Terjadi kesalahan sistem',
+                'debug_error' => $e->getMessage(), // Tambahkan ini untuk melihat error aslinya
+                'line' => $e->getLine()
             ], 500);
         }
     }
@@ -1501,6 +1503,8 @@ class QuotationController extends Controller
             approvalUrl: $approvalUrl,
             overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
         );
+        dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
+            ->delay(now()->addDay());
     }
     private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
@@ -1534,6 +1538,8 @@ class QuotationController extends Controller
             approvalUrl: $approvalUrl,
             overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
         );
+        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
+            ->delay(now()->addDay());
     }
     public function reset_Approval(Quotation $quotation, User $user)
     {
@@ -1569,9 +1575,9 @@ class QuotationController extends Controller
             'nama_perusahaan',
             'tgl_quotation',
             'kebutuhan_id',
-            'kebutuhan',       
-            'company',        
-            'mulai_kontrak',  
+            'kebutuhan',
+            'company',
+            'mulai_kontrak',
             'kontrak_selesai',
             'jumlah_site',
             'step',

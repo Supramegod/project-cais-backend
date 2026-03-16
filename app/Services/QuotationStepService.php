@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\DTO\DetailCalculation;
 use App\DTO\QuotationCalculationResult;
+use App\Jobs\EscalateQuotationJob;
 use App\Models\AplikasiPendukung;
 use App\Models\BarangDefaultQty;
 use App\Models\BidangPerusahaan;
@@ -1222,6 +1223,8 @@ class QuotationStepService
             approvalUrl: $approvalUrl,
             overrideRecipients: QuotationNotificationService::GM_HRM
         );
+        dispatch(new EscalateQuotationJob($quotation->id, 'GM', $currentDateTime))
+            ->delay(now()->addDay());
     }
 
     private function validateStep2(Request $request): void
