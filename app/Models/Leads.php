@@ -230,11 +230,12 @@ class Leads extends Model
         // Sales division
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             if ($user->cais_role_id == 29) {
-                // Sales - hanya melihat leads mereka sendiri
-                // Filter berdasarkan sl_leads_kebutuhan
-                $query->whereHas('leadsKebutuhan.timSalesD', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
+                // ✅ Ambil ID dulu, lalu whereIn — lebih ringan dari nested EXISTS
+                $timSalesDIds = TimSalesDetail::where('user_id', $user->id)->pluck('id');
+                $leadsIds = LeadsKebutuhan::whereIn('tim_sales_d_id', $timSalesDIds)
+                    ->whereNull('deleted_at')
+                    ->pluck('leads_id');
+                $query->whereIn('sl_leads.id', $leadsIds);
             } elseif ($user->cais_role_id == 31) {
                 // Sales Leader - melihat leads seluruh anggota tim
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
