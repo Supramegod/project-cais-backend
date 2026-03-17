@@ -1294,11 +1294,10 @@ class QuotationController extends Controller
         Carbon $now
     ): array {
         $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
-
-        $isOldQuotation = Carbon::createFromFormat('Y-m-d', $quotation->tgl_quotation)
+        $isOldQuotation = Carbon::parse($quotation->tgl_quotation)
             ->startOfDay()
             ->lt($gmStartDate);
-
+            
         if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
             return [
                 'success' => false,
