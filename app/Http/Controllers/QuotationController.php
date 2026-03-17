@@ -1293,8 +1293,13 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
-        // Guard clause — pastikan kedua GM sudah approve terlebih dahulu
-        if (empty($quotation->ot3) || empty($quotation->ot4)) {
+        $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
+
+        $isOldQuotation = Carbon::createFromFormat('Y-m-d', $quotation->tgl_quotation)
+            ->startOfDay()
+            ->lt($gmStartDate);
+
+        if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
             return [
                 'success' => false,
                 'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
