@@ -77,7 +77,7 @@ class DashboardApprovalController extends Controller
      *                 type="object",
      *                 description="Jumlah quotation yang belum diapprove per role",
      *                 @OA\Property(property="gm_operasional", type="integer", example=2),
-     *                 @OA\Property(property="gm_hrm", type="integer", example=2),
+     *                 @OA\Property(property="gm_hcm", type="integer", example=2),
      *                 @OA\Property(property="dir_sales", type="integer", example=3),
      *                 @OA\Property(property="dir_keu", type="integer", example=5)
      *             )
@@ -579,7 +579,7 @@ class DashboardApprovalController extends Controller
                 ->whereRaw("tgl_quotation >= ?", [$gmDate])
                 ->count(),
 
-            'gm_hrm' => (clone $baseConditions())
+            'gm_hcm' => (clone $baseConditions())
                 ->whereNull('ot4')
                 ->whereRaw("tgl_quotation >= ?", [$gmDate])
                 ->count(),
