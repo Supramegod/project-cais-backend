@@ -45,6 +45,7 @@ class DashboardApprovalController extends Controller
      *                 @OA\Items(
      *                     @OA\Property(property="step", type="integer", example=100),
      *                     @OA\Property(property="top", type="string", example="Lebih Dari 7 Hari"),
+     *                     @OA\Property(property="ot4", type="string", example=null),
      *                     @OA\Property(property="ot3", type="string", example=null),
      *                     @OA\Property(property="ot2", type="string", example=null),
      *                     @OA\Property(property="ot1", type="string", example=null),
@@ -75,8 +76,10 @@ class DashboardApprovalController extends Controller
      *                 property="pending_approval_summary",
      *                 type="object",
      *                 description="Jumlah quotation yang belum diapprove per role",
-     *                 @OA\Property(property="role_96", type="integer", example=3, description="Quotation menunggu approval Manager (role 96)"),
-     *                 @OA\Property(property="role_97_40", type="integer", example=5, description="Quotation menunggu approval Director (role 97 & 40)")
+     *                 @OA\Property(property="gm_operasional", type="integer", example=2),
+     *                 @OA\Property(property="gm_hrm", type="integer", example=2),
+     *                 @OA\Property(property="dir_sales", type="integer", example=3),
+     *                 @OA\Property(property="dir_keu", type="integer", example=5)
      *             )
      *         )
      *     ),
@@ -106,6 +109,10 @@ class DashboardApprovalController extends Controller
 
         $user = Auth::user();
 
+        // TODO: HAPUS SETELAH 2025-04-16 — tanggal mulai sistem GM aktif
+        $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
+        // END TODO
+
         // Base query factory — kondisi dasar yang berlaku untuk semua keperluan
         $baseQuery = fn() => Quotation::query()
             ->where('is_aktif', 0)
@@ -117,8 +124,8 @@ class DashboardApprovalController extends Controller
         // query COUNT() ringan — tanpa fetch record ke PHP.
         // Frontend cukup panggil 1x API dan baca key yang dibutuhkan.
         // ---------------------------------------------------------------
-        $counts = $this->getAllCaseCounts($baseQuery, $user);
-        $pendingSummary = $this->getPendingApprovalSummary($baseQuery);
+        $counts = $this->getAllCaseCounts($baseQuery, $user, $gmStartDate);
+        $pendingSummary = $this->getPendingApprovalSummary($baseQuery, $gmStartDate);
 
         // Query list data (dengan select & eager load)
         $query = $baseQuery()
@@ -126,6 +133,8 @@ class DashboardApprovalController extends Controller
                 'id',
                 'step',
                 'top',
+                'ot5',
+                'ot4',
                 'ot3',
                 'ot2',
                 'ot1',
@@ -149,21 +158,47 @@ class DashboardApprovalController extends Controller
         // Apply filter tambahan berdasarkan tipe — hanya memengaruhi $data
         switch ($request->tipe) {
             case 'menunggu-anda':
-                $this->applyMenungguAndaFilter($query, $user);
+                $this->applyMenungguAndaFilter($query, $user, $gmStartDate);
                 break;
 
             case 'menunggu-approval':
                 $query->where('step', 100)
                     ->where('is_aktif', 0)
                     ->where('status_quotation_id', 2)
-                    ->where(function ($q) {
-                        $q->whereNull('ot1')
+                    ->where(function ($q) use ($gmStartDate) {
+                        // Menunggu GM 1 (hanya quotation baru)
+                        $q->where(function ($subQ) use ($gmStartDate) {
+                            $subQ->whereNull('ot3')
+                                ->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')]);
+                        })
+                            // Menunggu GM 2 (hanya quotation baru)
+                            ->orWhere(function ($subQ) use ($gmStartDate) {
+                            $subQ->whereNull('ot4')
+                                ->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')]);
+                        })
+                            // Menunggu Dir Sales — quotation lama langsung, quotation baru wajib GM dulu
+                            ->orWhere(function ($subQ) use ($gmStartDate) {
+                            $subQ->whereNull('ot1')
+                                ->where(function ($inner) use ($gmStartDate) {
+                                    // Quotation lama → langsung antri Dir Sales
+                                    $inner->whereRaw("tgl_quotation < ?", [$gmStartDate->format('Y-m-d')])
+                                        // Quotation baru → wajib ot3 & ot4 dulu
+                                        ->orWhere(function ($new) use ($gmStartDate) {
+                                        $new->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')])
+                                            ->whereNotNull('ot3')
+                                            ->whereNotNull('ot4');
+                                    });
+                                });
+                        })
+                            // Menunggu Dir Keu
                             ->orWhere(function ($subQ) {
-                                $subQ->whereNull('ot2')
-                                    ->where('top', 'Lebih Dari 7 Hari');
-                            });
+                            $subQ->whereNotNull('ot1')
+                                ->whereNull('ot2')
+                                ->where('top', 'Lebih Dari 7 Hari');
+                        });
                     });
                 break;
+
             case 'quotation-belum-lengkap':
                 $query->where('step', '!=', 100)
                     ->where('status_quotation_id', 1);
@@ -276,7 +311,6 @@ class DashboardApprovalController extends Controller
                 $query->where('is_read', (bool) $request->input('is_read'));
             }
 
-            // Jalankan count & unread secara paralel (2 query ringan, tanpa fetch semua data)
             $total = $query->count();
             $unreadCount = LogNotification::where('user_id', $user->id)
                 ->where('is_read', false)
@@ -363,8 +397,7 @@ class DashboardApprovalController extends Controller
     {
         $user = Auth::user();
 
-        $notification = LogNotification::forUser($user->id)
-            ->find($id);
+        $notification = LogNotification::forUser($user->id)->find($id);
 
         if (!$notification) {
             return response()->json([
@@ -461,28 +494,63 @@ class DashboardApprovalController extends Controller
             ]
         ]);
     }
-    private function getAllCaseCounts(\Closure $baseQuery, $user): array
+
+    // ============================================================
+    // PRIVATE HELPERS
+    // ============================================================
+
+    private function getAllCaseCounts(\Closure $baseQuery, $user, Carbon $gmStartDate): array
     {
-        // semua  → base query tanpa filter tambahan
+        $gmDate = $gmStartDate->format('Y-m-d');
+
+        // semua → base query tanpa filter tambahan
         $countSemua = $baseQuery()->count();
 
         // menunggu-anda → step 100 + kondisi per role
         $qMenungguAnda = $baseQuery()->where('step', 100);
-        $this->applyMenungguAndaFilter($qMenungguAnda, $user);
+        $this->applyMenungguAndaFilter($qMenungguAnda, $user, $gmStartDate);
         $countMenungguAnda = $qMenungguAnda->count();
 
-        // menunggu-approval → total semua quotation yang menunggu approval (dir-sales + dir-keu)
         $baseConditions = $baseQuery()
             ->where('is_aktif', 0)
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
-        $countDirSales = (clone $baseConditions)->whereNull('ot1')->count();
-        $countDirKeu = (clone $baseConditions)->whereNull('ot2')->where('top', 'Lebih Dari 7 Hari')->count();
+        // GM 1 — hanya quotation mulai gmStartDate
+        $countGM1 = (clone $baseConditions)
+            ->whereNull('ot3')
+            ->whereRaw("tgl_quotation >= ?", [$gmDate])
+            ->count();
 
-        $countMenungguApproval = $countDirSales + $countDirKeu;
+        // GM 2 — hanya quotation mulai gmStartDate
+        $countGM2 = (clone $baseConditions)
+            ->whereNull('ot4')
+            ->whereRaw("tgl_quotation >= ?", [$gmDate])
+            ->count();
 
-        // quotation-belum-lengkap → step belum 100 + status belum lengkap
+        // Dir Sales — quotation lama langsung antri, quotation baru wajib ot3 & ot4 dulu
+        $countDirSales = (clone $baseConditions)
+            ->whereNull('ot1')
+            ->where(function ($q) use ($gmDate) {
+                $q->whereRaw("tgl_quotation < ?", [$gmDate])
+                    ->orWhere(function ($new) use ($gmDate) {
+                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
+                            ->whereNotNull('ot3')
+                            ->whereNotNull('ot4');
+                    });
+            })
+            ->count();
+
+        // Dir Keu — tetap sama
+        $countDirKeu = (clone $baseConditions)
+            ->whereNotNull('ot1')
+            ->whereNull('ot2')
+            ->where('top', 'Lebih Dari 7 Hari')
+            ->count();
+
+        $countMenungguApproval = $countGM1 + $countGM2 + $countDirSales + $countDirKeu;
+
+        // quotation-belum-lengkap
         $countBelumLengkap = $baseQuery()
             ->where('step', '!=', 100)
             ->where('status_quotation_id', 1)
@@ -496,65 +564,107 @@ class DashboardApprovalController extends Controller
         ];
     }
 
-    private function getPendingApprovalSummary(\Closure $baseQuery): array
+    private function getPendingApprovalSummary(\Closure $baseQuery, Carbon $gmStartDate): array
     {
+        $gmDate = $gmStartDate->format('Y-m-d');
+
         $baseConditions = fn() => $baseQuery()
             ->where('is_aktif', 0)
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
-        $role96Count = (clone $baseConditions())
-            ->whereNull('ot1')
-            ->count();
-
-        $role9740Count = (clone $baseConditions())
-            ->whereNull('ot2')
-            ->where('top', 'Lebih Dari 7 Hari')
-            ->count();
-
         return [
-            'dir_sales' => $role96Count,
-            'dir_keu' => $role9740Count,
+            'gm_operasional' => (clone $baseConditions())
+                ->whereNull('ot3')
+                ->whereRaw("tgl_quotation >= ?", [$gmDate])
+                ->count(),
+
+            'gm_hrm' => (clone $baseConditions())
+                ->whereNull('ot4')
+                ->whereRaw("tgl_quotation >= ?", [$gmDate])
+                ->count(),
+
+            'dir_sales' => (clone $baseConditions())
+                ->whereNull('ot1')
+                ->where(function ($q) use ($gmDate) {
+                    // Quotation lama → langsung
+                    $q->whereRaw("tgl_quotation <= ?", [$gmDate])
+                        // Quotation baru → wajib ot3 & ot4 dulu
+                        ->orWhere(function ($new) use ($gmDate) {
+                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
+                            ->whereNotNull('ot3')
+                            ->whereNotNull('ot4');
+                    });
+                })
+                ->count(),
+
+            'dir_keu' => (clone $baseConditions())
+                ->whereNotNull('ot1')
+                ->whereNull('ot2')
+                ->where('top', 'Lebih Dari 7 Hari')
+                ->count(),
         ];
     }
 
     /**
      * Apply filter untuk tipe "menunggu-anda" berdasarkan role user
      */
-    private function applyMenungguAndaFilter($query, $user): void
+    private function applyMenungguAndaFilter($query, $user, Carbon $gmStartDate): void
     {
+        $gmDate = $gmStartDate->format('Y-m-d');
+
         $query->where('step', 100)
             ->where('is_aktif', 0)
             ->where('status_quotation_id', 2);
 
-        // Build conditions berdasarkan role
         $conditions = [];
 
-        if ($user->cais_role_id == 96) {
-            $conditions[] = function ($q) {
-                $q->whereNull('ot1');
+        // GM 1 (role 10) — hanya quotation mulai gmStartDate
+        if ($user->cais_role_id == 10) {
+            $conditions[] = function ($q) use ($gmDate) {
+                $q->whereNull('ot3')
+                    ->whereRaw("tgl_quotation >= ?", [$gmDate]);
             };
         }
 
+        // GM 2 (role 53) — hanya quotation mulai gmStartDate
+        if ($user->cais_role_id == 53) {
+            $conditions[] = function ($q) use ($gmDate) {
+                $q->whereNull('ot4')
+                    ->whereRaw("tgl_quotation >= ?", [$gmDate]);
+            };
+        }
+
+        // Dir Sales (role 96) — quotation lama langsung, quotation baru wajib GM dulu
+        if ($user->cais_role_id == 96) {
+            $conditions[] = function ($q) use ($gmDate) {
+                // Quotation lama → langsung antri Dir Sales
+                $q->where(function ($old) use ($gmDate) {
+                    $old->whereRaw("tgl_quotation <= ?", [$gmDate])
+                        ->whereNull('ot1');
+                })
+                    // Quotation baru → wajib ot3 & ot4 dulu baru antri Dir Sales
+                    ->orWhere(function ($new) use ($gmDate) {
+                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
+                            ->whereNotNull('ot3')
+                            ->whereNotNull('ot4')
+                            ->whereNull('ot1');
+                    });
+            };
+        }
+
+        // Dir Keuangan (role 97 & 40) — tetap sama
         if (in_array($user->cais_role_id, [97, 40])) {
             $conditions[] = function ($q) {
-                $q->whereNull('ot2')
-                    ->where('top', 'Lebih Dari 7 Hari');
-            };
-        }
-
-        if ($user->cais_role_id == 99) {
-            $conditions[] = function ($q) {
                 $q->whereNotNull('ot1')
-                    ->whereNotNull('ot2')
-                    ->whereNull('ot3')
+                    ->whereNull('ot2')
                     ->where('top', 'Lebih Dari 7 Hari');
             };
         }
 
         // Jika user tidak memiliki role yang relevan, tidak ada data yang ditampilkan
         if (empty($conditions)) {
-            $query->whereRaw('1 = 0'); // Always false
+            $query->whereRaw('1 = 0');
             return;
         }
 
@@ -571,7 +681,6 @@ class DashboardApprovalController extends Controller
      */
     private function transformQuotationData($quotation): array
     {
-        // Format tanggal menggunakan accessor yang sudah ada di model
         $tglFormatted = $quotation->tgl_quotation
             ? Carbon::createFromFormat('d-m-Y', $quotation->tgl_quotation)->isoFormat('D MMMM Y')
             : null;
@@ -579,9 +688,10 @@ class DashboardApprovalController extends Controller
         return [
             'step' => $quotation->step,
             'top' => $quotation->top,
-            'ot3' => $quotation->ot3,
-            'ot2' => $quotation->ot2,
-            'ot1' => $quotation->ot1,
+            'ot4' => $quotation->ot4,  // GM 2 (GM HRM)
+            'ot3' => $quotation->ot3,  // GM 1 (GM Operasional)
+            'ot2' => $quotation->ot2,  // Direktur Keuangan
+            'ot1' => $quotation->ot1,  // Direktur Sales
             'status' => $quotation->statusQuotation->nama ?? null,
             'is_aktif' => $quotation->is_aktif,
             'quotation_id' => $quotation->id,
@@ -595,11 +705,9 @@ class DashboardApprovalController extends Controller
             'nama_perusahaan' => $quotation->nama_perusahaan,
             'tgl_quotation' => $quotation->tgl_quotation,
             'tgl' => $tglFormatted,
-            'sites' => $quotation->quotationSites->map(function ($site) {
-                return [
-                    'nama_site' => $site->nama_site
-                ];
-            })
+            'sites' => $quotation->quotationSites->map(fn($site) => [
+                'nama_site' => $site->nama_site
+            ])
         ];
     }
 
@@ -620,7 +728,6 @@ class DashboardApprovalController extends Controller
             'time_ago' => $notification->created_at->diffForHumans(),
         ];
 
-        // Tambahkan info quotation jika ada
         if ($notification->tabel === 'sl_quotation' && $notification->doc_id) {
             $quotation = Quotation::select('id', 'nomor', 'nama_perusahaan')
                 ->find($notification->doc_id);
