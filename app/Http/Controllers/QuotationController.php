@@ -1508,7 +1508,7 @@ class QuotationController extends Controller
             overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
-            ->delay(now()->addDay());
+            ->delay(now()->addMinutes(30));
     }
     private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
@@ -1543,7 +1543,7 @@ class QuotationController extends Controller
             overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
-            ->delay(now()->addDay());
+            ->delay(now()->addMinutes(30));
     }
     public function reset_Approval(Quotation $quotation, User $user)
     {

@@ -1224,7 +1224,7 @@ class QuotationStepService
             overrideRecipients: QuotationNotificationService::GM_HRM
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'GM', $currentDateTime))
-            ->delay(now()->addDay());
+            ->delay(now()->addMinutes(30));
     }
 
     private function validateStep2(Request $request): void
