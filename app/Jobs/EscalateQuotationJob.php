@@ -46,10 +46,10 @@ class EscalateQuotationJob implements ShouldQueue
 
         // Cek apakah masih perlu eskalasi berdasarkan target level
         $shouldEscalate = match ($this->targetLevel) {
-            'GM'        => empty($quotation->ot3) || empty($quotation->ot4),
-            'Sales'     => empty($quotation->ot1),
-            'Keuangan'  => empty($quotation->ot2),
-            default     => false,
+            'GM' => empty($quotation->ot3) || empty($quotation->ot4),
+            'Sales' => empty($quotation->ot1),
+            'Keuangan' => empty($quotation->ot2),
+            default => false,
         };
 
         if (!$shouldEscalate) {
@@ -71,19 +71,20 @@ class EscalateQuotationJob implements ShouldQueue
 
         // Tentukan label approver yang telat
         $approverLabel = match ($this->targetLevel) {
-            'GM'        => 'GM Operasional & GM HRM',
-            'Sales'     => 'Direktur Sales',
-            'Keuangan'  => 'Direktur Keuangan',
+            'GM' => 'GM Operasional & GM HRM',
+            'Sales' => 'Direktur Sales',
+            'Keuangan' => 'Direktur Keuangan',
         };
 
         // Data untuk email
         $data = [
+            'quotation_id' => $quotation->id,
             'quotation_number' => $quotation->nomor,
-            'creator_name'     => $creatorName,
-            'company_name'     => $quotation->nama_perusahaan ?? '-',
-            'approver_label'   => $approverLabel,
-            'entry_date'       => $this->entryDateTime->format('d-m-Y'),
-            'entry_time'       => $this->entryDateTime->format('H:i'),
+            'creator_name' => $creatorName,
+            'company_name' => $quotation->nama_perusahaan ?? '-',
+            'approver_label' => $approverLabel,
+            'entry_date' => $this->entryDateTime->format('d-m-Y'),
+            'entry_time' => $this->entryDateTime->format('H:i'),
         ];
 
         // Kirim email ke Direktur Utama
