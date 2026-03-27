@@ -36,6 +36,12 @@ class QuotationService
 {
     protected $quotationNotificationService;
 
+    /**
+     * Fallback hari kerja per bulan untuk kontrak PKHL apabila kolom hari_kerja
+     * pada sl_quotation kosong atau tidak terbaca.
+     */
+    private const PKHL_DEFAULT_HARI_KERJA = 25;
+
     public function __construct(
 
         QuotationNotificationService $quotationNotificationService,
@@ -243,7 +249,7 @@ class QuotationService
                 $wage->jenis_bayar_tunjangan_holiday = null;
             }
 
-            $this->initializeDetail($detail, $hpp, $site, $wage);
+            $this->initializeDetail($detail, $hpp, $site, $wage, $quotation);
             $this->calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, $detailCalculation);
 
             // Simpan detail calculation ke result
@@ -277,7 +283,7 @@ class QuotationService
         }
     }
 
-    private function initializeDetail($detail, $hpp, $site, $wage)
+    private function initializeDetail($detail, $hpp, $site, $wage, $quotation)
     {
         // ✅ PERBAIKAN: jumlah_hc_hpp sudah di-set di initializeAllDetails()
         // Di sini hanya set properties lainnya
@@ -306,7 +312,14 @@ class QuotationService
         $detail->tunjangan_holiday = $wage->tunjangan_holiday ?? "Tidak";
         $detail->nominal_tunjangan_holiday = $wage->nominal_tunjangan_holiday ?? 0;
         $detail->jenis_bayar_tunjangan_holiday = $wage->jenis_bayar_tunjangan_holiday ?? null;
+
+        // ✅ PKHL: Normalisasi upah harian → bulanan satu kali di sini.
+        // nominal_upah tetap menyimpan nilai harian (untuk gaji_pokok di HPP/COSS).
+        // nominal_upah_bulanan adalah property baru yang digunakan oleh semua
+        // kalkulasi downstream: calculateBpjs, calculateExtras, calculateFinalTotals.
+        $this->normalizeUpahForKontrak($detail, $quotation);
     }
+
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
         try {
@@ -344,7 +357,7 @@ class QuotationService
             'leads_id' => $quotation->leads_id,
             'position_id' => $detail->position_id,
             'jumlah_hc' => $detail->jumlah_hc_hpp, // ← GUNAKAN jumlah_hc_hpp
-            'gaji_pokok' => $detail->nominal_upah,
+            'gaji_pokok' => $detail->nominal_upah,  // ← tetap nominal harian untuk PKHL
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_hpp ?? 0,
             'kompensasi' => $detail->kompensasi_hpp ?? 0,
@@ -378,7 +391,7 @@ class QuotationService
             'leads_id' => $quotation->leads_id,
             'position_id' => $detail->position_id,
             'jumlah_hc' => $detail->jumlah_hc_original, // ← GUNAKAN jumlah_hc_original
-            'gaji_pokok' => $detail->nominal_upah,
+            'gaji_pokok' => $detail->nominal_upah,       // ← tetap nominal harian untuk PKHL
             'total_tunjangan' => $detail->total_tunjangan ?? 0,
             'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
             'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_coss ?? 0,
@@ -442,6 +455,7 @@ class QuotationService
             'total_coss' => $totalTunjanganCoss
         ];
     }
+
     private function calculateBpjs($detail, $quotation, $hpp)
     {
         // Jika BPU, langsung return dengan setting ke 0
@@ -478,7 +492,9 @@ class QuotationService
             // itu lazy-load → 1 query DB per detail dalam loop!
             $umk = $detail->umk ?? 0;
             $ump = $detail->ump ?? 0;
-            $nominalUpah = $detail->nominal_upah;
+
+
+            $nominalUpah = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
 
             // Base untuk BPJS Ketenagakerjaan: jika upah < UMP gunakan UMP, selain itu gunakan nominal upah
             $baseKetenagakerjaan = ($nominalUpah < $ump) ? $ump : $nominalUpah;
@@ -585,10 +601,15 @@ class QuotationService
             $this->updateQuotationBpjs($detail, $quotation);
         }
     }
-    // PERBAIKAN 1: Pastikan nilai THR dihitung dengan bena
+
+    // PERBAIKAN 1: Pastikan nilai THR dihitung dengan benar
     private function calculateExtras($detail, $quotation, $hpp, $coss, $wage): void
     {
         try {
+            // ✅ PKHL: Gunakan nominal_upah_bulanan sebagai basis THR dan Kompensasi
+            // agar kalkulasi (upah / 12) menggunakan nilai bulanan, bukan harian.
+            $baseUpahBulanan = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
+
             // TUNJANGAN HARI RAYA (THR)
             $tunjanganHariRayaHpp = $hpp ? (float) ($hpp->tunjangan_hari_raya ?? 0) : 0;
             $tunjanganHariRayaCoss = $coss ? (float) ($coss->tunjangan_hari_raya ?? 0) : 0;
@@ -596,8 +617,8 @@ class QuotationService
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
                 $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
-                    $tunjanganHariRayaHpp = ($detail->nominal_upah ?? 0) / 12;
-                    $tunjanganHariRayaCoss = ($detail->nominal_upah ?? 0) / 12;
+                    $tunjanganHariRayaHpp = $baseUpahBulanan / 12;
+                    $tunjanganHariRayaCoss = $baseUpahBulanan / 12;
                 }
             }
 
@@ -608,7 +629,7 @@ class QuotationService
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
                 $kompensasiWageValue = strtolower(trim($wage->kompensasi ?? 'Tidak Ada'));
                 if (in_array($kompensasiWageValue, ['diprovisikan'])) {
-                    $kompensasiDefault = ($detail->nominal_upah ?? 0) / 12;
+                    $kompensasiDefault = $baseUpahBulanan / 12;
                     $kompensasiHpp = $kompensasiDefault;
                     $kompensasiCoss = $kompensasiDefault;
                 }
@@ -669,6 +690,7 @@ class QuotationService
             throw $e;
         }
     }
+
     /**
      * Hitung tunjangan holiday dari data wage (step 4)
      */
@@ -1110,8 +1132,9 @@ class QuotationService
             $kompensasiHpp = (float) ($detail->kompensasi_hpp ?? 0);
             $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
             $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
-            $nominalUpah = (float) ($detail->nominal_upah ?? 0);
-            ;
+
+            $nominalUpah = (float) ($detail->nominal_upah_bulanan ?? $detail->nominal_upah ?? 0);
+
             $tunjanganHoliday = (float) ($detail->tunjangan_holiday_hpp ?? 0);
             $lembur = (float) ($detail->lembur_hpp ?? 0);
             $tunjanganHolidayCoss = (float) ($detail->tunjangan_holiday_coss ?? 0);
@@ -1208,6 +1231,7 @@ class QuotationService
             throw $e;
         }
     }
+
     // ============================ GROSS UP RECALCULATION ============================
     private function calculateBankInterestAndIncentive($quotation, $jumlahHc, QuotationCalculationResult $result): void
     {
@@ -1269,6 +1293,7 @@ class QuotationService
             }
         });
     }
+
     // ============================ HPP & COSS CALCULATIONS ============================
     private function calculateHpp(&$quotation, $jumlahHc, $provisi, QuotationCalculationResult $result): void
     {
@@ -1321,8 +1346,9 @@ class QuotationService
 
         // 3. Hitung upah pokok dengan jumlah_hc yang benar
         $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(
-            fn($detail) => $detail->nominal_upah * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
+            fn($detail) => ($detail->nominal_upah_bulanan ?? $detail->nominal_upah) * ($detail->{$jumlahHcField} ?? $detail->jumlah_hc)
         );
+
 
         // 4. Hitung total BPJS ketenagakerjaan dengan jumlah_hc yang benar
         $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(
@@ -1405,6 +1431,7 @@ class QuotationService
 
         $this->calculateDefaultTaxes($quotation, $suffix, $result);
     }
+
     private function calculateDefaultTaxes(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -1448,6 +1475,7 @@ class QuotationService
             }
         }
     }
+
     private function finalizeCalculations(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
@@ -1465,6 +1493,7 @@ class QuotationService
             $summary->{"gpm{$suffix}"} = 0;
         }
     }
+
     // ============================ HELPER METHODS ============================
     private function calculateProvisi($durasiKerjasama)
     {
@@ -1473,6 +1502,33 @@ class QuotationService
         return !str_contains($durasiKerjasama, 'tahun')
             ? (int) str_replace(" bulan", "", $durasiKerjasama)
             : 12;
+    }
+
+    private function parseHariKerja(?string $hariKerja): int
+    {
+        if (!$hariKerja) {
+            return self::PKHL_DEFAULT_HARI_KERJA;
+        }
+
+        $parsed = (int) $hariKerja;
+
+        return $parsed > 0 ? $parsed : self::PKHL_DEFAULT_HARI_KERJA;
+    }
+
+    private function normalizeUpahForKontrak($detail, $quotation): void
+    {
+        if (($quotation->jenis_kontrak ?? '') !== 'PKHL') {
+
+            $detail->nominal_upah_bulanan = (float) $detail->nominal_upah;
+            return;
+        }
+
+        $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
+
+        $detail->nominal_upah_harian = (float) $detail->nominal_upah;
+        $detail->hari_kerja_pkhl = $hariKerja;
+
+        $detail->nominal_upah_bulanan = round($detail->nominal_upah_harian * $hariKerja, 2);
     }
 
     private function calculateUpahBpjs($nominalUpah, $umk, $ump)
@@ -1502,6 +1558,7 @@ class QuotationService
         ];
         return $percentages[$resiko] ?? 0.24;
     }
+
     private function applyBpjsOptOut($detail)
     {
         $optOuts = [
@@ -1573,6 +1630,5 @@ class QuotationService
 
         return $bpuAmount;
     }
-
 
 }
