@@ -89,7 +89,7 @@ class EscalateQuotationJob implements ShouldQueue
 
         // Kirim email ke Direktur Utama
         try {
-            Mail::to('jluppradipta728@gmail.com')
+            Mail::to('hariw.shelter@gmail.com')
                 ->send(new EscalationMail($data));
 
             Log::info('EscalateQuotationJob: Email eskalasi terkirim', [
