@@ -155,7 +155,7 @@
             <p>Demi kelancaran operasional, dimohon kebijaksanaan Bapak untuk meninjau atau melakukan eskalasi lebih
                 lanjut terkait dokumen tersebut.</p>
             <div style="text-align: center; margin-top: 20px;">
-                <a href="https://cais2.shelterapp2.co.id//quotation/view/{{ $data['quotation_id'] }}" class="button">Tinjau
+                <a href="https://cais2.shelterapp2.co.id/quotation/view/{{ $data['quotation_id'] }}" class="button">Tinjau
                     Dokumen di CAIS</a>
             </div>
             <p style="margin-top: 30px;">Terima kasih.</p>
