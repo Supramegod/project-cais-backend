@@ -1225,10 +1225,8 @@ class QuotationService
 
         // Pastikan persen_insentif sebagai float
         $persenInsentif = (float) $quotation->persen_insentif;
-        // insentif_total disimpan tanpa dibagi HC — pembagian per jumlah_hc_hpp
-        // dilakukan di updateDetailsWithGrossUp karena tiap detail bisa beda HC-nya.
         $summary->insentif_total = $persenInsentif > 0
-            ? $summary->nominal_management_fee * ($persenInsentif / 100)
+            ? $summary->nominal_management_fee * ($persenInsentif / 100) / $jumlahHc
             : 0;
     }
 
@@ -1238,9 +1236,8 @@ class QuotationService
 
         $quotation->quotation_detail->each(function ($detail) use ($quotation, $summary, $daftarTunjangan, $result) {
             $detail->bunga_bank = $summary->bunga_bank_total;
-            $jumlahHcDetail = max((int) ($detail->jumlah_hc_hpp ?? $detail->jumlah_hc), 1);
             $detail->insentif = $summary->insentif_total > 0
-                ? round($summary->insentif_total / $jumlahHcDetail, 10)
+                ? round($summary->insentif_total, 10)
                 : 0;
 
             // Gunakan preloaded map — tidak ada query DB per-detail
