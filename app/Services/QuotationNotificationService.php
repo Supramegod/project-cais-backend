@@ -11,23 +11,23 @@ use Illuminate\Support\Facades\Mail;
 class QuotationNotificationService
 {
     const DIR_SALES = [
-        // ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino.shelter@gmail.com', 'role' => 'Direktur Sales'],
-        ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
+         ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino.shelter@gmail.com', 'role' => 'Direktur Sales'],
+        //['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [
-        // ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'alivian.shelter@gmail.com', 'role' => 'Direktur Keuangan'],
-        ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
+        ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'alivian.shelter@gmail.com', 'role' => 'Direktur Keuangan'],
+        //['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
     ];
-    // const GM_OPERASIONAL = [
-    //     // ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
-    //     ['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
-    // ];
+    const GM_OPERASIONAL = [
+        ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
+        //['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
+    ];
 
-    // const GM_HRM = [
-    //     // ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
-    //     ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HCM'],
-    // ];
+    const GM_HRM = [
+        ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
+        // ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HRD'],
+    ];
     // ✅ Constructor tidak perlu DynamicMailerService lagi
     public function __construct()
     {

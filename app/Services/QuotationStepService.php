@@ -1242,7 +1242,7 @@ class QuotationStepService
             ]);
         }
 
-        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
 
         // Email ke GM Operasional
         $this->quotationNotificationService->sendApprovalNotification(
