@@ -1207,8 +1207,8 @@ class QuotationController extends Controller
         $notes = $data['notes'] ?? null;
 
         return match ($user->cais_role_id) {
-            self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
-            self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            // self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            // self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_SALES => $this->handleSalesApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_KEUANGAN => $this->handleKeuanganApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             default => ['success' => false, 'message' => 'User tidak memiliki akses approval.'],
@@ -1293,17 +1293,17 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
-        $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
-        $isOldQuotation = Carbon::parse($quotation->tgl_quotation)
-            ->startOfDay()
-            ->lt($gmStartDate);
+        // $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
+        // $isOldQuotation = Carbon::parse($quotation->tgl_quotation)
+        //     ->startOfDay()
+        //     ->lt($gmStartDate);
             
-        if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
-            return [
-                'success' => false,
-                'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
-            ];
-        }
+        // if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
+        //     return [
+        //         'success' => false,
+        //         'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
+        //     ];
+        // }
 
         $needsLevel2 = $isApproved && $this->requiresLevel2Approval($quotation);
 

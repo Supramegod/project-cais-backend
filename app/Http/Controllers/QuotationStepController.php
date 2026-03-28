@@ -420,6 +420,7 @@ class QuotationStepController extends Controller
             'position_data' => $positionData,
             'global_data' => [
                 'is_ppn' => $quotation->is_ppn,
+                'jenis_kontrak' => $quotation->jenis_kontrak,
                 'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
                 'management_fee_id' => $quotation->management_fee_id,
                 'persentase' => $quotation->persentase,
@@ -578,6 +579,7 @@ class QuotationStepController extends Controller
         }
 
         return [
+            'hari_kerja' => $quotation->hari_kerja,
             'penagihan' => $quotation->penagihan,
             'nama_perusahaan' => $quotation->nama_perusahaan,
             'persentase' => $quotation->persentase,
