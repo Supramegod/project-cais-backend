@@ -109,8 +109,8 @@ class QuotationNotificationService
 
     private function resolveStageLabel(?array $recipients): string
 {
-    if ($recipients === self::GM_OPERASIONAL) return 'Persetujuan General Manager Operasional';
-    if ($recipients === self::GM_HRM)         return 'Persetujuan General Manager HCM';
+    // if ($recipients === self::GM_OPERASIONAL) return 'Persetujuan General Manager Operasional';
+    // if ($recipients === self::GM_HRM)         return 'Persetujuan General Manager HCM';
     if ($recipients === self::DIR_SALES)      return 'Persetujuan Direktur Sales';
     if ($recipients === self::DIR_KEU)        return 'Persetujuan Direktur Keuangan';
 
