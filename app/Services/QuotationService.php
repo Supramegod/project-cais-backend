@@ -608,7 +608,7 @@ class QuotationService
         try {
             // ✅ PKHL: Gunakan nominal_upah_bulanan sebagai basis THR dan Kompensasi
             // agar kalkulasi (upah / 12) menggunakan nilai bulanan, bukan harian.
-            $baseUpahBulanan = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
+            $baseUpahBulanan = $detail->nominal_upah;
 
             // TUNJANGAN HARI RAYA (THR)
             $tunjanganHariRayaHpp = $hpp ? (float) ($hpp->tunjangan_hari_raya ?? 0) : 0;
