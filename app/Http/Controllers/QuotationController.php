@@ -4,11 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
+use App\Jobs\EscalateQuotationJob;
 use App\Models\Branch;
+use App\Models\LeadsKebutuhan;
+use App\Models\LogApproval;
+use App\Models\LogNotification;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationSite;
 use App\Models\TimSalesDetail;
+use App\Models\User;
+use App\Services\AddendumService;
 use App\Services\QuotationDuplicationService;
+use App\Services\QuotationNotificationService;
 use App\Services\RekontrakService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -39,11 +46,13 @@ class QuotationController extends Controller
     public function __construct(
         QuotationService $quotationService,
         QuotationBusinessService $quotationBusinessService,
-        QuotationDuplicationService $quotationDuplicationService
+        QuotationDuplicationService $quotationDuplicationService,
+        QuotationNotificationService $quotationNotificationService
     ) {
         $this->quotationService = $quotationService;
         $this->quotationBusinessService = $quotationBusinessService;
         $this->quotationDuplicationService = $quotationDuplicationService;
+        $this->quotationNotificationService = $quotationNotificationService;
     }
 
     /**
@@ -164,6 +173,7 @@ class QuotationController extends Controller
         try {
             $query = Quotation::select([
                 'id',
+                'leads_id',            // ✅ WAJIB — untuk byUserRole dan eager load
                 'nomor',
                 'step',
                 'jumlah_site',
@@ -172,50 +182,39 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
-                'status_quotation_id',
+                'status_quotation_id', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
                 'created_by',
             ])
                 ->with([
                     'quotationSites:id,quotation_id,nama_site',
-                    'statusQuotation:id,nama'
+                    'statusQuotation:id,nama',
                 ])
                 ->byUserRole()
-                ->notDeleted()
                 ->orderBy('created_at', 'desc');
 
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-
-                } else {
-                    $allowedColumns = ['nomor', 'kebutuhan','created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by'])) {
+                    $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_quotation', [$tglDari, $tglSampai]);
             }
 
-            // Filter tambahan
             if ($request->filled('branch'))
-                $query->where('branch_id', $request->branch);
+                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));
             if ($request->filled('platform'))
-                $query->where('platform_id', $request->platform);
+                $query->whereHas('leads', fn($q) => $q->where('platform_id', $request->platform));
             if ($request->filled('status'))
                 $query->where('status_quotation_id', $request->status);
             if ($request->filled('company'))
@@ -225,7 +224,7 @@ class QuotationController extends Controller
 
             $data = $query->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->transform(function ($quotation) {
+            $data->getCollection()->transform(function ($quotation) {
                 return [
                     'id' => $quotation->id,
                     'nomor' => $quotation->nomor,
@@ -235,37 +234,34 @@ class QuotationController extends Controller
                     'company' => $quotation->company,
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
-                    'tgl_quotation' => $quotation->tgl_quotation,
+                    'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
                     'created_by' => $quotation->created_by,
-                    'status_quotation' => $quotation->statusQuotation ? [
-                        'id' => $quotation->statusQuotation->id,
-                        'nama' => $quotation->statusQuotation->nama
-                    ] : null,
-                    'sl_quotation_site' => $quotation->quotationSites->map(function ($site) {
-                        return [
-                            'nama_site' => $site->nama_site
-                        ];
-                    })
+                    'status_quotation' => $quotation->statusQuotation
+                        ? ['id' => $quotation->statusQuotation->id, 'nama' => $quotation->statusQuotation->nama]
+                        : null,
+                    'sl_quotation_site' => $quotation->quotationSites->map(fn($site) => [
+                        'nama_site' => $site->nama_site,
+                    ]),
                 ];
             });
 
             return response()->json([
                 'success' => true,
-                'data' => $transformedData,
+                'data' => $data->items(),
                 'pagination' => [
                     'current_page' => $data->currentPage(),
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
                 ],
-                'message' => 'Quotations retrieved successfully'
+                'message' => 'Quotations retrieved successfully',
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve quotations',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -585,7 +581,8 @@ class QuotationController extends Controller
      */
     // Di QuotationController
     public function show($id)
-    { set_time_limit(0);
+    {
+        set_time_limit(0);
         try {
             // Load semua relasi yang diperlukan
             $quotation = Quotation::with([
@@ -695,238 +692,7 @@ class QuotationController extends Controller
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/quotations/{sourceId}/copy/{targetId}",
-     *     tags={"Quotations"},
-     *     summary="Copy quotation data",
-     *     description="Copies all data from source quotation to target quotation",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="sourceId",
-     *         in="path",
-     *         description="Source quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Parameter(
-     *         name="targetId",
-     *         in="path",
-     *         description="Target quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=2)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Quotation copied successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotation copied successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Quotation not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Quotation not found"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to copy quotation"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function copy(Request $request, string $sourceId, string $targetId): JsonResponse
-    {
-        DB::beginTransaction();
-        try {
-            $sourceQuotation = Quotation::with([
-                'quotationSites',
-                'quotationDetails',
-                'quotationPics',
-                'quotationAplikasis',
-                'quotationKaporlaps',
-                'quotationDevices',
-                'quotationChemicals',
-                'quotationOhcs',
-                'quotationKerjasamas',
-                'quotationTrainings'
-            ])
-                ->notDeleted()
-                ->findOrFail($sourceId);
 
-            $targetQuotation = Quotation::notDeleted()->findOrFail($targetId);
-
-            $this->quotationService->copyQuotationData($sourceQuotation, $targetQuotation, Auth::user());
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($targetQuotation->fresh()),
-                'message' => 'Quotation copied successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to copy quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Post(
-     *     path="/api/quotations/{id}/resubmit",
-     *     tags={"Quotations"},
-     *     summary="Resubmit quotation",
-     *     description="Creates a new quotation version from an existing quotation with resubmit reason",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Original quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"alasan"},
-     *             @OA\Property(property="alasan", type="string", example="Perubahan kebutuhan client")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Quotation resubmitted successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotation resubmitted successfully")
-     *         )
-     *     )
-     * )
-     */
-    public function resubmit(Request $request, string $id): JsonResponse
-    {
-        DB::beginTransaction();
-        try {
-            $user = Auth::user();
-
-            // Get original quotation with all relations
-            $originalQuotation = Quotation::with([
-                'quotationDetails.quotationDetailHpps',
-                'quotationDetails.quotationDetailCosses',
-                'quotationDetails.wage',
-                'quotationDetails.quotationDetailRequirements',
-                'quotationDetails.quotationDetailTunjangans',
-                'leads',
-                'statusQuotation',
-                'quotationSites',
-                'quotationPics',
-                'quotationAplikasis',
-                'quotationKaporlaps',
-                'quotationDevices',
-                'quotationChemicals',
-                'quotationOhcs',
-                'quotationTrainings',
-                'quotationKerjasamas'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
-
-            $validator = Validator::make($request->all(), [
-                'alasan' => 'required|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
-            }
-
-            // Generate new quotation number for resubmit
-            $newNomor = $this->quotationService->generateResubmitNomor($originalQuotation->nomor);
-
-            // Create new quotation with resubmit data
-            $newQuotation = Quotation::create([
-                'nomor' => $newNomor,
-                'tgl_quotation' => Carbon::now()->toDateString(),
-                'leads_id' => $originalQuotation->leads_id,
-                'nama_perusahaan' => $originalQuotation->nama_perusahaan,
-                'kebutuhan_id' => $originalQuotation->kebutuhan_id,
-                'kebutuhan' => $originalQuotation->kebutuhan,
-                'company_id' => $originalQuotation->company_id,
-                'company' => $originalQuotation->company,
-                'jumlah_site' => $originalQuotation->jumlah_site,
-                'step' => 1,
-                'status_quotation_id' => 1, // Reset to draft
-                'is_aktif' => 0,
-                'alasan_resubmit' => $request->alasan,
-                'quotation_sebelumnya_id' => $originalQuotation->id,
-                'created_by' => $user->full_name
-            ]);
-
-            \Log::info('Resubmit: New quotation created', [
-                'new_id' => $newQuotation->id,
-                'original_id' => $originalQuotation->id,
-                'nomor' => $newNomor
-            ]);
-
-            // Duplicate all data from original quotation
-            $this->quotationDuplicationService->duplicateQuotationData(
-                $newQuotation,
-                $originalQuotation
-            );
-
-            // Deactivate original quotation
-            $originalQuotation->update([
-                'is_aktif' => 0,
-                'updated_by' => $user->full_name
-            ]);
-
-            // Load relations for response
-            $newQuotation->load([
-                'quotationSites',
-                'quotationPics',
-                'quotationDetails',
-                'statusQuotation'
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($newQuotation),
-                'message' => 'Quotation resubmitted successfully'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Failed to resubmit quotation', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to resubmit quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
 
     /**
      * @OA\Post(
@@ -963,7 +729,10 @@ class QuotationController extends Controller
     public function submitForApproval(Request $request, string $id): JsonResponse
     {
         try {
-            $quotation = Quotation::notDeleted()->findOrFail($id);
+            // TAMBAHKAN: with(['quotationDetails.wage']) agar data THR terbaca di Service
+            $quotation = Quotation::notDeleted()
+                ->with(['quotationDetails.wage'])
+                ->findOrFail($id);
 
             $validator = Validator::make($request->all(), [
                 'is_approved' => 'required|boolean',
@@ -973,24 +742,30 @@ class QuotationController extends Controller
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors()
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors() // Lebih rapi jika dipisah
                 ], 422);
             }
 
-            $result = $this->quotationService->submitForApproval($quotation, $request->all(), Auth::user());
+            // Panggil service yang sudah kita update logikanya tadi
+            $result = $this->submitApproval($quotation, $request->all(), Auth::user());
+
+            if (!$result['success']) {
+                return response()->json($result, 400);
+            }
 
             return response()->json([
-                'success' => $result['success'],
-                'message' => $result['success']
-                    ? ($request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully')
-                    : $result['message']
+                'success' => true,
+                'message' => $request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully',
+                'data' => $result['data'] ?? null
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to submit quotation for approval',
-                'error' => $e->getMessage()
+                'message' => 'Terjadi kesalahan sistem',
+                'debug_error' => $e->getMessage(), // Tambahkan ini untuk melihat error aslinya
+                'line' => $e->getLine()
             ], 500);
         }
     }
@@ -1063,7 +838,7 @@ class QuotationController extends Controller
     {
         $quotation = Quotation::notDeleted()->findOrFail($id);
         $user = $request->user();
-        $result = $this->quotationService->resetApproval($quotation, $user);
+        $result = $this->reset_Approval($quotation, $user);
 
         if (!$result['success']) {
             return response()->json($result, 400);
@@ -1075,234 +850,8 @@ class QuotationController extends Controller
             'data' => $result['data']
         ]);
     }
-    /**
-     * @OA\Get(
-     *     path="/api/quotations/{id}/calculate",
-     *     tags={"Quotations"},
-     *     summary="Calculate quotation",
-     *     description="Performs calculation for quotation including HPP, COSS, and financial details",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Quotation calculated successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object"),
-     *             @OA\Property(property="message", type="string", example="Quotation calculated successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Quotation not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Quotation not found"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to calculate quotation"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function calculate(string $id): JsonResponse
-    {
-        try {
-            $quotation = Quotation::with([
-                'quotationDetails',
-                'quotationSites',
-                'quotationDetails.quotationDetailTunjangans',
-                'quotationDetails.quotationDetailHpps',
-                'quotationDetails.quotationDetailCosses'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
 
-            $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
 
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationResource($calculatedQuotation),
-                'message' => 'Quotation calculated successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to calculate quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/quotations/{id}/export-pdf",
-     *     tags={"Quotations"},
-     *     summary="Export quotation to PDF",
-     *     description="Generates and returns PDF document for quotation",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="PDF generated successfully",
-     *         @OA\MediaType(
-     *             mediaType="application/pdf",
-     *             @OA\Schema(type="string", format="binary")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Quotation not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Quotation not found"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Internal server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to generate PDF"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function exportPdf(string $id): JsonResponse
-    {
-        try {
-            $quotation = Quotation::with([
-                'leads',
-                'quotationSites',
-                'quotationDetails',
-                'quotationPics',
-                'company'
-            ])
-                ->notDeleted()
-                ->findOrFail($id);
-
-            $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
-
-            // In a real implementation, you would generate PDF here
-            // For now, returning success response
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'quotation' => new QuotationResource($calculatedQuotation),
-                    'pdf_url' => url("/api/quotations/{$id}/pdf-download"),
-                    'message' => 'PDF export ready'
-                ],
-                'message' => 'PDF generated successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate PDF',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/quotations/{id}/status",
-     *     tags={"Quotations"},
-     *     summary="Get quotation status",
-     *     description="Retrieves current status and approval progress of quotation",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         description="Quotation ID",
-     *         required=true,
-     *         @OA\Schema(type="integer", example=1)
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Status retrieved successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object",
-     *                 @OA\Property(property="status_quotation_id", type="integer", example=3),
-     *                 @OA\Property(property="status_quotation", type="string", example="Approved"),
-     *                 @OA\Property(property="step", type="integer", example=12),
-     *                 @OA\Property(property="approval_progress", type="object",
-     *                     @OA\Property(property="ot1", type="string", example="approved"),
-     *                     @OA\Property(property="ot2", type="string", example="approved"),
-     *                     @OA\Property(property="ot3", type="string", example="pending")
-     *                 )
-     *             ),
-     *             @OA\Property(property="message", type="string", example="Status retrieved successfully")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Quotation not found",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Quotation not found"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
-     *     )
-     * )
-     */
-    public function getStatus(string $id): JsonResponse
-    {
-        try {
-            $quotation = Quotation::with(['statusQuotation'])
-                ->notDeleted()
-                ->findOrFail($id);
-
-            $approvalProgress = [
-                'ot1' => $quotation->status_ot1,
-                'ot2' => $quotation->status_ot2,
-                'ot3' => $quotation->status_ot3,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'status_quotation_id' => $quotation->status_quotation_id,
-                    'status_quotation' => $quotation->statusQuotation->nama ?? 'Unknown',
-                    'step' => $quotation->step,
-                    'approval_progress' => $approvalProgress,
-                    'is_aktif' => $quotation->is_aktif,
-                    'can_create_spk' => $quotation->is_aktif == 1
-                ],
-                'message' => 'Status retrieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Quotation not found',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
 
     /**
      * @OA\Get(
@@ -1353,10 +902,11 @@ class QuotationController extends Controller
             $user = auth()->user();
 
             // Base query dengan relasi yang diperlukan
-            $query = Leads::with([
-                'statusLeads:id,nama',
-                'branch:id,name'
-            ])
+            $query = Leads::select('id', 'nama_perusahaan', 'pic', 'status_leads_id', 'branch_id', 'customer_id')
+                ->with([
+                    'statusLeads:id,nama',
+                    'branch:id,name'
+                ])
                 ->filterByUserRole();
 
             // Filter berdasarkan tipe quotation menggunakan switch case
@@ -1403,9 +953,6 @@ class QuotationController extends Controller
                     'status_leads_id' => $lead->status_leads_id,
                     'status_leads' => $lead->statusLeads->nama ?? 'Unknown',
                     'customer_id' => $lead->customer_id,
-                    'telp_perusahaan' => $lead->telp_perusahaan,
-                    'email' => $lead->email,
-                    'created_at' => $lead->created_at,
                 ];
             });
 
@@ -1507,26 +1054,14 @@ class QuotationController extends Controller
                 ], 422);
             }
 
-            // Cek apakah leads exists dan memiliki quotation
-            $leads = Leads::withoutTrashed()->findOrFail($leadsId);
+            // ✅ 1 query — cukup untuk validasi leads exists
+            Leads::withoutTrashed()->findOrFail($leadsId);
 
-            $totalQuotations = Quotation::where('leads_id', $leadsId)
-                ->withoutTrashed()
-                ->count();
-
-            \Log::info("Leads {$leadsId} has {$totalQuotations} quotations");
-
-            $quotations = $this->quotationBusinessService->getFilteredQuotations($leadsId, $request->tipe_quotation);
+            $quotations = $this->getFilteredQuotations($leadsId, $request->tipe_quotation);
 
             return response()->json([
                 'success' => true,
                 'data' => $quotations,
-                'debug' => [ // Tambahkan debug info
-                    'leads_id' => $leadsId,
-                    'tipe_quotation' => $request->tipe_quotation,
-                    'total_quotations' => $totalQuotations,
-                    'filtered_count' => count($quotations)
-                ],
                 'message' => 'Quotation references retrieved successfully'
             ]);
 
@@ -1535,180 +1070,6 @@ class QuotationController extends Controller
                 'success' => false,
                 'message' => 'Failed to retrieve quotation references',
                 'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-    /**
-     * @OA\Get(
-     *     path="/api/quotations/hc-high-cost",
-     *     summary="Get sites with HC >= 12 and cost per HC >= 6.5 million",
-     *     tags={"Quotations"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="List of sites meeting criteria",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="array", @OA\Items(
-     *                 @OA\Property(property="site_id", type="integer", example=1),
-     *                 @OA\Property(property="nama_site", type="string", example="Site Jakarta Pusat"),
-     *                 @OA\Property(property="jumlah_hc", type="integer", example=15),
-     *                 @OA\Property(property="wilayah", type="string", example="Jakarta"),
-     *                 @OA\Property(property="biaya_per_hc", type="number", format="float", example=6800000),
-     *                 @OA\Property(property="total_biaya_site", type="number", format="float", example=102000000),
-     *                 @OA\Property(property="quotation_id", type="integer", example=123),
-     *                 @OA\Property(property="nomor_quotation", type="string", example="Q001/2024")
-     *             ))
-     *         )
-     *     )
-     * )
-     */
-    public function getSitesWithHighHcAndCost(Request $request)
-    {
-        set_time_limit(0);
-        try {
-            // Validasi parameter
-            $request->validate([
-                'min_hc' => 'nullable|integer|min:1',
-                'min_cost_per_hc' => 'nullable|numeric|min:0',
-            ]);
-
-            $minHc = $request->input('min_hc', 12);
-            $minCostPerHc = $request->input('min_cost_per_hc', 6500000);
-
-            // Query menggunakan Eloquent dengan relasi
-            $data = QuotationDetailHpp::with([
-                'quotationDetail.quotationSite',
-                'quotation.leads.branch.city.province',
-                'quotationDetail.position'
-            ])
-                ->where('jumlah_hc', '>=', $minHc)
-                ->where('total_biaya_per_personil', '>=', $minCostPerHc)
-                ->whereHas('quotation', function ($query) {
-                    $query->where('is_aktif', 1);
-                })
-                ->get();
-
-            // Group by site untuk summary
-            $groupedBySite = $data->groupBy(function ($item) {
-                return $item->quotationDetail->quotation_site_id;
-            })->map(function ($items) {
-                $firstItem = $items->first();
-                $site = $firstItem->quotationDetail->quotationSite;
-                $quotation = $firstItem->quotation;
-                $branch = $quotation->leads->branch;
-
-                return [
-                    'site_id' => $site->id,
-                    'nama_site' => $site->nama_site,
-                    'wilayah' => $site->kota . ', ' . $site->provinsi,
-                    'provinsi' => $site->provinsi,
-                    'kota' => $site->kota,
-                    'branch_name' => $branch->name,
-                    'city_name' => $branch->city->name ?? null,
-                    'province_name' => $branch->city->province->name ?? null,
-                    'nomor_quotation' => $quotation->nomor,
-                    'nama_perusahaan' => $quotation->nama_perusahaan,
-                    'jumlah_posisi' => $items->count(),
-                    'total_hc' => $items->sum('jumlah_hc'),
-                    'total_biaya' => (float) number_format($items->sum('total_biaya_all_personil'), 2, '.', ''),
-                    'avg_biaya_per_hc' => $items->sum('jumlah_hc') > 0
-                        ? (float) number_format($items->sum('total_biaya_all_personil') / $items->sum('jumlah_hc'), 2, '.', '')
-                        : 0,
-                    'posisi' => $items->map(function ($item) {
-                        return [
-                            'position_name' => $item->quotationDetail->position->name ?? null,
-                            'jumlah_hc' => (int) $item->jumlah_hc,
-                            'gaji_pokok' => (float) $item->gaji_pokok,
-                            'total_tunjangan' => (float) $item->total_tunjangan,
-                            'biaya_per_personil' => (float) $item->total_biaya_per_personil,
-                            'total_biaya' => (float) $item->total_biaya_all_personil,
-                        ];
-                    })->values()->toArray()
-                ];
-            })->values();
-
-            // Group by branch
-            $groupedByBranch = $data->groupBy(function ($item) {
-                return $item->quotation->leads->branch_id;
-            })->map(function ($items, $branchId) {
-                $firstItem = $items->first();
-                $branch = $firstItem->quotation->leads->branch;
-
-                $sites = $items->groupBy(function ($item) {
-                    return $item->quotationDetail->quotation_site_id;
-                })->map(function ($siteItems) {
-                    $firstSite = $siteItems->first();
-                    $site = $firstSite->quotationDetail->quotationSite;
-
-                    return [
-                        'site_id' => $site->id,
-                        'nama_site' => $site->nama_site,
-                        'wilayah' => $site->kota . ', ' . $site->provinsi,
-                        'jumlah_posisi' => $siteItems->count(),
-                        'total_hc' => $siteItems->sum('jumlah_hc'),
-                        'total_biaya' => (float) number_format($siteItems->sum('total_biaya_all_personil'), 2, '.', ''),
-                    ];
-                })->values()->toArray();
-
-                $totalHc = $items->sum('jumlah_hc');
-                $totalBiaya = $items->sum('total_biaya_all_personil');
-
-                return [
-                    'branch_id' => $branchId,
-                    'branch_name' => $branch->name,
-                    'city_name' => $branch->city->name ?? null,
-                    'province_name' => $branch->city->province->name ?? null,
-                    'total_sites' => $items->groupBy(function ($item) {
-                        return $item->quotationDetail->quotation_site_id;
-                    })->count(),
-                    'total_hc' => $totalHc,
-                    'total_biaya' => (float) number_format($totalBiaya, 2, '.', ''),
-                    'avg_cost_per_hc' => $totalHc > 0
-                        ? (float) number_format($totalBiaya / $totalHc, 2, '.', '')
-                        : 0,
-                    'sites' => $sites,
-                ];
-            })->values();
-
-            // Summary
-            $summary = [
-                'total_records' => $data->count(),
-                'total_branches' => $data->groupBy(function ($item) {
-                    return $item->quotation->leads->branch_id;
-                })->count(),
-                'total_sites' => $data->groupBy(function ($item) {
-                    return $item->quotationDetail->quotation_site_id;
-                })->count(),
-                'total_hc' => $data->sum('jumlah_hc'),
-                'total_biaya' => (float) number_format($data->sum('total_biaya_all_personil'), 2, '.', ''),
-                'avg_cost_per_hc' => $data->sum('jumlah_hc') > 0
-                    ? (float) number_format($data->sum('total_biaya_all_personil') / $data->sum('jumlah_hc'), 2, '.', '')
-                    : 0,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'sites' => $groupedBySite,
-                    'branches' => $groupedByBranch,
-                    'summary' => $summary,
-                    'criteria' => [
-                        'min_hc' => $minHc,
-                        'min_cost_per_hc' => number_format($minCostPerHc, 0, ',', '.'),
-                    ]
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error("Error fetching sites with high HC and cost: " . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch data',
-                'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
     }
@@ -1833,5 +1194,518 @@ class QuotationController extends Controller
                 ]);
             }
         }
+    }
+    private const ROLE_GM_1 = 10;
+    private const ROLE_GM_2 = 53;
+    private const ROLE_DIREKTUR_SALES = 96;
+    private const ROLE_DIREKTUR_KEUANGAN = 97;
+
+    public function submitApproval(Quotation $quotation, array $data, User $user): array
+    {
+        $isApproved = filter_var($data['is_approved'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $currentDateTime = Carbon::now();
+        $notes = $data['notes'] ?? null;
+
+        return match ($user->cais_role_id) {
+            // self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            // self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            self::ROLE_DIREKTUR_SALES => $this->handleSalesApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            self::ROLE_DIREKTUR_KEUANGAN => $this->handleKeuanganApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
+            default => ['success' => false, 'message' => 'User tidak memiliki akses approval.'],
+        };
+    }
+
+    // ============================================================
+// LEVEL 3 - GM 1
+// ============================================================
+    private function handleGM1Approval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+
+        $quotation->update([
+            'ot3' => $isApproved ? $user->full_name : null,
+            'status_quotation_id' => $isApproved ? 2 : 8,
+            'is_aktif' => 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+
+        $freshQuotation = $quotation->fresh();
+        if (!empty($freshQuotation->ot4)) {
+            $this->notifyDirSales($freshQuotation, $now);
+        }
+
+        // Jika reject, notifikasi sales agar tahu quotation ditolak
+        if (!$isApproved) {
+            $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
+        }
+
+        return ['success' => true, 'data' => $quotation->fresh()];
+    }
+
+    // ============================================================
+// LEVEL 4 - GM 2
+// ============================================================
+    private function handleGM2Approval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+        $quotation->update([
+            'ot4' => $isApproved ? $user->full_name : null,
+            'status_quotation_id' => $isApproved ? 2 : 8,  // sama
+            'is_aktif' => 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+
+        $freshQuotation = $quotation->fresh();
+        if (!empty($freshQuotation->ot3)) {
+            $this->notifyDirSales($freshQuotation, $now);
+        }
+
+
+        // Jika reject, notifikasi sales agar tahu quotation ditolak
+        if (!$isApproved) {
+            $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
+        }
+
+        return ['success' => true, 'data' => $quotation->fresh()];
+    }
+
+    // ============================================================
+// LEVEL 1 - Direktur Sales
+// ============================================================
+    private function handleSalesApproval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+        // $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
+        // $isOldQuotation = Carbon::parse($quotation->tgl_quotation)
+        //     ->startOfDay()
+        //     ->lt($gmStartDate);
+            
+        // if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
+        //     return [
+        //         'success' => false,
+        //         'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
+        //     ];
+        // }
+
+        $needsLevel2 = $isApproved && $this->requiresLevel2Approval($quotation);
+
+        $quotation->update([
+            'ot1' => $user->full_name,
+            'status_quotation_id' => $isApproved ? ($needsLevel2 ? 2 : 3) : 8,
+            'is_aktif' => $isApproved ? ($needsLevel2 ? 0 : 1) : 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 2, now: $now);
+
+        if ($needsLevel2) {
+            $this->notifyDirKeu($quotation->fresh(), $now);
+        }
+
+        return $this->finalizeApproval($quotation, $user, $isApproved, $notes);
+    }
+
+    // ============================================================
+// LEVEL 2 - Direktur Keuangan  (tidak ada perubahan)
+// ============================================================
+    private function handleKeuanganApproval(
+        Quotation $quotation,
+        bool $isApproved,
+        ?string $notes,
+        User $user,
+        Carbon $now
+    ): array {
+        if (empty($quotation->ot1)) {
+            return ['success' => false, 'message' => 'Quotation belum disetujui oleh Direktur Sales.'];
+        }
+
+        $quotation->update([
+            'ot2' => $user->full_name,
+            'status_quotation_id' => $isApproved ? 3 : 8,
+            'is_aktif' => $isApproved ? 1 : 0,
+            'updated_at' => $now,
+            'updated_by' => $user->full_name,
+        ]);
+
+        $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 3, now: $now);
+
+        return $this->finalizeApproval($quotation, $user, $isApproved, $notes);
+    }
+
+
+    // ============================================================
+// HELPERS
+// ============================================================
+
+    /** Cek apakah butuh eskalasi ke Direktur Keuangan */
+    private function requiresLevel2Approval(Quotation $quotation): bool
+    {
+        // 1. Pastikan relasi sudah di-load agar pengecekan THR akurat
+        $quotation->loadMissing('quotationDetails.wage');
+
+
+        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+            $thr = strtolower(trim($detail->wage->thr ?? ''));
+            return !empty($thr) && !in_array($thr, ['diprovisikan', 'tidak ada']);
+        });
+
+        $isLongTop = trim($quotation->top) === 'Lebih Dari 7 Hari';
+
+
+
+        return $isLongTop || $hasNonProvisionalThr;
+    }
+
+    /** Proses akhir setelah approve: notif sales + addendum */
+    private function finalizeApproval(
+        Quotation $quotation,
+        User $user,
+        bool $isApproved,
+        ?string $notes
+    ): array {
+        // Panggil fresh() SEKALI saja
+        $freshQuotation = $quotation->fresh();
+
+        $this->sendNotificationToSales($freshQuotation, $user, $isApproved, $notes);
+
+        if (
+            $isApproved
+            && $freshQuotation->status_quotation_id === 3
+            && $freshQuotation->tipe_quotation === 'addendum'
+        ) {
+            app(AddendumService::class)->process($freshQuotation);
+        }
+
+        return ['success' => true, 'data' => $freshQuotation];
+    }
+
+    /** Wrapper logging agar tidak duplikat di setiap handler */
+    private function logApproval(
+        Quotation $quotation,
+        User $user,
+        bool $isApproved,
+        ?string $notes,
+        int $tingkat,
+        Carbon $now
+    ): void {
+        LogApproval::create([
+            'tabel' => 'quotation',
+            'doc_id' => $quotation->id,
+            'tingkat' => $tingkat,
+            'is_approve' => $isApproved,
+            'note' => $notes,
+            'user_id' => $user->id,
+            'approval_date' => $now,
+            'created_at' => $now,
+            'created_by' => $user->full_name,
+        ]);
+    }
+
+    private function sendNotificationToSales(Quotation $quotation, User $approver, bool $isApproved, ?string $notes): void
+    {
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        if (!$leadsKebutuhan || !$leadsKebutuhan->timSalesD) {
+            return;
+        }
+
+        $salesUserId = $leadsKebutuhan->timSalesD->user_id ?? null;
+        if (!$salesUserId) {
+            return;
+        }
+
+        $status = $isApproved ? 'disetujui' : 'ditolak';
+        $approverRole = $approver->cais_role_id == 96 ? 'Direktur Sales' : 'Direktur Keuangan';
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah {$status} oleh {$approverRole}.";
+
+        if ($notes) {
+            $msg .= " Catatan: {$notes}";
+        }
+
+        LogNotification::create([
+            'user_id' => $salesUserId,
+            'doc_id' => $quotation->id,
+            'transaksi' => 'Quotation',
+            'tabel' => 'sl_quotation',
+            'pesan' => $msg,
+            'is_read' => 0,
+            'created_at' => Carbon::now(),
+            'created_by' => $approver->full_name
+        ]);
+
+        // $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        // $this->quotationNotificationService->sendApprovalNotification(
+        //     quotation: $quotation,
+        //     creatorName: $approver->full_name,
+        //     approvalUrl: $approvalUrl,
+        //     overrideRecipients: [$salesUserId]
+        // );
+    }
+
+    // 2. Di submitForApproval ketika Dir Sales approve
+    private function notifyDirKeu(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirKeu = [27928, 16986, 127823];
+
+        $hasNonProvisionalThr = $quotation->quotationDetails->contains(function ($detail) {
+            $thr = strtolower(trim($detail->wage->thr ?? ''));
+            return $thr !== 'diprovisikan';
+        });
+
+        if (!($quotation->top == 'Lebih Dari 7 Hari' || $hasNonProvisionalThr)) {
+            return;
+        }
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah disetujui Direktur Sales dan membutuhkan persetujuan Direktur Keuangan.";
+
+        foreach ($dirKeu as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        // notifyDirKeu
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+        );
+        dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
+            ->delay(now()->addDay());
+    }
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirSales = [27927, 127822];
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
+
+        foreach ($dirSales as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+        );
+        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
+            ->delay(now()->addDay());
+    }
+    public function reset_Approval(Quotation $quotation, User $user)
+    {
+        // Cek role - tambahkan role lain yang boleh reset
+        $allowedRoles = [2, 96, 97]; // Admin, OT1, OT2
+        if (!in_array($user->cais_role_id, $allowedRoles)) {
+            return ['success' => false, 'message' => 'Anda tidak memiliki akses untuk reset approval. Role: ' . $user->cais_role_id];
+        }
+
+        $quotation->update([
+            'status_quotation_id' => 2,
+            'is_aktif' => 0,
+            'ot1' => null,
+            'ot2' => null,
+            'updated_at' => Carbon::now()->toDateTimeString(),
+            'updated_by' => $user->full_name
+        ]);
+
+        \Log::info('Reset approval success', [
+            'quotation_id' => $quotation->id,
+            'reset_by' => $user->full_name
+        ]);
+
+        return ['success' => true, 'data' => $quotation->fresh()];
+    }
+
+
+    public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
+    {
+        $query = Quotation::select([
+            'id',
+            'nomor',
+            'nama_perusahaan',
+            'tgl_quotation',
+            'kebutuhan_id',
+            'kebutuhan',
+            'company',
+            'mulai_kontrak',
+            'kontrak_selesai',
+            'jumlah_site',
+            'step',
+            'is_aktif',
+            'status_quotation_id',
+            'tipe_quotation',
+        ])
+            ->where('leads_id', $leadsId) // ✅ cukup sekali di sini
+            ->with([
+                // ✅ Batasi kolom — kurangi data yang ditarik
+                'statusQuotation:id,nama',
+                'pks:id,quotation_id,nomor,tgl_pks,kontrak_awal,kontrak_akhir,is_aktif',
+                'quotationSites:id,quotation_id,nama_site,provinsi,provinsi_id,kota,kota_id,penempatan,ump,umk',
+            ])
+            ->withoutTrashed();
+
+        switch ($tipeQuotation) {
+            case 'baru':
+                $query
+                    // Bukan revisi
+                    ->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8])
+                    // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
+                    ->whereDoesntHave('pks', function ($q) {
+                        $q->where('is_aktif', 1)
+                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                    });
+                break;
+
+            case 'revisi':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+
+                break;
+            case 'addendum':
+                $query->where('leads_id', $leadsId)
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+                // ->where(function ($q) {
+                //     $q->whereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereHas('pks', function ($pksQuery) {
+                //             $pksQuery->where('is_aktif', 1)
+                //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
+                //         });
+                //     })
+                //     ->orWhereHas('sites', function ($siteQuery) {
+                //         $siteQuery->whereNull('pks_id');
+                //     });
+                // });
+                break;
+
+            case 'rekontrak':
+                $query->where('leads_id', $leadsId)
+                    ->where(function ($q) {
+                        $q->where('status_quotation_id', 3)
+                            ->orWhereNotNull('ot1');
+                    });
+                // ->whereHas('sites', function ($siteQuery) {
+                //     $siteQuery->whereHas('pks', function ($pksQuery) {
+                //         $pksQuery->where('is_aktif', 1)
+                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
+                //     });
+                // });
+                break;
+        }
+
+        return $query->latest('created_at')
+            ->get()
+            ->map(fn(Quotation $quotation) => $this->formatQuotationData($quotation, $tipeQuotation));
+    }
+
+    /**
+     * Format quotation data for response
+     */
+    public function formatQuotationData(Quotation $quotation, string $tipeQuotation): array
+    {
+        $data = [
+            'id' => $quotation->id,
+            'nomor' => $quotation->nomor,
+            'nama_perusahaan' => $quotation->nama_perusahaan,
+            'mulai_kontrak' => $quotation->mulai_kontrak,
+            'kontrak_selesai' => $quotation->kontrak_selesai,
+            'tgl_quotation' => $quotation->tgl_quotation,
+            'kebutuhan_id' => $quotation->kebutuhan_id,
+            'jumlah_site' => $quotation->jumlah_site,
+            'step' => $quotation->step,
+            'is_aktif' => $quotation->is_aktif,
+            'status_quotation_id' => $quotation->status_quotation_id,
+            'status_quotation' => $quotation->statusQuotation->nama ?? 'Unknown',
+            'tipe_quotation' => $quotation->tipe_quotation,
+            'kebutuhan' => $quotation->kebutuhan,
+            'company' => $quotation->company,
+            'source' => 'quotation',
+            // Menampilkan semua site dalam bentuk array
+            'sites' => $quotation->quotationSites->map(function ($site) {
+                return [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'provinsi' => $site->provinsi,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'provinsi_id' => $site->provinsi_id,
+                    'kota_id' => $site->kota_id,
+                    'ump' => $site->ump,
+                    'umk' => $site->umk
+                ];
+            })->toArray()
+        ];
+
+        // Untuk kompatibilitas dengan kode yang sudah ada, tetap sertakan site pertama
+        // (opsional, bisa dihapus jika tidak diperlukan)
+        $data['site'] = $quotation->quotationSites->first()->nama_site ?? null;
+
+        // Add PKS data for recontract
+        if ($tipeQuotation === 'rekontrak' && $quotation->pks) {
+            $data['pks_data'] = [
+                'id' => $quotation->pks->id,
+                'nomor' => $quotation->pks->nomor,
+                'tgl_pks' => $quotation->pks->tgl_pks,
+                'kontrak_awal' => $quotation->pks->kontrak_awal,
+                'kontrak_akhir' => $quotation->pks->kontrak_akhir,
+                'is_aktif' => $quotation->pks->is_aktif
+            ];
+        }
+
+        return $data;
     }
 }

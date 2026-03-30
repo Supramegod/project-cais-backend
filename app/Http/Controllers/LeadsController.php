@@ -181,6 +181,7 @@ class LeadsController extends Controller
     public function list(Request $request)
     {
         try {
+            // ✅ Flatten eager load — jangan nesting lebih dari 2 level
             $query = Leads::select([
                 'id',
                 'nomor',
@@ -197,58 +198,43 @@ class LeadsController extends Controller
                 'platform_id',
                 'created_by',
                 'notes',
-                'created_at'
+                'created_at',
             ])
                 ->with([
                     'statusLeads:id,nama',
                     'branch:id,name',
                     'platform:id,nama',
                     'timSalesD:id,nama',
-                    'kebutuhan' => function ($q) {
-                        $q->select('m_kebutuhan.id', 'm_kebutuhan.nama'); // sesuaikan nama tabel kebutuhan
-                    },
-                    'leadsKebutuhan.timSalesD:id,nama'
+                    'leadsKebutuhan:id,leads_id,kebutuhan_id,tim_sales_d_id',
+                    'leadsKebutuhan.timSalesD:id,nama',
+                    'leadsKebutuhan.kebutuhan:id,nama',
                 ])
-                ->where('status_leads_id', '!=', 102);
+                ->where('status_leads_id', '!=', 102)
+                ->filterByUserRole();
 
-            // ✅ Gunakan scope yang sudah ada di model Leads.php
-            $query->filterByUserRole();
-
+            // Search / filter tanggal (tidak berubah)
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
-                // Ambil parameter search_by, defaultnya ke 'nama_perusahaan'
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    // --- LOGIKA FULLTEXT (Kencang untuk nama perusahaan) ---
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-
-                } else {
-                    $allowedColumns = ['nomor', 'kebutuhan', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-
-                        if ($searchBy === 'kebutuhan') {
-                            // Kebutuhan adalah relasi, gunakan whereHas
-                            $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
-                                $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
-                            });
-                        } else {
-                            $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                        }
-                    }
+                } elseif ($searchBy === 'kebutuhan') {
+                    $query->whereHas('leadsKebutuhan.kebutuhan', function ($q) use ($searchTerm) {
+                        $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
+                    });
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $query->where("{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Filter tanggal default (hanya jalan kalau tidak sedang search)
                 $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
                 $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_leads', [$tglDari, $tglSampai]);
             }
-            // Filter tambahan
+
             if ($request->filled('branch'))
                 $query->where('branch_id', $request->branch);
             if ($request->filled('platform'))
@@ -256,15 +242,16 @@ class LeadsController extends Controller
             if ($request->filled('status'))
                 $query->where('status_leads_id', $request->status);
 
-            $data = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+            $data = $query->orderBy('created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
 
-            $transformedData = $data->getCollection()->transform(function ($item) {
+            $data->getCollection()->transform(function ($item) {
                 return [
                     'id' => $item->id,
                     'nomor' => $item->nomor,
                     'wilayah' => $item->branch->name ?? null,
                     'wilayah_id' => $item->branch_id,
-                    'tgl_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                    'tgl_leads' => Carbon::parse($item->getRawOriginal('tgl_leads'))->isoFormat('D MMMM Y'),
                     'sales' => $item->timSalesD->nama ?? null,
                     'nama_perusahaan' => $item->nama_perusahaan,
                     'telp_perusahaan' => $item->telp_perusahaan,
@@ -278,27 +265,25 @@ class LeadsController extends Controller
                     'sumber_leads_id' => $item->platform_id,
                     'created_by' => $item->created_by,
                     'notes' => $item->notes,
-                    'kebutuhan' => $item->leadsKebutuhan->map(function ($lk) {
-                        return [
-                            'id' => $lk->kebutuhan_id,
-                            'nama' => $lk->kebutuhan->nama ?? null,
-                            'tim_sales_d_id' => $lk->tim_sales_d_id,
-                            'sales_name' => $lk->timSalesD->nama ?? null
-                        ];
-                    })
+                    'kebutuhan' => $item->leadsKebutuhan->map(fn($lk) => [
+                        'id' => $lk->kebutuhan_id,
+                        'nama' => $lk->kebutuhan->nama ?? null,
+                        'tim_sales_d_id' => $lk->tim_sales_d_id,
+                        'sales_name' => $lk->timSalesD->nama ?? null,
+                    ]),
                 ];
             });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data leads berhasil diambil',
-                'data' => $transformedData,
+                'data' => $data->items(),
                 'pagination' => [
                     'current_page' => $data->currentPage(),
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -528,30 +513,7 @@ class LeadsController extends Controller
     public function add(Request $request)
     {
         try {
-            set_time_limit(0);
             DB::beginTransaction();
-
-            // // Debug: Test if UniqueCompanyStrict class exists
-            // if (!class_exists(UniqueCompanyStrict::class)) {
-            //     \Log::error('UniqueCompanyStrict class not found');
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'UniqueCompanyStrict class not found'
-            //     ], 500);
-            // }
-
-            // // Debug: Test instantiation
-            // try {
-            //     $testRule = new UniqueCompanyStrict();
-            //     \Log::info('UniqueCompanyStrict instantiated successfully');
-            // } catch (\Exception $e) {
-            //     \Log::error('Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage());
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => 'Failed to instantiate UniqueCompanyStrict: ' . $e->getMessage()
-            //     ], 500);
-            // }
-
             $validator = Validator::make($request->all(), [
                 'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
                 'pic' => 'required',
@@ -647,27 +609,26 @@ class LeadsController extends Controller
 
             // Create activity using model
             $nomorActivity = $this->generateNomorActivity($lead->id);
-            $activity = CustomerActivity::create([
+            // ✅ SESUDAH — satu INSERT, response tetap sama
+            $activityData = [
                 'leads_id' => $lead->id,
                 'branch_id' => $request->branch,
                 'tgl_activity' => $current_date_time,
                 'nomor' => $nomorActivity,
-                'notes' => 'Leads Terbentuk' .
-                    (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
+                'notes' => 'Leads Terbentuk' . (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
                 'tipe' => 'Leads',
                 'status_leads_id' => 1,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name
-            ]);
+            ];
 
-            // Update activity dengan sales info jika ada
             if ($lead->tim_sales_d_id) {
-                $activity->update([
-                    'tim_sales_id' => $lead->tim_sales_id,
-                    'tim_sales_d_id' => $lead->tim_sales_d_id
-                ]);
+                $activityData['tim_sales_id'] = $lead->tim_sales_id;
+                $activityData['tim_sales_d_id'] = $lead->tim_sales_d_id;
             }
+
+            CustomerActivity::create($activityData);
 
             DB::commit();
 
@@ -921,27 +882,25 @@ class LeadsController extends Controller
 
             // Create activity untuk update
             $nomorActivity = $this->generateNomorActivity($lead->id);
-            $activity = CustomerActivity::create([
+            $activityData = [
                 'leads_id' => $lead->id,
                 'branch_id' => $request->branch,
                 'tgl_activity' => $current_date_time,
                 'nomor' => $nomorActivity,
-                'notes' => 'Leads Diupdate' .
-                    (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
+                'notes' => 'Leads Terbentuk' . (!empty($assignmentResults) ? ' dengan assignment sales' : ''),
                 'tipe' => 'Leads',
-                'status_leads_id' => $lead->status_leads_id,
+                'status_leads_id' => 1,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name
-            ]);
+            ];
 
-            // Update activity dengan sales info jika ada
             if ($lead->tim_sales_d_id) {
-                $activity->update([
-                    'tim_sales_id' => $lead->tim_sales_id,
-                    'tim_sales_d_id' => $lead->tim_sales_d_id
-                ]);
+                $activityData['tim_sales_id'] = $lead->tim_sales_id;
+                $activityData['tim_sales_d_id'] = $lead->tim_sales_d_id;
             }
+
+            CustomerActivity::create($activityData);
 
             DB::commit();
 
@@ -2394,22 +2353,41 @@ class LeadsController extends Controller
                 ], 400);
             }
 
+            // ✅ FIX #1: Pre-load semua kebutuhan untuk menghilangkan N+1 query
+            $kebutuhanIds = [];
+            foreach ($request->assignments as $assignment) {
+                $kebutuhanIds = array_merge($kebutuhanIds, $assignment['kebutuhan_ids']);
+            }
+            $kebutuhanIds = array_unique($kebutuhanIds);
+            $kebutuhanMap = Kebutuhan::whereIn('id', $kebutuhanIds)->pluck('nama', 'id');
+
             $assignmentResults = [];
             $allAssignedKebutuhan = [];
-            $allAssignedKebutuhanNames = []; // Tambahkan array untuk menyimpan nama kebutuhan
+            $allAssignedKebutuhanNames = [];
+            $allAssignedSalesNames = []; // ✅ FIX #4: Kumpulkan semua sales untuk activity log
 
-            // Process each assignment
+            $timSalesDIds = array_column($request->assignments, 'tim_sales_d_id');
+            $timSalesDMap = TimSalesDetail::with('user', 'timSales')
+                ->whereIn('id', $timSalesDIds)
+                ->get()
+                ->keyBy('id');
+
+            // Ganti find() di dalam foreach:
             foreach ($request->assignments as $assignment) {
-                $timSalesD = TimSalesDetail::with('user', 'timSales')->find($assignment['tim_sales_d_id']);
+                $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']);
 
                 if (!$timSalesD) {
                     continue; // Skip jika sales tidak ditemukan
                 }
 
+                // ✅ FIX #4: Kumpulkan nama sales
+                $allAssignedSalesNames[] = $timSalesD->user->full_name ?? $timSalesD->nama;
+
                 // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
                 $assignedKebutuhan = [];
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
-                    $leadsKebutuhan = LeadsKebutuhan::firstOrCreate(
+
+                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
                         [
                             'leads_id' => $lead->id,
                             'kebutuhan_id' => $kebutuhan_id,
@@ -2423,10 +2401,9 @@ class LeadsController extends Controller
                     $assignedKebutuhan[] = $kebutuhan_id;
                     $allAssignedKebutuhan[] = $kebutuhan_id;
 
-                    // Ambil nama kebutuhan
-                    $kebutuhan = Kebutuhan::find($kebutuhan_id);
-                    if ($kebutuhan) {
-                        $allAssignedKebutuhanNames[] = $kebutuhan->nama;
+                    // ✅ FIX #1: Ambil nama kebutuhan dari pre-loaded map (bukan query)
+                    if (isset($kebutuhanMap[$kebutuhan_id])) {
+                        $allAssignedKebutuhanNames[] = $kebutuhanMap[$kebutuhan_id];
                     }
                 }
 
@@ -2441,14 +2418,14 @@ class LeadsController extends Controller
                 ];
             }
 
-            // Buat activity untuk mencatat perubahan sales
+            // ✅ FIX #4: Buat activity untuk mencatat perubahan semua sales (bukan cuma yang terakhir)
             $nomorActivity = $this->generateNomorActivity($lead->id);
             CustomerActivity::create([
                 'leads_id' => $lead->id,
                 'branch_id' => $lead->branch_id,
                 'tgl_activity' => Carbon::now()->toDateTimeString(),
                 'nomor' => $nomorActivity,
-                'notes' => $timSalesD->user->full_name . ' diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhanNames)), // Gunakan nama kebutuhan
+                'notes' => implode(', ', array_unique($allAssignedSalesNames)) . ' diassign ke kebutuhan: ' . implode(', ', array_unique($allAssignedKebutuhanNames)),
                 'tipe' => 'Assignment',
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
@@ -2878,24 +2855,22 @@ class LeadsController extends Controller
         for ($i = count($chars) - 1; $i >= 0; $i--) {
             $current = $chars[$i];
 
-            // Handle digits (0-9)
             if (is_numeric($current)) {
                 if ($current < '9') {
                     $chars[$i] = (string) ($current + 1);
                     break;
                 } else {
-                    $chars[$i] = 'A'; // 9 -> A
+                    $chars[$i] = 'A';
                     break;
                 }
             }
 
-            // Handle letters (A-Z)
             if (ctype_alpha($current)) {
                 if ($current < 'Z') {
                     $chars[$i] = chr(ord($current) + 1);
                     break;
                 } else {
-                    $chars[$i] = '0'; // Z -> 0 (carry over)
+                    $chars[$i] = '0'; // Z → 0, carry over ← sudah benar
                     continue;
                 }
             }
@@ -2979,6 +2954,7 @@ class LeadsController extends Controller
     /**
      * Manual assignment sales ke kebutuhan (untuk user berwenang)
      */
+    // ✅ SESUDAH — pre-load semua TimSalesDetail sekaligus, response tetap sama
     private function manualAssignSalesToKebutuhan($lead, $assignments)
     {
         $user = Auth::user();
@@ -2989,21 +2965,21 @@ class LeadsController extends Controller
             return $assignmentResults;
         }
 
+        // Pre-load semua TimSalesDetail yang dibutuhkan dalam SATU query
+        $timSalesDIds = array_column($assignments, 'tim_sales_d_id');
+        $timSalesDMap = TimSalesDetail::with('user', 'timSales')
+            ->whereIn('id', $timSalesDIds)
+            ->get()
+            ->keyBy('id');
+
         foreach ($assignments as $assignment) {
-            $timSalesD = TimSalesDetail::with('user', 'timSales')->find($assignment['tim_sales_d_id']);
+            $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']); // ← dari collection, no query
 
             if ($timSalesD) {
-                // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
                     LeadsKebutuhan::updateOrCreate(
-                        [
-                            'leads_id' => $lead->id,
-                            'kebutuhan_id' => $kebutuhan_id
-                        ],
-                        [
-                            'tim_sales_id' => $timSalesD->tim_sales_id,
-                            'tim_sales_d_id' => $timSalesD->id
-                        ]
+                        ['leads_id' => $lead->id, 'kebutuhan_id' => $kebutuhan_id],
+                        ['tim_sales_id' => $timSalesD->tim_sales_id, 'tim_sales_d_id' => $timSalesD->id]
                     );
                 }
 
@@ -3020,9 +2996,9 @@ class LeadsController extends Controller
             }
         }
 
-        // Update lead dengan sales dari assignment pertama (untuk konsistensi)
+        // Ambil dari map yang sudah di-load, tidak perlu query lagi
         if (!empty($assignments[0]['tim_sales_d_id'])) {
-            $firstTimSalesD = TimSalesDetail::find($assignments[0]['tim_sales_d_id']);
+            $firstTimSalesD = $timSalesDMap->get($assignments[0]['tim_sales_d_id']);
             if ($firstTimSalesD) {
                 $lead->update([
                     'tim_sales_id' => $firstTimSalesD->tim_sales_id,
@@ -3039,7 +3015,17 @@ class LeadsController extends Controller
      */
     private function syncKebutuhanTanpaSales($lead, $kebutuhanIds)
     {
-        $lead->kebutuhan()->sync($kebutuhanIds);
+        $user = Auth::user();
+        $kebutuhanData = [];
+        foreach ($kebutuhanIds as $kebutuhan_id) {
+            $kebutuhanData[$kebutuhan_id] = [
+                'tim_sales_d_id' => $user->id,
+                'tim_sales_id' => 2
+            ];
+        }
+
+        // Sync kebutuhan dengan data initialized
+        $lead->kebutuhan()->sync($kebutuhanData);
         return [];
     }
     /**

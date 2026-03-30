@@ -15,11 +15,9 @@ class LeadsKebutuhan extends Model
         'leads_id',
         'kebutuhan_id',
         'tim_sales_id',      // Tambahkan ini
-        'tim_sales_d_id',    // Tambahkan ini
-        'deleted_at',
+        'tim_sales_d_id',    // Tambahkan ini    
         'deleted_by',
     ];
-
     public $timestamps = false; // kalau tabel pivot nggak punya created_at, updated_at
     // Relasi ke tim sales
     public function timSales()

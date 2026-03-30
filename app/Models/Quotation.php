@@ -196,6 +196,12 @@ class Quotation extends Model
     {
         return $this->belongsTo(Company::class, 'company_id');
     }
+    // app/Models/Quotation.php
+
+    public function kebutuhan()
+    {
+        return $this->belongsTo(Kebutuhan::class, 'kebutuhan_id');
+    }
 
     // Relasi ke QuotationPic
     public function quotationPics()
@@ -438,4 +444,5 @@ class Quotation extends Model
     {
         return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
     }
+
 }

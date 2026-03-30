@@ -42,6 +42,7 @@ use App\Models\Company;
  */
 class SpkController extends Controller
 {
+
     /**
      * @OA\Get(
      *     path="/api/spk/list",
@@ -154,55 +155,65 @@ class SpkController extends Controller
             $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(3)->toDateString();
             $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
 
-            // Load relasi yang dibutuhkan: leads, statusSpk, dan spkSites
-            $query = Spk::with(['leads', 'statusSpk', 'spkSites'])
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc');
+            $query = Spk::select([
+                'sl_spk.id',
+                'sl_spk.leads_id',      // ✅ WAJIB untuk eager load leads
+                'sl_spk.nomor',
+                'sl_spk.tgl_spk',
+                'sl_spk.nama_perusahaan',
+                'sl_spk.status_spk_id',
+                'sl_spk.created_by',
+                'sl_spk.created_at',
+            ])
+                ->with([
+                    'leads:id,nama_perusahaan',
+                    'statusSpk:id,nama',
+                    'spkSites:id,spk_id,nama_site',
+                ])
+                ->orderBy('sl_spk.created_at', 'desc');
 
+            // ✅ Selalu JOIN leads (dipakai untuk filter branch maupun tidak)
+            $query->leftJoin('sl_leads', 'sl_spk.leads_id', '=', 'sl_leads.id');
+
+            // Search
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
-                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                } else {
-                    $allowedColumns = ['nomor', 'created_by'];
-                    if (in_array($searchBy, $allowedColumns)) {
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
+                    $query->whereRaw("MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $query->where("sl_spk.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                $query->whereBetween('tgl_spk', [$tglDari, $tglSampai]);
+                $query->whereBetween('sl_spk.tgl_spk', [$tglDari, $tglSampai]);
             }
 
-            // Filter tambahan (Branch diambil dari relasi Leads)
+            // ✅ Filter branch via JOIN — tidak perlu EXISTS
             if ($request->filled('branch')) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('branch_id', $request->branch);
-                });
+                $query->where('sl_leads.branch_id', $request->branch);
             }
 
             if ($request->filled('status')) {
-                $query->where('status_spk_id', $request->status);
+                $query->where('sl_spk.status_spk_id', $request->status);
             }
 
-            // Eksekusi dengan Paginate agar performa terjaga
             $data = $query->paginate($request->get('per_page', 15));
 
-            // Mapping Data sesuai permintaan
             $data->getCollection()->transform(function ($spk) {
                 return [
                     'id' => $spk->id,
-                    'nomor_spk' => $spk->nomor, // Dari kolom 'nomor' di sl_spk
-                    'tgl_spk' => $spk->tgl_spk, // Menggunakan accessor format tgl spk
-                    'nama_perusahaan' => $spk->nama_perusahaan, // Dari sl_spk
-                    'nama_site' => $spk->spkSites->pluck('nama_site')->toArray(), // Menghasilkan array nama site
-                    'status' => $spk->statusSpk?->nama ?? '-', // Nama status dari m_status_spk
+                    'nomor_spk' => $spk->nomor,
+                    // ✅ Format di sini, bukan via accessor model
+                    'tgl_spk' => Carbon::parse($spk->getRawOriginal('tgl_spk'))
+                        ->locale('id')
+                        ->isoFormat('D MMMM Y'),
+                    'nama_perusahaan' => $spk->leads->nama_perusahaan ?? $spk->nama_perusahaan,
+                    'nama_site' => $spk->spkSites->pluck('nama_site')->toArray(),
+                    'status' => $spk->statusSpk->nama ?? '-',
                     'created_by' => $spk->created_by,
                 ];
             });
@@ -214,7 +225,7 @@ class SpkController extends Controller
                     'last_page' => $data->lastPage(),
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
-                ]
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -248,8 +259,14 @@ class SpkController extends Controller
     public function listTerhapus()
     {
         try {
+            // Batasi kolom yang diambil dan gunakan constrained eager loading
+            // agar tidak memuat seluruh data dari tabel leads & quotation
             $data = Spk::onlyTrashed()
-                ->with(['leads', 'quotation'])
+                ->select('id', 'nomor', 'tgl_spk', 'nama_perusahaan', 'leads_id', 'quotation_id', 'status_spk_id', 'deleted_at', 'deleted_by', 'created_by')
+                ->with([
+                    'leads:id,nama_perusahaan,nomor',
+                    'quotation:id,nomor,leads_id,tgl_quotation',
+                ])
                 ->get();
 
             return $this->successResponse('Deleted SPK data retrieved successfully', $data);
@@ -554,28 +571,18 @@ class SpkController extends Controller
                 'leads',
                 'leads.jabatanPic',
                 'statusSpk',
-                'spkSites.quotation',  // Relasi ke quotation dari spkSite
-                'spkSites.quotation.quotationPics.jabatan', // Relasi ke PIC dengan jabatan
-                'spkSites.quotation.company', // Relasi ke company untuk alamat
-                'spkSites.quotation.quotationDetails', // Relasi ke details untuk HC
-                'spkSites.quotation.quotationDetailCosses', // Relasi ke details untuk HC
-                'spkSites.quotation.quotationTrainings', // Relasi ke training
-                'spkSites' // Relasi ke site
+                'spkSites.quotation',                        // Relasi ke quotation dari spkSite
+                'spkSites.quotation.quotationPics.jabatan',  // Relasi ke PIC dengan jabatan
+                'spkSites.quotation.company',                // Relasi ke company untuk alamat
+                'spkSites.quotation.quotationDetails',       // Relasi ke details untuk HC
+                'spkSites.quotation.wage',  // Relasi ke details untuk HC
+                'spkSites.quotation.quotationTrainings',     // Relasi ke training
+                'spkSites.quotation.salaryRule',             // Eager load agar tidak lazy load di loop
+                'spkSites.quotation.ruleThr',                // Eager load agar tidak lazy load di loop
             ])->find($id);
 
             if (!$spk) {
                 return $this->notFoundResponse('SPK not found');
-            }
-            // DEBUG: Cek apakah company dimuat dengan benar
-            if ($spk->spkSites->isNotEmpty()) {
-                $firstSite = $spk->spkSites->first();
-                if ($firstSite->quotation) {
-                    // Cek ini di browser/Postman
-                    \Log::info('Quotation ID: ' . $firstSite->quotation->id);
-                    \Log::info('Company ID: ' . ($firstSite->quotation->company_id ?? 'null'));
-                    \Log::info('Company loaded: ' . ($firstSite->quotation->relationLoaded('company') ? 'yes' : 'no'));
-                    // \Log::info('Company object: ', $firstSite->quotation->company ? $firstSite->quotation->company->toArray() : ['null']);
-                }
             }
 
             // 1. Informasi SPK
@@ -613,8 +620,9 @@ class SpkController extends Controller
                 // Calculate quotation using service
                 $calculatedQuotation = null;
                 try {
-                    $quotationService = new QuotationService();
-                    $calculatedQuotation = $quotationService->calculateQuotation($quotation);
+                    // Resolve QuotationService hanya saat dibutuhkan (lazy)
+                    // agar tidak membebani memory di endpoint lain yang tidak memerlukannya
+                    $calculatedQuotation = app(QuotationService::class)->calculateQuotation($quotation);
                 } catch (\Exception $e) {
                     \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
                 }
@@ -641,6 +649,8 @@ class SpkController extends Controller
                         'persen_bpjs_kesehatan' => $firstDetail->persen_bpjs_kesehatan ?? 0,
                     ];
                 }
+                // Bebaskan memori hasil kalkulasi setelah nilai diambil
+                unset($calculatedQuotation);
                 // Cari PIC utama (is_kuasa = 1)
                 // fallback: ambil Company via relation() jika properti ->company bukan model
                 $companyModel = null;
@@ -653,7 +663,7 @@ class SpkController extends Controller
                 // $picKuasa = $quotation->quotationPics->where('is_kuasa', 1)->first();
                 $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
                 // $posisiJabatan = $quotation->quotationDetails->first()?->jabatan_kebutuhan ?? null;
-                $cossdata = $quotation->quotationDetailCosses->first();
+                $wagedata = $quotation->wage->first();
 
                 // Get first detail for BPJS percentages
                 $firstDetail = $quotation->quotationDetails->first();
@@ -691,9 +701,9 @@ class SpkController extends Controller
                     'persen_bpjs_jht' => $persenBpjsBreakdown['persen_bpjs_jht'],
                     'persen_bpjs_jp' => $persenBpjsBreakdown['persen_bpjs_jp'],
                     'persen_bpjs_kesehatan' => $persenBpjsBreakdown['persen_bpjs_kesehatan'],
-                    'kompensasi' => $cossdata ? $cossdata->kompensasi ?? null : null,
-                    'lembur' => $cossdata ? $cossdata->lembur ?? null : null,
-                    'thr' => $cossdata ? $cossdata->tunjangan_hari_raya ?? null : null,
+                    'kompensasi' => $wagedata ? $wagedata->kompensasi ?? null : null,
+                    'lembur' => $wagedata ? $wagedata->lembur ?? null : null,
+                    'thr' => $wagedata ? $wagedata->thr ?? null : null,
                     'joker_reliever' => $quotation->joker_reliever ?? null,
                     'syarat_invoice' => $quotation->syarat_invoice ?? null,
                     'top' => $quotation->top ?? null,
@@ -759,6 +769,9 @@ class SpkController extends Controller
                     'quotation_id' => $site->quotation_id
                 ];
             });
+
+            // Bebaskan koleksi besar dari memory setelah selesai diproses
+            unset($uniqueQuotations);
 
             // Struktur respons akhir
             $responseData = [
@@ -855,6 +868,11 @@ class SpkController extends Controller
             // LANGSUNG AMBIL DARI RELASI SPK
             $quotation = $spk->quotation;
             $leads = $spk->leads;
+
+            // Unset relasi dari $spk agar tidak di-serialize dua kali dalam response
+            // ($quotation dan $leads sudah tersedia sebagai key terpisah di $data)
+            $spk->unsetRelation('quotation');
+            $spk->unsetRelation('leads');
 
             // Get jabatan PIC
             if ($leads->jabatan) {

@@ -161,7 +161,8 @@ class Leads extends Model
      */
     public function leadsKebutuhan()
     {
-        return $this->hasMany(LeadsKebutuhan::class, 'leads_id');
+        return $this->hasMany(LeadsKebutuhan::class, 'leads_id')
+            ->whereNull('deleted_at'); // Filter soft deleted records
     }
     // Tambahkan di dalam class Leads di file App\Models\Leads.php
 
@@ -229,11 +230,12 @@ class Leads extends Model
         // Sales division
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             if ($user->cais_role_id == 29) {
-                // Sales - hanya melihat leads mereka sendiri
-                // Filter berdasarkan sl_leads_kebutuhan
-                $query->whereHas('leadsKebutuhan.timSalesD', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
+                // ✅ Ambil ID dulu, lalu whereIn — lebih ringan dari nested EXISTS
+                $timSalesDIds = TimSalesDetail::where('user_id', $user->id)->pluck('id');
+                $leadsIds = LeadsKebutuhan::whereIn('tim_sales_d_id', $timSalesDIds)
+                    ->whereNull('deleted_at')
+                    ->pluck('leads_id');
+                $query->whereIn('sl_leads.id', $leadsIds);
             } elseif ($user->cais_role_id == 31) {
                 // Sales Leader - melihat leads seluruh anggota tim
                 $tim = TimSalesDetail::where('user_id', $user->id)->first();
@@ -270,11 +272,14 @@ class Leads extends Model
     /**
      * Scope untuk leads yang tersedia untuk aktivitas
      */
+    // ✅ SESUDAH — berikan logika pembeda agar scope ini punya alasan exist
     public function scopeAvailableForActivity($query, $user = null)
     {
         $user = $user ?: Auth::user();
 
-        // Panggil scope filter role
+        // Contoh: activity hanya untuk leads yang belum menjadi customer
+        $query->whereNull('customer_id');
+
         return $this->scopeFilterByUserRole($query, $user);
     }
 

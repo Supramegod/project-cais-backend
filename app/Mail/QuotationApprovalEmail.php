@@ -22,27 +22,36 @@ class QuotationApprovalEmail extends Mailable
     public ?string $top;
     public string $fromAddress;
     public string $fromName;
+    public ?string $namaPerusahaan;
+    public ?int $jumlahHariInvoice;
+    public ?string $tipeHariInvoice;
 
     public function __construct(
-        string  $recipientName,
-        string  $recipientRole,
-        string  $quotationNumber,
-        string  $creatorName,
-        string  $approvalStage,
-        string  $approvalUrl  = '#',
-        ?string $top          = null,
-        string  $fromAddress  = '',
-        string  $fromName     = '',
+        string $recipientName,
+        string $recipientRole,
+        string $quotationNumber,
+        string $creatorName,
+        string $approvalStage,
+        string $approvalUrl = '#',
+        ?string $top = null,
+        string $fromAddress = '',
+        string $fromName = '',
+        ?string $namaPerusahaan = null,
+        ?int $jumlahHariInvoice = null,
+        ?string $tipeHariInvoice = null,
     ) {
-        $this->recipientName   = $recipientName;
-        $this->recipientRole   = $recipientRole;
+        $this->recipientName = $recipientName;
+        $this->recipientRole = $recipientRole;
         $this->quotationNumber = $quotationNumber;
-        $this->creatorName     = $creatorName;
-        $this->approvalStage   = $approvalStage;
-        $this->approvalUrl     = $approvalUrl;
-        $this->top             = $top;
-        $this->fromAddress     = $fromAddress ?: config('mail.from.address');
-        $this->fromName        = $fromName    ?: config('mail.from.name');
+        $this->creatorName = $creatorName;
+        $this->approvalStage = $approvalStage;
+        $this->approvalUrl = $approvalUrl;
+        $this->top = $top;
+        $this->fromAddress = $fromAddress ?: config('mail.from.address');
+        $this->fromName = $fromName ?: config('mail.from.name');
+        $this->namaPerusahaan = $namaPerusahaan;
+        $this->jumlahHariInvoice = $jumlahHariInvoice;
+        $this->tipeHariInvoice = $tipeHariInvoice;
     }
 
     public function envelope(): Envelope
@@ -58,16 +67,19 @@ class QuotationApprovalEmail extends Mailable
         return new Content(
             view: 'emails.quotation-approval',
             with: [
-                'recipientName'   => $this->recipientName,
-                'recipientRole'   => $this->recipientRole,
+                'recipientName' => $this->recipientName,
+                'recipientRole' => $this->recipientRole,
                 'quotationNumber' => $this->quotationNumber,
-                'creatorName'     => $this->creatorName,
-                'approvalStage'   => $this->approvalStage,
-                'approvalUrl'     => $this->approvalUrl,
-                'top'             => $this->top,
-                'fromAddress'     => $this->fromAddress,
-                'fromName'        => $this->fromName,
-                'sentAt'          => now(),
+                'creatorName' => $this->creatorName,
+                'approvalStage' => $this->approvalStage,
+                'approvalUrl' => $this->approvalUrl,
+                'top' => $this->top,
+                'fromAddress' => $this->fromAddress,
+                'fromName' => $this->fromName,
+                'sentAt' => now(),
+                'namaPerusahaan' => $this->namaPerusahaan,
+                'jumlahHariInvoice' => $this->jumlahHariInvoice,
+                'tipeHariInvoice' => $this->tipeHariInvoice,
             ]
         );
     }
