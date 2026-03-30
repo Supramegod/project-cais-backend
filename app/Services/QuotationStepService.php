@@ -3401,12 +3401,31 @@ class QuotationStepService
         ];
 
         $hasUpdate = false;
+        $requiresHppCossRecalculation = false;
 
         // 1. Update upah jika nominal_upah diubah dan custom (dari detail_data)
-        if (isset($data['nominal_upah']) && isset($detail->is_custom_upah) && $detail->is_custom_upah) {
-            $wageUpdateData['upah'] = 'Custom';
-            // $wageUpdateData['hitungan_upah'] = 'Per Bulan';
-            $hasUpdate = true;
+        // ✅ PERBAIKAN KRITIS: Deteksi perubahan nominal_upah dan trigger recalculation
+        if (isset($data['nominal_upah'])) {
+            $newNominalUpah = $this->convertToFloat($data['nominal_upah']);
+            $oldNominalUpah = (float) $detail->nominal_upah;
+
+            // Jika nilai nominal_upah berubah, trigger HPP/COSS recalculation
+            // karena kompensasi dan THR bergantung pada nilai upah
+            if ($newNominalUpah !== $oldNominalUpah) {
+                $requiresHppCossRecalculation = true;
+
+                \Log::info("Nominal upah changed — triggering HPP/COSS recalculation", [
+                    'detail_id' => $detail->id,
+                    'old_nominal_upah' => $oldNominalUpah,
+                    'new_nominal_upah' => $newNominalUpah
+                ]);
+            }
+
+            // Update upah ke 'Custom' jika custom
+            if (isset($detail->is_custom_upah) && $detail->is_custom_upah) {
+                $wageUpdateData['upah'] = 'Custom';
+                $hasUpdate = true;
+            }
         }
 
         // 2. Update field wage dari data (untuk backward compatibility)
@@ -3419,6 +3438,20 @@ class QuotationStepService
             'tunjangan_holiday' => 'tunjangan_holiday',
             'nominal_tunjangan_holiday' => 'nominal_tunjangan_holiday',
             'lembur_ditagihkan' => 'lembur_ditagihkan'
+            // CATATAN: 'hitungan_upah' TIDAK ada di sini - field ini read-only di Step 11
+            // hitungan_upah hanya bisa diset di Step 4 saat membuat wage
+        ];
+
+        // Field yang kalau berubah, HPP/COSS perlu di-recalculate
+        $fieldsTriggeringRecalculation = [
+            'lembur',
+            'nominal_lembur',
+            'tunjangan_holiday',
+            'nominal_tunjangan_holiday',
+            'tunjangan_hari_raya',
+            'kompensasi',
+            'lembur_ditagihkan'
+            // CATATAN: 'hitungan_upah' TIDAK included - tidak trigger recalculation di Step 11
         ];
 
         foreach ($wageFieldMapping as $inputField => $wageField) {
@@ -3426,17 +3459,27 @@ class QuotationStepService
                 $value = $this->convertToFloat($data[$inputField]);
 
                 // Untuk field string (bukan numerik), jangan konversi
-                if (in_array($inputField, ['lembur', 'kompensasi', 'thr', 'tunjangan_holiday', 'lembur_ditagihkan'])) {
+                if (in_array($inputField, ['lembur', 'kompensasi', 'thr', 'tunjangan_holiday', 'lembur_ditagihkan', 'hitungan_upah'])) {
                     $value = $data[$inputField];
                 }
 
-                $wageUpdateData[$wageField] = $value;
-                $hasUpdate = true;
+                // Cek apakah nilai berbeda dengan yang sekarang (untuk detect perubahan)
+                if ($wage->{$wageField} != $value) {
+                    $wageUpdateData[$wageField] = $value;
+                    $hasUpdate = true;
+
+                    // Mark untuk recalculation jika field ini trigger recalculation
+                    if (in_array($inputField, $fieldsTriggeringRecalculation)) {
+                        $requiresHppCossRecalculation = true;
+                    }
+                }
 
                 \Log::info("Updating wage field from detail_data", [
                     'detail_id' => $detail->id,
                     'field' => $wageField,
-                    'value' => $value
+                    'old_value' => $wage->{$wageField} ?? 'null',
+                    'new_value' => $value,
+                    'changed' => ($wage->{$wageField} != $value)
                 ]);
             }
         }
@@ -3448,8 +3491,45 @@ class QuotationStepService
             \Log::debug("Wage updated from detail_data", [
                 'detail_id' => $detail->id,
                 'wage_id' => $wage->id,
-                'updated_fields' => array_keys($wageUpdateData)
+                'updated_fields' => array_keys($wageUpdateData),
+                'requires_recalculation' => $requiresHppCossRecalculation
             ]);
+
+            // ================================================
+            // **PENTING: CLEAR HPP/COSS NOMINAL VALUES**
+            // Jika ada perubahan wage yang affect calculation,
+            // clear nilai HPP/COSS agar dihitung ulang di step berikutnya
+            // ================================================
+            if ($requiresHppCossRecalculation) {
+                $fieldsToClear = [
+                    'tunjangan_hari_raya',
+                    'kompensasi',
+                    'tunjangan_hari_libur_nasional',
+                    'lembur',
+                    'updated_by' => $user,
+                    'updated_at' => $currentDateTime
+                ];
+
+                // Clear HPP nominal values
+                $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+                if ($hpp) {
+                    $hpp->update($fieldsToClear);
+                    \Log::info("Cleared HPP nominal values for recalculation", [
+                        'detail_id' => $detail->id,
+                        'reason' => 'Wage updated in Step 11'
+                    ]);
+                }
+
+                // Clear COSS nominal values
+                $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+                if ($coss) {
+                    $coss->update($fieldsToClear);
+                    \Log::info("Cleared COSS nominal values for recalculation", [
+                        'detail_id' => $detail->id,
+                        'reason' => 'Wage updated in Step 11'
+                    ]);
+                }
+            }
         }
     }
 
