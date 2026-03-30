@@ -2298,10 +2298,14 @@ class QuotationStepService
             // ============================
             // 1. TERAPKAN NILAI DARI REQUEST (hpp_editable_data)
             // ============================
+            // FIX Bug 1: 'tunjangan_hari_raya' & 'kompensasi' DIHAPUS dari sini.
+            // Keduanya adalah auto-calculated berdasarkan wage.thr & wage.kompensasi
+            // di calculateExtras(). Membiarkannya di sini akan menimpa nilai yang
+            // baru dihitung dengan nilai lama dari frontend.
             $allowedHppFields = [
                 'jumlah_hc',
-                'tunjangan_hari_raya',
-                'kompensasi',
+                // 'tunjangan_hari_raya',  // auto-calculated — jangan override dari request
+                // 'kompensasi',           // auto-calculated — jangan override dari request
                 'tunjangan_hari_libur_nasional',
                 'lembur',
                 'provisi_seragam',
@@ -2337,7 +2341,8 @@ class QuotationStepService
             // ============================
             if ($request && $request->has('hpp_data') && isset($request->hpp_data[$detailCalculation->detail_id])) {
                 $userHppData = $request->hpp_data[$detailCalculation->detail_id];
-                $legacyFields = ['tunjangan_hari_raya', 'kompensasi', 'jumlah_hc'];
+                // FIX Bug 1: Hapus 'tunjangan_hari_raya' & 'kompensasi' dari legacy fields juga
+                $legacyFields = ['jumlah_hc'];
                 foreach ($legacyFields as $field) {
                     if (array_key_exists($field, $userHppData)) {
                         $userValue = $userHppData[$field];
@@ -2466,6 +2471,8 @@ class QuotationStepService
 
             \Log::info("Saved HPP data from calculation", [
                 'detail_id' => $detailCalculation->detail_id,
+                'thr_saved' => $hppData['tunjangan_hari_raya'] ?? 'n/a',
+                'kompensasi_saved' => $hppData['kompensasi'] ?? 'n/a',
                 'updated_fields' => array_keys($hppData)
             ]);
 
@@ -2490,15 +2497,17 @@ class QuotationStepService
             // ============================
             // TERAPKAN NILAI DARI REQUEST (coss_data) UNTUK SEMUA FIELD YANG DIKIRIM
             // ============================
+            // FIX Bug 1: 'tunjangan_hari_raya' & 'kompensasi' DIHAPUS dari sini.
+            // Keduanya adalah auto-calculated — sama seperti di saveHppDataFromCalculation.
             $allowedCossFields = [
                 'provisi_seragam',
                 'provisi_peralatan',
                 'provisi_chemical',
                 'provisi_ohc',
                 'lembur',
-                'tunjangan_hari_raya',
+                // 'tunjangan_hari_raya', // auto-calculated — jangan override dari request
                 'tunjangan_hari_libur_nasional',
-                'kompensasi',
+                // 'kompensasi',          // auto-calculated — jangan override dari request
             ];
 
             if ($request && $request->has('coss_data') && isset($request->coss_data[$detailCalculation->detail_id])) {
@@ -2771,8 +2780,9 @@ class QuotationStepService
                 }
             }
 
-            $this->syncWageDataForStep11($quotation, $user, $currentDateTime);
+            // FIX Bug 2: syncWageDataForStep11 dihapus — ditulis sebelum reset, efeknya nol
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
+
             if ($request->filled('persen_insentif')) {
                 $quotation->persen_insentif = (float) str_replace(['.', ','], ['', '.'], $request->persen_insentif);
             }
@@ -2781,19 +2791,9 @@ class QuotationStepService
             }
 
             $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
+
+            // saveAllCalculationResults sudah menangani hpp_editable_data & coss_data di dalamnya
             $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
-
-
-            if ($request->has('hpp_editable_data') && is_array($request->hpp_editable_data)) {
-                foreach ($request->hpp_editable_data as $detailId => $data) {
-                    $this->updateHppDataFromRequest($detailId, $data, $user, $currentDateTime, $quotation->id);
-                }
-            }
-            if ($request->has('coss_data') && is_array($request->coss_data)) {
-                foreach ($request->coss_data as $detailId => $data) {
-                    $this->updateCossDataFromRequest($detailId, $data, $user, $currentDateTime, $quotation->id);
-                }
-            }
 
             if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
                 $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
@@ -3688,45 +3688,44 @@ class QuotationStepService
      */
     private function resetAllCalculatedValues(Quotation $quotation, string $user, Carbon $currentDateTime): void
     {
-        \Log::info("=== RESET ALL CALCULATED VALUES ===", [
+        \Log::info("=== RESET ALL CALCULATED VALUES (bulk) ===", [
             'quotation_id' => $quotation->id
         ]);
 
-        foreach ($quotation->quotationDetails as $detail) {
-            // Reset HPP
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
-            if ($hpp) {
-                $hpp->update([
-                    'tunjangan_hari_raya' => null,
-                    'kompensasi' => null,
-                    'tunjangan_hari_libur_nasional' => null,
-                    'lembur' => null,
-                    'provisi_seragam' => null,
-                    'provisi_peralatan' => null,
-                    'provisi_chemical' => null,
-                    'provisi_ohc' => null,
-                    'updated_by' => $user,
-                    'updated_at' => $currentDateTime
-                ]);
-            }
+        // FIX Bug 3: Ganti loop N+1 query dengan 2 bulk query (whereIn)
+        // Sebelum: 2 query per detail = 2N queries (N bisa puluhan)
+        // Sesudah: 2 query total, apapun jumlah detailnya
+        $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
 
-            // Reset COSS
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
-            if ($coss) {
-                $coss->update([
-                    'tunjangan_hari_raya' => null,
-                    'kompensasi' => null,
-                    'tunjangan_hari_libur_nasional' => null,
-                    'lembur' => null,
-                    // 'provisi_seragam' => null,
-                    // 'provisi_peralatan' => null,
-                    // 'provisi_chemical' => null,
-                    // 'provisi_ohc' => null,
-                    'updated_by' => $user,
-                    'updated_at' => $currentDateTime
-                ]);
-            }
+        if (empty($detailIds)) {
+            return;
         }
+
+        // 1 query untuk semua HPP
+        QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update([
+            'tunjangan_hari_raya' => null,
+            'kompensasi' => null,
+            'tunjangan_hari_libur_nasional' => null,
+            'lembur' => null,
+            'provisi_seragam' => null,
+            'provisi_peralatan' => null,
+            'provisi_chemical' => null,
+            'provisi_ohc' => null,
+            'updated_by' => $user,
+            'updated_at' => $currentDateTime,
+        ]);
+
+        // 1 query untuk semua COSS
+        QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update([
+            'tunjangan_hari_raya' => null,
+            'kompensasi' => null,
+            'tunjangan_hari_libur_nasional' => null,
+            'lembur' => null,
+            'updated_by' => $user,
+            'updated_at' => $currentDateTime,
+        ]);
+
+        \Log::info("Reset selesai untuk " . count($detailIds) . " detail (2 queries total)");
     }
     /**
      * Force sync antara HPP dan COSS untuk field yang sama
