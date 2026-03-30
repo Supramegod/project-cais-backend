@@ -1330,7 +1330,7 @@ class QuotationStepService
         $hitunganUpah = "Per Bulan";
 
         if (($positionData['upah'] ?? null) == "Custom") {
-            $hitunganUpah = $positionData['hitungan_upah'] ;
+            $hitunganUpah = $positionData['hitungan_upah'] ?? "Per Bulan";
             $customUpah = $positionData['nominal_upah'] ?? 0; // AMBIL DARI nominal_upah BUKAN custom_upah
 
             // Jika nominal_upah adalah string dengan format, bersihkan
@@ -1338,14 +1338,9 @@ class QuotationStepService
                 $customUpah = str_replace('.', '', $customUpah);
             }
 
-            // Konversi ke nominal bulanan berdasarkan hitungan upah
-            // if ($hitunganUpah == "Per Hari") {
-            //     $nominalUpah = $customUpah * 21; // 21 hari kerja
-            // } else if ($hitunganUpah == "Per Jam") {
-            //     $nominalUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
-            // } else {
-            //     $nominalUpah = $customUpah; // Per Bulan
-            // }
+            // TIDAK ada konversi - simpan nilai custom apa adanya
+            // Baik Per Bulan, Per Hari, atau Per Jam, nilai disimpan tanpa perkalian
+            $nominalUpah = $customUpah;
         } else {
             $site = QuotationSite::find($detail->quotation_site_id);
             if ($site) {
@@ -1949,7 +1944,7 @@ class QuotationStepService
             $wageData = [
                 'quotation_id' => $quotation->id,
                 'upah' => $positionData['upah'] ?? 'UMK',
-                'hitungan_upah' => $upahData['hitungan_upah'] ,
+                'hitungan_upah' => $upahData['hitungan_upah'],
                 'lembur' => $positionData['lembur'] ?? 'Tidak Ada',
                 'nominal_upah' => $upahData['nominal_upah'] ?? null,
                 'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
