@@ -912,7 +912,10 @@ class QuotationService
                         $hppDivider,
                         'chemical',
                         $detail->jumlah_hc_hpp,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        false,
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 } elseif (isset($config['special']) && $config['special'] === 'kaporlap') {
                     // Kaporlap: dikali dengan HC, bukan dibagi
@@ -924,7 +927,10 @@ class QuotationService
                         1, // Tidak dibagi, langsung dikali HC
                         'kaporlap',
                         $detail->jumlah_hc_hpp,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        false,
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 } else {
                     $hppValue = $this->calculateItemTotalForHpp(
@@ -936,7 +942,9 @@ class QuotationService
                         $config['special'] ?? null,
                         $detail->jumlah_hc_hpp,
                         $config['site_specific'] ? $currentSiteId : null,
-                        ($detail->id === $primaryDetailId) // includeLegacy
+                        ($detail->id === $primaryDetailId), // includeLegacy
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 }
                 $detail->{"personil_$key"} = $hppValue;
@@ -955,7 +963,10 @@ class QuotationService
                         $cossDivider,
                         'chemical',
                         $detail->jumlah_hc_original,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        false,
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 } elseif (isset($config['special']) && $config['special'] === 'kaporlap') {
                     // Kaporlap: dikali dengan HC, bukan dibagi
@@ -967,7 +978,10 @@ class QuotationService
                         1, // Tidak dibagi, langsung dikali HC
                         'kaporlap',
                         $detail->jumlah_hc_original,
-                        $config['site_specific'] ? $currentSiteId : null
+                        $config['site_specific'] ? $currentSiteId : null,
+                        false,
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 } else {
                     $cossValue = $this->calculateItemTotalForCoss(
@@ -979,7 +993,9 @@ class QuotationService
                         $config['special'] ?? null,
                         $detail->jumlah_hc_original,
                         $config['site_specific'] ? $currentSiteId : null,
-                        ($detail->id === $primaryDetailId) // includeLegacy
+                        ($detail->id === $primaryDetailId), // includeLegacy
+                        $quotation->jenis_kontrak,
+                        max(1, $this->parseHariKerja($quotation->hari_kerja))
                     );
                 }
                 $detail->{"personil_{$key}_coss"} = $cossValue;
@@ -990,7 +1006,7 @@ class QuotationService
     /**
      * Calculate item total khusus untuk HPP dengan filter site dan soft delete
      */
-    private function calculateItemTotalForHpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false)
+    private function calculateItemTotalForHpp($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false, $jenisKontrak = null, $hariKerja = 25)
     {
         // Query dengan filter soft delete
         $query = $model::whereNull('deleted_at');
@@ -1045,10 +1061,16 @@ class QuotationService
                 $total += $perPerson;
             }
         }
+
+        // ✅ PKHL ADJUSTMENT: Jika jenis_kontrak adalah PKHL, bagi total dengan jumlah hari kerja
+        if ($jenisKontrak === 'PKHL' && $hariKerja > 0) {
+            $total = $total / $hariKerja;
+        }
+
         return $total;
     }
 
-    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false)
+    private function calculateItemTotalForCoss($model, $quotationId, $detailId, $provisi, $divider = 1, $special = null, $jumlahHc = 1, $siteId = null, $includeLegacy = false, $jenisKontrak = null, $hariKerja = 25)
     {
         // Query dengan filter soft delete
         $query = $model::whereNull('deleted_at');
@@ -1100,6 +1122,12 @@ class QuotationService
                 $total += $perPerson;
             }
         }
+
+        // ✅ PKHL ADJUSTMENT: Jika jenis_kontrak adalah PKHL, bagi total dengan jumlah hari kerja
+        if ($jenisKontrak === 'PKHL' && $hariKerja > 0) {
+            $total = $total / $hariKerja;
+        }
+
         return $total;
     }
 
@@ -1133,7 +1161,7 @@ class QuotationService
             $tunjanganHariRayaCoss = (float) ($detail->tunjangan_hari_raya_coss ?? 0);
             $kompensasiCoss = (float) ($detail->kompensasi_coss ?? 0);
 
-            $nominalUpah = (float) ($detail->nominal_upah_bulanan ?? $detail->nominal_upah ?? 0);
+            $nominalUpah = (float) ($detail->nominal_upah ?? 0);
 
             $tunjanganHoliday = (float) ($detail->tunjangan_holiday_hpp ?? 0);
             $lembur = (float) ($detail->lembur_hpp ?? 0);
@@ -1237,6 +1265,9 @@ class QuotationService
     {
         $summary = $result->calculation_summary;
 
+        // ✅ PKHL ADJUSTMENT: Parse hari_kerja untuk PKHL contracts
+        $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
+
         // Pastikan persen_bunga_bank sebagai float
         $persenBungaBank = (float) $quotation->persen_bunga_bank;
         if ($quotation->top == "Non TOP") {
@@ -1247,11 +1278,21 @@ class QuotationService
             ? $summary->total_sebelum_management_fee * ($persenBungaBank / 100) / $jumlahHc
             : 0;
 
+        // ✅ PKHL ADJUSTMENT: Divide bunga_bank_total by hari_kerja if PKHL
+        if ($quotation->jenis_kontrak === 'PKHL' && $hariKerja > 0) {
+            $summary->bunga_bank_total = $summary->bunga_bank_total / $hariKerja;
+        }
+
         // Pastikan persen_insentif sebagai float
         $persenInsentif = (float) $quotation->persen_insentif;
         $summary->insentif_total = $persenInsentif > 0
             ? $summary->nominal_management_fee * ($persenInsentif / 100) / $jumlahHc
             : 0;
+
+        // ✅ PKHL ADJUSTMENT: Divide insentif_total by hari_kerja if PKHL
+        if ($quotation->jenis_kontrak === 'PKHL' && $hariKerja > 0) {
+            $summary->insentif_total = $summary->insentif_total / $hariKerja;
+        }
     }
 
     private function updateDetailsWithGrossUp($quotation, $daftarTunjangan, $jumlahHc, QuotationCalculationResult $result): void
