@@ -1330,7 +1330,7 @@ class QuotationStepService
         $hitunganUpah = "Per Bulan";
 
         if (($positionData['upah'] ?? null) == "Custom") {
-            $hitunganUpah = $positionData['hitungan_upah'] ?? "Per Bulan";
+            $hitunganUpah = $positionData['hitungan_upah'] ;
             $customUpah = $positionData['nominal_upah'] ?? 0; // AMBIL DARI nominal_upah BUKAN custom_upah
 
             // Jika nominal_upah adalah string dengan format, bersihkan
@@ -3410,7 +3410,7 @@ class QuotationStepService
         // 1. Update upah jika nominal_upah diubah dan custom (dari detail_data)
         if (isset($data['nominal_upah']) && isset($detail->is_custom_upah) && $detail->is_custom_upah) {
             $wageUpdateData['upah'] = 'Custom';
-            $wageUpdateData['hitungan_upah'] = 'Per Bulan';
+            // $wageUpdateData['hitungan_upah'] = 'Per Bulan';
             $hasUpdate = true;
         }
 
