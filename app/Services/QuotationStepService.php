@@ -1339,13 +1339,13 @@ class QuotationStepService
             }
 
             // Konversi ke nominal bulanan berdasarkan hitungan upah
-            if ($hitunganUpah == "Per Hari") {
-                $nominalUpah = $customUpah * 21; // 21 hari kerja
-            } else if ($hitunganUpah == "Per Jam") {
-                $nominalUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
-            } else {
-                $nominalUpah = $customUpah; // Per Bulan
-            }
+            // if ($hitunganUpah == "Per Hari") {
+            //     $nominalUpah = $customUpah * 21; // 21 hari kerja
+            // } else if ($hitunganUpah == "Per Jam") {
+            //     $nominalUpah = $customUpah * 21 * 8; // 21 hari × 8 jam
+            // } else {
+            //     $nominalUpah = $customUpah; // Per Bulan
+            // }
         } else {
             $site = QuotationSite::find($detail->quotation_site_id);
             if ($site) {
@@ -1949,7 +1949,7 @@ class QuotationStepService
             $wageData = [
                 'quotation_id' => $quotation->id,
                 'upah' => $positionData['upah'] ?? 'UMK',
-                'hitungan_upah' => $upahData['hitungan_upah'] ?? 'Per Bulan',
+                'hitungan_upah' => $upahData['hitungan_upah'] ,
                 'lembur' => $positionData['lembur'] ?? 'Tidak Ada',
                 'nominal_upah' => $upahData['nominal_upah'] ?? null,
                 'nominal_lembur' => isset($positionData['nominal_lembur']) ? str_replace('.', '', $positionData['nominal_lembur']) : null,
