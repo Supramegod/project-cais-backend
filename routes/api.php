@@ -32,6 +32,7 @@ use App\Http\Controllers\SalaryRuleController;
 use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
+use App\Http\Controllers\UpahController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
@@ -41,7 +42,7 @@ use App\Http\Controllers\UserEmailConfigController;
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
 
-Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
+Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
@@ -182,6 +183,16 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/view/{id}', 'view');
         Route::get('/city/{cityId}', 'listUmk');
         Route::post('/add', 'add');
+    });
+
+    // Upah (Unified wage management: UMP, UMK & UMSK)
+    Route::prefix('upah')->controller(UpahController::class)->group(function () {
+        Route::get('/provinsi', 'listProvinsi');
+        Route::get('/provinsi/{provinceId}/kota', 'listKota');
+        Route::get('/kota/{cityId}', 'detailKota');
+        Route::post('/ump', 'storeUmp');
+        Route::post('/umk', 'storeUmk');
+        Route::post('/umsk', 'storeUmsk');
     });
 
     // Supplier
@@ -471,5 +482,6 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/quotations/{quotation}/ohc', 'updateStep10');
         Route::post('/quotations/{quotation}/harga-jual', 'updateStep11');
     });
+
 
 });

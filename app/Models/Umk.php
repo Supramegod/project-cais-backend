@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\HasWageHistory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Umk extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes,HasWageHistory;
 
+    protected $connection = 'mysql';
     protected $table = 'm_umk';
     protected $fillable = [
         'city_id',
@@ -36,11 +39,9 @@ class Umk extends Model
     /**
      * Format umk sebelum menyimpan
      */
-    public function setUmkAttribute($value)
+    public function setUmkAttribute(mixed $value): void
     {
-        // Format: Rp. 1.000.000,00 -> 1000000.00
-        $value = str_replace(["Rp.", ".", ","], "", $value);
-        $this->attributes['umk'] = (float) $value;
+        $this->attributes['umk'] = $this->parseCurrencyInput($value);
     }
 
     /**
@@ -72,18 +73,15 @@ class Umk extends Model
     /**
      * Scope untuk city tertentu
      */
-    public function scopeByCity($query, $cityId)
+
+    public function scopeByCity(Builder $query, int $cityId): Builder
     {
         return $query->where('city_id', $cityId);
     }
     // App\Models\Umk.php
-public function formatUmk()
-{
-    if (!$this->umk) {
-        return 'Rp. 0';
+    public function formatumk(): string
+    {
+        return $this->formatWage('umk');
     }
-
-    return 'Rp. ' . number_format(floatval($this->umk), 0, ',', '.');
-}
 
 }
