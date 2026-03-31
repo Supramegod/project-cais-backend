@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreUmkRequest;
 use App\Http\Requests\StoreUmpRequest;
 use App\Http\Requests\StoreUmskRequest;
+use App\Models\Province;
 use App\Services\UpahService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,13 @@ class UpahController extends Controller
      *     summary="[Level 1] List provinsi beserta UMP aktif",
      *     tags={"Upah"},
      *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number for pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer", default=15)),
      *     @OA\Response(response=200, description="OK"),
      *     @OA\Response(response=500, description="Internal server error")
@@ -74,7 +82,14 @@ class UpahController extends Controller
      *         in="path",
      *         required=true,
      *         description="ID Provinsi",
-     *         @OA\Schema(type="integer", example=35)
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number for pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
      *     ),
      *     @OA\Parameter(
      *         name="per_page",
@@ -134,10 +149,21 @@ class UpahController extends Controller
             $perPage = (int) $request->query('per_page', 15);
             $search = $request->query('search'); // parameter search opsional
 
+            // Get UMP data for province
+            $province = Province::with('activeUmp')->findOrFail($provinceId);
+            $umpData = $province->activeUmp ? [
+                'id' => $province->activeUmp->id,
+                'nilai' => (float) $province->activeUmp->ump,
+                'nama_provinsi' => $province->name,
+                'formatted' => $province->activeUmp->formatump(),
+            ] : null;
+
+            // Get cities list
             $paginator = $this->service->getKotaList($provinceId, $perPage, $search);
 
             return response()->json([
                 'success' => true,
+                'ump' => $umpData,
                 'data' => $paginator->items(),
                 'pagination' => [
                     'current_page' => $paginator->currentPage(),
@@ -148,6 +174,8 @@ class UpahController extends Controller
                 'message' => 'Data kota/kabupaten berhasil diambil',
             ]);
 
+        } catch (ModelNotFoundException) {
+            return $this->notFound("Provinsi dengan ID {$provinceId} tidak ditemukan.");
         } catch (\RuntimeException $e) {
             return $this->serviceError('listKota', $e);
         } catch (\Throwable $e) {
@@ -164,6 +192,13 @@ class UpahController extends Controller
      *     tags={"Upah"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="cityId", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         description="Page number for pagination (default: 1)",
+     *         required=false,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
      *     @OA\Response(response=200, description="OK"),
      *     @OA\Response(response=404, description="Kota tidak ditemukan"),
      *     @OA\Response(response=500, description="Internal server error")
