@@ -182,7 +182,8 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
-                'status_quotation_id', // ✅ sudah ada, untuk eager load statusQuotation
+                'status_quotation_id',
+                'jenis_kontrak', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
                 'created_by',
             ])
@@ -235,6 +236,7 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
+                    'jenis_kontrak' => $quotation->jenis_kontrak,
                     'created_by' => $quotation->created_by,
                     'status_quotation' => $quotation->statusQuotation
                         ? ['id' => $quotation->statusQuotation->id, 'nama' => $quotation->statusQuotation->nama]

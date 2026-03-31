@@ -52,15 +52,18 @@ class QuotationStepService
 
     protected $quotationBarangService;
     protected $quotationNotificationService;
+    protected $quotationBusinessService;
 
     public function __construct(
         QuotationBarangService $quotationBarangService,
-        QuotationNotificationService $quotationNotificationService
+        QuotationNotificationService $quotationNotificationService,
+        QuotationBusinessService $quotationBusinessService
     ) {
         // QuotationService TIDAK di-inject di constructor
         // karena QuotationService juga inject QuotationStepService → circular dependency
         $this->quotationBarangService = $quotationBarangService;
         $this->quotationNotificationService = $quotationNotificationService;
+          $this->quotationBusinessService = $quotationBusinessService;
     }
 
     /**
@@ -1039,8 +1042,7 @@ class QuotationStepService
             $statusData = $this->calculateFinalStatus($quotation);
 
             // **PERBAIKAN: Gunakan DB::table untuk menghindari attribute yang tidak diinginkan**
-            DB::table('sl_quotation')
-                ->where('id', $quotation->id)
+            Quotation::where('id', $quotation->id)
                 ->update(array_merge([
                     'step' => 100,
                     'updated_by' => $user,
@@ -1056,6 +1058,26 @@ class QuotationStepService
 
             if ($statusData['status_quotation_id'] == 2) {
                 $this->notifyDirSales($quotation, $currentDateTime);
+            }
+            if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
+                // Cari quotation lama (referensi)
+                $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
+                
+                if ($oldQuotation) {
+                    // 1. Soft delete semua relasi yang nyangkut di quotation lama
+                    $this->quotationBusinessService->softDeleteQuotationRelations($oldQuotation, $user);
+                    
+                    // 2. Soft delete quotation lamanya itu sendiri
+                    $oldQuotation->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user
+                    ]);
+
+                    \Log::info("Soft deleted old quotation and its relations", [
+                        'old_quotation_id' => $oldQuotation->id,
+                        'new_quotation_id' => $quotation->id
+                    ]);
+                }
             }
 
             DB::commit();
