@@ -25,16 +25,16 @@ class UpahService
                 ->paginate($perPage);
 
             // Map setiap item, biarkan struktur pagination tetap utuh
-            $paginated->through(fn (Province $province) => [
-                'id'   => $province->id,
+            $paginated->through(fn(Province $province) => [
+                'id' => $province->id,
                 'nama' => $province->name,
-                'ump'  => $province->activeUmp
+                'ump' => $province->activeUmp
                     ? [
-                        'id'          => $province->activeUmp->id,
-                        'nilai'       => (float) $province->activeUmp->ump,
-                        'formatted'   => $province->activeUmp->formatump(),
+                        'id' => $province->activeUmp->id,
+                        'nilai' => (float) $province->activeUmp->ump,
+                        'formatted' => $province->activeUmp->formatump(),
                         'tgl_berlaku' => $province->activeUmp->tgl_berlaku,
-                        'sumber'      => $province->activeUmp->sumber,
+                        'sumber' => $province->activeUmp->sumber,
                     ]
                     : null,
             ]);
@@ -44,7 +44,7 @@ class UpahService
         } catch (QueryException $e) {
             Log::error('[UpahService::getProvinsiList] Query error', [
                 'message' => $e->getMessage(),
-                'sql'     => $e->getSql(),
+                'sql' => $e->getSql(),
             ]);
             throw new \RuntimeException('Gagal mengambil data provinsi. Periksa koneksi database.', previous: $e);
 
@@ -58,26 +58,32 @@ class UpahService
 
     // ── Level 2 ───────────────────────────────────────────────────────────────
 
-    public function getKotaList(int $provinceId, int $perPage = 15): LengthAwarePaginator
+    public function getKotaList(int $provinceId, int $perPage = 15, ?string $search = null): LengthAwarePaginator
     {
         try {
-            $paginated = City::active()
+            $query = City::active()
                 ->byProvince($provinceId)
-                ->with('activeUmk')
+                ->with('activeUmk');
+
+            // Apply search filter if provided
+            if ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            }
+
+            $paginated = $query
                 ->orderBy('name')
                 ->paginate($perPage);
 
-            $paginated->through(fn (City $city) => [
-                'id'   => $city->id,
-                'kode' => $city->kode,
+            $paginated->through(fn(City $city) => [
+                'id' => $city->id,
                 'nama' => $city->name,
-                'umk'  => $city->activeUmk
+                'umk' => $city->activeUmk
                     ? [
-                        'id'          => $city->activeUmk->id,
-                        'nilai'       => (float) $city->activeUmk->umk,
-                        'formatted'   => $city->activeUmk->formatumk(),
+                        'id' => $city->activeUmk->id,
+                        'nilai' => (float) $city->activeUmk->umk,
+                        'formatted' => $city->activeUmk->formatumk(),
                         'tgl_berlaku' => $city->activeUmk->tgl_berlaku,
-                        'sumber'      => $city->activeUmk->sumber,
+                        'sumber' => $city->activeUmk->sumber,
                     ]
                     : null,
             ]);
@@ -87,15 +93,17 @@ class UpahService
         } catch (QueryException $e) {
             Log::error('[UpahService::getKotaList] Query error', [
                 'province_id' => $provinceId,
-                'message'     => $e->getMessage(),
-                'sql'         => $e->getSql(),
+                'search' => $search,
+                'message' => $e->getMessage(),
+                'sql' => $e->getSql(),
             ]);
             throw new \RuntimeException('Gagal mengambil data kota/kabupaten. Periksa koneksi database.', previous: $e);
 
         } catch (\Throwable $e) {
             Log::error('[UpahService::getKotaList] Unexpected error', [
                 'province_id' => $provinceId,
-                'message'     => $e->getMessage(),
+                'search' => $search,
+                'message' => $e->getMessage(),
             ]);
             throw new \RuntimeException('Terjadi kesalahan tak terduga saat mengambil data kota/kabupaten.', previous: $e);
         }
@@ -117,7 +125,7 @@ class UpahService
             Log::error('[UpahService::getDetailKota] Query error saat load city', [
                 'city_id' => $cityId,
                 'message' => $e->getMessage(),
-                'sql'     => $e->getSql(),
+                'sql' => $e->getSql(),
             ]);
             throw new \RuntimeException('Gagal mengambil data kota. Periksa koneksi database.', previous: $e);
         }
@@ -132,7 +140,7 @@ class UpahService
             Log::error('[UpahService::getDetailKota] Query error saat load UMK history', [
                 'city_id' => $cityId,
                 'message' => $e->getMessage(),
-                'sql'     => $e->getSql(),
+                'sql' => $e->getSql(),
             ]);
             throw new \RuntimeException('Gagal mengambil riwayat UMK.', previous: $e);
         }
@@ -148,59 +156,59 @@ class UpahService
             Log::error('[UpahService::getDetailKota] Query error saat load UMSK history', [
                 'city_id' => $cityId,
                 'message' => $e->getMessage(),
-                'sql'     => $e->getSql(),
+                'sql' => $e->getSql(),
             ]);
             throw new \RuntimeException('Gagal mengambil riwayat UMSK.', previous: $e);
         }
 
         return [
             'kota' => [
-                'id'       => $city->id,
-                'nama'     => $city->name,
+                'id' => $city->id,
+                'nama' => $city->name,
                 'provinsi' => $city->province
                     ? [
-                        'id'   => $city->province->id,
+                        'id' => $city->province->id,
                         'nama' => $city->province->nama,
                     ]
                     : null,
                 'umk_aktif' => $city->activeUmk
                     ? [
-                        'id'          => $city->activeUmk->id,
-                        'nilai'       => (float) $city->activeUmk->umk,
-                        'formatted'   => $city->activeUmk->formatumk(),
+                        'id' => $city->activeUmk->id,
+                        'nilai' => (float) $city->activeUmk->umk,
+                        'formatted' => $city->activeUmk->formatumk(),
                         'tgl_berlaku' => $city->activeUmk->tgl_berlaku,
-                        'sumber'      => $city->activeUmk->sumber,
+                        'sumber' => $city->activeUmk->sumber,
                     ]
                     : null,
-                'umsk_aktif' => $city->activeUmsks->map(fn (Umsk $umsk) => [
-                    'id'          => $umsk->id,
-                    'nilai'       => (float) $umsk->umsk,
-                    'formatted'   => $umsk->formatumsk(),
+                'umsk_aktif' => $city->activeUmsks->map(fn(Umsk $umsk) => [
+                    'id' => $umsk->id,
+                    'nilai' => (float) $umsk->umsk,
+                    'formatted' => $umsk->formatumsk(),
                     'tgl_berlaku' => $umsk->tgl_berlaku,
-                    'sumber'      => $umsk->sumber,
+                    'sumber' => $umsk->sumber,
                 ])->values(),
             ],
 
-            'umk_history' => $umkHistory->map(fn (Umk $umk) => [
-                'id'          => $umk->id,
-                'nilai'       => (float) $umk->umk,
-                'formatted'   => $umk->formatumk(),
+            'umk_history' => $umkHistory->map(fn(Umk $umk) => [
+                'id' => $umk->id,
+                'nilai' => (float) $umk->umk,
+                'formatted' => $umk->formatumk(),
                 'tgl_berlaku' => $umk->tgl_berlaku,
-                'sumber'      => $umk->sumber,
-                'is_aktif'    => $umk->is_aktif,
-                'created_by'  => $umk->created_by,
-                'deleted_at'  => $umk->deleted_at?->format('d-m-Y'),
+                'sumber' => $umk->sumber,
+                'is_aktif' => $umk->is_aktif,
+                'created_by' => $umk->created_by,
+                'deleted_at' => $umk->deleted_at?->format('d-m-Y'),
             ])->values(),
 
-            'umsk_history' => $umskHistory->map(fn (Umsk $umsk) => [
-                'id'          => $umsk->id,
-                'nilai'       => (float) $umsk->umsk,
-                'formatted'   => $umsk->formatumsk(),
+            'umsk_history' => $umskHistory->map(fn(Umsk $umsk) => [
+                'id' => $umsk->id,
+                'nilai' => (float) $umsk->umsk,
+                'formatted' => $umsk->formatumsk(),
                 'tgl_berlaku' => $umsk->tgl_berlaku,
-                'sumber'      => $umsk->sumber,
-                'is_aktif'    => $umsk->is_aktif,
-                'created_by'  => $umsk->created_by,
-                'deleted_at'  => $umsk->deleted_at?->format('d-m-Y'),
+                'sumber' => $umsk->sumber,
+                'is_aktif' => $umsk->is_aktif,
+                'created_by' => $umsk->created_by,
+                'deleted_at' => $umsk->deleted_at?->format('d-m-Y'),
             ])->values(),
         ];
     }
@@ -217,9 +225,9 @@ class UpahService
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmp] Gagal menonaktifkan UMP lama', [
                         'province_id' => $validated['province_id'],
-                        'actor'       => $actor,
-                        'message'     => $e->getMessage(),
-                        'sql'         => $e->getSql(),
+                        'actor' => $actor,
+                        'message' => $e->getMessage(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException(
                         "Gagal menonaktifkan UMP lama untuk province_id {$validated['province_id']}.",
@@ -230,15 +238,15 @@ class UpahService
                 try {
                     return Ump::create([
                         ...$validated,
-                        'is_aktif'   => true,
+                        'is_aktif' => true,
                         'created_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmp] Gagal insert UMP baru', [
                         'province_id' => $validated['province_id'],
-                        'actor'       => $actor,
-                        'message'     => $e->getMessage(),
-                        'sql'         => $e->getSql(),
+                        'actor' => $actor,
+                        'message' => $e->getMessage(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException('Gagal menyimpan data UMP baru.', previous: $e);
                 }
@@ -250,7 +258,7 @@ class UpahService
         } catch (\Throwable $e) {
             Log::error('[UpahService::storeUmp] Unexpected error', [
                 'province_id' => $validated['province_id'] ?? null,
-                'message'     => $e->getMessage(),
+                'message' => $e->getMessage(),
             ]);
             throw new \RuntimeException('Terjadi kesalahan tak terduga saat menyimpan UMP.', previous: $e);
         }
@@ -268,9 +276,9 @@ class UpahService
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmk] Gagal menonaktifkan UMK lama', [
                         'city_id' => $validated['city_id'],
-                        'actor'   => $actor,
+                        'actor' => $actor,
                         'message' => $e->getMessage(),
-                        'sql'     => $e->getSql(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException(
                         "Gagal menonaktifkan UMK lama untuk city_id {$validated['city_id']}.",
@@ -281,15 +289,15 @@ class UpahService
                 try {
                     return Umk::create([
                         ...$validated,
-                        'is_aktif'   => true,
+                        'is_aktif' => true,
                         'created_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmk] Gagal insert UMK baru', [
                         'city_id' => $validated['city_id'],
-                        'actor'   => $actor,
+                        'actor' => $actor,
                         'message' => $e->getMessage(),
-                        'sql'     => $e->getSql(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException('Gagal menyimpan data UMK baru.', previous: $e);
                 }
@@ -323,10 +331,10 @@ class UpahService
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmsk] Gagal menonaktifkan UMSK lama', [
                         'city_id' => $validated['city_id'],
-                        'sektor'  => $validated['sektor'],
-                        'actor'   => $actor,
+                        'sektor' => $validated['sektor'],
+                        'actor' => $actor,
                         'message' => $e->getMessage(),
-                        'sql'     => $e->getSql(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException(
                         "Gagal menonaktifkan UMSK lama untuk city_id {$validated['city_id']} sektor '{$validated['sektor']}'.",
@@ -337,16 +345,16 @@ class UpahService
                 try {
                     return Umsk::create([
                         ...$validated,
-                        'is_aktif'   => true,
+                        'is_aktif' => true,
                         'created_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmsk] Gagal insert UMSK baru', [
                         'city_id' => $validated['city_id'],
-                        'sektor'  => $validated['sektor'],
-                        'actor'   => $actor,
+                        'sektor' => $validated['sektor'],
+                        'actor' => $actor,
                         'message' => $e->getMessage(),
-                        'sql'     => $e->getSql(),
+                        'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException('Gagal menyimpan data UMSK baru.', previous: $e);
                 }
@@ -358,7 +366,7 @@ class UpahService
         } catch (\Throwable $e) {
             Log::error('[UpahService::storeUmsk] Unexpected error', [
                 'city_id' => $validated['city_id'] ?? null,
-                'sektor'  => $validated['sektor'] ?? null,
+                'sektor' => $validated['sektor'] ?? null,
                 'message' => $e->getMessage(),
             ]);
             throw new \RuntimeException('Terjadi kesalahan tak terduga saat menyimpan UMSK.', previous: $e);
