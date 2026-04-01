@@ -686,15 +686,10 @@ class QuotationStepService
             if ($request->has('aplikasi_pendukung') && is_array($request->aplikasi_pendukung)) {
                 $aplikasiIds = $request->aplikasi_pendukung;
 
-                // Preload semua data yang diperlukan
+                // Preload semua aplikasi pendukung yang dipilih
                 $aplikasiList = AplikasiPendukung::whereIn('id', $aplikasiIds)->get()->keyBy('id');
 
-                $existingQuotAplikasi = QuotationAplikasi::where('quotation_id', $quotation->id)
-                    ->whereIn('aplikasi_pendukung_id', $aplikasiIds)
-                    ->get()
-                    ->keyBy('aplikasi_pendukung_id');
-
-                // Hitung jumlah HC per site dari semua detail (ambil dari DB untuk akurasi)
+                // Hitung jumlah HC per site dari database
                 $siteHcMap = QuotationDetail::where('quotation_id', $quotation->id)
                     ->whereNull('deleted_at')
                     ->select('quotation_site_id', DB::raw('SUM(jumlah_hc) as total_hc'))
@@ -702,45 +697,54 @@ class QuotationStepService
                     ->pluck('total_hc', 'quotation_site_id')
                     ->toArray();
 
-                // Preload existing devices
-                $existingDevices = QuotationDevices::where('quotation_id', $quotation->id)
-                    ->whereNotNull('quotation_aplikasi_id')
-                    ->get()
-                    ->keyBy(function ($device) {
-                        return $device->quotation_aplikasi_id . '_' . $device->quotation_site_id;
-                    });
-
-                // Siapkan data untuk batch insert/update
-                $devicesToInsert = [];
-                $devicesToUpdate = [];
-
+                // 1. Update atau create QuotationAplikasi
+                $quotationAplikasiIds = [];
                 foreach ($aplikasiIds as $aplikasiId) {
                     $app = $aplikasiList->get($aplikasiId);
                     if (!$app)
                         continue;
 
-                    $quotAplikasi = $existingQuotAplikasi->get($aplikasiId);
-                    if (!$quotAplikasi) {
-                        // Create QuotationAplikasi baru
-                        $quotAplikasi = QuotationAplikasi::create([
+                    $qa = QuotationAplikasi::updateOrCreate(
+                        [
                             'quotation_id' => $quotation->id,
                             'aplikasi_pendukung_id' => $aplikasiId,
+                        ],
+                        [
                             'aplikasi_pendukung' => $app->nama,
                             'harga' => $app->harga,
-                            'created_by' => $user,
-                            'created_at' => $currentDateTime,
-                        ]);
-                        $existingQuotAplikasi->put($aplikasiId, $quotAplikasi);
-                    }
+                            'updated_at' => $currentDateTime,
+                            'updated_by' => $user,
+                            'deleted_at' => null,
+                        ]
+                    );
+                    $quotationAplikasiIds[] = $qa->id;
+                }
+
+                // 2. Hapus semua devices yang terkait dengan aplikasi pendukung (soft delete)
+                QuotationDevices::where('quotation_id', $quotation->id)
+                    ->whereNotNull('quotation_aplikasi_id')
+                    ->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user
+                    ]);
+
+                // 3. Siapkan data untuk batch insert devices
+                $devicesToInsert = [];
+                foreach ($quotationAplikasiIds as $qaId) {
+                    $qa = QuotationAplikasi::find($qaId);
+                    if (!$qa)
+                        continue;
+
+                    $app = $aplikasiList->get($qa->aplikasi_pendukung_id);
+                    if (!$app)
+                        continue;
 
                     foreach ($siteHcMap as $siteId => $jumlahHc) {
                         if ($jumlahHc <= 0)
                             continue;
-                        $key = $quotAplikasi->id . '_' . $siteId;
-                        $existing = $existingDevices->get($key);
 
-                        $data = [
-                            'quotation_aplikasi_id' => $quotAplikasi->id,
+                        $devicesToInsert[] = [
+                            'quotation_aplikasi_id' => $qaId,
                             'quotation_site_id' => $siteId,
                             'barang_id' => $app->barang_id,
                             'jumlah' => $jumlahHc,
@@ -748,32 +752,20 @@ class QuotationStepService
                             'nama' => $app->nama,
                             'jenis_barang' => 'Aplikasi Pendukung',
                             'jenis_barang_id' => 8,
+                            'created_at' => $currentDateTime,
+                            'created_by' => $user,
                             'updated_at' => $currentDateTime,
                             'updated_by' => $user,
                         ];
-
-                        if ($existing) {
-                            $data['id'] = $existing->id;
-                            $devicesToUpdate[] = $data;
-                        } else {
-                            $data['created_at'] = $currentDateTime;
-                            $data['created_by'] = $user;
-                            $devicesToInsert[] = $data;
-                        }
                     }
                 }
 
-                // Batch insert
+                // Batch insert devices
                 if (!empty($devicesToInsert)) {
                     QuotationDevices::insert($devicesToInsert);
                 }
 
-                // Batch update (per row because different values)
-                foreach ($devicesToUpdate as $device) {
-                    QuotationDevices::where('id', $device['id'])->update($device);
-                }
-
-                // Soft delete aplikasi pendukung yang tidak dipilih
+                // Hapus aplikasi pendukung yang tidak dipilih (soft delete)
                 QuotationAplikasi::where('quotation_id', $quotation->id)
                     ->whereNotIn('aplikasi_pendukung_id', $aplikasiIds)
                     ->update([
@@ -781,17 +773,8 @@ class QuotationStepService
                         'deleted_by' => $user
                     ]);
 
-                // Soft delete devices yang tidak terkait dengan aplikasi yang dipilih
-                QuotationDevices::where('quotation_id', $quotation->id)
-                    ->whereNotNull('quotation_aplikasi_id')
-                    ->whereNotIn('quotation_aplikasi_id', $existingQuotAplikasi->pluck('id')->toArray())
-                    ->update([
-                        'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
-                    ]);
-
             } else {
-                // Hapus semua aplikasi dan devices
+                // Tidak ada aplikasi pendukung dipilih – hapus semua
                 QuotationAplikasi::where('quotation_id', $quotation->id)->update([
                     'deleted_at' => $currentDateTime,
                     'deleted_by' => $user
@@ -804,6 +787,7 @@ class QuotationStepService
                     ]);
             }
 
+            // Update timestamp quotation
             $quotation->update([
                 'updated_by' => $user,
                 'updated_at' => $currentDateTime
@@ -2386,7 +2370,7 @@ class QuotationStepService
                 'provisi_ohc',
                 'bunga_bank',
                 'insentif',
-                'potongan_bpu',
+
             ];
 
             if ($request && $request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailCalculation->detail_id])) {
@@ -2495,7 +2479,7 @@ class QuotationStepService
                 'provisi_ohc',
                 'bunga_bank',
                 'insentif',
-                'potongan_bpu',
+
                 'total_biaya_per_personil',
                 'total_biaya_all_personil'
             ];
@@ -2622,7 +2606,6 @@ class QuotationStepService
                 'provisi_ohc',
                 'bunga_bank',
                 'insentif',
-                'potongan_bpu'
             ];
 
             foreach ($numericFields as $field) {
@@ -3192,7 +3175,6 @@ class QuotationStepService
                     'provisi_ohc',
                     'bunga_bank',
                     'insentif',
-                    'potongan_bpu',
                 ];
                 foreach ($allowedHppFields as $field) {
                     if (array_key_exists($field, $userHppData)) {
@@ -3757,7 +3739,7 @@ class QuotationStepService
                     'provisi_ohc',
                     'provisi_chemical',
                     // Biaya lain-lain
-                    'potongan_bpu',
+
                     'bunga_bank',
                     'insentif',
                     // Persentase BPJS per detail (override dari default)
@@ -4082,7 +4064,6 @@ class QuotationStepService
             'provisi_ohc',
             'bunga_bank',
             'insentif',
-            'potongan_bpu',
         ];
 
         $updateData = [];
