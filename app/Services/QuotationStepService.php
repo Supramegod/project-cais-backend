@@ -744,6 +744,7 @@ class QuotationStepService
                             continue;
 
                         $devicesToInsert[] = [
+                            'quotation_id' => $quotation->id,
                             'quotation_aplikasi_id' => $qaId,
                             'quotation_site_id' => $siteId,
                             'barang_id' => $app->barang_id,
@@ -2479,7 +2480,6 @@ class QuotationStepService
                 'provisi_ohc',
                 'bunga_bank',
                 'insentif',
-
                 'total_biaya_per_personil',
                 'total_biaya_all_personil'
             ];
@@ -3140,9 +3140,6 @@ class QuotationStepService
     }
 
     /**
-     * Save semua hasil perhitungan ke database
-     */
-    /**
      * Save all calculation results – Optimized batch for HPP & COSS
      */
     private function saveAllCalculationResults(QuotationCalculationResult $calculationResult, string $user, Carbon $currentDateTime, Request $request = null): void
@@ -3153,6 +3150,10 @@ class QuotationStepService
         $existingHpp = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->get()->keyBy('quotation_detail_id');
         $existingCoss = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->get()->keyBy('quotation_detail_id');
 
+        // Dapatkan kolom yang diizinkan dari masing-masing model
+        $hppAllowed = (new QuotationDetailHpp())->getFillable();
+        $cossAllowed = (new QuotationDetailCoss())->getFillable();
+
         $hppInsert = [];
         $cossInsert = [];
         $hppUpdate = [];
@@ -3162,7 +3163,11 @@ class QuotationStepService
             $hppData = $detailCalculation->hpp_data;
             $cossData = $detailCalculation->coss_data;
 
-            // Apply user edits if any (same logic as before)
+            // Filter hanya kolom yang ada di fillable
+            $hppData = array_intersect_key($hppData, array_flip($hppAllowed));
+            $cossData = array_intersect_key($cossData, array_flip($cossAllowed));
+
+            // Terapkan user edits jika ada (sama seperti sebelumnya)
             if ($request && $request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailId])) {
                 $userHppData = $request->hpp_editable_data[$detailId];
                 $allowedHppFields = [
@@ -3205,7 +3210,7 @@ class QuotationStepService
                 }
             }
 
-            // Add summary fields
+            // Tambahkan field summary yang sudah pasti ada di fillable
             $hppData = array_merge($hppData, [
                 'management_fee' => $calculationResult->calculation_summary->nominal_management_fee ?? 0,
                 'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
@@ -3231,6 +3236,10 @@ class QuotationStepService
                 'updated_by' => $user,
                 'updated_at' => $currentDateTime
             ]);
+
+            // Filter lagi setelah merge karena bisa jadi ada field tambahan yang tidak diizinkan
+            $hppData = array_intersect_key($hppData, array_flip($hppAllowed));
+            $cossData = array_intersect_key($cossData, array_flip($cossAllowed));
 
             if ($existingHpp->has($detailId)) {
                 $hppUpdate[] = array_merge($hppData, ['id' => $existingHpp[$detailId]->id]);
