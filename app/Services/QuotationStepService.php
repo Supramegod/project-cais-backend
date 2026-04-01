@@ -3171,6 +3171,8 @@ class QuotationStepService
             if ($request && $request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailId])) {
                 $userHppData = $request->hpp_editable_data[$detailId];
                 $allowedHppFields = [
+                    'tunjangan_hari_raya',
+                    'kompensasi',
                     'jumlah_hc',
                     'tunjangan_hari_libur_nasional',
                     'lembur',
