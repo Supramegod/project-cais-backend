@@ -14,9 +14,9 @@ class City extends Model
     use HasFactory;
 
     protected $connection = 'mysqlhris';
-    protected $table      = 'm_city';
+    protected $table = 'm_city';
     protected $primaryKey = 'id';
-    protected $fillable   = ['province_id', 'name', 'kode', 'is_active'];
+    protected $fillable = ['province_id', 'name', 'kode', 'is_active'];
 
     public function province(): BelongsTo
     {
@@ -28,12 +28,12 @@ class City extends Model
         return $this->hasMany(Umk::class, 'city_id');
     }
 
-   
+
     public function activeUmk(): HasOne
     {
         return $this->hasOne(Umk::class, 'city_id')
-                    ->where('is_aktif', true)
-                    ->latestOfMany('tgl_berlaku');
+            ->where('is_aktif', true)
+            ->latestOfMany('tgl_berlaku');
     }
 
     public function umsks(): HasMany
@@ -41,11 +41,12 @@ class City extends Model
         return $this->hasMany(Umsk::class, 'city_id');
     }
 
-    public function activeUmsks(): HasMany
+    // City.php
+    public function activeUmsks(): HasOne
     {
-        return $this->hasMany(Umsk::class, 'city_id')
-                    ->where('is_aktif', true)
-                    ->orderByDesc('tgl_berlaku');
+        return $this->hasOne(Umsk::class, 'city_id')
+            ->where('is_aktif', true)
+            ->latestOfMany('tgl_berlaku');
     }
 
     public function scopeActive(Builder $query): Builder
