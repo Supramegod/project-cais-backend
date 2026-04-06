@@ -152,6 +152,7 @@ class UpahController extends Controller
             // Get UMP data for province
             $province = Province::with('activeUmp')->findOrFail($provinceId);
             $umpData = $province->activeUmp ? [
+                'province_id' => $province->id,
                 'id' => $province->activeUmp->id,
                 'nilai' => (float) $province->activeUmp->ump,
                 'nama_provinsi' => $province->name,
