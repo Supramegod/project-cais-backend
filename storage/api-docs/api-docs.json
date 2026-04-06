@@ -7760,6 +7760,10 @@
                                                         "type": "string",
                                                         "example": "Lebih Dari 7 Hari"
                                                     },
+                                                    "ot4": {
+                                                        "type": "string",
+                                                        "example": null
+                                                    },
                                                     "ot3": {
                                                         "type": "string",
                                                         "example": null
@@ -7824,9 +7828,17 @@
                                                         "type": "string",
                                                         "example": "1 Januari 2023"
                                                     },
-                                                    "nama_site": {
-                                                        "type": "string",
-                                                        "example": "Site A<br />Site B"
+                                                    "sites": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "nama_site": {
+                                                                    "type": "string",
+                                                                    "example": "Site A"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
                                                     }
                                                 },
                                                 "type": "object"
@@ -7835,6 +7847,20 @@
                                         "count": {
                                             "type": "integer",
                                             "example": 5
+                                        },
+                                        "pending_approval_summary": {
+                                            "description": "Jumlah quotation yang belum diapprove per role",
+                                            "properties": {
+                                                "dir_sales": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "dir_keu": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -20359,187 +20385,6 @@
                 ]
             }
         },
-        "/api/quotations/{sourceId}/copy/{targetId}": {
-            "post": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Copy quotation data",
-                "description": "Copies all data from source quotation to target quotation",
-                "operationId": "e3eefea7ffa348bf25e7e33117e45691",
-                "parameters": [
-                    {
-                        "name": "sourceId",
-                        "in": "path",
-                        "description": "Source quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "targetId",
-                        "in": "path",
-                        "description": "Target quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 2
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Quotation copied successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation copied successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Quotation not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to copy quotation"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/quotations/{id}/resubmit": {
-            "post": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Resubmit quotation",
-                "description": "Creates a new quotation version from an existing quotation with resubmit reason",
-                "operationId": "fed70055cddc2b54ec29fd9c56463435",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Original quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "alasan"
-                                ],
-                                "properties": {
-                                    "alasan": {
-                                        "type": "string",
-                                        "example": "Perubahan kebutuhan client"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Quotation resubmitted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation resubmitted successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/quotations/{id}/submit-approval": {
             "post": {
                 "tags": [
@@ -20755,301 +20600,6 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Quotation tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/quotations/{id}/calculate": {
-            "get": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Calculate quotation",
-                "description": "Performs calculation for quotation including HPP, COSS, and financial details",
-                "operationId": "21f721267e72feb1a4a575d4c4db6bed",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Quotation calculated successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation calculated successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Quotation not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to calculate quotation"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/quotations/{id}/export-pdf": {
-            "get": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Export quotation to PDF",
-                "description": "Generates and returns PDF document for quotation",
-                "operationId": "257d69a6dcf0d17a765c58fc106d996c",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "PDF generated successfully",
-                        "content": {
-                            "application/pdf": {
-                                "schema": {
-                                    "type": "string",
-                                    "format": "binary"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Quotation not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to generate PDF"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/quotations/{id}/status": {
-            "get": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Get quotation status",
-                "description": "Retrieves current status and approval progress of quotation",
-                "operationId": "5a7dc39dcf7fced1c46227831b0144b8",
-                "parameters": [
-                    {
-                        "name": "id",
-                        "in": "path",
-                        "description": "Quotation ID",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Status retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "status_quotation_id": {
-                                                    "type": "integer",
-                                                    "example": 3
-                                                },
-                                                "status_quotation": {
-                                                    "type": "string",
-                                                    "example": "Approved"
-                                                },
-                                                "step": {
-                                                    "type": "integer",
-                                                    "example": 12
-                                                },
-                                                "approval_progress": {
-                                                    "properties": {
-                                                        "ot1": {
-                                                            "type": "string",
-                                                            "example": "approved"
-                                                        },
-                                                        "ot2": {
-                                                            "type": "string",
-                                                            "example": "approved"
-                                                        },
-                                                        "ot3": {
-                                                            "type": "string",
-                                                            "example": "pending"
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Status retrieved successfully"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Quotation not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        },
-                                        "error": {
-                                            "type": "string",
-                                            "example": "Error details"
                                         }
                                     },
                                     "type": "object"
@@ -21320,80 +20870,6 @@
                 ]
             }
         },
-        "/api/quotations/hc-high-cost": {
-            "get": {
-                "tags": [
-                    "Quotations"
-                ],
-                "summary": "Get sites with HC >= 12 and cost per HC >= 6.5 million",
-                "operationId": "8f176146c7285344fcd36912c9f5f311",
-                "responses": {
-                    "200": {
-                        "description": "List of sites meeting criteria",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "site_id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama_site": {
-                                                        "type": "string",
-                                                        "example": "Site Jakarta Pusat"
-                                                    },
-                                                    "jumlah_hc": {
-                                                        "type": "integer",
-                                                        "example": 15
-                                                    },
-                                                    "wilayah": {
-                                                        "type": "string",
-                                                        "example": "Jakarta"
-                                                    },
-                                                    "biaya_per_hc": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 6800000
-                                                    },
-                                                    "total_biaya_site": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 102000000
-                                                    },
-                                                    "quotation_id": {
-                                                        "type": "integer",
-                                                        "example": 123
-                                                    },
-                                                    "nomor_quotation": {
-                                                        "type": "string",
-                                                        "example": "Q001/2024"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/quotations-step/{id}/step/{step}": {
             "get": {
                 "tags": [
@@ -21406,7 +20882,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Quotation ID",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -21415,7 +20890,6 @@
                     {
                         "name": "step",
                         "in": "path",
-                        "description": "Step number (1-12)",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -21441,6 +20915,10 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Step data retrieved successfully"
+                                        },
+                                        "processing_time": {
+                                            "type": "string",
+                                            "example": "42.30ms"
                                         }
                                     },
                                     "type": "object"
@@ -21483,8 +20961,7 @@
                                             "example": "Failed to get step data"
                                         },
                                         "error": {
-                                            "type": "string",
-                                            "example": "Error message details"
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"
@@ -21510,7 +20987,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Quotation ID",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -21519,7 +20995,6 @@
                     {
                         "name": "step",
                         "in": "path",
-                        "description": "Step number (1-12)",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -21529,201 +21004,17 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "Step data (varies by step)",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "properties": {
                                     "edit": {
-                                        "description": "Set to true if only updating without progressing step",
                                         "type": "boolean",
                                         "example": false
                                     }
                                 },
-                                "type": "object",
-                                "oneOf": [
-                                    {
-                                        "description": "Step 1 - Contract Type",
-                                        "properties": {
-                                            "jenis_kontrak": {
-                                                "type": "string",
-                                                "example": "Reguler"
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    {
-                                        "description": "Step 2 - Contract Details",
-                                        "properties": {
-                                            "mulai_kontrak": {
-                                                "type": "string",
-                                                "format": "date",
-                                                "example": "2024-01-01"
-                                            },
-                                            "kontrak_selesai": {
-                                                "type": "string",
-                                                "format": "date",
-                                                "example": "2024-12-31"
-                                            },
-                                            "tgl_penempatan": {
-                                                "type": "string",
-                                                "format": "date",
-                                                "example": "2024-01-01"
-                                            },
-                                            "salary_rule": {
-                                                "type": "integer",
-                                                "example": 1
-                                            },
-                                            "top": {
-                                                "type": "string",
-                                                "example": "7 Hari"
-                                            },
-                                            "ada_cuti": {
-                                                "type": "string",
-                                                "example": "Ada"
-                                            },
-                                            "cuti": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string",
-                                                    "example": "Cuti Tahunan"
-                                                }
-                                            },
-                                            "edit": {
-                                                "type": "boolean",
-                                                "example": false
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    {
-                                        "description": "Step 4 - Wage Calculation",
-                                        "properties": {
-                                            "upah": {
-                                                "type": "string",
-                                                "example": "UMP"
-                                            },
-                                            "manajemen_fee": {
-                                                "type": "integer",
-                                                "example": 1
-                                            },
-                                            "persentase": {
-                                                "type": "number",
-                                                "format": "float",
-                                                "example": 10.5
-                                            },
-                                            "thr": {
-                                                "type": "string",
-                                                "example": "Diprovisikan"
-                                            },
-                                            "kompensasi": {
-                                                "type": "string",
-                                                "example": "Diprovisikan"
-                                            },
-                                            "lembur": {
-                                                "type": "string",
-                                                "example": "Flat"
-                                            },
-                                            "is_ppn": {
-                                                "type": "boolean",
-                                                "example": true
-                                            },
-                                            "ppn_pph_dipotong": {
-                                                "type": "string",
-                                                "example": "Management Fee"
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    {
-                                        "description": "Step 5 - BPJS & Company Data",
-                                        "properties": {
-                                            "penjamin": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": "BPJS",
-                                                    "2": "Takaful"
-                                                }
-                                            },
-                                            "jkk": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": true,
-                                                    "2": false
-                                                }
-                                            },
-                                            "jkm": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": true,
-                                                    "2": true
-                                                }
-                                            },
-                                            "jht": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": true,
-                                                    "2": true
-                                                }
-                                            },
-                                            "jp": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": true,
-                                                    "2": false
-                                                }
-                                            },
-                                            "nominal_takaful": {
-                                                "type": "object",
-                                                "example": {
-                                                    "1": 50000,
-                                                    "2": 75000
-                                                }
-                                            },
-                                            "jenis_perusahaan": {
-                                                "type": "integer",
-                                                "example": 1
-                                            },
-                                            "bidang_perusahaan": {
-                                                "type": "integer",
-                                                "example": 2
-                                            },
-                                            "resiko": {
-                                                "type": "string",
-                                                "example": "Rendah"
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    {
-                                        "description": "Step 6 - Supporting Applications",
-                                        "properties": {
-                                            "aplikasi_pendukung": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                }
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    {
-                                        "description": "Step 11 - Billing & Agreement",
-                                        "properties": {
-                                            "penagihan": {
-                                                "type": "string",
-                                                "example": "Bulanan"
-                                            },
-                                            "training_id": {
-                                                "type": "string",
-                                                "example": "1,2,3"
-                                            }
-                                        },
-                                        "type": "object"
-                                    }
-                                ]
+                                "type": "object"
                             }
                         }
                     }
@@ -21745,6 +21036,10 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Step 1 updated successfully"
+                                        },
+                                        "processing_time": {
+                                            "type": "string",
+                                            "example": "85.10ms"
                                         }
                                     },
                                     "type": "object"
@@ -21810,8 +21105,7 @@
                                             "example": "Failed to update step 1"
                                         },
                                         "error": {
-                                            "type": "string",
-                                            "example": "Error message details"
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"
@@ -26720,6 +26014,244 @@
                 ]
             }
         },
+        "/api/system-announcements/list": {
+            "get": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Get list of announcements",
+                "description": "Mendapatkan daftar pengumuman sistem/update aplikasi",
+                "operationId": "d3661c7d37465a19683e8daf5aa96365",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "Filter berdasarkan kategori (Fitur Baru, Bug Fix, Aturan, Update)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/add": {
+            "post": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Create a new announcement",
+                "description": "Membuat pengumuman sistem baru",
+                "operationId": "31fe03c3b840a29ead90b5fad2bcdb24",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ],
+                                        "example": "Fitur Baru"
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "example": "Fitur Export Data ke Excel"
+                                    },
+                                    "version": {
+                                        "type": "string",
+                                        "example": "v2.5.0"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-03-25"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Sekarang Anda dapat mengekspor semua data laporan ke format Excel dengan mudah."
+                                    },
+                                    "details": {
+                                        "type": "string",
+                                        "example": "<ul><li>Mendukung export untuk semua jenis laporan</li></ul>"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Announcement created successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/view/{id}": {
+            "get": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Get announcement by ID",
+                "description": "Mendapatkan detail pengumuman berdasarkan ID",
+                "operationId": "9f7bbb785298ebeee8b415039bf4f050",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/update/{id}": {
+            "put": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Update announcement",
+                "description": "Mengupdate data pengumuman yang sudah ada",
+                "operationId": "6a30810ce4e1a4ce8b1b5503c1d9c49d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Announcement updated successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Delete announcement",
+                "description": "Menghapus pengumuman (soft delete)",
+                "operationId": "bb492b57e21b05120528306e68c48be5",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/targets/list": {
             "get": {
                 "tags": [
@@ -30501,6 +30033,433 @@
                 ]
             }
         },
+        "/api/upah/provinsi": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "[Level 1] List provinsi beserta UMP aktif",
+                "operationId": "d2950298ddda9f2bba4eb499c2bb6c4b",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/provinsi/{provinceId}/kota": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "[Level 2] List kota/kabupaten beserta UMK aktif (dengan pencarian)",
+                "operationId": "a1cacad254ea7f47f1b5e76e160884f3",
+                "parameters": [
+                    {
+                        "name": "provinceId",
+                        "in": "path",
+                        "description": "ID Provinsi",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Cari berdasarkan nama kota/kabupaten (partial match)",
+                        "schema": {
+                            "type": "string",
+                            "example": "Surabaya"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 3578
+                                                    },
+                                                    "kode": {
+                                                        "type": "string",
+                                                        "example": "35.78"
+                                                    },
+                                                    "nama": {
+                                                        "type": "string",
+                                                        "example": "Kota Surabaya"
+                                                    },
+                                                    "umk": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 123
+                                                            },
+                                                            "nilai": {
+                                                                "type": "number",
+                                                                "example": 4725479
+                                                            },
+                                                            "formatted": {
+                                                                "type": "string",
+                                                                "example": "Rp 4.725.479"
+                                                            },
+                                                            "tgl_berlaku": {
+                                                                "type": "string",
+                                                                "format": "date",
+                                                                "example": "2024-01-01"
+                                                            },
+                                                            "sumber": {
+                                                                "type": "string",
+                                                                "example": "https://jatim.go.id/umk2024"
+                                                            }
+                                                        },
+                                                        "type": "object",
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 75
+                                                },
+                                                "total_per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data kota/kabupaten berhasil diambil"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/kota/{cityId}": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "[Level 3] Detail kota: riwayat UMK & UMSK per sektor",
+                "operationId": "9ca11b48540884a3fe41bd789e36899d",
+                "parameters": [
+                    {
+                        "name": "cityId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number for pagination (default: 1)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Kota tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/ump": {
+            "post": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Tambah UMP baru untuk suatu provinsi",
+                "operationId": "c13e776a2ee52bd38d9d6a24b936f2e9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "province_id",
+                                    "province_name",
+                                    "ump",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "province_id": {
+                                        "type": "integer",
+                                        "example": 35
+                                    },
+                                    "province_name": {
+                                        "type": "string",
+                                        "example": "Jawa Timur"
+                                    },
+                                    "ump": {
+                                        "type": "number",
+                                        "example": 2165244.3
+                                    },
+                                    "tgl_berlaku": {
+                                        "type": "string",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "type": "string",
+                                        "example": "https://jatim.go.id/ump2024"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "UMP berhasil ditambahkan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/umk": {
+            "post": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Tambah UMK baru untuk suatu kota/kabupaten",
+                "operationId": "4830ec9a5dcd4e74736cffbe0b55bc42",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "city_id",
+                                    "city_name",
+                                    "umk",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "city_id": {
+                                        "type": "integer",
+                                        "example": 3578
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "example": "Kota Surabaya"
+                                    },
+                                    "umk": {
+                                        "type": "number",
+                                        "example": 4725479
+                                    },
+                                    "tgl_berlaku": {
+                                        "type": "string",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "type": "string",
+                                        "example": "https://jatim.go.id/umk2024"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "UMK berhasil ditambahkan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/umsk": {
+            "post": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Tambah UMSK baru untuk suatu sektor di kota/kabupaten",
+                "operationId": "dcdc3a164a05ff62af001c352eabb4b5",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "city_id",
+                                    "city_name",
+                                    "sektor",
+                                    "umsk",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "city_id": {
+                                        "type": "integer",
+                                        "example": 3578
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "example": "Kota Surabaya"
+                                    },
+                                    "umsk": {
+                                        "type": "number",
+                                        "example": 4900000
+                                    },
+                                    "tgl_berlaku": {
+                                        "type": "string",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "type": "string",
+                                        "example": "https://jatim.go.id/umsk2024"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "UMSK berhasil ditambahkan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/user/list": {
             "get": {
                 "tags": [
@@ -30801,6 +30760,10 @@
             "description": "API Endpoints untuk Management Supplier"
         },
         {
+            "name": "System Announcements",
+            "description": "API Endpoints untuk Log Update Aplikasi dan Pengumuman Sistem"
+        },
+        {
             "name": "Target",
             "description": "API untuk manajemen target sales/user"
         },
@@ -30827,6 +30790,10 @@
         {
             "name": "UMP",
             "description": "API Endpoints untuk Management Upah Minimum Provinsi (UMP)"
+        },
+        {
+            "name": "Upah",
+            "description": "Modul terpadu Upah Minimum: UMP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
         },
         {
             "name": "User Email Config",

@@ -340,6 +340,7 @@ class QuotationResource extends JsonResource
                     'no_telp' => $this->leads->no_telp,
                     'email' => $this->leads->email,
                     'alamat' => $this->leads->alamat,
+                    'branch' => $this->leads->branch ? $this->leads->branch->name : null,
                 ];
             }),
 
@@ -737,7 +738,7 @@ class QuotationResource extends JsonResource
                             'personil_devices_coss' => $cossData['provisi_peralatan'] ?? 0,
                             'personil_ohc_coss' => $cossData['provisi_ohc'] ?? 0,
                             'personil_chemical_coss' => $cossData['provisi_chemical'] ?? 0,
-                            'total_personil' => $cossData['total_personil_coss'] ?? 0  ,
+                            'total_personil' => $cossData['total_personil_coss'] ?? 0,
                             'sub_total_personil' => $cossData['sub_total_personil_coss'] ?? 0,
                             'total_base_manpower' => $cossData['total_base_manpower'] ?? 0,
                             'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,

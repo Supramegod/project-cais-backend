@@ -11,19 +11,24 @@ use Illuminate\Support\Facades\Log;
 class CheckTokenExpiry
 {
     public function handle(Request $request, Closure $next): Response
-    {
-        $user = $request->user();
-        
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated'
-            ], 401);
-        }
+{
+    $user = $request->user();
+    
+    if (!$user) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthenticated'
+        ], 401);
+    }
 
-        $token = $user->currentAccessToken();
-        
-        if ($token && $token->expires_at && now()->gt($token->expires_at)) {
+    $token = $user->currentAccessToken();
+
+    /** * Cek apakah token adalah instance dari PersonalAccessToken (Token Database)
+     * TransientToken (Session) tidak punya expires_at dan tidak perlu dicek kadaluarsanya
+     * karena sudah diatur oleh session lifetime Laravel.
+     */
+    if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
+        if ($token->expires_at && now()->gt($token->expires_at)) {
             Log::warning('Access token expired attempt', [
                 'user_id' => $user->id,
                 'username' => $user->username,
@@ -36,7 +41,8 @@ class CheckTokenExpiry
                 'message' => 'Access token telah kadaluarsa, silakan gunakan refresh token'
             ], 401);
         }
-
-        return $next($request);
     }
+
+    return $next($request);
+}
 }

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,8 +41,15 @@
         }
 
         @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(5deg); }
+
+            0%,
+            100% {
+                transform: translateY(0px) rotate(0deg);
+            }
+
+            50% {
+                transform: translateY(-20px) rotate(5deg);
+            }
         }
 
         .welcome-content {
@@ -64,6 +72,7 @@
                 opacity: 0;
                 transform: translateY(50px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -83,8 +92,13 @@
         }
 
         @keyframes titleGlow {
-            from { text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 255, 255, 0.3); }
-            to { text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 255, 255, 0.5); }
+            from {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 255, 255, 0.3);
+            }
+
+            to {
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3), 0 0 30px rgba(255, 255, 255, 0.5);
+            }
         }
 
         .welcome-subtitle {
@@ -195,20 +209,20 @@
                 padding: 40px 20px;
                 margin: 20px;
             }
-            
+
             .welcome-title {
                 font-size: 2.5rem;
             }
-            
+
             .welcome-subtitle {
                 font-size: 1.2rem;
             }
-            
+
             .cta-buttons {
                 flex-direction: column;
                 align-items: center;
             }
-            
+
             .btn {
                 width: 100%;
                 max-width: 250px;
@@ -229,14 +243,17 @@
                 opacity: 1;
                 transform: translateY(100vh) scale(0);
             }
+
             10% {
                 opacity: 1;
                 transform: translateY(90vh) scale(1);
             }
+
             90% {
                 opacity: 1;
                 transform: translateY(-10vh) scale(1);
             }
+
             100% {
                 opacity: 0;
                 transform: translateY(-10vh) scale(0);
@@ -244,22 +261,51 @@
         }
     </style>
 </head>
+
 <body>
     <div class="welcome-container">
         <div class="welcome-content">
             <h1 class="welcome-title">Selamat Datang!</h1>
             <p class="welcome-subtitle">Backend Server Successfully Running!</p>
             <p class="welcome-description">
-                Selamat! Backend server Anda telah berhasil dijalankan dan siap digunakan. Semua endpoint API sudah aktif dan dapat diakses. Silakan cek dokumentasi API untuk melihat semua fitur yang tersedia.
+                Selamat! Backend server Anda telah berhasil dijalankan dan siap digunakan. Semua endpoint API sudah
+                aktif dan dapat diakses. Silakan cek dokumentasi API untuk melihat semua fitur yang tersedia.
             </p>
-            
+
             <div class="cta-buttons">
-                <a href="/api/documentation" class="btn btn-primary">API Documentation</a>
-                <!-- <a href="#status" class="btn btn-secondary"> Server Status</a> -->
+                @auth
+                    <h2 style="margin-bottom: 20px;">Halo, {{ Auth::user()->username }}!</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <a href="/api/documentation" class="btn btn-primary">Open API Docs</a>
+                        <form action="{{ route('logout.web') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn btn-secondary">Logout</button>
+                        </form>
+                    </div>
+                @else
+                    <div
+                        style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 20px; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); width: 350px;">
+                        <form action="{{ route('login.web') }}" method="POST">
+                            @csrf
+                            <input type="text" name="username" placeholder="Username" required
+                                style="width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 10px; border: none; background: rgba(255,255,255,0.9);">
+
+                            <input type="password" name="password" placeholder="Password" required
+                                style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: rgba(255,255,255,0.9);">
+
+                            <button type="submit" class="btn btn-primary" style="width: 100%; border-radius: 10px;">Login
+                                Access</button>
+
+                            @if($errors->any())
+                                <p style="color: #ff6b6b; margin-top: 10px; font-size: 0.9rem;">{{ $errors->first() }}</p>
+                            @endif
+                        </form>
+                    </div>
+                @endauth
             </div>
 
-            </div>
         </div>
+    </div>
     </div>
 
     <script>
@@ -267,16 +313,16 @@
         function createParticle() {
             const particle = document.createElement('div');
             particle.classList.add('particle');
-            
+
             const size = Math.random() * 4 + 2;
             particle.style.width = size + 'px';
             particle.style.height = size + 'px';
             particle.style.left = Math.random() * window.innerWidth + 'px';
             particle.style.animationDuration = (Math.random() * 3 + 5) + 's';
             particle.style.opacity = Math.random() * 0.5 + 0.3;
-            
+
             document.querySelector('.welcome-container').appendChild(particle);
-            
+
             setTimeout(() => {
                 particle.remove();
             }, 8000);
@@ -300,11 +346,11 @@
 
         // Add hover effect to buttons
         document.querySelectorAll('.btn').forEach(btn => {
-            btn.addEventListener('mouseenter', function() {
+            btn.addEventListener('mouseenter', function () {
                 this.style.transform = 'translateY(-3px) scale(1.05)';
             });
-            
-            btn.addEventListener('mouseleave', function() {
+
+            btn.addEventListener('mouseleave', function () {
                 this.style.transform = 'translateY(0) scale(1)';
             });
         });
@@ -313,7 +359,7 @@
         function updateTime() {
             const now = new Date();
             const timeString = now.toLocaleString('id-ID');
-            
+
             if (!document.querySelector('.server-time')) {
                 const timeDiv = document.createElement('div');
                 timeDiv.className = 'server-time';
@@ -333,10 +379,10 @@
                 `;
                 document.body.appendChild(timeDiv);
             }
-            
+
             document.querySelector('.server-time').textContent = `Server Time: ${timeString}`;
         }
-        
+
         updateTime();
         setInterval(updateTime, 1000);
 
@@ -366,4 +412,5 @@
         document.body.appendChild(serverInfo);
     </script>
 </body>
+
 </html>
