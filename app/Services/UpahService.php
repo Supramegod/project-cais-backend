@@ -325,19 +325,17 @@ class UpahService
                 try {
                     Umsk::deactivatePreviousBySector(
                         $validated['city_id'],
-                        $validated['sektor'],
                         $actor
                     );
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmsk] Gagal menonaktifkan UMSK lama', [
                         'city_id' => $validated['city_id'],
-                        'sektor' => $validated['sektor'],
                         'actor' => $actor,
                         'message' => $e->getMessage(),
                         'sql' => $e->getSql(),
                     ]);
                     throw new \RuntimeException(
-                        "Gagal menonaktifkan UMSK lama untuk city_id {$validated['city_id']} sektor '{$validated['sektor']}'.",
+                        "Gagal menonaktifkan UMSK lama untuk city_id {$validated['city_id']}.",
                         previous: $e
                     );
                 }
@@ -351,7 +349,6 @@ class UpahService
                 } catch (QueryException $e) {
                     Log::error('[UpahService::storeUmsk] Gagal insert UMSK baru', [
                         'city_id' => $validated['city_id'],
-                        'sektor' => $validated['sektor'],
                         'actor' => $actor,
                         'message' => $e->getMessage(),
                         'sql' => $e->getSql(),
@@ -366,7 +363,6 @@ class UpahService
         } catch (\Throwable $e) {
             Log::error('[UpahService::storeUmsk] Unexpected error', [
                 'city_id' => $validated['city_id'] ?? null,
-                'sektor' => $validated['sektor'] ?? null,
                 'message' => $e->getMessage(),
             ]);
             throw new \RuntimeException('Terjadi kesalahan tak terduga saat menyimpan UMSK.', previous: $e);
