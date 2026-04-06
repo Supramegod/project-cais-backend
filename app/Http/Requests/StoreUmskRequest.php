@@ -14,7 +14,6 @@ class StoreUmskRequest extends FormRequest
         return [
             'city_id'     => ['required', 'integer', 'min:1'],
             'city_name'   => ['required', 'string', 'max:255'],
-            'sektor'      => ['required', 'string', 'max:255'],
             'umsk'        => ['required', 'numeric', 'min:0'],
             'tgl_berlaku' => ['required', 'date'],
             'sumber'      => ['required', 'url', 'max:500'],
@@ -26,7 +25,6 @@ class StoreUmskRequest extends FormRequest
         return [
             'city_id.required'     => 'City ID harus diisi.',
             'city_name.required'   => 'Nama kota/kabupaten harus diisi.',
-            'sektor.required'      => 'Nama sektor harus diisi.',
             'umsk.required'        => 'Nilai UMSK harus diisi.',
             'umsk.numeric'         => 'Nilai UMSK harus berupa angka.',
             'tgl_berlaku.required' => 'Tanggal berlaku harus diisi.',
