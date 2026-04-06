@@ -26014,6 +26014,244 @@
                 ]
             }
         },
+        "/api/system-announcements/list": {
+            "get": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Get list of announcements",
+                "description": "Mendapatkan daftar pengumuman sistem/update aplikasi",
+                "operationId": "d3661c7d37465a19683e8daf5aa96365",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "Filter berdasarkan kategori (Fitur Baru, Bug Fix, Aturan, Update)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/add": {
+            "post": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Create a new announcement",
+                "description": "Membuat pengumuman sistem baru",
+                "operationId": "31fe03c3b840a29ead90b5fad2bcdb24",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ],
+                                        "example": "Fitur Baru"
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "example": "Fitur Export Data ke Excel"
+                                    },
+                                    "version": {
+                                        "type": "string",
+                                        "example": "v2.5.0"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-03-25"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Sekarang Anda dapat mengekspor semua data laporan ke format Excel dengan mudah."
+                                    },
+                                    "details": {
+                                        "type": "string",
+                                        "example": "<ul><li>Mendukung export untuk semua jenis laporan</li></ul>"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Announcement created successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/view/{id}": {
+            "get": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Get announcement by ID",
+                "description": "Mendapatkan detail pengumuman berdasarkan ID",
+                "operationId": "9f7bbb785298ebeee8b415039bf4f050",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/update/{id}": {
+            "put": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Update announcement",
+                "description": "Mengupdate data pengumuman yang sudah ada",
+                "operationId": "6a30810ce4e1a4ce8b1b5503c1d9c49d",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Announcement updated successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/system-announcements/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "System Announcements"
+                ],
+                "summary": "Delete announcement",
+                "description": "Menghapus pengumuman (soft delete)",
+                "operationId": "bb492b57e21b05120528306e68c48be5",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/targets/list": {
             "get": {
                 "tags": [
@@ -30520,6 +30758,10 @@
         {
             "name": "Supplier",
             "description": "API Endpoints untuk Management Supplier"
+        },
+        {
+            "name": "System Announcements",
+            "description": "API Endpoints untuk Log Update Aplikasi dan Pengumuman Sistem"
         },
         {
             "name": "Target",

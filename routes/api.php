@@ -38,6 +38,7 @@ use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
+use App\Http\Controllers\SystemAnnouncementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -483,5 +484,13 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::post('/quotations/{quotation}/harga-jual', 'updateStep11');
     });
 
+    // System Announcements
+    Route::prefix('system-announcements')->controller(SystemAnnouncementController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
 
 });
