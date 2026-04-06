@@ -804,6 +804,18 @@ class QuotationService
             $detail->tunjangan_holiday = $tunjanganHolidayHpp;
             $detail->lembur = $lemburHpp;
             $detail->insentif = $insentifHpp;
+            \Log::info("Calculated extras for detail {$detail->id}", [
+                'tunjangan_hari_raya_hpp' => $detail->tunjangan_hari_raya_hpp,
+                'tunjangan_hari_raya_coss' => $detail->tunjangan_hari_raya_coss,
+                'kompensasi_hpp' => $detail->kompensasi_hpp,
+                'kompensasi_coss' => $detail->kompensasi_coss,
+                'tunjangan_holiday_hpp' => $detail->tunjangan_holiday_hpp,
+                'tunjangan_holiday_coss' => $detail->tunjangan_holiday_coss,
+                'lembur_hpp' => $detail->lembur_hpp,
+                'lembur_coss' => $detail->lembur_coss,
+                'insentif_hpp' => $detail->insentif_hpp,
+                'insentif_coss' => $detail->insentif_coss,
+            ]);
 
         } catch (\Exception $e) {
             \Log::error("Error in calculateExtras for detail {$detail->id}: " . $e->getMessage());
@@ -885,6 +897,12 @@ class QuotationService
                 2
             );
             $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHcCoss, 2);
+            \Log::info("Calculated totals for detail {$detail->id}", [
+                'total_personil' => $detail->total_personil,
+                'sub_total_personil' => $detail->sub_total_personil,
+                'total_personil_coss' => $detail->total_personil_coss,
+                'sub_total_personil_coss' => $detail->sub_total_personil_coss,
+            ]);
 
         } catch (\Exception $e) {
             \Log::error("Error in calculateFinalTotals for detail {$detail->id}: " . $e->getMessage());

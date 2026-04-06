@@ -1015,7 +1015,7 @@ class QuotationStepService
             // Create notification untuk Dir Sales dan Dir Keu
 
             if ($statusData['status_quotation_id'] == 2) {
-                $this->notifyDirSales($quotation, $currentDateTime);
+                $this->notifyGM($quotation, $currentDateTime);
             }
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
                 // Cari quotation lama (referensi)
@@ -1162,41 +1162,7 @@ class QuotationStepService
     }
 
 
-    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
-    {
-        $dirSales = [27927, 127822];
-
-        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
-            ->where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->first();
-
-        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
-        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
-
-        foreach ($dirSales as $userId) {
-            LogNotification::create([
-                'user_id' => $userId,
-                'doc_id' => $quotation->id,
-                'transaksi' => 'Quotation',
-                'tabel' => 'sl_quotation',
-                'pesan' => $msg,
-                'is_read' => 0,
-                'created_at' => $currentDateTime,
-                'created_by' => $creatorName
-            ]);
-        }
-
-        $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
-        $this->quotationNotificationService->sendApprovalNotification(
-            quotation: $quotation,
-            creatorName: $creatorName,
-            approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
-        );
-        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
-            ->delay(now()->addDay());
-    }
+   
     private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
     {
         $gmUserIds = [127824, 16932, 16991];
