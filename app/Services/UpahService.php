@@ -115,9 +115,11 @@ class UpahService
     {
         try {
             $city = City::active()
-                ->with(['province', 'activeUmk', 'activeUmsks'])
+                ->with('province') // hanya province, satu koneksi
                 ->findOrFail($cityId);
 
+            // Lazy load — aman meski beda koneksi
+            $city->activeUmsks; // otomatis query ke koneksi mysql
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             throw $e;
 
@@ -180,13 +182,15 @@ class UpahService
                         'sumber' => $city->activeUmk->sumber,
                     ]
                     : null,
-                'umsk_aktif' => $city->activeUmsks->map(fn(Umsk $umsk) => [
-                    'id' => $umsk->id,
-                    'nilai' => (float) $umsk->umsk,
-                    'formatted' => $umsk->formatumsk(),
-                    'tgl_berlaku' => $umsk->tgl_berlaku,
-                    'sumber' => $umsk->sumber,
-                ])->values(),
+                'umsk_aktif' => $city->activeUmsks
+                    ? [
+                        'id' => $city->activeUmsks->id,
+                        'nilai' => (float) $city->activeUmsks->umsk,
+                        'formatted' => $city->activeUmsks->formatumsk(),
+                        'tgl_berlaku' => $city->activeUmsks->tgl_berlaku,
+                        'sumber' => $city->activeUmsks->sumber,
+                    ]
+                    : null,
             ],
 
             'umk_history' => $umkHistory->map(fn(Umk $umk) => [
