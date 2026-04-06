@@ -47,7 +47,6 @@ class Umsk extends Model
      */
     public static function deactivatePreviousBySector(
         int $cityId,
-        string $sektor,
         string $updatedBy = 'System',
     ): void {
         static::where('city_id', $cityId)
