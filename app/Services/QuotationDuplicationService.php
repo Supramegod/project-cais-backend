@@ -214,6 +214,7 @@ class QuotationDuplicationService
                 'kota' => $siteReferensi->kota,
                 'ump' => $siteReferensi->ump,
                 'umk' => $siteReferensi->umk,
+                'umsk' => $siteReferensi->umsk,
                 'nominal_upah' => $siteReferensi->nominal_upah,
                 'penempatan' => $siteReferensi->penempatan,
                 'created_by' => $newQuotation->created_by

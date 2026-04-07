@@ -15,6 +15,7 @@ use App\Models\Leads;
 use App\Models\QuotationSite;
 use App\Models\QuotationPic;
 use App\Models\CustomerActivity;
+use App\Models\Umsk;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -81,17 +82,21 @@ class QuotationBusinessService
         $umk = Umk::where('city_id', $city->id)
             ->active()
             ->first();
+        $umsk = Umsk::where('city_id', $city->id)
+            ->active()
+            ->first();
 
         QuotationSite::create([
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
             'provinsi_id' => $provinceId,
-            'provinsi' => $province->nama,
+            'provinsi' => $province->name,
             'kota_id' => $cityId,
             'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
+            'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
             'created_by' => $createdBy
         ]);
@@ -110,17 +115,21 @@ class QuotationBusinessService
         $umk = Umk::where('city_id', $city->id)
             ->active()
             ->first();
+        $umsk = Umsk::where('city_id', $city->id)
+            ->active()
+            ->first();
 
         return QuotationSite::create([
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $refSite->nama_site,
             'provinsi_id' => $refSite->provinsi_id,
-            'provinsi' => $province->nama,
+            'provinsi' => $province->name,
             'kota_id' => $refSite->kota_id,
             'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
-            'umk' => $umk ? $umk->umk : 0, // ✅ UMK TERBARU
+            'umk' => $umk ? $umk->umk : 0,
+            'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $refSite->penempatan,
             'created_by' => $createdBy
         ]);
@@ -412,7 +421,7 @@ class QuotationBusinessService
     /**
      * Get filtered quotations based on type
      */
-    
+
 
 
 }
