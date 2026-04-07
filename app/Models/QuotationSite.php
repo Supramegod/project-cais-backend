@@ -17,6 +17,7 @@ class QuotationSite extends Model
         'quotation_id',
         'ump',
         'umk',
+        'umsk',
         'leads_id',
         'nama_site',
         'provinsi_id',

@@ -1295,8 +1295,8 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
-            
-        if ( (empty($quotation->ot3) || empty($quotation->ot4))) {
+
+        if ((empty($quotation->ot3) || empty($quotation->ot4))) {
             return [
                 'success' => false,
                 'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
@@ -1631,17 +1631,14 @@ class QuotationController extends Controller
                 break;
 
             case 'rekontrak':
-                $query->where('leads_id', $leadsId)
-                    ->where(function ($q) {
-                        $q->where('status_quotation_id', 3)
-                            ->orWhereNotNull('ot1');
+                $query->whereIn('status_quotation_id', [3, 6])
+                    ->whereHas('sites', function ($siteQuery) { 
+                        $siteQuery->whereHas('pks', function ($pksQuery) { 
+                            $pksQuery->where('is_aktif', 1);
+                                
+                                // ->where('kontrak_akhir', '<=', now()->addMonths(3));
+                        });
                     });
-                // ->whereHas('sites', function ($siteQuery) {
-                //     $siteQuery->whereHas('pks', function ($pksQuery) {
-                //         $pksQuery->where('is_aktif', 1)
-                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
-                //     });
-                // });
                 break;
         }
 
