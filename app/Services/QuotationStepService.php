@@ -1162,7 +1162,7 @@ class QuotationStepService
     }
 
 
-   
+
     private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
     {
         $gmUserIds = [127824, 16932, 16991];
@@ -3105,135 +3105,108 @@ class QuotationStepService
         }
     }
 
-    /**
-     * Save all calculation results – Optimized batch for HPP & COSS
-     */
     private function saveAllCalculationResults(QuotationCalculationResult $calculationResult, string $user, Carbon $currentDateTime, Request $request = null): void
     {
         $detailIds = array_keys($calculationResult->detail_calculations);
+        $summary = $calculationResult->calculation_summary;
+        $persentase = $calculationResult->quotation->persentase ?? 0;
 
-        // Preload existing HPP & COSS
-        $existingHpp = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->get()->keyBy('quotation_detail_id');
-        $existingCoss = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->get()->keyBy('quotation_detail_id');
+        // Definisikan field yang bisa diedit agar tidak menulis ulang berkali-kali
+        $editableFields = [
+            'tunjangan_hari_raya',
+            'kompensasi',
+            'jumlah_hc',
+            'tunjangan_hari_libur_nasional',
+            'lembur',
+            'provisi_seragam',
+            'provisi_peralatan',
+            'provisi_chemical',
+            'provisi_ohc',
+            'bunga_bank',
+            'insentif'
+        ];
 
-        // Dapatkan kolom yang diizinkan dari masing-masing model
-        $hppAllowed = (new QuotationDetailHpp())->getFillable();
-        $cossAllowed = (new QuotationDetailCoss())->getFillable();
+        $bpjsMap = [
+            'jkk' => 'persen_bpjs_jkk',
+            'jkm' => 'persen_bpjs_jkm',
+            'jht' => 'persen_bpjs_jht',
+            'jp' => 'persen_bpjs_jp',
+            'kes' => 'persen_bpjs_kes'
+        ];
 
-        $hppInsert = [];
-        $cossInsert = [];
-        $hppUpdate = [];
-        $cossUpdate = [];
+        $hppAllowed = array_flip((new QuotationDetailHpp())->getFillable());
+        $cossAllowed = array_flip((new QuotationDetailCoss())->getFillable());
+
+        $hppFinalData = [];
+        $cossFinalData = [];
 
         foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
+            // Ambil data dasar dari hasil kalkulasi
             $hppData = $detailCalculation->hpp_data;
             $cossData = $detailCalculation->coss_data;
 
-            // Filter hanya kolom yang ada di fillable
-            $hppData = array_intersect_key($hppData, array_flip($hppAllowed));
-            $cossData = array_intersect_key($cossData, array_flip($cossAllowed));
-
-            // Terapkan user edits jika ada (sama seperti sebelumnya)
-            if ($request && $request->has('hpp_editable_data') && isset($request->hpp_editable_data[$detailId])) {
-                $userHppData = $request->hpp_editable_data[$detailId];
-                $allowedHppFields = [
-                    'tunjangan_hari_raya',
-                    'kompensasi',
-                    'jumlah_hc',
-                    'tunjangan_hari_libur_nasional',
-                    'lembur',
-                    'provisi_seragam',
-                    'provisi_peralatan',
-                    'provisi_chemical',
-                    'provisi_ohc',
-                    'bunga_bank',
-                    'insentif',
-                ];
-                foreach ($allowedHppFields as $field) {
-                    if (array_key_exists($field, $userHppData)) {
-                        $userValue = $userHppData[$field];
-                        if ($userValue === null || $userValue === '') {
-                            $hppData[$field] = null;
-                        } else {
-                            $hppData[$field] = is_numeric($userValue) ? (float) $userValue : (float) str_replace(['.', ','], ['', '.'], $userValue);
-                        }
-                    }
+            // 1. PROSES USER EDITS (HPP & COSS)
+            foreach ($editableFields as $field) {
+                // HPP Edits
+                if ($request?->has("hpp_editable_data.$detailId.$field")) {
+                    $val = $request->input("hpp_editable_data.$detailId.$field");
+                    $hppData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                }
+                // COSS Edits
+                if ($request?->has("coss_data.$detailId.$field")) {
+                    $val = $request->input("coss_data.$detailId.$field");
+                    $cossData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
                 }
             }
 
-            if ($request && $request->has('bpjs_persentase_data') && isset($request->bpjs_persentase_data[$detailId])) {
-                $userBpjsData = $request->bpjs_persentase_data[$detailId];
-                $bpjsPercentFields = [
-                    'persen_bpjs_jkk' => 'jkk',
-                    'persen_bpjs_jkm' => 'jkm',
-                    'persen_bpjs_jht' => 'jht',
-                    'persen_bpjs_jp' => 'jp',
-                    'persen_bpjs_kes' => 'kes'
-                ];
-                foreach ($bpjsPercentFields as $hppField => $requestField) {
-                    if (isset($userBpjsData[$requestField])) {
-                        $userValue = $userBpjsData[$requestField];
-                        $hppData[$hppField] = is_numeric($userValue) ? (float) $userValue : (float) str_replace(['.', ','], ['', '.'], $userValue);
-                    }
+            // 2. PROSES BPJS PERCENTAGE (HPP)
+            foreach ($bpjsMap as $reqKey => $dbKey) {
+                if ($request?->has("bpjs_persentase_data.$detailId.$reqKey")) {
+                    $val = $request->input("bpjs_persentase_data.$detailId.$reqKey");
+                    $hppData[$dbKey] = is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val);
                 }
             }
 
-            // Tambahkan field summary yang sudah pasti ada di fillable
-            $hppData = array_merge($hppData, [
-                'management_fee' => $calculationResult->calculation_summary->nominal_management_fee ?? 0,
-                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
-                'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak ?? 0,
-                'ppn' => $calculationResult->calculation_summary->ppn ?? 0,
-                'pph' => $calculationResult->calculation_summary->pph ?? 0,
-                'total_invoice' => $calculationResult->calculation_summary->total_invoice ?? 0,
-                'pembulatan' => $calculationResult->calculation_summary->pembulatan ?? 0,
-                'is_pembulatan' => ($calculationResult->calculation_summary->pembulatan != $calculationResult->calculation_summary->total_invoice) ? 1 : 0,
+            // 3. MERGE SUMMARY & METADATA
+            $commonMetadata = [
+                'quotation_detail_id' => $detailId,
+                'persen_management_fee' => $persentase,
                 'updated_by' => $user,
-                'updated_at' => $currentDateTime
+                'updated_at' => $currentDateTime,
+            ];
+
+            $hppData = array_merge($hppData, $commonMetadata, [
+                'management_fee' => $summary->nominal_management_fee ?? 0,
+                'grand_total' => $summary->grand_total_sebelum_pajak ?? 0,
+                'ppn' => $summary->ppn ?? 0,
+                'pph' => $summary->pph ?? 0,
+                'total_invoice' => $summary->total_invoice ?? 0,
+                'pembulatan' => $summary->pembulatan ?? 0,
+                'is_pembulatan' => ($summary->pembulatan != $summary->total_invoice) ? 1 : 0,
             ]);
 
-            $cossData = array_merge($cossData, [
-                'management_fee' => $calculationResult->calculation_summary->nominal_management_fee_coss ?? 0,
-                'persen_management_fee' => $calculationResult->quotation->persentase ?? 0,
-                'grand_total' => $calculationResult->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
-                'ppn' => $calculationResult->calculation_summary->ppn_coss ?? 0,
-                'pph' => $calculationResult->calculation_summary->pph_coss ?? 0,
-                'total_invoice' => $calculationResult->calculation_summary->total_invoice_coss ?? 0,
-                'pembulatan' => $calculationResult->calculation_summary->pembulatan_coss ?? 0,
-                'is_pembulatan' => ($calculationResult->calculation_summary->pembulatan_coss != $calculationResult->calculation_summary->total_invoice_coss) ? 1 : 0,
-                'updated_by' => $user,
-                'updated_at' => $currentDateTime
+            $cossData = array_merge($cossData, $commonMetadata, [
+                'management_fee' => $summary->nominal_management_fee_coss ?? 0,
+                'grand_total' => $summary->grand_total_sebelum_pajak_coss ?? 0,
+                'ppn' => $summary->ppn_coss ?? 0,
+                'pph' => $summary->pph_coss ?? 0,
+                'total_invoice' => $summary->total_invoice_coss ?? 0,
+                'pembulatan' => $summary->pembulatan_coss ?? 0,
+                'is_pembulatan' => ($summary->pembulatan_coss != $summary->total_invoice_coss) ? 1 : 0,
             ]);
 
-            // Filter lagi setelah merge karena bisa jadi ada field tambahan yang tidak diizinkan
-            $hppData = array_intersect_key($hppData, array_flip($hppAllowed));
-            $cossData = array_intersect_key($cossData, array_flip($cossAllowed));
-
-            if ($existingHpp->has($detailId)) {
-                $hppUpdate[] = array_merge($hppData, ['id' => $existingHpp[$detailId]->id]);
-            } else {
-                $hppInsert[] = $hppData;
-            }
-
-            if ($existingCoss->has($detailId)) {
-                $cossUpdate[] = array_merge($cossData, ['id' => $existingCoss[$detailId]->id]);
-            } else {
-                $cossInsert[] = $cossData;
-            }
+            // 4. FILTER FILLABLE & ADD TO BATCH
+            $hppFinalData[] = array_intersect_key($hppData, $hppAllowed);
+            $cossFinalData[] = array_intersect_key($cossData, $cossAllowed);
         }
 
-        // Batch insert
-        if (!empty($hppInsert))
-            QuotationDetailHpp::insert($hppInsert);
-        if (!empty($cossInsert))
-            QuotationDetailCoss::insert($cossInsert);
-
-        // Batch update (per row)
-        foreach ($hppUpdate as $data) {
-            QuotationDetailHpp::where('id', $data['id'])->update($data);
+        // 5. EKSEKUSI DATABASE (Batch Upsert)
+        // Syarat: Kolom 'quotation_detail_id' harus punya Unique Index di DB
+        if (!empty($hppFinalData)) {
+            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], array_keys($hppAllowed));
         }
-        foreach ($cossUpdate as $data) {
-            QuotationDetailCoss::where('id', $data['id'])->update($data);
+        if (!empty($cossFinalData)) {
+            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], array_keys($cossAllowed));
         }
     }
 
