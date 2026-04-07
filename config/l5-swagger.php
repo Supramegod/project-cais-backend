@@ -67,7 +67,7 @@ return [
             'middleware' => [
                 'api' => [],
                 'asset' => [],
-                'docs' => [],
+                'docs' => ['web', 'auth'],
                 'oauth2_callback' => [],
             ],
 
@@ -292,13 +292,15 @@ return [
                  * the tag.
                  */
                 'filter' => env('L5_SWAGGER_UI_FILTERS', true), // true | false
+                'additional_css' => 'https://cdn.jsdelivr.net/npm/swagger-ui-themes@3.0.0/themes/3.x/theme-material.css',
+
             ],
 
             'authorization' => [
                 /*
                  * If set to true, it persists authorization data, and it would not be lost on browser close/refresh
                  */
-                'persist_authorization' => env('L5_SWAGGER_UI_PERSIST_AUTHORIZATION', false),
+                'persist_authorization' => env('L5_SWAGGER_UI_PERSIST_AUTHORIZATION', true),
 
                 'oauth2' => [
                     /*

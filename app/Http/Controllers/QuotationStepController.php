@@ -20,6 +20,7 @@ use App\Models\Top;
 use App\Models\Training;
 use App\Models\Umk;
 use App\Models\Ump;
+use App\Models\Umsk;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -289,7 +290,7 @@ class QuotationStepController extends Controller
         return [
             'quotation' => $quotation,
             'step' => $step,
-            'step_data' => $stepData,       
+            'step_data' => $stepData,
             'additional_data' => $additionalData,
             'metadata' => [
                 'actual_step' => $quotation->step,
@@ -419,10 +420,11 @@ class QuotationStepController extends Controller
         return [
             'position_data' => $positionData,
             'global_data' => [
-                'is_ppn' => $quotation->is_ppn,
-                'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                'management_fee_id' => $quotation->management_fee_id,
-                'persentase' => $quotation->persentase,
+                'is_ppn' => $quotation->is_ppn ?? false,
+                'jenis_kontrak' => $quotation->jenis_kontrak ?? '', // Default ke string kosong jika null
+                'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
+                'management_fee_id' => $quotation->management_fee_id ?? null,
+                'persentase' => $quotation->persentase ?? 0,
             ],
         ];
     }
@@ -578,12 +580,14 @@ class QuotationStepController extends Controller
         }
 
         return [
-            'penagihan' => $quotation->penagihan,
-            'nama_perusahaan' => $quotation->nama_perusahaan,
-            'persentase' => $quotation->persentase,
+             'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+            'hari_kerja' => $quotation->hari_kerja ?? 0,
+            'penagihan' => $quotation->penagihan ?? '',
+            'nama_perusahaan' => $quotation->nama_perusahaan ?? '',
+            'persentase' => $quotation->persentase ?? 0,
             'management_fee_nama' => $quotation->managementFee->nama ?? null,
-            'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-            'note_harga_jual' => $quotation->note_harga_jual,
+            'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
+            'note_harga_jual' => $quotation->note_harga_jual ?? '',
             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
             'persen_insentif' => $quotation->persen_insentif ?? 0,
             'quotation_pics' => $quotation->relationLoaded('quotationPics')
@@ -824,11 +828,13 @@ class QuotationStepController extends Controller
     {
         $umkPerSite = [];
         $umpPerSite = [];
+        $umskPerSite = [];
 
         if ($quotation->relationLoaded('quotationSites')) {
             foreach ($quotation->quotationSites as $site) {
                 $umk = Umk::byCity($site->kota_id)->active()->first();
                 $ump = Ump::byProvince($site->provinsi_id)->active()->first();
+                $umsk = Umsk::byCity($site->kota_id)->active()->first();
 
                 $umkPerSite[$site->id] = [
                     'site_id' => $site->id,
@@ -847,6 +853,14 @@ class QuotationStepController extends Controller
                     'ump_value' => $ump?->ump ?? 0,
                     'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
                 ];
+                $umskPerSite[$site->id] = [
+                    'site_id' => $site->id,
+                    'site_name' => $site->nama_site,
+                    'city_id' => $site->kota_id,
+                    'city_name' => $site->kota,
+                    'umsk_value' => $umsk?->umsk ?? 0,
+                    'formatted_umsk' => $umsk ? $umsk->formatUmsk() : 'UMSK : Rp. 0',
+                ];
             }
         }
         if (!$quotation->relationLoaded('quotationSites')) {
@@ -862,6 +876,7 @@ class QuotationStepController extends Controller
             'management_fees' => ManagementFee::select('id', 'nama')->get(),
             'umk_per_site' => $umkPerSite,
             'ump_per_site' => $umpPerSite,
+            'umsk_per_site' => $umskPerSite,
             'quotation_sites' => $quotation->relationLoaded('quotationSites')
                 ? $quotation->quotationSites->map(fn($site) => [
                     'id' => $site->id,

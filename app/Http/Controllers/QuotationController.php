@@ -182,7 +182,8 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
-                'status_quotation_id', // ✅ sudah ada, untuk eager load statusQuotation
+                'status_quotation_id',
+                'jenis_kontrak', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
                 'created_by',
             ])
@@ -235,6 +236,7 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
+                    'jenis_kontrak' => $quotation->jenis_kontrak,
                     'created_by' => $quotation->created_by,
                     'status_quotation' => $quotation->statusQuotation
                         ? ['id' => $quotation->statusQuotation->id, 'nama' => $quotation->statusQuotation->nama]
@@ -1293,12 +1295,8 @@ class QuotationController extends Controller
         User $user,
         Carbon $now
     ): array {
-        $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
-        $isOldQuotation = Carbon::parse($quotation->tgl_quotation)
-            ->startOfDay()
-            ->lt($gmStartDate);
-            
-        if (!$isOldQuotation && (empty($quotation->ot3) || empty($quotation->ot4))) {
+
+        if ((empty($quotation->ot3) || empty($quotation->ot4))) {
             return [
                 'success' => false,
                 'message' => 'Quotation harus disetujui oleh GM 1 dan GM 2 terlebih dahulu.',
@@ -1633,17 +1631,14 @@ class QuotationController extends Controller
                 break;
 
             case 'rekontrak':
-                $query->where('leads_id', $leadsId)
-                    ->where(function ($q) {
-                        $q->where('status_quotation_id', 3)
-                            ->orWhereNotNull('ot1');
+                $query->whereIn('status_quotation_id', [3, 6])
+                    ->whereHas('sites', function ($siteQuery) { 
+                        $siteQuery->whereHas('pks', function ($pksQuery) { 
+                            $pksQuery->where('is_aktif', 1);
+                                
+                                // ->where('kontrak_akhir', '<=', now()->addMonths(3));
+                        });
                     });
-                // ->whereHas('sites', function ($siteQuery) {
-                //     $siteQuery->whereHas('pks', function ($pksQuery) {
-                //         $pksQuery->where('is_aktif', 1)
-                //             ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
-                //     });
-                // });
                 break;
         }
 

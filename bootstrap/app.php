@@ -13,6 +13,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->statefulApi(); // Ini yang sudah kamu tambah tadi
+    
+        // Tambahkan ini untuk memastikan web session terbaca di rute API
+        $middleware->group('api', [
+            \Illuminate\Cookie\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \Illuminate\Routing\Middleware\SubstituteBindings::class,
+        ]);
+
         $middleware->alias([
             'token.expiry' => \App\Http\Middleware\CheckTokenExpiry::class,
         ]);

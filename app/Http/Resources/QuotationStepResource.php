@@ -238,10 +238,11 @@ class QuotationStepResource extends JsonResource
                 return [
                     'position_data' => $positionData,
                     'global_data' => [
-                        'is_ppn' => $quotation->is_ppn,
-                        'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                        'management_fee_id' => $quotation->management_fee_id,
-                        'persentase' => $quotation->persentase,
+                        'is_ppn' => $quotation->is_ppn ?? false,
+                        'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+                        'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
+                        'management_fee_id' => $quotation->management_fee_id ?? null,
+                        'persentase' => $quotation->persentase ?? 0,
                     ]
                 ];
             // Di method getStepSpecificData - case 5:
@@ -431,6 +432,8 @@ class QuotationStepResource extends JsonResource
                 };
 
                 return [
+                    'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+                    'hari_kerja' => $quotation->hari_kerja ?? 0,
                     'penagihan' => $quotation->penagihan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'persentase' => $quotation->persentase,

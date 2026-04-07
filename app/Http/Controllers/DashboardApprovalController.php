@@ -110,7 +110,7 @@ class DashboardApprovalController extends Controller
         $user = Auth::user();
 
         // TODO: HAPUS SETELAH 2025-04-16 — tanggal mulai sistem GM aktif
-        $gmStartDate = Carbon::parse('2026-03-17')->startOfDay();
+        $gmStartDate = Carbon::parse('2026-03-16')->startOfDay();
         // END TODO
 
         // Base query factory — kondisi dasar yang berlaku untuk semua keperluan
@@ -194,7 +194,12 @@ class DashboardApprovalController extends Controller
                             ->orWhere(function ($subQ) {
                             $subQ->whereNotNull('ot1')
                                 ->whereNull('ot2')
-                                ->where('top', 'Lebih Dari 7 Hari');
+                                ->where('top', 'Lebih Dari 7 Hari')
+                                ->whereHas('quotationDetails', function ($wageQ) {
+                                    $wageQ->whereHas('wage', function ($q) {
+                                        $q->where('thr', '!=', 'diprovisikan');
+                                    });
+                                });
                         });
                     });
                 break;
@@ -546,6 +551,11 @@ class DashboardApprovalController extends Controller
             ->whereNotNull('ot1')
             ->whereNull('ot2')
             ->where('top', 'Lebih Dari 7 Hari')
+            ->whereHas('quotationDetails', function ($wageQ) {
+                $wageQ->whereHas('wage', function ($q) {
+                    $q->where('thr', '!=', 'diprovisikan');
+                });
+            })
             ->count();
 
         $countMenungguApproval = $countGM1 + $countGM2 + $countDirSales + $countDirKeu;
@@ -602,6 +612,11 @@ class DashboardApprovalController extends Controller
                 ->whereNotNull('ot1')
                 ->whereNull('ot2')
                 ->where('top', 'Lebih Dari 7 Hari')
+                ->whereHas('quotationDetails', function ($wageQ) {
+                    $wageQ->whereHas('wage', function ($q) {
+                        $q->where('thr', '!=', 'diprovisikan');
+                    });
+                })
                 ->count(),
         ];
     }
@@ -658,7 +673,12 @@ class DashboardApprovalController extends Controller
             $conditions[] = function ($q) {
                 $q->whereNotNull('ot1')
                     ->whereNull('ot2')
-                    ->where('top', 'Lebih Dari 7 Hari');
+                    ->where('top', 'Lebih Dari 7 Hari')
+                    ->whereHas('quotationDetails', function ($wageQ) {
+                        $wageQ->whereHas('wage', function ($q) {
+                            $q->where('thr', '!=', 'diprovisikan');
+                        });
+                    });
             };
         }
 

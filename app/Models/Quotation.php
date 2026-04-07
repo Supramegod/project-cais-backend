@@ -433,7 +433,7 @@ class Quotation extends Model
     }
     public function wage()
     {
-        return $this->hasOne(QuotationDetailWage::class);
+        return $this->hasMany(QuotationDetailWage::class);
     }
 
     public function logApprovals()
