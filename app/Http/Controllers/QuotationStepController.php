@@ -528,8 +528,17 @@ class QuotationStepController extends Controller
             'quotation_trainings' => $quotationTrainings,
         ];
     }
+
+
     private function buildStepDataStep11(Quotation $quotation, array $additionalData): array
     {
+        // ✅ FIX: Inisialisasi $summary dan breakdown di awal agar tidak undefined
+        $summary = null;
+        $persenBpjsTotalHpp = 0;
+        $persenBpjsTotalCoss = 0;
+        $persenBpjsBreakdownHpp = [];
+        $persenBpjsBreakdownCoss = [];
+
         try {
             $calculatedQuotation = $additionalData['calculated_quotation'] ?? null;
             Log::info('Calculated quotation', ['quotation_id' => $quotation->id, 'calculated' => !!$calculatedQuotation]);
@@ -546,12 +555,8 @@ class QuotationStepController extends Controller
             $calculatedQuotation = null;
         }
 
-        $persenBpjsTotalHpp = 0;
-        $persenBpjsTotalCoss = 0;
-        $persenBpjsBreakdownHpp = [];
-        $persenBpjsBreakdownCoss = [];
-
-        if ($calculatedQuotation && isset($summary)) {
+        // ✅ FIX: Hapus isset($summary) — assign $summary dulu, baru pakai
+        if ($calculatedQuotation) {
             $summary = $calculatedQuotation->calculation_summary;
 
             $persenBpjsTotalHpp = round($summary->persen_bpjs_ketenagakerjaan ?? 0, 2);
@@ -570,6 +575,7 @@ class QuotationStepController extends Controller
                 'persen_bpjs_jp' => round($summary->persen_bpjs_jp_coss ?? 0, 2),
             ];
         }
+
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             $calculatedQuotation->quotation->quotationDetails->loadMissing([
                 'quotationDetailHpps',
@@ -580,7 +586,7 @@ class QuotationStepController extends Controller
         }
 
         return [
-             'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+            'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
             'hari_kerja' => $quotation->hari_kerja ?? 0,
             'penagihan' => $quotation->penagihan ?? '',
             'nama_perusahaan' => $quotation->nama_perusahaan ?? '',
@@ -600,7 +606,9 @@ class QuotationStepController extends Controller
                     'is_kuasa' => $pic->is_kuasa,
                 ])->values()->toArray()
                 : [],
-            'calculation' => $calculatedQuotation ? [
+
+            // ✅ FIX: Pakai ($calculatedQuotation && $summary) agar $summary tidak undefined
+            'calculation' => ($calculatedQuotation && $summary) ? [
                 'bpu' => [
                     'total_potongan_bpu' => $summary->total_potongan_bpu ?? 0,
                     'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang ?? 0,
