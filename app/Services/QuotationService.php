@@ -629,6 +629,8 @@ class QuotationService
 
     private function calculateBpjs($detail, $quotation, $hpp): void
     {
+        // 1. Cek jika Penjamin Kesehatan adalah BPU (Bukan Penerima Upah)
+        // Jika BPU, semua BPJS dipaksa nol.
         if ($detail->penjamin_kesehatan === 'BPU') {
             foreach ([
                 'bpjs_jkk',
@@ -648,6 +650,7 @@ class QuotationService
             return;
         }
 
+        // 2. Cek apakah Program BPJS di Quotation aktif
         $programBpjs = $quotation->program_bpjs ?? '';
         $isBpjsProgram = (stripos($programBpjs, 'BPJS') !== false)
             || in_array($programBpjs, ['Ya', '1', true, '', null], true);
@@ -672,12 +675,17 @@ class QuotationService
             return;
         }
 
+        // 3. Tentukan Dasar Perhitungan (Base)
         $nominalUpah = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
         $umk = $detail->umk ?? 0;
         $ump = $detail->ump ?? 0;
+
+        // Dasar Ketenagakerjaan pakai UMP jika upah di bawah UMP
         $baseKetenagakerjaan = ($nominalUpah < $ump) ? $ump : $nominalUpah;
+        // Dasar Kesehatan pakai UMK jika upah di bawah UMK
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
 
+        // Configuration Map
         $bpjsConfig = [
             'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
             'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
@@ -690,16 +698,18 @@ class QuotationService
             $persentase = 0.0;
             $base = $config['base'];
             $optOutField = 'is_bpjs_' . $key;
+            $hppField = 'bpjs_' . $key; // Asumsi di HPP namanya: bpjs_jkk, bpjs_jkm, bpjs_kes, dll.
 
-            if (isset($detail->{$config['percent']}) && $detail->{$config['percent']} !== null) {
+            // A. Tentukan Persentase
+            if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
                 $persentase = (float) $detail->{$config['percent']};
-            } elseif ($hpp && isset($hpp->{$config['percent']}) && $hpp->{$config['percent']} !== null) {
-                $hppVal = (float) $hpp->{$config['percent']};
-                $persentase = ($hppVal == 0) ? $config['default'] : $hppVal;
+            } elseif ($hpp && isset($hpp->{$config['percent']}) && (float) $hpp->{$config['percent']} != 0) {
+                $persentase = (float) $hpp->{$config['percent']};
             } else {
                 $persentase = $config['default'];
             }
 
+            // B. Cek Opt-Out (Jika User memilih "Tidak" untuk program tertentu)
             $isOptOut = false;
             if (isset($detail->{$optOutField})) {
                 $optValue = $detail->{$optOutField};
@@ -712,17 +722,21 @@ class QuotationService
                 }
             }
 
+            // C. Eksekusi Pengisian Nilai Nominal
             if ($isOptOut) {
                 $detail->{$config['field']} = 0;
                 $detail->{$config['percent']} = 0;
             } elseif ($key === 'kes' && in_array($detail->penjamin_kesehatan, ["Asuransi Swasta", "Takaful"])) {
+                // Khusus Kesehatan jika menggunakan provider non-BPJS
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
                 $detail->{$config['percent']} = 0;
-            } elseif ($key === 'kes' && $hpp && $hpp->bpjs_ks !== null && $hpp->bpjs_ks > 0) {
-                $detail->{$config['field']} = $hpp->bpjs_ks;
+            } elseif ($hpp && isset($hpp->{$hppField}) && (float) $hpp->{$hppField} > 0) {
+                // PRIORITAS: Ambil nominal langsung dari HPP jika tersedia
+                $detail->{$config['field']} = (float) $hpp->{$hppField};
                 $detail->{$config['percent']} = $persentase;
             } else {
-                $detail->{$config['field']} = $base * $persentase / 100;
+                // FALLBACK: Hitung otomatis (Base * Persentase / 100)
+                $detail->{$config['field']} = ($base * $persentase) / 100;
                 $detail->{$config['percent']} = $persentase;
             }
         }
