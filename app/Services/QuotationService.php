@@ -691,14 +691,20 @@ class QuotationService
             'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
             'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
             'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
-            'kes' => ['field' => 'bpjs_kes', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKesehatan],
+            'kes' => [
+                'field' => 'bpjs_kes',
+                'hpp_field' => 'bpjs_ks',
+                'percent' => 'persen_bpjs_kes',
+                'default' => 4.00,
+                'base' => $baseKesehatan
+            ],
         ];
 
         foreach ($bpjsConfig as $key => $config) {
             $persentase = 0.0;
             $base = $config['base'];
             $optOutField = 'is_bpjs_' . $key;
-            $hppField = 'bpjs_' . $key; // Asumsi di HPP namanya: bpjs_jkk, bpjs_jkm, bpjs_kes, dll.
+            $hppField = $config['hpp_field'] ?? ('bpjs_' . $key); // Asumsi di HPP namanya: bpjs_jkk, bpjs_jkm, bpjs_kes, dll.
 
             // A. Tentukan Persentase
             if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
