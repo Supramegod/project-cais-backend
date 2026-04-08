@@ -1,5 +1,7 @@
 <?php
 
+// app/Models/City.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +20,8 @@ class City extends Model
     protected $primaryKey = 'id';
     protected $fillable = ['province_id', 'name', 'kode', 'is_active'];
 
+    // ── Relationships ─────────────────────────────────────────────────────────
+
     public function province(): BelongsTo
     {
         return $this->belongsTo(Province::class, 'province_id');
@@ -28,7 +32,9 @@ class City extends Model
         return $this->hasMany(Umk::class, 'city_id');
     }
 
-
+    /**
+     * UMK aktif terbaru — latestOfMany menghindari N+1.
+     */
     public function activeUmk(): HasOne
     {
         return $this->hasOne(Umk::class, 'city_id')
@@ -41,13 +47,18 @@ class City extends Model
         return $this->hasMany(Umsk::class, 'city_id');
     }
 
-    // City.php
-    public function activeUmsks(): HasOne
+    /**
+     * Semua UMSK aktif (satu per sektor) — eager-loadable tanpa N+1.
+     * HasMany karena satu kota bisa punya banyak sektor aktif sekaligus.
+     */
+    public function activeUmsks(): HasMany
     {
-        return $this->hasOne(Umsk::class, 'city_id')
+        return $this->hasMany(Umsk::class, 'city_id')
             ->where('is_aktif', true)
-            ->latestOfMany('tgl_berlaku');
+            ->orderBy('sektor');
     }
+
+    // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeActive(Builder $query): Builder
     {

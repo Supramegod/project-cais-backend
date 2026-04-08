@@ -7851,6 +7851,14 @@
                                         "pending_approval_summary": {
                                             "description": "Jumlah quotation yang belum diapprove per role",
                                             "properties": {
+                                                "gm_operasional": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "gm_hcm": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
                                                 "dir_sales": {
                                                     "type": "integer",
                                                     "example": 3
@@ -30038,14 +30046,12 @@
                 "tags": [
                     "Upah"
                 ],
-                "summary": "[Level 1] List provinsi beserta UMP aktif",
+                "summary": "[Level 1] List provinsi beserta UMP aktif dan UMSP aktif per sektor",
                 "operationId": "d2950298ddda9f2bba4eb499c2bb6c4b",
                 "parameters": [
                     {
                         "name": "page",
                         "in": "query",
-                        "description": "Page number for pagination (default: 1)",
-                        "required": false,
                         "schema": {
                             "type": "integer",
                             "example": 1
@@ -30062,69 +30068,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    },
-                    "500": {
-                        "description": "Internal server error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/upah/provinsi/{provinceId}/kota": {
-            "get": {
-                "tags": [
-                    "Upah"
-                ],
-                "summary": "[Level 2] List kota/kabupaten beserta UMK aktif (dengan pencarian)",
-                "operationId": "a1cacad254ea7f47f1b5e76e160884f3",
-                "parameters": [
-                    {
-                        "name": "provinceId",
-                        "in": "path",
-                        "description": "ID Provinsi",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "description": "Page number for pagination (default: 1)",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Jumlah data per halaman",
-                        "schema": {
-                            "type": "integer",
-                            "default": 15
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Cari berdasarkan nama kota/kabupaten (partial match)",
-                        "schema": {
-                            "type": "string",
-                            "example": "Surabaya"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data",
+                        "description": "OK",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -30139,71 +30083,77 @@
                                                 "properties": {
                                                     "id": {
                                                         "type": "integer",
-                                                        "example": 3578
-                                                    },
-                                                    "kode": {
-                                                        "type": "string",
-                                                        "example": "35.78"
+                                                        "example": 35
                                                     },
                                                     "nama": {
                                                         "type": "string",
-                                                        "example": "Kota Surabaya"
+                                                        "example": "Jawa Timur"
                                                     },
-                                                    "umk": {
+                                                    "ump": {
                                                         "properties": {
                                                             "id": {
                                                                 "type": "integer",
-                                                                "example": 123
+                                                                "example": 1
                                                             },
                                                             "nilai": {
                                                                 "type": "number",
-                                                                "example": 4725479
+                                                                "example": 2165244.3
                                                             },
                                                             "formatted": {
                                                                 "type": "string",
-                                                                "example": "Rp 4.725.479"
+                                                                "example": "Rp 2.165.244"
                                                             },
                                                             "tgl_berlaku": {
                                                                 "type": "string",
-                                                                "format": "date",
                                                                 "example": "2024-01-01"
                                                             },
                                                             "sumber": {
                                                                 "type": "string",
-                                                                "example": "https://jatim.go.id/umk2024"
+                                                                "example": "https://jatim.go.id"
                                                             }
                                                         },
                                                         "type": "object",
                                                         "nullable": true
+                                                    },
+                                                    "umsps": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer",
+                                                                    "example": 10
+                                                                },
+                                                                "sektor": {
+                                                                    "type": "string",
+                                                                    "example": "Tekstil"
+                                                                },
+                                                                "nilai": {
+                                                                    "type": "number",
+                                                                    "example": 2300000
+                                                                },
+                                                                "formatted": {
+                                                                    "type": "string",
+                                                                    "example": "Rp 2.300.000"
+                                                                },
+                                                                "tgl_berlaku": {
+                                                                    "type": "string",
+                                                                    "example": "2024-01-01"
+                                                                },
+                                                                "sumber": {
+                                                                    "type": "string",
+                                                                    "example": "https://jatim.go.id"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
                                                     }
                                                 },
                                                 "type": "object"
                                             }
                                         },
-                                        "pagination": {
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "last_page": {
-                                                    "type": "integer",
-                                                    "example": 5
-                                                },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "example": 75
-                                                },
-                                                "total_per_page": {
-                                                    "type": "integer",
-                                                    "example": 15
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
                                         "message": {
                                             "type": "string",
-                                            "example": "Data kota/kabupaten berhasil diambil"
+                                            "example": "Data provinsi berhasil diambil"
                                         }
                                     },
                                     "type": "object"
@@ -30222,16 +30172,16 @@
                 ]
             }
         },
-        "/api/upah/kota/{cityId}": {
+        "/api/upah/provinsi/{provinceId}": {
             "get": {
                 "tags": [
                     "Upah"
                 ],
-                "summary": "[Level 3] Detail kota: riwayat UMK & UMSK per sektor",
-                "operationId": "9ca11b48540884a3fe41bd789e36899d",
+                "summary": "[Level 2] Detail provinsi: tab kota, UMP, atau UMSP",
+                "operationId": "2653f58c03c476ca263d181cd5fc0f2c",
                 "parameters": [
                     {
-                        "name": "cityId",
+                        "name": "provinceId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -30239,19 +30189,194 @@
                         }
                     },
                     {
+                        "name": "type",
+                        "in": "query",
+                        "description": "Tipe data: cities, ump, umsp",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "cities",
+                                "ump",
+                                "umsp"
+                            ]
+                        }
+                    },
+                    {
                         "name": "page",
                         "in": "query",
-                        "description": "Page number for pagination (default: 1)",
-                        "required": false,
                         "schema": {
                             "type": "integer",
-                            "example": 1
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Pencarian nama kota (hanya untuk type=cities)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sektor",
+                        "in": "query",
+                        "description": "Filter sektor UMSP (hanya untuk type=umsp)",
+                        "schema": {
+                            "type": "string"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK"
+                    },
+                    "400": {
+                        "description": "Type tidak valid"
+                    },
+                    "404": {
+                        "description": "Provinsi tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/kota/{cityId}": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "[Level 3] Detail kota: UMK aktif, UMSK aktif per sektor, dan riwayat lengkap",
+                "operationId": "9ca11b48540884a3fe41bd789e36899d",
+                "parameters": [
+                    {
+                        "name": "cityId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 3578
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "kota": {
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "kode": {
+                                                            "type": "string"
+                                                        },
+                                                        "nama": {
+                                                            "type": "string"
+                                                        },
+                                                        "umk_aktif": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "nilai": {
+                                                                    "type": "number"
+                                                                },
+                                                                "formatted": {
+                                                                    "type": "string"
+                                                                },
+                                                                "tgl_berlaku": {
+                                                                    "type": "string"
+                                                                },
+                                                                "sumber": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object",
+                                                            "nullable": true
+                                                        },
+                                                        "umsk_aktif": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "integer"
+                                                                    },
+                                                                    "sektor": {
+                                                                        "type": "string",
+                                                                        "example": "Tekstil"
+                                                                    },
+                                                                    "nilai": {
+                                                                        "type": "number"
+                                                                    },
+                                                                    "formatted": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "tgl_berlaku": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "sumber": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "umk_history": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "umsk_history": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "sektor": {
+                                                                "type": "string"
+                                                            },
+                                                            "riwayat": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "object"
+                                                                }
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Kota tidak ditemukan"
@@ -30301,6 +30426,7 @@
                                     },
                                     "tgl_berlaku": {
                                         "type": "string",
+                                        "format": "date",
                                         "example": "2024-01-01"
                                     },
                                     "sumber": {
@@ -30316,6 +30442,76 @@
                 "responses": {
                     "201": {
                         "description": "UMP berhasil ditambahkan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/umsp": {
+            "post": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Tambah UMSP baru untuk suatu sektor di provinsi",
+                "operationId": "4b1c0feee9763a09e97a3a0c8f77f6a8",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "province_id",
+                                    "province_name",
+                                    "sektor",
+                                    "umsp",
+                                    "tgl_berlaku",
+                                    "sumber"
+                                ],
+                                "properties": {
+                                    "province_id": {
+                                        "type": "integer",
+                                        "example": 35
+                                    },
+                                    "province_name": {
+                                        "type": "string",
+                                        "example": "Jawa Timur"
+                                    },
+                                    "sektor": {
+                                        "type": "string",
+                                        "example": "Tekstil"
+                                    },
+                                    "umsp": {
+                                        "type": "number",
+                                        "example": 2350000
+                                    },
+                                    "tgl_berlaku": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2024-01-01"
+                                    },
+                                    "sumber": {
+                                        "type": "string",
+                                        "example": "https://jatim.go.id/umsp2024"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "UMSP berhasil ditambahkan"
                     },
                     "422": {
                         "description": "Validasi gagal"
@@ -30365,6 +30561,7 @@
                                     },
                                     "tgl_berlaku": {
                                         "type": "string",
+                                        "format": "date",
                                         "example": "2024-01-01"
                                     },
                                     "sumber": {
@@ -30424,12 +30621,17 @@
                                         "type": "string",
                                         "example": "Kota Surabaya"
                                     },
+                                    "sektor": {
+                                        "type": "string",
+                                        "example": "Otomotif"
+                                    },
                                     "umsk": {
                                         "type": "number",
                                         "example": 4900000
                                     },
                                     "tgl_berlaku": {
                                         "type": "string",
+                                        "format": "date",
                                         "example": "2024-01-01"
                                     },
                                     "sumber": {
@@ -30793,7 +30995,7 @@
         },
         {
             "name": "Upah",
-            "description": "Modul terpadu Upah Minimum: UMP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
+            "description": "Modul terpadu Upah Minimum: UMP & UMSP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
         },
         {
             "name": "User Email Config",

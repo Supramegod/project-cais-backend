@@ -189,8 +189,9 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
     // Upah (Unified wage management: UMP, UMK & UMSK)
     Route::prefix('upah')->controller(UpahController::class)->group(function () {
         Route::get('/provinsi', 'listProvinsi');
-        Route::get('/provinsi/{provinceId}/kota', 'listKota');
+        Route::get('/provinsi/{provinceId}', 'getProvinceDetail');
         Route::get('/kota/{cityId}', 'detailKota');
+        Route::post('/umsp', 'storeUmsp');
         Route::post('/ump', 'storeUmp');
         Route::post('/umk', 'storeUmk');
         Route::post('/umsk', 'storeUmsk');
