@@ -1,6 +1,6 @@
 <?php
 
-// app/Models/Umsk.php
+// app/Models/Umsp.php
 
 namespace App\Models;
 
@@ -11,21 +11,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Upah Minimum Sektoral Kota/Kabupaten (UMSK).
- * Satu record aktif per (city_id + sektor).
+ * Upah Minimum Sektoral Provinsi (UMSP).
+ * Satu record per (province_id + sektor + periode).
+ * Deaktivasi dilakukan per-sektor, bukan per-provinsi.
  */
-class Umsk extends Model
+class Umsp extends Model
 {
     use HasFactory, SoftDeletes, HasWageHistory;
 
     protected $connection = 'mysql';
-    protected $table = 'm_umsk';
+    protected $table      = 'm_umsp';
 
     protected $fillable = [
-        'city_id',
-        'city_name',
+        'province_id',
+        'province_name',
         'sektor',
-        'umsk',
+        'umsp',
         'tgl_berlaku',
         'sumber',
         'is_aktif',
@@ -36,16 +37,16 @@ class Umsk extends Model
     protected $hidden = ['deleted_at'];
 
     protected $casts = [
-        'umsk' => 'decimal:2',
-        'tgl_berlaku' => 'date:Y-m-d',
-        'is_aktif' => 'boolean',
+        'umsp'       => 'decimal:2',
+        'tgl_berlaku'=> 'date:Y-m-d',
+        'is_aktif'   => 'boolean',
     ];
 
     // ── Mutators ──────────────────────────────────────────────────────────────
 
-    public function setUmskAttribute(mixed $value): void
+    public function setUmspAttribute(mixed $value): void
     {
-        $this->attributes['umsk'] = $this->parseCurrencyInput($value);
+        $this->attributes['umsp'] = $this->parseCurrencyInput($value);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
@@ -55,9 +56,9 @@ class Umsk extends Model
         return $query->where('is_aktif', true);
     }
 
-    public function scopeByCity(Builder $query, int $cityId): Builder
+    public function scopeByProvince(Builder $query, int $provinceId): Builder
     {
-        return $query->where('city_id', $cityId);
+        return $query->where('province_id', $provinceId);
     }
 
     public function scopeBySektor(Builder $query, string $sektor): Builder
@@ -68,27 +69,27 @@ class Umsk extends Model
     // ── Business Logic ────────────────────────────────────────────────────────
 
     /**
-     * Deaktivasi record aktif per (city_id + sektor).
-     * Hanya menonaktifkan sektor yang sama, sehingga sektor lain tidak terpengaruh.
+     * Deaktivasi record aktif per (province_id + sektor).
+     * Dipanggil sebelum insert record baru agar hanya ada satu aktif per sektor.
      */
     public static function deactivatePreviousBySector(
-        int $cityId,
+        int    $provinceId,
         string $sektor,
         string $updatedBy = 'System',
     ): void {
-        static::where('city_id', $cityId)
+        static::where('province_id', $provinceId)
             ->where('sektor', $sektor)
             ->where('is_aktif', true)
             ->update([
-                'is_aktif' => false,
+                'is_aktif'   => false,
                 'updated_by' => $updatedBy,
             ]);
     }
 
     // ── Formatters ────────────────────────────────────────────────────────────
 
-    public function formatumsk(): string
+    public function formatumsp(): string
     {
-        return $this->formatWage('umsk');
+        return $this->formatWage('umsp');
     }
 }
