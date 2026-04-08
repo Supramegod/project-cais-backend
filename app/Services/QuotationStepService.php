@@ -2293,7 +2293,7 @@ class QuotationStepService
             'sl_quotation_detail_hpp',
             'sl_quotation_detail_coss',
             'sl_quotation_detail_tunjangan',
-            'sl_quotation_detail_wage',
+            'sl_quotation_detail_wages',
             'sl_quotation_detail_requirement',
         ];
 
