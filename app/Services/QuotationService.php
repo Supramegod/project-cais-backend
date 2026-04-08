@@ -728,6 +728,10 @@ class QuotationService
                     $isOptOut = true;
                 }
             }
+            if ($hpp && $hpp->bpjs_ks !== null) {
+                $detail->bpjs_kes = $hpp->bpjs_ks;
+                return;
+            }
 
             // C. Eksekusi Pengisian Nilai Nominal
             if ($isOptOut) {
