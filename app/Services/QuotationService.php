@@ -627,6 +627,7 @@ class QuotationService
         return ['total' => $totalTunjangan, 'total_coss' => $totalTunjanganCoss];
     }
 
+
     private function calculateBpjs($detail, $quotation, $hpp): void
     {
         // 1. Cek jika Penjamin Kesehatan adalah BPU (Bukan Penerima Upah)
@@ -685,26 +686,26 @@ class QuotationService
         // Dasar Kesehatan pakai UMK jika upah di bawah UMK
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
 
-        // Configuration Map
+        // ✅ FIX: Tambahkan 'hpp_field' untuk 'kes' karena nama kolom di tabel HPP/COSS
+        //         adalah 'bpjs_ks' (bukan 'bpjs_kes'), sehingga priority check tidak salah baca
         $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
-            'jkm' => ['field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
-            'jht' => ['field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
-            'jp' => ['field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
-            'kes' => [
-                'field' => 'bpjs_kes',
-                'hpp_field' => 'bpjs_ks',
-                'percent' => 'persen_bpjs_kes',
-                'default' => 4.00,
-                'base' => $baseKesehatan
-            ],
+            'jkk' => ['field' => 'bpjs_jkk', 'hpp_field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
+            'jkm' => ['field' => 'bpjs_jkm', 'hpp_field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
+            'jht' => ['field' => 'bpjs_jht', 'hpp_field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
+            'jp' => ['field' => 'bpjs_jp', 'hpp_field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
+            // ✅ FIX: 'field' tetap 'bpjs_kes' (nama di $detail object),
+            //         tapi 'hpp_field' pakai 'bpjs_ks' (nama kolom asli di tabel HPP/COSS)
+            'kes' => ['field' => 'bpjs_kes', 'hpp_field' => 'bpjs_ks', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKesehatan],
         ];
 
         foreach ($bpjsConfig as $key => $config) {
             $persentase = 0.0;
             $base = $config['base'];
             $optOutField = 'is_bpjs_' . $key;
-            $hppField = $config['hpp_field'] ?? ('bpjs_' . $key); // Asumsi di HPP namanya: bpjs_jkk, bpjs_jkm, bpjs_kes, dll.
+
+            // ✅ FIX: Gunakan 'hpp_field' (nama kolom DB) untuk baca dari $hpp,
+            //         bukan 'bpjs_' . $key yang untuk 'kes' menghasilkan 'bpjs_kes' (salah)
+            $hppField = $config['hpp_field'];
 
             // A. Tentukan Persentase
             if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
@@ -737,7 +738,8 @@ class QuotationService
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
                 $detail->{$config['percent']} = 0;
             } elseif ($hpp && isset($hpp->{$hppField}) && (float) $hpp->{$hppField} > 0) {
-                // PRIORITAS: Ambil nominal langsung dari HPP jika tersedia
+                // ✅ PRIORITAS: Ambil nominal langsung dari HPP jika tersedia
+                //    Untuk 'kes': sekarang baca $hpp->bpjs_ks (benar) bukan $hpp->bpjs_kes (salah)
                 $detail->{$config['field']} = (float) $hpp->{$hppField};
                 $detail->{$config['percent']} = $persentase;
             } else {
