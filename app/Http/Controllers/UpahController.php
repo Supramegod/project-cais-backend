@@ -165,10 +165,13 @@ class UpahController extends Controller
                     $message = 'Data UMSP provinsi berhasil diambil';
                     break;
             }
+            $umpdata = $province->activeUmp;
+
 
             return response()->json([
                 'success'    => true,
                 'data'       => $data,
+                'umpdata'   => $umpdata,
                 'pagination' => $this->paginationMeta($paginator),
                 'message'    => $message,
             ]);

@@ -268,8 +268,6 @@
             <h1 class="welcome-title">Selamat Datang!</h1>
             <p class="welcome-subtitle">Backend Server Successfully Running!</p>
             <p class="welcome-description">
-                Selamat! Backend server Anda telah berhasil dijalankan dan siap digunakan. Semua endpoint API sudah
-                aktif dan dapat diakses. Silakan cek dokumentasi API untuk melihat semua fitur yang tersedia.
             </p>
 
             <div class="cta-buttons">
@@ -292,6 +290,11 @@
 
                             <input type="password" name="password" placeholder="Password" required
                                 style="width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 10px; border: none; background: rgba(255,255,255,0.9);">
+
+                            <div style="display: flex; align-items: center; margin-bottom: 20px; gap: 10px;">
+                                <input type="checkbox" name="remember" id="remember" style="width: auto; margin: 0;">
+                                <label for="remember" style="color: white; cursor: pointer;">Ingat saya</label>
+                            </div>
 
                             <button type="submit" class="btn btn-primary" style="width: 100%; border-radius: 10px;">Login
                                 Access</button>
