@@ -10,6 +10,10 @@ Route::get('/', function () {
 
 // Proses login web
 Route::post('/login-web', [WebAuthController::class, 'login'])->name('login.web');
+// Tambahkan ini di atas route POST login-web
+Route::get('/login-web', function () {
+    return redirect('/')->withErrors(['msg' => 'Silakan login melalui form.']);
+});
 
 // Logout web
 Route::post('/logout-web', [WebAuthController::class, 'logout'])->name('logout.web');
