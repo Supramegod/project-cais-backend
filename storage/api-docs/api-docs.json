@@ -30392,6 +30392,238 @@
                 ]
             }
         },
+        "/api/upah/umsp/{id}": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Detail satu record UMSP berdasarkan ID",
+                "operationId": "de791ac81008f00f472369c1e8674bbc",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID record UMSP (termasuk yang sudah di-soft-delete)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "province_id": {
+                                                    "type": "integer",
+                                                    "example": 35
+                                                },
+                                                "province_name": {
+                                                    "type": "string",
+                                                    "example": "Jawa Timur"
+                                                },
+                                                "sektor": {
+                                                    "type": "string",
+                                                    "example": "Tekstil"
+                                                },
+                                                "nilai": {
+                                                    "type": "number",
+                                                    "example": 2350000
+                                                },
+                                                "formatted": {
+                                                    "type": "string",
+                                                    "example": "Rp 2.350.000"
+                                                },
+                                                "tgl_berlaku": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01"
+                                                },
+                                                "sumber": {
+                                                    "type": "string",
+                                                    "example": "https://jatim.go.id/umsp2024"
+                                                },
+                                                "is_aktif": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01 08:00:00"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01 08:00:00"
+                                                },
+                                                "deleted_at": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data UMSP berhasil diambil"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "UMSP tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/upah/umsk/{id}": {
+            "get": {
+                "tags": [
+                    "Upah"
+                ],
+                "summary": "Detail satu record UMSK berdasarkan ID",
+                "operationId": "b3c92ea239f5fde8f8d9e44af5dd33ad",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID record UMSK (termasuk yang sudah di-soft-delete)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "city_id": {
+                                                    "type": "integer",
+                                                    "example": 3578
+                                                },
+                                                "city_name": {
+                                                    "type": "string",
+                                                    "example": "Kota Surabaya"
+                                                },
+                                                "sektor": {
+                                                    "type": "string",
+                                                    "example": "Otomotif"
+                                                },
+                                                "nilai": {
+                                                    "type": "number",
+                                                    "example": 4900000
+                                                },
+                                                "formatted": {
+                                                    "type": "string",
+                                                    "example": "Rp 4.900.000"
+                                                },
+                                                "tgl_berlaku": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01"
+                                                },
+                                                "sumber": {
+                                                    "type": "string",
+                                                    "example": "https://jatim.go.id/umsk2024"
+                                                },
+                                                "is_aktif": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01 08:00:00"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "example": "2024-01-01 08:00:00"
+                                                },
+                                                "deleted_at": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data UMSK berhasil diambil"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "UMSK tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Internal server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/upah/ump": {
             "post": {
                 "tags": [

@@ -191,10 +191,13 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/provinsi', 'listProvinsi');
         Route::get('/provinsi/{provinceId}', 'getProvinceDetail');
         Route::get('/kota/{cityId}', 'detailKota');
+        Route::get('/umsp/{id}', 'showUmsp');
+        Route::get('/umsk/{id}', 'showUmsk');
         Route::post('/umsp', 'storeUmsp');
         Route::post('/ump', 'storeUmp');
         Route::post('/umk', 'storeUmk');
         Route::post('/umsk', 'storeUmsk');
+
     });
 
     // Supplier

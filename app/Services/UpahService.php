@@ -467,6 +467,80 @@ class UpahService
         }
     }
 
+    // ── Show UMSP by ID ───────────────────────────────────────────────────────
+
+    public function getUmspById(int $id): array
+    {
+        try {
+            /** @var Umsp $umsp */
+            $umsp = Umsp::withTrashed()->findOrFail($id);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (QueryException $e) {
+            Log::error('[UpahService::getUmspById] Query error', [
+                'id'      => $id,
+                'message' => $e->getMessage(),
+                'sql'     => $e->getSql(),
+            ]);
+            throw new \RuntimeException('Gagal mengambil data UMSP. Periksa koneksi database.', previous: $e);
+        } catch (\Throwable $e) {
+            Log::error('[UpahService::getUmspById] Unexpected error', [
+                'id'      => $id,
+                'message' => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('Terjadi kesalahan tak terduga saat mengambil data UMSP.', previous: $e);
+        }
+
+        return [
+            ...$this->formatUmsp($umsp),
+            'province_id'   => $umsp->province_id,
+            'province_name' => $umsp->province_name,
+            'is_aktif'      => $umsp->is_aktif,
+            'created_by'    => $umsp->created_by,
+            'updated_by'    => $umsp->updated_by,
+            'created_at'    => $umsp->created_at?->format('Y-m-d H:i:s'),
+            'updated_at'    => $umsp->updated_at?->format('Y-m-d H:i:s'),
+            'deleted_at'    => $umsp->deleted_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
+    // ── Show UMSK by ID ───────────────────────────────────────────────────────
+
+    public function getUmskById(int $id): array
+    {
+        try {
+            /** @var Umsk $umsk */
+            $umsk = Umsk::withTrashed()->findOrFail($id);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            throw $e;
+        } catch (QueryException $e) {
+            Log::error('[UpahService::getUmskById] Query error', [
+                'id'      => $id,
+                'message' => $e->getMessage(),
+                'sql'     => $e->getSql(),
+            ]);
+            throw new \RuntimeException('Gagal mengambil data UMSK. Periksa koneksi database.', previous: $e);
+        } catch (\Throwable $e) {
+            Log::error('[UpahService::getUmskById] Unexpected error', [
+                'id'      => $id,
+                'message' => $e->getMessage(),
+            ]);
+            throw new \RuntimeException('Terjadi kesalahan tak terduga saat mengambil data UMSK.', previous: $e);
+        }
+
+        return [
+            ...$this->formatUmsk($umsk),
+            'city_id'    => $umsk->city_id,
+            'city_name'  => $umsk->city_name,
+            'is_aktif'   => $umsk->is_aktif,
+            'created_by' => $umsk->created_by,
+            'updated_by' => $umsk->updated_by,
+            'created_at' => $umsk->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $umsk->updated_at?->format('Y-m-d H:i:s'),
+            'deleted_at' => $umsk->deleted_at?->format('Y-m-d H:i:s'),
+        ];
+    }
+
     // ── Private Formatters ────────────────────────────────────────────────────
 
     private function formatUmp(Ump $ump): array
