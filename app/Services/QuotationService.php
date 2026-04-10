@@ -545,11 +545,11 @@ class QuotationService
             'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_hpp ?? 0,
             'lembur' => $detail->lembur_hpp ?? 0,
             'takaful' => $detail->nominal_takaful ?? 0,
-            'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
-            'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
-            'bpjs_jht' => $detail->bpjs_jht ?? 0,
-            'bpjs_jp' => $detail->bpjs_jp ?? 0,
-            'bpjs_ks' => $detail->bpjs_kes ?? 0,
+            'bpjs_jkk' => $detail->bpjs_jkk ?? null,
+            'bpjs_jkm' => $detail->bpjs_jkm ?? null,
+            'bpjs_jht' => $detail->bpjs_jht ?? null,
+            'bpjs_jp' => $detail->bpjs_jp ?? null,
+            'bpjs_ks' => $detail->bpjs_kes ?? null,
             'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
             'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
             'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
@@ -579,11 +579,11 @@ class QuotationService
             'kompensasi' => $detail->kompensasi_coss ?? 0,
             'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_coss ?? 0,
             'lembur' => $detail->lembur_coss ?? 0,
-            'bpjs_jkk' => $detail->bpjs_jkk ?? 0,
-            'bpjs_jkm' => $detail->bpjs_jkm ?? 0,
-            'bpjs_jht' => $detail->bpjs_jht ?? 0,
-            'bpjs_jp' => $detail->bpjs_jp ?? 0,
-            'bpjs_ks' => $detail->bpjs_kes ?? 0,
+            'bpjs_jkk' => $detail->bpjs_jkk ?? null,
+            'bpjs_jkm' => $detail->bpjs_jkm ?? null,
+            'bpjs_jht' => $detail->bpjs_jht ?? null,
+            'bpjs_jp' => $detail->bpjs_jp ?? null,
+            'bpjs_ks' => $detail->bpjs_kes ?? null,
             'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
             'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
             'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
@@ -728,10 +728,6 @@ class QuotationService
                     $isOptOut = true;
                 }
             }
-            if ($hpp && $hpp->bpjs_ks !== null) {
-                $detail->bpjs_kes = $hpp->bpjs_ks;
-                return;
-            }
 
             // C. Eksekusi Pengisian Nilai Nominal
             if ($isOptOut) {
@@ -741,7 +737,7 @@ class QuotationService
                 // Khusus Kesehatan jika menggunakan provider non-BPJS
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
                 $detail->{$config['percent']} = 0;
-            } elseif ($hpp && isset($hpp->{$hppField}) && (float) $hpp->{$hppField} > 0) {
+            } elseif ($hpp && $hpp->{$hppField} !== null) {
                 // ✅ PRIORITAS: Ambil nominal langsung dari HPP jika tersedia
                 //    Untuk 'kes': sekarang baca $hpp->bpjs_ks (benar) bukan $hpp->bpjs_kes (salah)
                 $detail->{$config['field']} = (float) $hpp->{$hppField};
