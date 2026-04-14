@@ -42,6 +42,8 @@ use App\Http\Controllers\SystemAnnouncementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+Route::get('/admin-panel/consultations', [AdminPanelController::class, 'getConsultations']);
+Route::post('/admin-panel/consultations', [AdminPanelController::class, 'storeConsultation']);
 
 Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
@@ -346,7 +348,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
         Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
-        
+
         // Submit Checklist
         Route::post('/{id}/submit-checklist', 'submitChecklist');
     });

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\DTO\CalculationSummary;
 use App\DTO\DetailCalculation;
 use App\DTO\QuotationCalculationResult;
 use App\Jobs\EscalateQuotationJob;
@@ -14,6 +15,7 @@ use App\Models\JabatanPic;
 use App\Models\JenisBarang;
 use App\Models\JenisPerusahaan;
 use App\Models\LeadsKebutuhan;
+use App\Models\LogApproval;
 use App\Models\LogNotification;
 use App\Models\ManagementFee;
 use App\Models\Position;
@@ -997,43 +999,53 @@ class QuotationStepService
             $currentDateTime = Carbon::now();
             $user = Auth::user()->full_name;
 
-            $statusData = $this->calculateFinalStatus($quotation);
+            $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
+            $summary = $calculationResult->calculation_summary;
 
-            // **PERBAIKAN: Gunakan DB::table untuk menghindari attribute yang tidak diinginkan**
+            $statusData = $this->calculateFinalStatus($quotation, $summary);
+            $dbUpdateData = array_filter($statusData, fn($key) => $key !== 'notes', ARRAY_FILTER_USE_KEY);
+
             Quotation::where('id', $quotation->id)
                 ->update(array_merge([
                     'step' => 100,
                     'updated_by' => $user,
-                    'updated_at' => $currentDateTime
-                ], $statusData));
+                    'updated_at' => $currentDateTime,
+                ], $dbUpdateData));
 
-            // Update kerjasama data - menggunakan pendekatan pengecekan seperti training
             $this->updateKerjasamaData($quotation, $request, $currentDateTime);
-
-            // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
-            // Create notification untuk Dir Sales dan Dir Keu
+
+            if ($statusData['status_quotation_id'] === 8) {
+                LogApproval::create([
+                    'tabel' => 'sl_quotation',
+                    'doc_id' => $quotation->id,
+                    'tingkat' => 0,
+                    'is_approve' => false,
+                    'user_id' => Auth::id(),
+                    'approval_date' => $currentDateTime,
+                    'note' => $statusData['notes'],
+                    'created_by' => $user,
+                ]);
+            }
 
             if ($statusData['status_quotation_id'] == 2) {
                 $this->notifyGM($quotation, $currentDateTime);
             }
+
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
-                // Cari quotation lama (referensi)
                 $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
 
                 if ($oldQuotation) {
-                    // 1. Soft delete semua relasi yang nyangkut di quotation lama
                     $this->quotationBusinessService->softDeleteQuotationRelations($oldQuotation, $user);
 
-                    // 2. Soft delete quotation lamanya itu sendiri
                     $oldQuotation->update([
                         'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
+                        'deleted_by' => $user,
                     ]);
 
                     \Log::info("Soft deleted old quotation and its relations", [
                         'old_quotation_id' => $oldQuotation->id,
-                        'new_quotation_id' => $quotation->id
+                        'new_quotation_id' => $quotation->id,
                     ]);
                 }
             }
@@ -1043,7 +1055,7 @@ class QuotationStepService
             \Log::info("Step 12 completed successfully", [
                 'quotation_id' => $quotation->id,
                 'final_status' => $statusData,
-                'step' => 100
+                'step' => 100,
             ]);
 
         } catch (\Exception $e) {
@@ -1051,7 +1063,7 @@ class QuotationStepService
             \Log::error("Error in updateStep12", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -1512,55 +1524,188 @@ class QuotationStepService
         }
     }
 
-    public function calculateFinalStatus(Quotation $quotation): array
+    public function calculateFinalStatus(Quotation $quotation, ?CalculationSummary $summary = null): array
     {
-        // 1. Cek BPJS
-        $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
-            $query->where('is_bpjs_jkk', 0)
-                ->orWhere('is_bpjs_jkm', 0)
-                ->orWhere('is_bpjs_jht', 0)
-                ->orWhere('is_bpjs_jp', 0);
-        })->exists();
+        if ($summary === null) {
+            $summary = $this->getQuotationService()
+                ->calculateQuotation($quotation)
+                ->calculation_summary;
+        }
 
-        // 2. Cek Kompensasi & THR (Gunakan strtolower/trim agar lebih aman)
-        $hasUnconventionalBenefits = $quotation->quotationDetails()->whereHas('wage', function ($query) {
-            $query->where('kompensasi', 'Tidak Ada')
-                ->orWhere('thr', 'Tidak Ada')
-                ->orWhere('thr', '!=', 'Diprovisikan');
-        })->exists();
+        $quotation->loadMissing([
+            'quotationDetails.wage',
+            'quotationDetails.quotationSite',
+        ]);
 
-        // 3. Cek Upah Custom < 85% UMK
-        $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
+        $rejectResult = $this->checkAutoReject($quotation, $summary);
+        if ($rejectResult !== null) {
+            return $rejectResult;
+        }
+
+        return $this->checkNeedsApproval($quotation)
+            ? $this->makeStatusResult(0, 2)
+            : $this->makeStatusResult(1, 3);
+    }
+
+    private function checkAutoReject(Quotation $quotation, CalculationSummary $summary): ?array
+    {
+        if ($this->isInvalidBpjsTk($quotation)) {
+            return $this->makeRejectResult('BPJS TK tidak memenuhi minimum program');
+        }
+
+        if ($this->isMissingBpjsKesForReguler($quotation)) {
+            return $this->makeRejectResult('BPJS Kesehatan wajib untuk kontrak reguler');
+        }
+
+        if ($this->isBelowSalesMargin($summary)) {
+            return $this->makeRejectResult('margin dibawah standard');
+        }
+
+        if ($this->isBelowMinimumHc($quotation)) {
+            return $this->makeRejectResult('tidak sesuai standart');
+        }
+
+        return null;
+    }
+
+    private function checkNeedsApproval(Quotation $quotation): bool
+    {
+        return (
+            $this->hasMissingBpjsDetail($quotation) ||
+            $this->hasUnconventionalBenefits($quotation) ||
+            $this->isUnderMinimumWage($quotation) ||
+            $this->isLowPercentage($quotation) ||
+            $quotation->company_id == 17 ||
+            $quotation->top === 'Lebih Dari 7 Hari'
+        );
+    }
+
+    private function isInvalidBpjsTk(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->whereRaw(
+                '(CAST(is_bpjs_jkk AS UNSIGNED)
+                + CAST(is_bpjs_jkm AS UNSIGNED)
+                + CAST(is_bpjs_jht AS UNSIGNED)
+                + CAST(is_bpjs_jp  AS UNSIGNED)) < 3'
+            )
+            ->exists();
+    }
+
+    private function isMissingBpjsKesForReguler(Quotation $quotation): bool
+    {
+        if (strtolower((string) $quotation->jenis_kontrak) !== 'reguler') {
+            return false;
+        }
+
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->where('is_bpjs_kes', 0)
+            ->exists();
+    }
+
+    private function isBelowSalesMargin(CalculationSummary $summary): bool
+    {
+        $user = Auth::user();
+
+        if (!$user || (int) $user->cais_role_id !== 29) {
+            return false;
+        }
+
+        return (float) $summary->gpm < 2.8;
+    }
+
+    private function isBelowMinimumHc(Quotation $quotation): bool
+    {
+        $kebutuhanId = (int) $quotation->kebutuhan_id;
+
+        if (!in_array($kebutuhanId, [1, 2, 3], true)) {
+            return false;
+        }
+
+        $totalHc = QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->sum('jumlah_hc');
+
+        return match ($kebutuhanId) {
+            2 => $totalHc < 10,
+            1, 3 => $totalHc < 5,
+            default => false,
+        };
+    }
+
+    private function hasMissingBpjsDetail(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->where(function ($q) {
+                $q->where('is_bpjs_jkk', 0)
+                    ->orWhere('is_bpjs_jkm', 0)
+                    ->orWhere('is_bpjs_jht', 0)
+                    ->orWhere('is_bpjs_jp', 0);
+            })
+            ->exists();
+    }
+
+    private function hasUnconventionalBenefits(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->whereHas('wage', function ($q) {
+                $q->where('kompensasi', 'Tidak Ada')
+                    ->orWhere('thr', 'Tidak Ada')
+                    ->orWhere('thr', '!=', 'Diprovisikan');
+            })
+            ->exists();
+    }
+
+    private function isUnderMinimumWage(Quotation $quotation): bool
+    {
+        foreach ($quotation->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
-            if (!$wage || !$site || $wage->upah !== 'Custom')
-                return false;
+
+            if (!$wage || !$site || $wage->upah !== 'Custom') {
+                continue;
+            }
 
             $umkData = Umk::byCity($site->kota_id)->active()->first();
-            if (!$umkData)
-                return false;
+            if (!$umkData) {
+                continue;
+            }
 
-            return (float) $wage->nominal_upah < ((float) $umkData->umk * 0.85);
-        });
+            if ((float) $wage->nominal_upah < ((float) $umkData->umk * 0.85)) {
+                return true;
+            }
+        }
 
-        // 4. Cek Persentase
-        $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
-        $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
+        return false;
+    }
 
-        // 5. Evaluasi Apakah Butuh Level 2 (Direktur Keuangan)
-        $needsApproval = (
-            $hasMissingBpjs ||
-            $hasUnconventionalBenefits ||
-            $isUnderMinimumWage ||
-            $isLowPercentage ||
-            $quotation->company_id == 17 ||
-            $quotation->top == "Lebih Dari 7 Hari"
-        );
+    private function isLowPercentage(Quotation $quotation): bool
+    {
+        $threshold = ((int) $quotation->kebutuhan_id === 1) ? 7.0 : 6.0;
 
-        // 'needs_level_2' tidak disertakan karena kolom ini tidak ada di tabel sl_quotation
+        return (float) ($quotation->persentase ?? 0) < $threshold;
+    }
+
+    private function makeRejectResult(string $notes): array
+    {
+        return $this->makeStatusResult(0, 8, 'baru', $notes);
+    }
+
+    private function makeStatusResult(
+        int $isAktif,
+        int $statusQuotationId,
+        ?string $tipeQuotation = null,
+        ?string $notes = null
+    ): array {
         return [
-            'is_aktif' => $needsApproval ? 0 : 1,
-            'status_quotation_id' => $needsApproval ? 2 : 3
+            'is_aktif' => $isAktif,
+            'status_quotation_id' => $statusQuotationId,
+            'tipe_quotation' => $tipeQuotation,
+            'notes' => $notes,
         ];
     }
 

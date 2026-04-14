@@ -945,6 +945,103 @@
                 ]
             }
         },
+        "/api/admin-panel/consultations": {
+            "get": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Get list data konsultasi",
+                "operationId": "6f7145616c6000bd60a3fe14b693b3e9",
+                "responses": {
+                    "200": {
+                        "description": "Data konsultasi berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Admin Panel"
+                ],
+                "summary": "Simpan data konsultasi baru",
+                "operationId": "d7272f2fd4e3376d5ac8a497a101cdf9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama_lengkap",
+                                    "perusahaan",
+                                    "aplikasi",
+                                    "no_whatsapp",
+                                    "alamat_email",
+                                    "jadwal_konsultasi"
+                                ],
+                                "properties": {
+                                    "nama_lengkap": {
+                                        "type": "string",
+                                        "example": "Budi Utomo"
+                                    },
+                                    "perusahaan": {
+                                        "type": "string",
+                                        "example": "PT Maju Bersama"
+                                    },
+                                    "aplikasi": {
+                                        "type": "string",
+                                        "enum": [
+                                            "shelter +",
+                                            "shelter guard",
+                                            "shelter cleaning",
+                                            "sellgo",
+                                            "casual work"
+                                        ]
+                                    },
+                                    "no_whatsapp": {
+                                        "type": "string",
+                                        "example": "08123456789"
+                                    },
+                                    "alamat_email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "budi@perusahaan.com"
+                                    },
+                                    "jadwal_konsultasi": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2026-04-20 10:00:00"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Konsultasi berhasil dijadwalkan"
+                    }
+                }
+            }
+        },
         "/api/auth/login": {
             "post": {
                 "tags": [

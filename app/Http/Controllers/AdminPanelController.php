@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Consultation;
 use App\Models\Quotation;
 use App\Services\QuotationStepService;
 use Illuminate\Http\Request;
@@ -869,6 +870,97 @@ class AdminPanelController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil data step: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+         * path="/api/admin-panel/consultations",
+         * summary="Get list data konsultasi",
+         * tags={"Admin Panel"},
+           * @OA\Response(
+                * response=200,
+                 * description="Data konsultasi berhasil diambil",
+                * @OA\JsonContent(
+                 * @OA\Property(property="success", type="boolean", example=true),
+                 * @OA\Property(property="data", type="array", @OA\Items(type="object"))
+                      * )
+          * )
+          * )
+     */
+    public function getConsultations()
+    {
+        try {
+            // Mengambil semua data yang belum di-softdelete
+            $data = \App\Models\Consultation::all();
+
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+         * path="/api/admin-panel/consultations",
+         * summary="Simpan data konsultasi baru",
+         * tags={"Admin Panel"},
+        * @OA\RequestBody(
+        * required=true,
+     * @OA\JsonContent(
+     * required={"nama_lengkap", "perusahaan", "aplikasi", "no_whatsapp", "alamat_email", "jadwal_konsultasi"},
+     * @OA\Property(property="nama_lengkap", type="string", example="Budi Utomo"),
+     * @OA\Property(property="perusahaan", type="string", example="PT Maju Bersama"),
+     * @OA\Property(property="aplikasi", type="string", enum={"shelter +", "shelter guard", "shelter cleaning", "sellgo", "casual work"}),
+     * @OA\Property(property="no_whatsapp", type="string", example="08123456789"),
+     * @OA\Property(property="alamat_email", type="string", format="email", example="budi@perusahaan.com"),
+     * @OA\Property(property="jadwal_konsultasi", type="string", format="date-time", example="2026-04-20 10:00:00")
+     * )
+     * ),
+     * @OA\Response(
+     * response=201,
+     * description="Konsultasi berhasil dijadwalkan"
+     * )
+     * )
+     */
+    public function storeConsultation(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'nama_lengkap' => 'required|string|max:255',
+                'perusahaan' => 'required|string|max:255',
+                'aplikasi' => 'required|in:shelter +,shelter guard,shelter cleaning,sellgo,casual work',
+                'no_whatsapp' => 'required|string|max:20',
+                'alamat_email' => 'required|email|max:255',
+                'jadwal_konsultasi' => 'required|date_format:Y-m-d H:i:s',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validasi gagal',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $consultation = Consultation::create($request->all());
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Jadwal konsultasi berhasil disimpan',
+                'data' => $consultation
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan data: ' . $e->getMessage()
             ], 500);
         }
     }
