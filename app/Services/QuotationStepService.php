@@ -1017,7 +1017,7 @@ class QuotationStepService
 
             if ($statusData['status_quotation_id'] === 8) {
                 LogApproval::create([
-                    'tabel' => 'sl_quotation',
+                    'tabel' => 'quotation',
                     'doc_id' => $quotation->id,
                     'tingkat' => 0,
                     'is_approve' => false,
@@ -1537,6 +1537,17 @@ class QuotationStepService
             'quotationDetails.quotationSite',
         ]);
 
+        // ✅ TAMBAHAN: Jika user memiliki role tertentu (54,55,56), skip auto-reject
+        $user = Auth::user();
+        $skipAutoRejectRoles = [54, 55, 56]; // Sesuaikan dengan role yang diinginkan
+        if ($user && in_array((int) $user->cais_role_id, $skipAutoRejectRoles)) {
+            // Langsung ke pengecekan need approval, tanpa auto-reject
+            return $this->checkNeedsApproval($quotation)
+                ? $this->makeStatusResult(0, 2)
+                : $this->makeStatusResult(1, 3);
+        }
+
+        // Proses normal: cek auto-reject dulu
         $rejectResult = $this->checkAutoReject($quotation, $summary);
         if ($rejectResult !== null) {
             return $rejectResult;
@@ -1549,6 +1560,14 @@ class QuotationStepService
 
     private function checkAutoReject(Quotation $quotation, CalculationSummary $summary): ?array
     {
+        // Hanya berlaku untuk kontrak reguler
+        if (strtolower((string) $quotation->jenis_kontrak) !== 'reguler') {
+            return null;
+        }
+
+        if ($this->isBelowMinimumHc($quotation)) {
+            return $this->makeRejectResult('tidak sesuai standart untuk headconut di bawah minimum');
+        }
         if ($this->isInvalidBpjsTk($quotation)) {
             return $this->makeRejectResult('BPJS TK tidak memenuhi minimum program');
         }
@@ -1561,9 +1580,6 @@ class QuotationStepService
             return $this->makeRejectResult('margin dibawah standard');
         }
 
-        if ($this->isBelowMinimumHc($quotation)) {
-            return $this->makeRejectResult('tidak sesuai standart');
-        }
 
         return null;
     }
@@ -1595,10 +1611,6 @@ class QuotationStepService
 
     private function isMissingBpjsKesForReguler(Quotation $quotation): bool
     {
-        if (strtolower((string) $quotation->jenis_kontrak) !== 'reguler') {
-            return false;
-        }
-
         return QuotationDetail::where('quotation_id', $quotation->id)
             ->whereNull('deleted_at')
             ->where('is_bpjs_kes', 0)
@@ -1712,26 +1724,44 @@ class QuotationStepService
     private function insertRequirements(Quotation $quotation): void
     {
         $currentDateTime = Carbon::now();
+        $user = Auth::user()->full_name;
 
-        foreach ($quotation->quotationDetails as $detail) {
-            $existData = $detail->quotationDetailRequirements->count();
+        // Cari detail yang belum punya requirements
+        $detailsWithoutReqs = $quotation->quotationDetails->filter(function ($detail) {
+            return $detail->quotationDetailRequirements->count() == 0;
+        });
 
-            if ($existData == 0) {
-                $requirements = DB::table('m_kebutuhan_detail_requirement')
-                    ->whereNull('deleted_at')
-                    ->where('position_id', $detail->position_id)
-                    ->get();
+        if ($detailsWithoutReqs->isEmpty()) {
+            return;
+        }
 
-                foreach ($requirements as $req) {
-                    DB::table('sl_quotation_detail_requirement')->insert([
-                        'quotation_id' => $quotation->id,
-                        'quotation_detail_id' => $detail->id,
-                        'requirement' => $req->requirement,
-                        'created_at' => $currentDateTime,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
+        // Ambil semua position_id yang dibutuhkan
+        $positionIds = $detailsWithoutReqs->pluck('position_id')->unique()->toArray();
+
+        // Satu query ambil semua requirement untuk position yang diperlukan
+        $allRequirements = QuotationDetailRequirement::whereNull('deleted_at')
+            ->whereIn('position_id', $positionIds)
+            ->get()
+            ->groupBy('position_id');
+
+        // Siapkan batch insert
+        $batchInsert = [];
+        foreach ($detailsWithoutReqs as $detail) {
+            $requirements = $allRequirements[$detail->position_id] ?? collect();
+            foreach ($requirements as $req) {
+                $batchInsert[] = [
+                    'quotation_id' => $quotation->id,
+                    'quotation_detail_id' => $detail->id,
+                    'requirement' => $req->requirement,
+                    'created_at' => $currentDateTime,
+                    'created_by' => $user,
+                ];
             }
+        }
+
+        // Batch insert
+        if (!empty($batchInsert)) {
+            QuotationDetailRequirement::insert($batchInsert);
         }
     }
     /**
@@ -2259,77 +2289,72 @@ class QuotationStepService
      */
     private function syncKerjasamaData(Quotation $quotation, array $kerjasamas, Carbon $currentDateTime, string $user): void
     {
-        \Log::info("Starting kerjasama data sync", [
-            'quotation_id' => $quotation->id,
-            'kerjasamas_count' => count($kerjasamas)
-        ]);
-
-        // Get existing kerjasama IDs untuk quotation ini
-        $existingKerjasamaIds = QuotationKerjasama::where('quotation_id', $quotation->id)
-            ->whereNull('deleted_at')
-            ->pluck('id')
-            ->toArray();
-
-        $incomingKerjasamaIds = [];
-        $createdCount = 0;
-        $updatedCount = 0;
-        $deletedCount = 0;
-
-        foreach ($kerjasamas as $kerjasamaData) {
-            // Skip jika perjanjian kosong
-            if (empty(trim($kerjasamaData['perjanjian'] ?? ''))) {
-                continue;
-            }
-
-            $kerjasamaId = $kerjasamaData['id'] ?? null;
-            $perjanjian = trim($kerjasamaData['perjanjian']);
-            $isDelete = $kerjasamaData['is_delete'] ?? 1;
-
-            // Jika ada ID, update existing
-            if ($kerjasamaId && in_array($kerjasamaId, $existingKerjasamaIds)) {
-                $kerjasama = QuotationKerjasama::find($kerjasamaId);
-                if ($kerjasama) {
-                    $kerjasama->update([
-                        'perjanjian' => $perjanjian,
-                        'is_delete' => $isDelete,
-                        'updated_at' => $currentDateTime,
-                        'updated_by' => $user
-                    ]);
-                    $updatedCount++;
-                }
-
-                $incomingKerjasamaIds[] = $kerjasamaId;
-            }
-            // Jika tidak ada ID, create baru
-            else {
-                QuotationKerjasama::create([
-                    'quotation_id' => $quotation->id,
-                    'perjanjian' => $perjanjian,
-                    'is_delete' => $isDelete,
-                    'created_at' => $currentDateTime,
-                    'created_by' => $user
-                ]);
-                $createdCount++;
-            }
-        }
-
-        // Soft delete kerjasama yang tidak ada dalam incoming data tapi masih ada di database
-        $toDeleteIds = array_diff($existingKerjasamaIds, $incomingKerjasamaIds);
-        if (!empty($toDeleteIds)) {
-            QuotationKerjasama::whereIn('id', $toDeleteIds)
+        if (empty($kerjasamas)) {
+            // Soft delete semua jika tidak ada data
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
                 ->update([
                     'deleted_at' => $currentDateTime,
                     'deleted_by' => $user
                 ]);
-            $deletedCount = count($toDeleteIds);
+            return;
         }
 
-        \Log::info("Kerjasama data sync completed", [
-            'quotation_id' => $quotation->id,
-            'created' => $createdCount,
-            'updated' => $updatedCount,
-            'deleted' => $deletedCount
-        ]);
+        // Siapkan data untuk upsert
+        $upsertData = [];
+        $incomingIds = [];
+
+        foreach ($kerjasamas as $kerjasamaData) {
+            $perjanjian = trim($kerjasamaData['perjanjian'] ?? '');
+            if ($perjanjian === '')
+                continue;
+
+            $item = [
+                'quotation_id' => $quotation->id,
+                'perjanjian' => $perjanjian,
+                'is_delete' => $kerjasamaData['is_delete'] ?? 1,
+                'updated_at' => $currentDateTime,
+                'updated_by' => $user,
+            ];
+
+            if (!empty($kerjasamaData['id'])) {
+                $item['id'] = $kerjasamaData['id'];
+                $incomingIds[] = $kerjasamaData['id'];
+            } else {
+                // Untuk insert baru, set created_at & created_by
+                $item['created_at'] = $currentDateTime;
+                $item['created_by'] = $user;
+            }
+            $upsertData[] = $item;
+        }
+
+        // Batch upsert (insert or update)
+        if (!empty($upsertData)) {
+            QuotationKerjasama::upsert(
+                $upsertData,
+                ['id'], // unique key
+                ['perjanjian', 'is_delete', 'updated_at', 'updated_by'] // fields to update
+            );
+        }
+
+        // Soft delete yang tidak ada di incoming
+        if (!empty($incomingIds)) {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNotIn('id', $incomingIds)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+        } else {
+            // Jika tidak ada id incoming, hapus semua
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+        }
     }
 
     /**
