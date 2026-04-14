@@ -892,7 +892,7 @@ class AdminPanelController extends Controller
     {
         try {
             // Mengambil semua data yang belum di-softdelete
-            $data = \App\Models\Consultation::all();
+            $data = Consultation::all();
 
             return response()->json([
                 'success' => true,
@@ -920,7 +920,7 @@ class AdminPanelController extends Controller
      * @OA\Property(property="aplikasi", type="string", enum={"shelter +", "shelter guard", "shelter cleaning", "sellgo", "casual work"}),
      * @OA\Property(property="no_whatsapp", type="string", example="08123456789"),
      * @OA\Property(property="alamat_email", type="string", format="email", example="budi@perusahaan.com"),
-     * @OA\Property(property="jadwal_konsultasi", type="string", format="date-time", example="2026-04-20 10:00:00")
+     * @OA\Property(property="jadwal_konsultasi", type="string", format="date", example="2026-04-20")
      * )
      * ),
      * @OA\Response(
@@ -935,10 +935,10 @@ class AdminPanelController extends Controller
             $validator = Validator::make($request->all(), [
                 'nama_lengkap' => 'required|string|max:255',
                 'perusahaan' => 'required|string|max:255',
-                'aplikasi' => 'required|in:shelter +,shelter guard,shelter cleaning,sellgo,casual work',
+                'aplikasi' => 'required|string|max:255',
                 'no_whatsapp' => 'required|string|max:20',
                 'alamat_email' => 'required|email|max:255',
-                'jadwal_konsultasi' => 'required|date_format:Y-m-d H:i:s',
+                'jadwal_konsultasi' => 'required|date_format:Y-m-d',
             ]);
 
             if ($validator->fails()) {
