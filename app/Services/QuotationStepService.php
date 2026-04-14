@@ -1736,18 +1736,18 @@ class QuotationStepService
         }
 
         // Ambil semua position_id yang dibutuhkan
-        $positionIds = $detailsWithoutReqs->pluck('position_id')->unique()->toArray();
+        $positionIds = $detailsWithoutReqs->pluck('id')->unique()->toArray();
 
         // Satu query ambil semua requirement untuk position yang diperlukan
         $allRequirements = QuotationDetailRequirement::whereNull('deleted_at')
-            ->whereIn('position_id', $positionIds)
+            ->whereIn('quotation_detail_id', $positionIds)
             ->get()
-            ->groupBy('position_id');
+            ->groupBy('quotation_detail_id');
 
         // Siapkan batch insert
         $batchInsert = [];
         foreach ($detailsWithoutReqs as $detail) {
-            $requirements = $allRequirements[$detail->position_id] ?? collect();
+            $requirements = $allRequirements[$detail->id] ?? collect();
             foreach ($requirements as $req) {
                 $batchInsert[] = [
                     'quotation_id' => $quotation->id,
