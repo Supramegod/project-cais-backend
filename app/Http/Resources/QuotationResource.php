@@ -780,24 +780,36 @@ class QuotationResource extends JsonResource
                     $detail = $this->quotationDetails->firstWhere('id', $detailId);
                     return [
                         'quotation_detail_id' => $detailId,
+                        'quotation_site_id' => $detail->quotation_site_id ?? null,
                         'jabatan_kebutuhan' => $detail->jabatan_kebutuhan ?? 'Legacy Item',
                         'jumlah_hc' => $detail->jumlah_hc ?? 0,
-                        'items' => $kaporlaps->map(function ($kaporlap) {
-                            return [
-                                'id' => $kaporlap->id,
-                                'barang_id' => $kaporlap->barang_id,
-                                'nama' => $kaporlap->nama,
-                                'jenis_barang_id' => $kaporlap->jenis_barang_id,
-                                'jenis_barang' => $kaporlap->jenis_barang,
-                                'jumlah' => $kaporlap->jumlah,
-                                'harga' => $kaporlap->harga,
-                                'total' => $kaporlap->jumlah * $kaporlap->harga,
-                            ];
-                        })->values()
+                        'items' => $kaporlaps->map(fn($k) => [
+                            'id' => $k->id,
+                            'barang_id' => $k->barang_id,
+                            'nama' => $k->nama,
+                            'jenis_barang_id' => $k->jenis_barang_id,
+                            'jenis_barang' => $k->jenis_barang,
+                            'jumlah' => $k->jumlah,
+                            'harga' => $k->harga,
+                            'total' => $k->jumlah * $k->harga,
+                        ])->values(),
                     ];
-                })->values();
+                })
+                    ->values()
+                    ->groupBy('quotation_site_id')                          // group detail by site
+                    ->map(function ($details, $siteId) {
+                        $site = $this->quotationSites->firstWhere('id', $siteId);
+                        return [
+                            'quotation_site_id' => $siteId,
+                            'nama_site' => $site->nama_site ?? 'Unknown Site',
+                            'details' => $details->map(function ($detail) {
+                                // buang key quotation_site_id dari level detail (opsional)
+                                return collect($detail)->except('quotation_site_id')->toArray();
+                            })->values(),
+                        ];
+                    })
+                    ->values();
             }),
-
             'quotation_devices' => $this->whenLoaded('quotationDevices', function () {
                 return $this->quotationDevices->groupBy('quotation_site_id')->map(function ($devices, $siteId) {
                     $site = $this->quotationSites->firstWhere('id', $siteId);
