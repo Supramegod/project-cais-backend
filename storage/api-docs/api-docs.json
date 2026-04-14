@@ -1026,8 +1026,8 @@
                                     },
                                     "jadwal_konsultasi": {
                                         "type": "string",
-                                        "format": "date-time",
-                                        "example": "2026-04-20 10:00:00"
+                                        "format": "date",
+                                        "example": "2026-04-20"
                                     }
                                 },
                                 "type": "object"
