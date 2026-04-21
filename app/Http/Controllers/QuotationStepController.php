@@ -151,7 +151,7 @@ class QuotationStepController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' =>$stepData,
+                'data' => $stepData,
                 'message' => 'Step data retrieved successfully',
                 'processing_time' => $this->elapsedMs($startTime),
             ]);
@@ -163,7 +163,7 @@ class QuotationStepController extends Controller
         } catch (\Exception $e) {
             Log::error("QuotationStepController@getStep: " . $e->getMessage(), [
                 'id' => $id,
-                'step' => $stepData,
+                'step' => $step,
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -288,7 +288,7 @@ class QuotationStepController extends Controller
             : [];
 
         return [
-            // 'quotation' => $quotation,
+            'id' => $quotation->id,
             'step' => $step,
             'step_data' => $stepData,
             'additional_data' => $additionalData,
