@@ -350,14 +350,23 @@ class QuotationService
 
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
+        // 1. Hitung semua komponen seperti biasa (asumsi nilai input adalah nilai total/bulanan)
         $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
         $this->calculateBpjs($detail, $quotation, $hpp);
         $this->calculateExtras($detail, $quotation, $hpp, $coss, $wage);
         $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
+
+        // 2. Jika General Cleaning, bagi semua komponen yang sudah dihitung di atas dengan hari kerja
+        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
+        if ($isGC) {
+            $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
+            $this->divideAllComponentsByDays($detail, $hariKerja, $daftarTunjangan);
+        }
+
+        // 3. Baru hitung total akhir berdasarkan nilai yang sudah dibagi
         $this->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
         $this->populateDetailCalculation($detail, $quotation, $detailCalculation);
     }
-
     // ============================ ITEM CALCULATIONS (CORE REFACTOR) ============================
 
 
@@ -530,6 +539,7 @@ class QuotationService
 
     private function populateDetailCalculation($detail, $quotation, DetailCalculation $detailCalculation): void
     {
+        $isRo = strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
         $potonganBpu = ($detail->penjamin_kesehatan === 'BPU') ? 16800 : 0;
 
         $detailCalculation->hpp_data = [
@@ -566,40 +576,79 @@ class QuotationService
             'total_biaya_all_personil' => $detail->sub_total_personil ?? 0,
         ];
 
-        $detailCalculation->coss_data = [
-            'quotation_detail_id' => $detail->id,
-            'quotation_id' => $quotation->id,
-            'leads_id' => $quotation->leads_id,
-            'position_id' => $detail->position_id,
-            'jumlah_hc' => $detail->jumlah_hc_original,
-            'gaji_pokok' => $detail->nominal_upah,
-            'total_tunjangan' => $detail->total_tunjangan ?? 0,
-            'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
-            'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_coss ?? 0,
-            'kompensasi' => $detail->kompensasi_coss ?? 0,
-            'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_coss ?? 0,
-            'lembur' => $detail->lembur_coss ?? 0,
-            'bpjs_jkk' => $detail->bpjs_jkk ?? null,
-            'bpjs_jkm' => $detail->bpjs_jkm ?? null,
-            'bpjs_jht' => $detail->bpjs_jht ?? null,
-            'bpjs_jp' => $detail->bpjs_jp ?? null,
-            'bpjs_ks' => $detail->bpjs_kes ?? null,
-            'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
-            'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
-            'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
-            'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
-            'persen_bpjs_ks' => $detail->persen_bpjs_kes ?? 0,
-            'provisi_seragam' => $detail->personil_kaporlap_coss ?? 0,
-            'provisi_peralatan' => $detail->personil_devices_coss ?? 0,
-            'provisi_chemical' => $detail->personil_chemical_coss ?? 0,
-            'provisi_ohc' => $detail->personil_ohc_coss ?? 0,
-            'total_personil_coss' => $detail->total_personil_coss ?? 0,
-            'sub_total_personil_coss' => $detail->sub_total_personil_coss ?? 0,
-            'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
-            'bunga_bank' => $detail->bunga_bank ?? 0,
-            'insentif' => $detail->insentif ?? 0,
-            'potongan_bpu' => $potonganBpu,
-        ];
+        if ($isRo) {
+            // RO: semua field COSS di-set 0
+            $detailCalculation->coss_data = [
+                'quotation_detail_id' => $detail->id,
+                'quotation_id' => $quotation->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $detail->position_id,
+                'jumlah_hc' => 0,
+                'gaji_pokok' => 0,
+                'total_tunjangan' => 0,
+                'total_base_manpower' => 0,
+                'tunjangan_hari_raya' => 0,
+                'kompensasi' => 0,
+                'tunjangan_hari_libur_nasional' => 0,
+                'lembur' => 0,
+                'bpjs_jkk' => 0,
+                'bpjs_jkm' => 0,
+                'bpjs_jht' => 0,
+                'bpjs_jp' => 0,
+                'bpjs_ks' => 0,
+                'persen_bpjs_jkk' => 0,
+                'persen_bpjs_jkm' => 0,
+                'persen_bpjs_jht' => 0,
+                'persen_bpjs_jp' => 0,
+                'persen_bpjs_ks' => 0,
+                'provisi_seragam' => 0,
+                'provisi_peralatan' => 0,
+                'provisi_chemical' => 0,
+                'provisi_ohc' => 0,
+                'total_personil_coss' => 0,
+                'sub_total_personil_coss' => 0,
+                'total_exclude_base_manpower' => 0,
+                'bunga_bank' => 0,
+                'insentif' => 0,
+                'potongan_bpu' => 0,
+            ];
+        } else {
+
+            $detailCalculation->coss_data = [
+                'quotation_detail_id' => $detail->id,
+                'quotation_id' => $quotation->id,
+                'leads_id' => $quotation->leads_id,
+                'position_id' => $detail->position_id,
+                'jumlah_hc' => $detail->jumlah_hc_original,
+                'gaji_pokok' => $detail->nominal_upah,
+                'total_tunjangan' => $detail->total_tunjangan ?? 0,
+                'total_base_manpower' => $detail->total_base_manpower_coss ?? 0,
+                'tunjangan_hari_raya' => $detail->tunjangan_hari_raya_coss ?? 0,
+                'kompensasi' => $detail->kompensasi_coss ?? 0,
+                'tunjangan_hari_libur_nasional' => $detail->tunjangan_holiday_coss ?? 0,
+                'lembur' => $detail->lembur_coss ?? 0,
+                'bpjs_jkk' => $detail->bpjs_jkk ?? null,
+                'bpjs_jkm' => $detail->bpjs_jkm ?? null,
+                'bpjs_jht' => $detail->bpjs_jht ?? null,
+                'bpjs_jp' => $detail->bpjs_jp ?? null,
+                'bpjs_ks' => $detail->bpjs_kes ?? null,
+                'persen_bpjs_jkk' => $detail->persen_bpjs_jkk ?? 0,
+                'persen_bpjs_jkm' => $detail->persen_bpjs_jkm ?? 0,
+                'persen_bpjs_jht' => $detail->persen_bpjs_jht ?? 0,
+                'persen_bpjs_jp' => $detail->persen_bpjs_jp ?? 0,
+                'persen_bpjs_ks' => $detail->persen_bpjs_kes ?? 0,
+                'provisi_seragam' => $detail->personil_kaporlap_coss ?? 0,
+                'provisi_peralatan' => $detail->personil_devices_coss ?? 0,
+                'provisi_chemical' => $detail->personil_chemical_coss ?? 0,
+                'provisi_ohc' => $detail->personil_ohc_coss ?? 0,
+                'total_personil_coss' => $detail->total_personil_coss ?? 0,
+                'sub_total_personil_coss' => $detail->sub_total_personil_coss ?? 0,
+                'total_exclude_base_manpower' => $detail->total_exclude_base_manpower ?? 0,
+                'bunga_bank' => $detail->bunga_bank ?? 0,
+                'insentif' => $detail->insentif ?? 0,
+                'potongan_bpu' => $potonganBpu,
+            ];
+        }
     }
 
     // ============================ COMPONENT CALCULATIONS (TIDAK BERUBAH) ============================
@@ -919,12 +968,14 @@ class QuotationService
                 2
             );
             $detail->sub_total_personil_coss = round($detail->total_personil_coss * $jumlahHcCoss, 2);
-            \Log::info("Calculated totals for detail {$detail->id}", [
-                'total_personil' => $detail->total_personil,
-                'sub_total_personil' => $detail->sub_total_personil,
-                'total_personil_coss' => $detail->total_personil_coss,
-                'sub_total_personil_coss' => $detail->sub_total_personil_coss,
-            ]);
+
+            // Business rule: Jabatan RO tidak masuk perhitungan COSS
+            if ($this->isRo($detail)) {
+                $detail->total_base_manpower_coss = 0;
+                $detail->total_exclude_base_manpower = 0;
+                $detail->total_personil_coss = 0;
+                $detail->sub_total_personil_coss = 0;
+            }
 
         } catch (\Exception $e) {
             \Log::error("Error in calculateFinalTotals for detail {$detail->id}: " . $e->getMessage());
@@ -1017,10 +1068,16 @@ class QuotationService
         $summary = $result->calculation_summary;
         $jumlahHcField = ($suffix === '_coss') ? 'jumlah_hc_original' : 'jumlah_hc_hpp';
 
-        $summary->{"total_sebelum_management_fee{$suffix}"} =
-            $quotation->quotation_detail->sum('sub_total_personil' . $suffix);
+        // ── Aturan Bisnis: Jabatan RO dikecualikan dari SELURUH agregasi COSS ──
+        // Menggunakan properti yang sudah di-preload → ZERO N+1 query.
+        $details = ($suffix === '_coss')
+            ? $quotation->quotation_detail->filter(fn($d) => !$this->isRo($d))
+            : $quotation->quotation_detail;
 
-        $summary->{"total_base_manpower{$suffix}"} = $quotation->quotation_detail->sum(
+        $summary->{"total_sebelum_management_fee{$suffix}"} =
+            $details->sum('sub_total_personil' . $suffix);
+
+        $summary->{"total_base_manpower{$suffix}"} = $details->sum(
             function ($detail) use ($suffix, $jumlahHcField) {
                 $total = ($suffix === '_coss') ? ($detail->total_base_manpower_coss ?? 0) : ($detail->total_base_manpower ?? 0);
                 $jumlahHc = $detail->{$jumlahHcField} ?? $detail->jumlah_hc;
@@ -1028,27 +1085,26 @@ class QuotationService
             }
         );
 
-        $summary->{"upah_pokok{$suffix}"} = $quotation->quotation_detail->sum(
+        $summary->{"upah_pokok{$suffix}"} = $details->sum(
             fn($d) => ($d->nominal_upah_bulanan ?? $d->nominal_upah) * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
         );
 
-        $summary->{"total_bpjs{$suffix}"} = $quotation->quotation_detail->sum(
+        $summary->{"total_bpjs{$suffix}"} = $details->sum(
             fn($d) => ($d->bpjs_ketenagakerjaan ?? 0) * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
         );
 
-        $summary->{"total_bpjs_kesehatan{$suffix}"} = $quotation->quotation_detail->sum(
+        $summary->{"total_bpjs_kesehatan{$suffix}"} = $details->sum(
             fn($d) => ($d->bpjs_kesehatan ?? 0) * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
         );
 
-        $summary->total_potongan_bpu = $quotation->quotation_detail->sum(
+        $summary->total_potongan_bpu = $details->sum(
             fn($d) => ($d->penjamin_kesehatan === 'BPU') ? 16800 * ($d->{$jumlahHcField} ?? $d->jumlah_hc) : 0
         );
         $summary->potongan_bpu_per_orang = 16800;
 
-        $totalHc = $quotation->quotation_detail->sum(fn($d) => $d->{$jumlahHcField} ?? $d->jumlah_hc);
+        $totalHc = $details->sum(fn($d) => $d->{$jumlahHcField} ?? $d->jumlah_hc);
 
-        if ($totalHc > 0 && ($firstDetail = $quotation->quotation_detail->first())) {
-            $prefix = ($suffix === '') ? '' : '_coss';
+        if ($totalHc > 0 && ($firstDetail = $details->first())) {
             $fields = [
                 'persen_bpjs_ketenagakerjaan',
                 'persen_bpjs_kesehatan',
@@ -1318,5 +1374,41 @@ class QuotationService
             "Per Bulan" => $nominalLembur,
             default => $nominalLembur,
         }, 2);
+    }
+
+    // ============================ BUSINESS RULE: RO ============================
+
+    private function isRo($detail): bool
+    {
+        return strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+    }
+    private function divideAllComponentsByDays($detail, $hariKerja, $daftarTunjangan): void
+    {
+        // Bagi Gaji Pokok
+        $detail->nominal_upah_bulanan = round($detail->nominal_upah_bulanan / $hariKerja, 2);
+
+        // Bagi semua Tunjangan Dinamis
+        foreach ($daftarTunjangan as $tunjangan) {
+            $nama = $tunjangan->nama;
+            $detail->$nama = round(($detail->$nama ?? 0) / $hariKerja, 2);
+        }
+        $detail->total_tunjangan = round($detail->total_tunjangan / $hariKerja, 2);
+        $detail->total_tunjangan_coss = round($detail->total_tunjangan_coss / $hariKerja, 2);
+
+        // Bagi BPJS
+        $detail->bpjs_ketenagakerjaan_hpp = round(($detail->bpjs_ketenagakerjaan_hpp ?? 0) / $hariKerja, 2);
+        $detail->biaya_kesehatan_hpp = round(($detail->biaya_kesehatan_hpp ?? 0) / $hariKerja, 2);
+
+        // Bagi Extras (THR, Kompensasi, dll)
+        $detail->tunjangan_hari_raya_hpp = round(($detail->tunjangan_hari_raya_hpp ?? 0) / $hariKerja, 2);
+        $detail->kompensasi_hpp = round(($detail->kompensasi_hpp ?? 0) / $hariKerja, 2);
+        $detail->tunjangan_holiday = round(($detail->tunjangan_holiday ?? 0) / $hariKerja, 2);
+        $detail->lembur = round(($detail->lembur ?? 0) / $hariKerja, 2);
+
+        // Bagi Item (Kaporlap, Chemical, dll)
+        $detail->personil_kaporlap = round(($detail->personil_kaporlap ?? 0) / $hariKerja, 2);
+        $detail->personil_devices = round(($detail->personil_devices ?? 0) / $hariKerja, 2);
+        $detail->personil_chemical = round(($detail->personil_chemical ?? 0) / $hariKerja, 2);
+        $detail->personil_ohc = round(($detail->personil_ohc ?? 0) / $hariKerja, 2);
     }
 }
