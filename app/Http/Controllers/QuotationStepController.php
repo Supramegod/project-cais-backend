@@ -292,11 +292,7 @@ class QuotationStepController extends Controller
             'step' => $step,
             'step_data' => $stepData,
             'additional_data' => $additionalData,
-            'metadata' => [
-                'actual_step' => $quotation->step,
-                'is_final' => $quotation->step >= 100,
-                'readonly' => $quotation->step >= 100,
-            ],
+            'metadata' =>  $quotation->step, 
         ];
     }
     private function buildStepDataStep1(Quotation $quotation, array $additionalData): array
