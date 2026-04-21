@@ -497,7 +497,7 @@ class QuotationStepService
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("Error in updateStep3", [
+            \Log::error("Error in saveAllCalculationResults ", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -3323,9 +3323,12 @@ class QuotationStepService
                     $hppData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
                 }
                 // COSS Edits
-                if ($request?->has("coss_data.$detailId.$field")) {
-                    $val = $request->input("coss_data.$detailId.$field");
-                    $cossData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                $detailForCheck = $calculationResult->quotation->quotation_detail->firstWhere('id', $detailId);
+                if (!($detailForCheck && strtoupper(trim($detailForCheck->jabatan_kebutuhan ?? '')) === 'RO')) {
+                    if ($request?->has("coss_data.$detailId.$field")) {
+                        $val = $request->input("coss_data.$detailId.$field");
+                        $cossData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                    }
                 }
             }
 
@@ -4075,7 +4078,8 @@ class QuotationStepService
                         ]);
                     }
                 }
-                if ($coss) {
+                // Business rule: Jabatan RO tidak disinkronkan ke COSS
+                if ($coss && strtoupper(trim($detail->jabatan_kebutuhan ?? '')) !== 'RO') {
                     $updateData = [];
 
                     // Hanya update jika nilai di COSS null atau 0
