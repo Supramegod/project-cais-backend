@@ -287,13 +287,18 @@ class QuotationStepController extends Controller
             ? $this->$stepDataMethod($quotation, $additionalData)
             : [];
 
-        return [
+        $baseData = [
             'id' => $quotation->id,
             'step' => $step,
             'step_data' => $stepData,
             'additional_data' => $additionalData,
-            'metadata' =>  $quotation->step, 
+            'metadata' => $quotation->step,
         ];
+        if (in_array($step, [1])) {
+            $baseData['nama_perusahaan'] = $this->nama_perusahaan ?? $quotation->nama_perusahaan;
+            $baseData['kebutuhan'] = $this->kebutuhan ?? $quotation->kebutuhan;
+        }
+        return $baseData;
     }
     private function buildStepDataStep1(Quotation $quotation, array $additionalData): array
     {
