@@ -370,24 +370,26 @@ class QuotationStepController extends Controller
     {
         $positionData = [];
 
+        // Pastikan relasi utama dimuat untuk menghindari N+1 query
         if ($quotation->relationLoaded('quotationDetails')) {
             foreach ($quotation->quotationDetails as $detail) {
                 $wage = $detail->wage;
                 $site = $detail->quotationSite;
 
-                $keteranganMinUpah = 'Data UMK tidak ditemukan';
+                // 1. Logika Penentuan Keterangan Minimal Upah
+                $keteranganMinUpah = "Data UMK tidak ditemukan";
 
                 if ($site && $site->kota_id) {
+                    // Mencari data UMK aktif berdasarkan kota_id dari site
                     $umkData = Umk::byCity($site->kota_id)->active()->first();
 
                     if ($umkData) {
                         $minUpahNominal = $umkData->umk * 0.85;
-                        $keteranganMinUpah = 'Upah kurang dari 85% UMK ( Rp '
-                            . number_format($minUpahNominal, 0, ',', '.')
-                            . ' ) membutuhkan approval ';
+                        $keteranganMinUpah = "Upah kurang dari 85% UMK ( Rp " . number_format($minUpahNominal, 0, ',', '.') . " ) membutuhkan approval ";
                     }
                 }
 
+                // 2. Mapping Data Posisi
                 $positionData[] = [
                     'quotation_detail_id' => $detail->id,
                     'position_id' => $detail->position_id,
@@ -397,6 +399,8 @@ class QuotationStepController extends Controller
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nominal_upah' => $detail->nominal_upah,
                     'keterangan_minimal_upah' => $keteranganMinUpah,
+
+                    // Data dari relasi wage (dengan fallback null/0)
                     'upah' => $wage->upah ?? null,
                     'hitungan_upah' => $wage->hitungan_upah ?? null,
                     'lembur' => $wage->lembur ?? null,
@@ -409,6 +413,8 @@ class QuotationStepController extends Controller
                     'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
                     'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? 0,
                     'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
+
+                    // Data BPJS & Penjamin
                     'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? null,
                     'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? null,
                     'is_bpjs_jht' => $detail->is_bpjs_jht ?? null,
@@ -418,11 +424,12 @@ class QuotationStepController extends Controller
             }
         }
 
+        // 3. Return Struktur Akhir (Step Data & Global Data)
         return [
             'position_data' => $positionData,
             'global_data' => [
                 'is_ppn' => $quotation->is_ppn ?? false,
-                'jenis_kontrak' => $quotation->jenis_kontrak ?? '', // Default ke string kosong jika null
+                'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
                 'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
                 'management_fee_id' => $quotation->management_fee_id ?? null,
                 'persentase' => $quotation->persentase ?? 0,
@@ -872,39 +879,7 @@ class QuotationStepController extends Controller
         $umpPerSite = [];
         $umskPerSite = [];
 
-        if ($quotation->relationLoaded('quotationSites')) {
-            foreach ($quotation->quotationSites as $site) {
-                $umk = Umk::byCity($site->kota_id)->active()->first();
-                $ump = Ump::byProvince($site->provinsi_id)->active()->first();
-                $umsk = Umsk::byCity($site->kota_id)->active()->first();
-
-                $umkPerSite[$site->id] = [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'city_id' => $site->kota_id,
-                    'city_name' => $site->kota,
-                    'umk_value' => $umk?->umk ?? 0,
-                    'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
-                ];
-
-                $umpPerSite[$site->id] = [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'province_id' => $site->provinsi_id,
-                    'province_name' => $site->provinsi,
-                    'ump_value' => $ump?->ump ?? 0,
-                    'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
-                ];
-                $umskPerSite[$site->id] = [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'city_id' => $site->kota_id,
-                    'city_name' => $site->kota,
-                    'umsk_value' => $umsk?->umsk ?? 0,
-                    'formatted_umsk' => $umsk ? $umsk->formatUmsk() : 'UMSK : Rp. 0',
-                ];
-            }
-        }
+        // Memastikan relasi quotationSites dimuat
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
@@ -913,16 +888,75 @@ class QuotationStepController extends Controller
             ]);
         }
 
+        foreach ($quotation->quotationSites as $site) {
+            // Menggunakan scope sesuai case 4
+            $umk = Umk::byCity($site->kota_id)->active()->first();
+            $ump = Ump::byProvince($site->provinsi_id)->active()->first();
+            $umsk = Umsk::byCity($site->kota_id)->active()->first();
+
+            $umkPerSite[$site->id] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'city_id' => $site->kota_id,
+                'city_name' => $site->kota,
+                'umk_value' => $umk?->umk ?? 0,
+                'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
+            ];
+
+            $umpPerSite[$site->id] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'province_id' => $site->provinsi_id,
+                'province_name' => $site->provinsi,
+                'ump_value' => $ump?->ump ?? 0,
+                'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
+            ];
+
+            $umskPerSite[$site->id] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'city_id' => $site->kota_id,
+                'city_name' => $site->kota,
+                'umsk_value' => $umsk?->umsk ?? 0,
+                'formatted_umsk' => $umsk ? $umsk->formatUmsk() : 'UMSK : Rp. 0',
+            ];
+        }
 
         return [
+            // Master Data & Options sesuai Case 4
             'management_fees' => ManagementFee::select('id', 'nama')->get(),
+            'upah_options' => ['UMP', 'UMK', 'Custom'],
+            'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
+            'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
+            'lembur_options' => ['Tidak', 'Flat'],
+            'kompensasi_options' => ['Tidak', 'Diprovisikan'],
+            'thr_options' => ['Tidak', 'Diprovisikan'],
+            'tunjangan_holiday_options' => ['Tidak', 'Flat'],
+            'lembur_ditagihkan_options' => ['Tidak Ditagihkan', 'Ditagihkan Terpisah'],
+            'is_ppn_options' => ['Ya', 'Tidak'],
+            'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'],
+
+            // Data Dinamis Per Site
             'umk_per_site' => $umkPerSite,
             'ump_per_site' => $umpPerSite,
             'umsk_per_site' => $umskPerSite,
-            'quotation_sites' => $quotation->relationLoaded('quotationSites')
-                ? $quotation->quotationSites->map(fn($site) => [
-                    'id' => $site->id,
-                    'nama_site' => $site->nama_site,
+
+            // Data Site (Disederhanakan untuk Dropdown Site)
+            'quotation_sites' => $quotation->quotationSites->map(fn($site) => [
+                'id' => $site->id,
+                'nama_site' => $site->nama_site,
+            ])->toArray(),
+
+            // Data Details (Jika frontend memerlukan daftar posisi di additional_data)
+            'quotation_details' => $quotation->relationLoaded('quotationDetails')
+                ? $quotation->quotationDetails->map(fn($detail) => [
+                    'id' => $detail->id,
+                    'position_id' => $detail->position_id,
+                    'position_name' => $detail->jabatan_kebutuhan,
+                    'site_id' => $detail->quotation_site_id,
+                    'site_name' => $detail->nama_site,
+                    'jumlah_hc' => $detail->jumlah_hc,
+                    'nominal_upah' => $detail->nominal_upah,
                 ])->toArray()
                 : [],
         ];

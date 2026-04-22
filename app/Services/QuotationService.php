@@ -350,27 +350,20 @@ class QuotationService
 
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
-        // 1. Hitung semua komponen seperti biasa (asumsi nilai input adalah nilai total/bulanan)
+        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
+        $hariKerja = $isGC ? max(1, $this->parseHariKerja($quotation->hari_kerja)) : 1;
+
         $totalTunjangan = $this->calculateTunjangan($detail, $daftarTunjangan);
         $this->calculateBpjs($detail, $quotation, $hpp);
-        $this->calculateExtras($detail, $quotation, $hpp, $coss, $wage);
-        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss);
-
-        // 2. Jika General Cleaning, bagi semua komponen yang sudah dihitung di atas dengan hari kerja
-        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
-        if ($isGC) {
-            $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
-            $this->divideAllComponentsByDays($detail, $hariKerja, $daftarTunjangan);
-        }
-
-        // 3. Baru hitung total akhir berdasarkan nilai yang sudah dibagi
+        $this->calculateExtras($detail, $quotation, $hpp, $coss, $wage, $isGC, $hariKerja);
+        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss, $isGC, $hariKerja);
         $this->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
         $this->populateDetailCalculation($detail, $quotation, $detailCalculation);
     }
     // ============================ ITEM CALCULATIONS (CORE REFACTOR) ============================
 
 
-    private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss): void
+    private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss, bool $isGC = false, int $hariKerja = 1): void
     {
         // ── OPTIMASI #4: Pre-compute site & global HC totals sekali per quotation ──
         if (!isset($this->_site_hc_cache) || $this->_site_hc_cache['quotation_id'] !== $quotation->id) {
@@ -492,14 +485,23 @@ class QuotationService
             }
 
             // ── HPP value ──────────────────────────────────────────────────
-            $detail->{"personil_$key"} = $hppManualValue !== null
+            $hppValue = $hppManualValue !== null
                 ? $hppManualValue
                 : $this->computeItemValue($loadedItems, $config['special'], $hppDivider, $quotation->provisi, $detail->jumlah_hc_hpp);
 
             // ── COSS value ─────────────────────────────────────────────────
-            $detail->{"personil_{$key}_coss"} = $cossManualValue !== null
+            $cossValue = $cossManualValue !== null
                 ? $cossManualValue
                 : $this->computeItemValue($loadedItems, $config['special'], $cossDivider, $quotation->provisi, $detail->jumlah_hc_original);
+
+            // GC: langsung bagi $hariKerja di sini (bukan dibagi setelahnya via divideAllComponentsByDays)
+            if ($isGC) {
+                $hppValue = $hppValue / $hariKerja;
+                $cossValue = $cossValue / $hariKerja;
+            }
+
+            $detail->{"personil_$key"} = $hppValue;
+            $detail->{"personil_{$key}_coss"} = $cossValue;
         }
     }
 
@@ -735,15 +737,11 @@ class QuotationService
         // Dasar Kesehatan pakai UMK jika upah di bawah UMK
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
 
-        // ✅ FIX: Tambahkan 'hpp_field' untuk 'kes' karena nama kolom di tabel HPP/COSS
-        //         adalah 'bpjs_ks' (bukan 'bpjs_kes'), sehingga priority check tidak salah baca
         $bpjsConfig = [
             'jkk' => ['field' => 'bpjs_jkk', 'hpp_field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
             'jkm' => ['field' => 'bpjs_jkm', 'hpp_field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
             'jht' => ['field' => 'bpjs_jht', 'hpp_field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
             'jp' => ['field' => 'bpjs_jp', 'hpp_field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
-            // ✅ FIX: 'field' tetap 'bpjs_kes' (nama di $detail object),
-            //         tapi 'hpp_field' pakai 'bpjs_ks' (nama kolom asli di tabel HPP/COSS)
             'kes' => ['field' => 'bpjs_kes', 'hpp_field' => 'bpjs_ks', 'percent' => 'persen_bpjs_kes', 'default' => 4.00, 'base' => $baseKesehatan],
         ];
 
@@ -751,9 +749,6 @@ class QuotationService
             $persentase = 0.0;
             $base = $config['base'];
             $optOutField = 'is_bpjs_' . $key;
-
-            // ✅ FIX: Gunakan 'hpp_field' (nama kolom DB) untuk baca dari $hpp,
-            //         bukan 'bpjs_' . $key yang untuk 'kes' menghasilkan 'bpjs_kes' (salah)
             $hppField = $config['hpp_field'];
 
             // A. Tentukan Persentase
@@ -802,7 +797,7 @@ class QuotationService
         $this->updateQuotationBpjs($detail, $quotation);
     }
 
-    private function calculateExtras($detail, $quotation, $hpp, $coss, $wage): void
+    private function calculateExtras($detail, $quotation, $hpp, $coss, $wage, bool $isGC = false, int $hariKerja = 1): void
     {
         try {
             $baseUpahBulanan = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
@@ -814,8 +809,9 @@ class QuotationService
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
                 $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
-                    $tunjanganHariRayaHpp = $baseUpahBulanan / 12;
-                    $tunjanganHariRayaCoss = $baseUpahBulanan / 12;
+                    $divisor = $isGC ? $hariKerja : 12;
+                    $tunjanganHariRayaHpp = $baseUpahBulanan / $divisor;
+                    $tunjanganHariRayaCoss = $baseUpahBulanan / $divisor;
                 }
             }
 
@@ -825,8 +821,11 @@ class QuotationService
 
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
                 if (in_array(strtolower(trim($wage->kompensasi ?? 'Tidak Ada')), ['diprovisikan'])) {
-                    $kompensasiHpp = $baseUpahBulanan / 12;
-                    $kompensasiCoss = $baseUpahBulanan / 12;
+                    // GC: langsung bagi $hariKerja di rumus (bukan dibagi setelahnya)
+                    // Non-GC: provisi bulanan standar dibagi 12
+                    $divisor = $isGC ? $hariKerja : 12;
+                    $kompensasiHpp = $baseUpahBulanan / $divisor;
+                    $kompensasiCoss = $baseUpahBulanan / $divisor;
                 }
             }
 
@@ -1382,33 +1381,5 @@ class QuotationService
     {
         return strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
     }
-    private function divideAllComponentsByDays($detail, $hariKerja, $daftarTunjangan): void
-    {
-        // Bagi Gaji Pokok
-        $detail->nominal_upah_bulanan = round($detail->nominal_upah_bulanan / $hariKerja, 2);
-
-        // Bagi semua Tunjangan Dinamis
-        foreach ($daftarTunjangan as $tunjangan) {
-            $nama = $tunjangan->nama;
-            $detail->$nama = round(($detail->$nama ?? 0) / $hariKerja, 2);
-        }
-        $detail->total_tunjangan = round($detail->total_tunjangan / $hariKerja, 2);
-        $detail->total_tunjangan_coss = round($detail->total_tunjangan_coss / $hariKerja, 2);
-
-        // Bagi BPJS
-        $detail->bpjs_ketenagakerjaan_hpp = round(($detail->bpjs_ketenagakerjaan_hpp ?? 0) / $hariKerja, 2);
-        $detail->biaya_kesehatan_hpp = round(($detail->biaya_kesehatan_hpp ?? 0) / $hariKerja, 2);
-
-        // Bagi Extras (THR, Kompensasi, dll)
-        $detail->tunjangan_hari_raya_hpp = round(($detail->tunjangan_hari_raya_hpp ?? 0) / $hariKerja, 2);
-        $detail->kompensasi_hpp = round(($detail->kompensasi_hpp ?? 0) / $hariKerja, 2);
-        $detail->tunjangan_holiday = round(($detail->tunjangan_holiday ?? 0) / $hariKerja, 2);
-        $detail->lembur = round(($detail->lembur ?? 0) / $hariKerja, 2);
-
-        // Bagi Item (Kaporlap, Chemical, dll)
-        $detail->personil_kaporlap = round(($detail->personil_kaporlap ?? 0) / $hariKerja, 2);
-        $detail->personil_devices = round(($detail->personil_devices ?? 0) / $hariKerja, 2);
-        $detail->personil_chemical = round(($detail->personil_chemical ?? 0) / $hariKerja, 2);
-        $detail->personil_ohc = round(($detail->personil_ohc ?? 0) / $hariKerja, 2);
-    }
+    
 }

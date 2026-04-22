@@ -26,7 +26,7 @@ class QuotationStepRequest extends BaseRequest
 
         switch ($step) {
             case 1:
-                $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
+                $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan,General Cleaning';
                 break;
             case 2:
                 $excludedRoles = [53, 54, 55, 56, 2];
