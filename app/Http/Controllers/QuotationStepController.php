@@ -896,7 +896,7 @@ class QuotationStepController extends Controller
             $umsk = Umsk::byCity($site->kota_id)->active()->first();
             $umsp = Umsp::byProvince($site->provinsi_id)->active()->first();
 
-            $umpPerSite[] = [ // Langsung push ke array
+            $umpPerSite[] = [ 
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'province_id' => $site->provinsi_id,
@@ -904,7 +904,7 @@ class QuotationStepController extends Controller
                 'ump_value' => $ump?->ump ?? 0,
                 'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
             ];
-            $umspPerSite[] = [ // Langsung push ke array
+            $umspPerSite[] = [ 
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'province_id' => $site->provinsi_id,
@@ -913,7 +913,7 @@ class QuotationStepController extends Controller
                 'formatted_umsp' => $umsp ? $umsp->formatUmsp() : 'UMSP : Rp. 0',
             ];
 
-            $umkPerSite[] = [ // Langsung push ke array (tanpa key $site->id)
+            $umkPerSite[] = [ 
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
@@ -922,7 +922,7 @@ class QuotationStepController extends Controller
                 'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
             ];
 
-            $umskPerSite[] = [ // Langsung push ke array
+            $umskPerSite[] = [ 
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,

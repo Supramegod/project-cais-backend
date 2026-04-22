@@ -732,6 +732,12 @@ class QuotationService
         $umk = $detail->umk ?? 0;
         $ump = $detail->ump ?? 0;
 
+        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
+        if ($isGC) {
+            $nominalUpah = (float) $detail->nominal_upah;
+        }
+
+
         // Dasar Ketenagakerjaan pakai UMP jika upah di bawah UMP
         $baseKetenagakerjaan = ($nominalUpah < $ump) ? $ump : $nominalUpah;
         // Dasar Kesehatan pakai UMK jika upah di bawah UMK
@@ -1153,6 +1159,13 @@ class QuotationService
         $isPpn = $quotation->is_ppn ?? "Tidak";
 
         $isPpnBoolean = is_numeric($isPpn) ? ((int) $isPpn === 1) : ($isPpn === "Ya");
+        if (!$isPpnBoolean) {
+            $summary->{"grand_total_sebelum_pajak{$suffix}"} = 0;
+            $summary->{"dpp{$suffix}"} = 0;
+            $summary->{"ppn{$suffix}"} = 0;
+            $summary->{"pph{$suffix}"} = 0;
+            return;
+        }
 
         $baseAmount = 0;
         if ($ppnPphDipotong == "Management Fee") {
@@ -1381,5 +1394,5 @@ class QuotationService
     {
         return strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
     }
-    
+
 }
