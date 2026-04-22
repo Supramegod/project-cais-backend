@@ -575,7 +575,11 @@ class QuotationResource extends JsonResource
                 });
             }),
             // CALCULATION SUMMARY
-            'calculation' => $this->calculatedQuotation ? [
+            'calculation' => ($this->calculatedQuotation && $this->calculatedQuotation->calculation_summary) ? [
+                'bpu' => [
+                    'total_potongan_bpu' => $this->calculatedQuotation->calculation_summary->total_potongan_bpu ?? 0,
+                    'potongan_bpu_per_orang' => $this->calculatedQuotation->calculation_summary->potongan_bpu_per_orang ?? 0,
+                ],
                 'hpp' => [
                     'total_sebelum_management_fee' => $this->calculatedQuotation->calculation_summary->total_sebelum_management_fee ?? 0,
                     'nominal_management_fee' => $this->calculatedQuotation->calculation_summary->nominal_management_fee ?? 0,
@@ -588,9 +592,15 @@ class QuotationResource extends JsonResource
                     'margin' => $this->calculatedQuotation->calculation_summary->margin ?? 0,
                     'gpm' => $this->calculatedQuotation->calculation_summary->gpm ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
-                    'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan ?? 0, 2),
                     'persen_insentif' => $this->persen_insentif ?? 0,
+                    'persen_bpjs_ksht' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan ?? 0, 2),
+                    'breakdown_bpjs' => [
+                        'persen_bpjs_jkk' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jkk ?? 0, 2),
+                        'persen_bpjs_jkm' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jkm ?? 0, 2),
+                        'persen_bpjs_jht' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jht ?? 0, 2),
+                        'persen_bpjs_jp' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jp ?? 0, 2),
+                    ],
                 ],
                 'coss' => [
                     'total_sebelum_management_fee_coss' => $this->calculatedQuotation->calculation_summary->total_sebelum_management_fee_coss ?? 0,
@@ -604,81 +614,71 @@ class QuotationResource extends JsonResource
                     'margin_coss' => $this->calculatedQuotation->calculation_summary->margin_coss ?? 0,
                     'gpm_coss' => $this->calculatedQuotation->calculation_summary->gpm_coss ?? 0,
                     'persen_bunga_bank' => $this->persen_bunga_bank ?? 0,
-                    'persen_bpjs_kesehatan' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan ?? 0,
-                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0, 2),
                     'persen_insentif' => $this->persen_insentif ?? 0,
+                    'persen_bpjs_ksht' => $this->calculatedQuotation->calculation_summary->persen_bpjs_kesehatan_coss ?? 0,
+                    'persen_bpjs_ketenagakerjaan' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_ketenagakerjaan_coss ?? 0, 2),
+                    'breakdown_bpjs' => [
+                        'persen_bpjs_jkk' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jkk_coss ?? 0, 2),
+                        'persen_bpjs_jkm' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jkm_coss ?? 0, 2),
+                        'persen_bpjs_jht' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jht_coss ?? 0, 2),
+                        'persen_bpjs_jp' => round($this->calculatedQuotation->calculation_summary->persen_bpjs_jp_coss ?? 0, 2),
+                    ],
                 ],
-                'quotation_details' => $this->calculatedQuotation->quotation->quotation_detail->map(function ($detail) {
+                'quotation_details' => $this->calculatedQuotation->quotation->quotationDetails->map(function ($detail) {
                     $wage = $detail->wage ?? null;
-                    $site = $detail->quotationSite ?? null;
-
                     $detailCalc = $this->calculatedQuotation->detail_calculations[$detail->id] ?? null;
                     $hppData = $detailCalc?->hpp_data ?? [];
                     $cossData = $detailCalc?->coss_data ?? [];
 
-                    $tunjanganData = $detail->relationLoaded('quotationDetailTunjangans')
-                        ? $detail->quotationDetailTunjangans->map(fn($t) => [
-                            'nama_tunjangan' => $t->nama_tunjangan,
-                            'nominal' => $t->nominal,
-                            'nominal_coss' => $t->nominal_coss,
-                        ])->toArray()
-                        : [];
-
-                    $getTunjanganDisplay = function ($wage, string $jenisField, $hppValue, $cossValue, ?string $fieldDitagihkanTerpisah = null) {
-                        if (!$wage) {
+                    // Helper Resolve Display (Sesuai Logic buildStepDataStep11)
+                    $resolveDisplay = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkan = null) {
+                        if (!$wage)
                             return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
-                        }
+                        $jenis = strtolower(trim($wage->$jenisField ?? ''));
 
-                        $jenisValueString = is_string($wage->$jenisField ?? null) ? strtolower(trim($wage->$jenisField)) : '';
-                        $ditagihkanValueString = '';
-
-                        if ($fieldDitagihkanTerpisah && isset($wage->$fieldDitagihkanTerpisah)) {
-                            $ditagihkanRaw = $wage->$fieldDitagihkanTerpisah;
-                            $ditagihkanValueString = is_string($ditagihkanRaw) ? strtolower(trim($ditagihkanRaw)) : '';
-
-                            if ($ditagihkanValueString === 'ditagihkan terpisah') {
-                                return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
-                            }
-                            if (in_array($ditagihkanValueString, ['diberikan langsung', 'diberikan langsung oleh client'])) {
-                                return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
-                            }
-                        }
-
-                        if (in_array($jenisValueString, ['normatif', 'ditagihkan'])) {
+                        if ($fieldDitagihkan && strtolower(trim($wage->$fieldDitagihkan ?? '')) === 'ditagihkan terpisah') {
                             return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
                         }
-                        if (in_array($jenisValueString, ['flat', 'diprovisikan'])) {
+                        if (in_array($jenis, ['normatif', 'ditagihkan'])) {
+                            return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
+                        }
+                        if (in_array($jenis, ['flat', 'diprovisikan'])) {
                             return [
                                 'hpp' => $hppValue > 0 ? $hppValue : 'Tidak Ada',
-                                'coss' => $cossValue > 0 ? $cossValue : 'Tidak Ada',
+                                'coss' => $cVal = ($cossValue > 0 ? $cossValue : 'Tidak Ada')
                             ];
-                        }
-                        if (in_array($jenisValueString, ['diberikan langsung', 'diberikan langsung oleh client'])) {
-                            return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
                         }
                         return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     };
 
-                    $thrDisplay = $getTunjanganDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
-                    $kompDisplay = $getTunjanganDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
-                    $lemburDisplay = $getTunjanganDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
-                    $holidayDisplay = $getTunjanganDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
+                    $isRoDetail = strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
 
-                    return [
+                    $thr = $resolveDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
+                    $komp = $resolveDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
+                    $lembur = $resolveDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
+                    $holiday = $resolveDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
+
+                    $item = [
                         'id' => $detail->id,
                         'position_name' => $detail->jabatan_kebutuhan,
-                        'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
-                        'jumlah_hc_coss' => $cossData['jumlah_hc'] ?? 0,
                         'nama_site' => $detail->nama_site,
                         'quotation_site_id' => $detail->quotation_site_id,
-                        'kota' => $site?->kota,
                         'penjamin_kesehatan' => $detail->penjamin_kesehatan,
-                        'tunjangan_data' => $tunjanganData,
                         'upah' => $wage?->upah ?? 0,
-
+                        'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
+                        'jumlah_hc_coss' => $isRoDetail ? 0 : ($cossData['jumlah_hc'] ?? 0),
+                        'tunjangan_data' => $detail->quotationDetailTunjangans->map(fn($t) => [
+                            'nama_tunjangan' => $t->nama_tunjangan,
+                            'nominal' => $t->nominal,
+                            'nominal_coss' => $t->nominal_coss,
+                        ])->values()->toArray(),
                         'hpp' => [
                             'nominal_upah' => $hppData['gaji_pokok'] ?? 0,
                             'total_tunjangan' => $hppData['total_tunjangan'] ?? 0,
+                            'tunjangan_hari_raya' => $thr['hpp'],
+                            'kompensasi' => $komp['hpp'],
+                            'lembur' => $lembur['hpp'],
+                            'tunjangan_holiday' => $holiday['hpp'],
                             'bpjs_ketenagakerjaan' => ($hppData['bpjs_jkk'] ?? 0) + ($hppData['bpjs_jkm'] ?? 0) + ($hppData['bpjs_jht'] ?? 0) + ($hppData['bpjs_jp'] ?? 0),
                             'bpjs_kesehatan' => $hppData['bpjs_ks'] ?? 0,
                             'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 0,
@@ -691,28 +691,27 @@ class QuotationResource extends JsonResource
                             'persen_bpjs_jht' => $hppData['persen_bpjs_jht'] ?? 0,
                             'persen_bpjs_jp' => $hppData['persen_bpjs_jp'] ?? 0,
                             'persen_bpjs_kes' => $hppData['persen_bpjs_ks'] ?? 0,
-                            'persen_bpjs_ketenagakerjaan' => ($hppData['persen_bpjs_jkk'] ?? 0) + ($hppData['persen_bpjs_jkm'] ?? 0) + ($hppData['persen_bpjs_jht'] ?? 0) + ($hppData['persen_bpjs_jp'] ?? 0),
-                            'persen_bpjs_kesehatan' => $hppData['persen_bpjs_ks'] ?? 0,
                             'potongan_bpu' => $hppData['potongan_bpu'] ?? 0,
-                            'tunjangan_hari_raya' => $thrDisplay['hpp'],
-                            'kompensasi' => $kompDisplay['hpp'],
-                            'lembur' => $lemburDisplay['hpp'],
-                            'tunjangan_holiday' => $holidayDisplay['hpp'],
-                            'bunga_bank' => $hppData['bunga_bank'] ?? 0,
-                            'insentif' => $hppData['insentif'] ?? 0,
                             'personil_kaporlap' => $hppData['provisi_seragam'] ?? 0,
                             'personil_devices' => $hppData['provisi_peralatan'] ?? 0,
                             'personil_ohc' => $hppData['provisi_ohc'] ?? 0,
                             'personil_chemical' => $hppData['provisi_chemical'] ?? 0,
                             'total_personil' => $hppData['total_biaya_per_personil'] ?? 0,
                             'sub_total_personil' => $hppData['total_biaya_all_personil'] ?? 0,
-                            'total_base_manpower' => $hppData['total_biaya_per_personil'] ?? 0,
-                            'total_exclude_base_manpower' => 0,
+                            'bunga_bank' => $hppData['bunga_bank'] ?? 0,
+                            'insentif' => $hppData['insentif'] ?? 0,
                         ],
+                    ];
 
-                        'coss' => [
+                    // Hanya tambahkan key 'coss' jika BUKAN RO
+                    if (!$isRoDetail) {
+                        $item['coss'] = [
                             'nominal_upah' => $cossData['gaji_pokok'] ?? 0,
                             'total_tunjangan' => $cossData['total_tunjangan'] ?? 0,
+                            'tunjangan_hari_raya' => $thr['coss'],
+                            'kompensasi' => $komp['coss'],
+                            'lembur' => $lembur['coss'],
+                            'tunjangan_holiday' => $holiday['coss'],
                             'bpjs_ketenagakerjaan' => ($cossData['bpjs_jkk'] ?? 0) + ($cossData['bpjs_jkm'] ?? 0) + ($cossData['bpjs_jht'] ?? 0) + ($cossData['bpjs_jp'] ?? 0),
                             'bpjs_kesehatan' => $cossData['bpjs_ks'] ?? 0,
                             'bpjs_jkk' => $cossData['bpjs_jkk'] ?? 0,
@@ -725,15 +724,7 @@ class QuotationResource extends JsonResource
                             'persen_bpjs_jht' => $cossData['persen_bpjs_jht'] ?? 0,
                             'persen_bpjs_jp' => $cossData['persen_bpjs_jp'] ?? 0,
                             'persen_bpjs_kes' => $cossData['persen_bpjs_ks'] ?? 0,
-                            'persen_bpjs_ketenagakerjaan' => ($cossData['persen_bpjs_jkk'] ?? 0) + ($cossData['persen_bpjs_jkm'] ?? 0) + ($cossData['persen_bpjs_jht'] ?? 0) + ($cossData['persen_bpjs_jp'] ?? 0),
-                            'persen_bpjs_kesehatan' => $cossData['persen_bpjs_ks'] ?? 0,
                             'potongan_bpu' => $cossData['potongan_bpu'] ?? 0,
-                            'tunjangan_hari_raya' => $thrDisplay['coss'],
-                            'kompensasi' => $kompDisplay['coss'],
-                            'lembur' => $lemburDisplay['coss'],
-                            'tunjangan_holiday' => $holidayDisplay['coss'],
-                            'bunga_bank' => $cossData['bunga_bank'] ?? 0,
-                            'insentif' => $cossData['insentif'] ?? 0,
                             'personil_kaporlap_coss' => $cossData['provisi_seragam'] ?? 0,
                             'personil_devices_coss' => $cossData['provisi_peralatan'] ?? 0,
                             'personil_ohc_coss' => $cossData['provisi_ohc'] ?? 0,
@@ -742,9 +733,13 @@ class QuotationResource extends JsonResource
                             'sub_total_personil' => $cossData['sub_total_personil_coss'] ?? 0,
                             'total_base_manpower' => $cossData['total_base_manpower'] ?? 0,
                             'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,
-                        ],
-                    ];
-                })->toArray()
+                            'bunga_bank' => $cossData['bunga_bank'] ?? 0,
+                            'insentif' => $cossData['insentif'] ?? 0,
+                        ];
+                    }
+
+                    return $item;
+                })->values()->toArray()
             ] : null,
             'quotation_pics' => $this->whenLoaded('quotationPics', function () {
                 return $this->quotationPics->map(function ($pic) {
