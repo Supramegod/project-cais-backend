@@ -21,6 +21,7 @@ use App\Models\Training;
 use App\Models\Umk;
 use App\Models\Ump;
 use App\Models\Umsk;
+use App\Models\Umsp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -875,8 +876,9 @@ class QuotationStepController extends Controller
 
     private function buildAdditionalDataStep4(Quotation $quotation): array
     {
-        $umkPerSite = [];
         $umpPerSite = [];
+        $umspPerSite = [];
+        $umkPerSite = [];
         $umskPerSite = [];
 
         // Memastikan relasi quotationSites dimuat
@@ -889,12 +891,29 @@ class QuotationStepController extends Controller
         }
 
         foreach ($quotation->quotationSites as $site) {
-            // Menggunakan scope sesuai case 4
             $umk = Umk::byCity($site->kota_id)->active()->first();
             $ump = Ump::byProvince($site->provinsi_id)->active()->first();
             $umsk = Umsk::byCity($site->kota_id)->active()->first();
+            $umsp = Umsp::byProvince($site->provinsi_id)->active()->first();
 
-            $umkPerSite[$site->id] = [
+            $umpPerSite[] = [ // Langsung push ke array
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'province_id' => $site->provinsi_id,
+                'province_name' => $site->provinsi,
+                'ump_value' => $ump?->ump ?? 0,
+                'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
+            ];
+            $umspPerSite[] = [ // Langsung push ke array
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'province_id' => $site->provinsi_id,
+                'province_name' => $site->provinsi,
+                'umsp_value' => $umsp?->umsp ?? 0,
+                'formatted_umsp' => $umsp ? $umsp->formatUmsp() : 'UMSP : Rp. 0',
+            ];
+
+            $umkPerSite[] = [ // Langsung push ke array (tanpa key $site->id)
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
@@ -903,16 +922,7 @@ class QuotationStepController extends Controller
                 'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
             ];
 
-            $umpPerSite[$site->id] = [
-                'site_id' => $site->id,
-                'site_name' => $site->nama_site,
-                'province_id' => $site->provinsi_id,
-                'province_name' => $site->provinsi,
-                'ump_value' => $ump?->ump ?? 0,
-                'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
-            ];
-
-            $umskPerSite[$site->id] = [
+            $umskPerSite[] = [ // Langsung push ke array
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
@@ -923,7 +933,7 @@ class QuotationStepController extends Controller
         }
 
         return [
-            // Master Data & Options sesuai Case 4
+            // Master Data & Options
             'management_fees' => ManagementFee::select('id', 'nama')->get(),
             'upah_options' => ['UMP', 'UMK', 'Custom'],
             'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
@@ -936,18 +946,19 @@ class QuotationStepController extends Controller
             'is_ppn_options' => ['Ya', 'Tidak'],
             'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'],
 
-            // Data Dinamis Per Site
-            'umk_per_site' => $umkPerSite,
+            // Data Dinamis Per Site (Sudah berbentuk Array Sequential)
             'ump_per_site' => $umpPerSite,
+            'umsp_per_site' => $umspPerSite,
+            'umk_per_site' => $umkPerSite,
             'umsk_per_site' => $umskPerSite,
 
-            // Data Site (Disederhanakan untuk Dropdown Site)
+            // Data Site (Disederhanakan)
             'quotation_sites' => $quotation->quotationSites->map(fn($site) => [
                 'id' => $site->id,
                 'nama_site' => $site->nama_site,
-            ])->toArray(),
+            ])->values()->toArray(), // Tambahkan values() untuk memastikan array
 
-            // Data Details (Jika frontend memerlukan daftar posisi di additional_data)
+            // Data Details
             'quotation_details' => $quotation->relationLoaded('quotationDetails')
                 ? $quotation->quotationDetails->map(fn($detail) => [
                     'id' => $detail->id,
@@ -957,7 +968,7 @@ class QuotationStepController extends Controller
                     'site_name' => $detail->nama_site,
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nominal_upah' => $detail->nominal_upah,
-                ])->toArray()
+                ])->values()->toArray() // Tambahkan values() di sini juga
                 : [],
         ];
     }
