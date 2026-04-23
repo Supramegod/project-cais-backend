@@ -3293,7 +3293,17 @@ class QuotationStepService
             'provisi_chemical',
             'provisi_ohc',
             'bunga_bank',
-            'insentif'
+            'insentif',
+            'bpjs_jkk',
+            'bpjs_jkm',
+            'bpjs_jht',
+            'bpjs_jp',
+            'bpjs_ks',
+            'persen_bpjs_jkk',
+            'persen_bpjs_jkm',
+            'persen_bpjs_jht',
+            'persen_bpjs_jp',
+            'persen_bpjs_ks',
         ];
 
         $bpjsMap = [
@@ -3301,7 +3311,7 @@ class QuotationStepService
             'jkm' => 'persen_bpjs_jkm',
             'jht' => 'persen_bpjs_jht',
             'jp' => 'persen_bpjs_jp',
-            'kes' => 'persen_bpjs_kes'
+            'kes' => 'persen_bpjs_ks'
         ];
 
         // Ambil fillable untuk filter kolom yang valid
@@ -3946,56 +3956,66 @@ class QuotationStepService
      * Reset semua nilai calculated values (HPP & COSS)
      */
     private function resetAllCalculatedValues(Quotation $quotation, string $user, Carbon $currentDateTime): void
-{
-    \Log::info("=== RESET ALL CALCULATED VALUES (bulk) ===", [
-        'quotation_id' => $quotation->id
-    ]);
+    {
+        \Log::info("=== RESET ALL CALCULATED VALUES (bulk) ===", [
+            'quotation_id' => $quotation->id
+        ]);
 
-    $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
+        $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
 
-    if (empty($detailIds)) {
-        return;
+        if (empty($detailIds)) {
+            return;
+        }
+
+        // Field yang di-reset untuk HPP
+        $hppResetFields = [
+            'tunjangan_hari_raya' => null,
+            'kompensasi' => null,
+            'tunjangan_hari_libur_nasional' => null,
+            'lembur' => null,
+            'provisi_seragam' => null,
+            'provisi_peralatan' => null,
+            'provisi_chemical' => null,
+            'provisi_ohc' => null,
+            'bpjs_jkk' => null,
+            'bpjs_jkm' => null,
+            'bpjs_jht' => null,
+            'bpjs_jp' => null,
+            'bpjs_ks' => null,
+            'persen_bpjs_jkk' => null,
+            'persen_bpjs_jkm' => null,
+            'persen_bpjs_jht' => null,
+            'persen_bpjs_jp' => null,
+            'persen_bpjs_ks' => null,
+            'updated_by' => $user,
+            'updated_at' => $currentDateTime,
+        ];
+
+        QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update($hppResetFields);
+
+        $cossResetFields = [
+            'tunjangan_hari_raya' => null,
+            'kompensasi' => null,
+            'tunjangan_hari_libur_nasional' => null,
+            'lembur' => null,
+            'bpjs_jkk' => null,
+            'bpjs_jkm' => null,
+            'bpjs_jht' => null,
+            'bpjs_jp' => null,
+            'bpjs_ks' => null,
+            'persen_bpjs_jkk' => null,
+            'persen_bpjs_jkm' => null,
+            'persen_bpjs_jht' => null,
+            'persen_bpjs_jp' => null,
+            'persen_bpjs_ks' => null,
+            'updated_by' => $user,
+            'updated_at' => $currentDateTime,
+        ];
+
+        QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update($cossResetFields);
+
+        \Log::info("Reset selesai untuk " . count($detailIds) . " detail (termasuk persentase BPJS)");
     }
-
-    // Field yang di-reset untuk HPP
-    $hppResetFields = [
-        'tunjangan_hari_raya' => null,
-        'kompensasi' => null,
-        'tunjangan_hari_libur_nasional' => null,
-        'lembur' => null,
-        'provisi_seragam' => null,
-        'provisi_peralatan' => null,
-        'provisi_chemical' => null,
-        'provisi_ohc' => null,
-        'persen_bpjs_jkk' => null,
-        'persen_bpjs_jkm' => null,
-        'persen_bpjs_jht' => null,
-        'persen_bpjs_jp' => null,
-        'persen_bpjs_ks' => null,
-        'updated_by' => $user,
-        'updated_at' => $currentDateTime,
-    ];
-
-    QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update($hppResetFields);
-
-    $cossResetFields = [
-        'tunjangan_hari_raya' => null,
-        'kompensasi' => null,
-        'tunjangan_hari_libur_nasional' => null,
-        'lembur' => null,
-        'persen_bpjs_jkk' => null,
-        'persen_bpjs_jkm' => null,
-        'persen_bpjs_jht' => null,
-        'persen_bpjs_jp' => null,
-        'persen_bpjs_ks' => null,
-        'updated_by' => $user,
-        'updated_at' => $currentDateTime,
-    ];
-
-    QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update($cossResetFields);
-
-    \Log::info("Reset selesai untuk " . count($detailIds) . " detail (termasuk persentase BPJS)");
-}
     /**
      * Force sync antara HPP dan COSS untuk field yang sama
      */
