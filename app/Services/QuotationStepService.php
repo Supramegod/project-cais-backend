@@ -3396,6 +3396,11 @@ class QuotationStepService
             // Filter hanya kolom yang ada di fillable
             $hppFinalData[] = array_intersect_key($hppFull, $hppAllowed);
             $cossFinalData[] = array_intersect_key($cossFull, $cossAllowed);
+            \Log::debug('HPP data to save', [
+                'detail_id' => $detailId,
+                'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 'not set',
+                'persen_bpjs_jkk' => $hppData['persen_bpjs_jkk'] ?? 'not set',
+            ]);
         }
 
         // 3. EKSEKUSI DATABASE (Batch Upsert)
