@@ -757,11 +757,14 @@ class QuotationService
             $optOutField = 'is_bpjs_' . $key;
             $hppField = $config['hpp_field'];
 
-            // A. Tentukan Persentase
-            if ($hpp && isset($hpp->{$config['percent']}) && $hpp->{$config['percent']} !== null) {
-                $persentase = (float) $hpp->{$config['percent']};
+  
+            if ($hpp && $hpp->{$hppField} !== null) {
+                $detail->{$config['field']} = (float) $hpp->{$hppField};
+                $detail->{$config['percent']} = $persentase;
             } else {
-                $persentase = $config['default'];
+                // Hitung otomatis: Base * Persentase / 100
+                $detail->{$config['field']} = ($base * $persentase) / 100;
+                $detail->{$config['percent']} = $persentase;
             }
 
 
