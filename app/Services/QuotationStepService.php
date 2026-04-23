@@ -3277,11 +3277,11 @@ class QuotationStepService
 
     private function saveAllCalculationResults(QuotationCalculationResult $calculationResult, string $user, Carbon $currentDateTime, Request $request = null): void
     {
-        $detailIds = array_keys($calculationResult->detail_calculations);
+        // 1. Persiapan data di luar loop (Optimasi Performa)
+        $detailsMap = $calculationResult->quotation->quotation_detail->keyBy('id');
         $summary = $calculationResult->calculation_summary;
         $persentase = $calculationResult->quotation->persentase ?? 0;
 
-        // Definisikan field yang bisa diedit agar tidak menulis ulang berkali-kali
         $editableFields = [
             'tunjangan_hari_raya',
             'kompensasi',
@@ -3304,43 +3304,56 @@ class QuotationStepService
             'kes' => 'persen_bpjs_kes'
         ];
 
+        // Ambil fillable untuk filter kolom yang valid
         $hppAllowed = array_flip((new QuotationDetailHpp())->getFillable());
         $cossAllowed = array_flip((new QuotationDetailCoss())->getFillable());
 
         $hppFinalData = [];
         $cossFinalData = [];
 
+        /**
+         * Helper untuk membersihkan format angka (IDR string ke float)
+         * Contoh: "1.500.000,50" -> 1500000.50
+         */
+        $parseNumber = function ($val) {
+            if ($val === '' || $val === null)
+                return null;
+            if (is_numeric($val))
+                return (float) $val;
+
+            // Hilangkan titik (ribuan) dan ubah koma ke titik (desimal)
+            return (float) str_replace(',', '.', str_replace('.', '', $val));
+        };
+
+        // 2. Loop Utama
         foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
-            // Ambil data dasar dari hasil kalkulasi
             $hppData = $detailCalculation->hpp_data;
             $cossData = $detailCalculation->coss_data;
+            $detailForCheck = $detailsMap->get($detailId);
 
-            // 1. PROSES USER EDITS (HPP & COSS)
+            // A. PROSES USER EDITS
             foreach ($editableFields as $field) {
-                // HPP Edits
+                // Edit HPP
                 if ($request?->has("hpp_editable_data.$detailId.$field")) {
-                    $val = $request->input("hpp_editable_data.$detailId.$field");
-                    $hppData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                    $hppData[$field] = $parseNumber($request->input("hpp_editable_data.$detailId.$field"));
                 }
-                // COSS Edits
-                $detailForCheck = $calculationResult->quotation->quotation_detail->firstWhere('id', $detailId);
-                if (!($detailForCheck && strtoupper(trim($detailForCheck->jabatan_kebutuhan ?? '')) === 'RO')) {
+
+                // Edit COSS (Hanya jika bukan RO)
+                if (!($detailForCheck && $this->isRo($detailForCheck))) {
                     if ($request?->has("coss_data.$detailId.$field")) {
-                        $val = $request->input("coss_data.$detailId.$field");
-                        $cossData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                        $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
                     }
                 }
             }
 
-            // 2. PROSES BPJS PERCENTAGE (HPP)
+            // B. PROSES BPJS PERCENTAGE (HPP)
             foreach ($bpjsMap as $reqKey => $dbKey) {
                 if ($request?->has("bpjs_persentase_data.$detailId.$reqKey")) {
-                    $val = $request->input("bpjs_persentase_data.$detailId.$reqKey");
-                    $hppData[$dbKey] = is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val);
+                    $hppData[$dbKey] = $parseNumber($request->input("bpjs_persentase_data.$detailId.$reqKey"));
                 }
             }
 
-            // 3. MERGE SUMMARY & METADATA
+            // C. MERGE METADATA & SUMMARY
             $commonMetadata = [
                 'quotation_detail_id' => $detailId,
                 'persen_management_fee' => $persentase,
@@ -3348,38 +3361,44 @@ class QuotationStepService
                 'updated_at' => $currentDateTime,
             ];
 
-            $hppData = array_merge($hppData, $commonMetadata, [
+            // HPP Final Prep
+            $hppFull = array_merge($hppData, $commonMetadata, [
                 'management_fee' => $summary->nominal_management_fee ?? 0,
                 'grand_total' => $summary->grand_total_sebelum_pajak ?? 0,
                 'ppn' => $summary->ppn ?? 0,
                 'pph' => $summary->pph ?? 0,
                 'total_invoice' => $summary->total_invoice ?? 0,
                 'pembulatan' => $summary->pembulatan ?? 0,
-                'is_pembulatan' => ($summary->pembulatan != $summary->total_invoice) ? 1 : 0,
+                'is_pembulatan' => (($summary->pembulatan ?? 0) != ($summary->total_invoice ?? 0)) ? 1 : 0,
             ]);
 
-            $cossData = array_merge($cossData, $commonMetadata, [
+            // COSS Final Prep
+            $cossFull = array_merge($cossData, $commonMetadata, [
                 'management_fee' => $summary->nominal_management_fee_coss ?? 0,
                 'grand_total' => $summary->grand_total_sebelum_pajak_coss ?? 0,
                 'ppn' => $summary->ppn_coss ?? 0,
                 'pph' => $summary->pph_coss ?? 0,
                 'total_invoice' => $summary->total_invoice_coss ?? 0,
                 'pembulatan' => $summary->pembulatan_coss ?? 0,
-                'is_pembulatan' => ($summary->pembulatan_coss != $summary->total_invoice_coss) ? 1 : 0,
+                'is_pembulatan' => (($summary->pembulatan_coss ?? 0) != ($summary->total_invoice_coss ?? 0)) ? 1 : 0,
             ]);
 
-            // 4. FILTER FILLABLE & ADD TO BATCH
-            $hppFinalData[] = array_intersect_key($hppData, $hppAllowed);
-            $cossFinalData[] = array_intersect_key($cossData, $cossAllowed);
+            // Filter hanya kolom yang ada di fillable
+            $hppFinalData[] = array_intersect_key($hppFull, $hppAllowed);
+            $cossFinalData[] = array_intersect_key($cossFull, $cossAllowed);
         }
 
-        // 5. EKSEKUSI DATABASE (Batch Upsert)
-        // Syarat: Kolom 'quotation_detail_id' harus punya Unique Index di DB
+        // 3. EKSEKUSI DATABASE (Batch Upsert)
+        // Tentukan kolom mana saja yang diupdate jika terjadi duplikasi (semua fillable kecuali kolom kunci)
+        $updateFieldsHpp = array_diff(array_keys($hppAllowed), ['id', 'created_at', 'quotation_detail_id']);
+        $updateFieldsCoss = array_diff(array_keys($cossAllowed), ['id', 'created_at', 'quotation_detail_id']);
+
         if (!empty($hppFinalData)) {
-            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], array_keys($hppAllowed));
+            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], $updateFieldsHpp);
         }
+
         if (!empty($cossFinalData)) {
-            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], array_keys($cossAllowed));
+            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], $updateFieldsCoss);
         }
     }
 
@@ -3927,46 +3946,56 @@ class QuotationStepService
      * Reset semua nilai calculated values (HPP & COSS)
      */
     private function resetAllCalculatedValues(Quotation $quotation, string $user, Carbon $currentDateTime): void
-    {
-        \Log::info("=== RESET ALL CALCULATED VALUES (bulk) ===", [
-            'quotation_id' => $quotation->id
-        ]);
+{
+    \Log::info("=== RESET ALL CALCULATED VALUES (bulk) ===", [
+        'quotation_id' => $quotation->id
+    ]);
 
-        // FIX Bug 3: Ganti loop N+1 query dengan 2 bulk query (whereIn)
-        // Sebelum: 2 query per detail = 2N queries (N bisa puluhan)
-        // Sesudah: 2 query total, apapun jumlah detailnya
-        $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
+    $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
 
-        if (empty($detailIds)) {
-            return;
-        }
-
-        // 1 query untuk semua HPP
-        QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update([
-            'tunjangan_hari_raya' => null,
-            'kompensasi' => null,
-            'tunjangan_hari_libur_nasional' => null,
-            'lembur' => null,
-            'provisi_seragam' => null,
-            'provisi_peralatan' => null,
-            'provisi_chemical' => null,
-            'provisi_ohc' => null,
-            'updated_by' => $user,
-            'updated_at' => $currentDateTime,
-        ]);
-
-        // 1 query untuk semua COSS
-        QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update([
-            'tunjangan_hari_raya' => null,
-            'kompensasi' => null,
-            'tunjangan_hari_libur_nasional' => null,
-            'lembur' => null,
-            'updated_by' => $user,
-            'updated_at' => $currentDateTime,
-        ]);
-
-        \Log::info("Reset selesai untuk " . count($detailIds) . " detail (2 queries total)");
+    if (empty($detailIds)) {
+        return;
     }
+
+    // Field yang di-reset untuk HPP
+    $hppResetFields = [
+        'tunjangan_hari_raya' => null,
+        'kompensasi' => null,
+        'tunjangan_hari_libur_nasional' => null,
+        'lembur' => null,
+        'provisi_seragam' => null,
+        'provisi_peralatan' => null,
+        'provisi_chemical' => null,
+        'provisi_ohc' => null,
+        'persen_bpjs_jkk' => null,
+        'persen_bpjs_jkm' => null,
+        'persen_bpjs_jht' => null,
+        'persen_bpjs_jp' => null,
+        'persen_bpjs_kes' => null,
+        'updated_by' => $user,
+        'updated_at' => $currentDateTime,
+    ];
+
+    QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update($hppResetFields);
+
+    $cossResetFields = [
+        'tunjangan_hari_raya' => null,
+        'kompensasi' => null,
+        'tunjangan_hari_libur_nasional' => null,
+        'lembur' => null,
+        'persen_bpjs_jkk' => null,
+        'persen_bpjs_jkm' => null,
+        'persen_bpjs_jht' => null,
+        'persen_bpjs_jp' => null,
+        'persen_bpjs_kes' => null,
+        'updated_by' => $user,
+        'updated_at' => $currentDateTime,
+    ];
+
+    QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update($cossResetFields);
+
+    \Log::info("Reset selesai untuk " . count($detailIds) . " detail (termasuk persentase BPJS)");
+}
     /**
      * Force sync antara HPP dan COSS untuk field yang sama
      */
@@ -4079,7 +4108,7 @@ class QuotationStepService
                     }
                 }
                 // Business rule: Jabatan RO tidak disinkronkan ke COSS
-                if ($coss && strtoupper(trim($detail->jabatan_kebutuhan ?? '')) !== 'RO') {
+                if ($coss && !$this->isRo($detail)) {
                     $updateData = [];
 
                     // Hanya update jika nilai di COSS null atau 0
@@ -4210,5 +4239,9 @@ class QuotationStepService
             $hpp->update($updateData);
             \Log::info("Updated HPP data from request", ['detail_id' => $detailId, 'fields' => array_keys($updateData)]);
         }
+    }
+    private function isRo($detail): bool
+    {
+        return ($detail->position_id ?? null) === 224;
     }
 }

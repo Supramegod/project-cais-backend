@@ -541,7 +541,7 @@ class QuotationService
 
     private function populateDetailCalculation($detail, $quotation, DetailCalculation $detailCalculation): void
     {
-        $isRo = strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+
         $potonganBpu = ($detail->penjamin_kesehatan === 'BPU') ? 16800 : 0;
 
         $detailCalculation->hpp_data = [
@@ -578,7 +578,7 @@ class QuotationService
             'total_biaya_all_personil' => $detail->sub_total_personil ?? 0,
         ];
 
-        if ($isRo) {
+        if ($this->isRo($detail)) {
             // RO: semua field COSS di-set 0
             $detailCalculation->coss_data = [
                 'quotation_detail_id' => $detail->id,
@@ -758,13 +758,12 @@ class QuotationService
             $hppField = $config['hpp_field'];
 
             // A. Tentukan Persentase
-            if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
-                $persentase = (float) $detail->{$config['percent']};
-            } elseif ($hpp && isset($hpp->{$config['percent']}) && (float) $hpp->{$config['percent']} != 0) {
+            if ($hpp && isset($hpp->{$config['percent']}) && $hpp->{$config['percent']} !== null) {
                 $persentase = (float) $hpp->{$config['percent']};
             } else {
                 $persentase = $config['default'];
             }
+
 
             // B. Cek Opt-Out (Jika User memilih "Tidak" untuk program tertentu)
             $isOptOut = false;
@@ -1160,7 +1159,6 @@ class QuotationService
 
         $isPpnBoolean = is_numeric($isPpn) ? ((int) $isPpn === 1) : ($isPpn === "Ya");
         if (!$isPpnBoolean) {
-            $summary->{"grand_total_sebelum_pajak{$suffix}"} = 0;
             $summary->{"dpp{$suffix}"} = 0;
             $summary->{"ppn{$suffix}"} = 0;
             $summary->{"pph{$suffix}"} = 0;
@@ -1392,7 +1390,7 @@ class QuotationService
 
     private function isRo($detail): bool
     {
-        return strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+        return ($detail->position_id ?? null) === 224;
     }
 
 }
