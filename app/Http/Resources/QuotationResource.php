@@ -650,8 +650,7 @@ class QuotationResource extends JsonResource
                         }
                         return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
                     };
-
-                    $isRoDetail = strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+                    $isRoDetail = $detail?->position_id === 224;
 
                     $thr = $resolveDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
                     $komp = $resolveDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);

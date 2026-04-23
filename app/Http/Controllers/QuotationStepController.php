@@ -576,7 +576,7 @@ class QuotationStepController extends Controller
         }
 
         // Helper untuk mengecek RO
-        $isRo = fn($detail) => strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+        // $isRo = fn($detail) => strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
 
 
         // Helper untuk resolve tampilan tunjangan
@@ -612,7 +612,7 @@ class QuotationStepController extends Controller
         $quotationDetails = [];
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             foreach ($calculatedQuotation->quotation->quotationDetails as $detail) {
-                $isRoDetail = $isRo($detail);
+                $isRoDetail =$this->isRo($detail);
                 \Log::info('RO Check', [
                     'detail_id' => $detail->id,
                     'jabatan' => $detail->jabatan_kebutuhan,
@@ -643,7 +643,7 @@ class QuotationStepController extends Controller
                 $lemburDisplay = $resolveDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
                 $holidayDisplay = $resolveDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
 
-                $isRoDetail = $isRo($detail);
+                $isRoDetail = $this->isRo($detail);
 
                 // Data HPP (selalu ada)
                 $hppArray = [
@@ -861,7 +861,10 @@ class QuotationStepController extends Controller
     {
         return [
             'positions' => Position::where('is_active', 1)
-                ->where('layanan_id', $quotation->kebutuhan_id)
+                ->where(function ($query) use ($quotation) {
+                    $query->where('layanan_id', $quotation->kebutuhan_id)
+                        ->orWhere('id', 224); // Ganti 99 dengan ID posisi tertentu tersebut
+                })
                 ->orderBy('name', 'asc')
                 ->select('id', 'name')
                 ->get(),
@@ -896,7 +899,7 @@ class QuotationStepController extends Controller
             $umsk = Umsk::byCity($site->kota_id)->active()->first();
             $umsp = Umsp::byProvince($site->provinsi_id)->active()->first();
 
-            $umpPerSite[] = [ 
+            $umpPerSite[] = [
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'province_id' => $site->provinsi_id,
@@ -904,7 +907,7 @@ class QuotationStepController extends Controller
                 'ump_value' => $ump?->ump ?? 0,
                 'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
             ];
-            $umspPerSite[] = [ 
+            $umspPerSite[] = [
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'province_id' => $site->provinsi_id,
@@ -913,7 +916,7 @@ class QuotationStepController extends Controller
                 'formatted_umsp' => $umsp ? $umsp->formatUmsp() : 'UMSP : Rp. 0',
             ];
 
-            $umkPerSite[] = [ 
+            $umkPerSite[] = [
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
@@ -922,7 +925,7 @@ class QuotationStepController extends Controller
                 'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
             ];
 
-            $umskPerSite[] = [ 
+            $umskPerSite[] = [
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
@@ -1275,4 +1278,8 @@ class QuotationStepController extends Controller
     {
         return round((microtime(true) - $startTime) * 1000, 2) . 'ms';
     }
+      private function isRo($detail): bool
+{
+    return ($detail->position_id ?? null) === 224;
+}
 }
