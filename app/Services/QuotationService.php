@@ -681,8 +681,6 @@ class QuotationService
 
     private function calculateBpjs($detail, $quotation, $hpp): void
     {
-        // 1. Cek jika Penjamin Kesehatan adalah BPU (Bukan Penerima Upah)
-        // Jika BPU, semua BPJS dipaksa nol.
         if ($detail->penjamin_kesehatan === 'BPU') {
             foreach ([
                 'bpjs_jkk',
@@ -706,26 +704,10 @@ class QuotationService
         $programBpjs = $quotation->program_bpjs ?? '';
         $isBpjsProgram = (stripos($programBpjs, 'BPJS') !== false)
             || in_array($programBpjs, ['Ya', '1', true, '', null], true);
-
-        if (!$isBpjsProgram) {
-            \Log::warning("BPJS program is NOT ACTIVE", ['program' => $programBpjs]);
-            foreach ([
-                'bpjs_jkk',
-                'bpjs_jkm',
-                'bpjs_jht',
-                'bpjs_jp',
-                'bpjs_kes',
-                'persen_bpjs_jkk',
-                'persen_bpjs_jkm',
-                'persen_bpjs_jht',
-                'persen_bpjs_jp',
-                'persen_bpjs_kes'
-            ] as $f) {
-                $detail->{$f} = 0;
-            }
-            $this->updateQuotationBpjs($detail, $quotation);
-            return;
-        }
+        \Log::debug('calculateBpjs - after program check', [
+            'detail_id' => $detail->id,
+            'isBpjsProgram' => $isBpjsProgram,
+        ]);
 
         // 3. Tentukan Dasar Perhitungan (Base)
         $nominalUpah = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
@@ -744,7 +726,15 @@ class QuotationService
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
 
         $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'hpp_field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => $this->getJkkPercentage($quotation->resiko), 'base' => $baseKetenagakerjaan],
+            'jkk' => [
+                'field' => 'bpjs_jkk',
+                'hpp_field' => 'bpjs_jkk',
+                'percent' => 'persen_bpjs_jkk',
+                'default' => function () use ($quotation) {
+                    return $this->getJkkPercentage($quotation->resiko);
+                },
+                'base' => $baseKetenagakerjaan
+            ],
             'jkm' => ['field' => 'bpjs_jkm', 'hpp_field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
             'jht' => ['field' => 'bpjs_jht', 'hpp_field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
             'jp' => ['field' => 'bpjs_jp', 'hpp_field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
@@ -757,16 +747,20 @@ class QuotationService
             $optOutField = 'is_bpjs_' . $key;
             $hppField = $config['hpp_field'];
 
-  
-            if ($hpp && $hpp->{$hppField} !== null) {
-                $detail->{$config['field']} = (float) $hpp->{$hppField};
-                $detail->{$config['percent']} = $persentase;
-            } else {
-                // Hitung otomatis: Base * Persentase / 100
-                $detail->{$config['field']} = ($base * $persentase) / 100;
-                $detail->{$config['percent']} = $persentase;
-            }
 
+            // Dapatkan nilai default (bisa angka langsung atau closure)
+            $defaultPercent = is_callable($config['default'])
+                ? $config['default']()
+                : $config['default'];
+
+            // A. Tentukan Persentase
+            if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
+                $persentase = (float) $detail->{$config['percent']};
+            } elseif ($hpp && isset($hpp->{$config['percent']}) && (float) $hpp->{$config['percent']} != 0) {
+                $persentase = (float) $hpp->{$config['percent']};
+            } else {
+                $persentase = $defaultPercent;
+            }
 
             // B. Cek Opt-Out (Jika User memilih "Tidak" untuk program tertentu)
             $isOptOut = false;
@@ -780,6 +774,7 @@ class QuotationService
                     $isOptOut = true;
                 }
             }
+
 
             // C. Eksekusi Pengisian Nilai Nominal
             if ($isOptOut) {
