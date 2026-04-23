@@ -3971,7 +3971,7 @@ class QuotationStepService
         'persen_bpjs_jkm' => null,
         'persen_bpjs_jht' => null,
         'persen_bpjs_jp' => null,
-        'persen_bpjs_kes' => null,
+        'persen_bpjs_ks' => null,
         'updated_by' => $user,
         'updated_at' => $currentDateTime,
     ];
@@ -3987,7 +3987,7 @@ class QuotationStepService
         'persen_bpjs_jkm' => null,
         'persen_bpjs_jht' => null,
         'persen_bpjs_jp' => null,
-        'persen_bpjs_kes' => null,
+        'persen_bpjs_ks' => null,
         'updated_by' => $user,
         'updated_at' => $currentDateTime,
     ];
