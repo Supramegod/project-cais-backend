@@ -714,10 +714,10 @@ class QuotationService
         $umk = $detail->umk ?? 0;
         $ump = $detail->ump ?? 0;
 
-        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
-        if ($isGC) {
-            $nominalUpah = (float) $detail->nominal_upah;
-        }
+        // $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
+        // if ($isGC) {
+        //     $nominalUpah = (float) $detail->nominal_upah;
+        // }
 
 
         // Dasar Ketenagakerjaan pakai UMP jika upah di bawah UMP
@@ -1253,16 +1253,18 @@ class QuotationService
 
     private function normalizeUpahForKontrak($detail, $quotation): void
     {
-        if (($quotation->jenis_kontrak ?? '') !== 'PKHL') {
-            $detail->nominal_upah_bulanan = (float) $detail->nominal_upah;
+        $jenisKontrak = strtoupper($quotation->jenis_kontrak ?? '');
+
+        if ($jenisKontrak === 'PKHL' || $jenisKontrak === 'GENERAL CLEANING') {
+            $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
+            $detail->nominal_upah_harian = (float) $detail->nominal_upah;
+            $detail->hari_kerja_pkhl = $hariKerja; // bisa rename jadi hari_kerja_bulanan
+            $detail->nominal_upah_bulanan = round($detail->nominal_upah_harian * $hariKerja, 2);
             return;
         }
-        $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
-        $detail->nominal_upah_harian = (float) $detail->nominal_upah;
-        $detail->hari_kerja_pkhl = $hariKerja;
-        $detail->nominal_upah_bulanan = round($detail->nominal_upah_harian * $hariKerja, 2);
-    }
 
+        $detail->nominal_upah_bulanan = (float) $detail->nominal_upah;
+    }
     private function calculateUpahBpjs($nominalUpah, $umk, $ump): float
     {
         if ($nominalUpah > $umk)

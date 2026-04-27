@@ -381,7 +381,7 @@ class SpkController extends Controller
                 })
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
-                    ->where('status_quotation_id', 3) 
+                        ->where('status_quotation_id', 3)
                         ->where('is_aktif', 1);
                 });
 

@@ -19851,7 +19851,8 @@
                                 "nama_perusahaan",
                                 "nomor",
                                 "kebutuhan",
-                                "created_by"
+                                "created_by",
+                                "jenis_kontrak"
                             ],
                             "example": "nama_perusahaan"
                         }

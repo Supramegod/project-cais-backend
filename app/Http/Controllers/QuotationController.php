@@ -123,7 +123,7 @@ class QuotationController extends Controller
      *         in="query",
      *         description="Column to search in (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by","jenis_kontrak"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -203,7 +203,7 @@ class QuotationController extends Controller
                         ? '"' . $searchTerm . '"'
                         : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by'])) {
+                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by','jenis_kontrak'])) {
                     $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
@@ -213,7 +213,7 @@ class QuotationController extends Controller
             }
 
             if ($request->filled('branch'))
-                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));
+                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));  
             if ($request->filled('platform'))
                 $query->whereHas('leads', fn($q) => $q->where('platform_id', $request->platform));
             if ($request->filled('status'))
