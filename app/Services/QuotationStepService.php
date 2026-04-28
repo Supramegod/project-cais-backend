@@ -3335,22 +3335,39 @@ class QuotationStepService
             return (float) str_replace(',', '.', str_replace('.', '', $val));
         };
 
+        $syncHppToCossFields = ['tunjangan_hari_raya', 'kompensasi'];
+
         // 2. Loop Utama
         foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
             $hppData = $detailCalculation->hpp_data;
             $cossData = $detailCalculation->coss_data;
             $detailForCheck = $detailsMap->get($detailId);
+            $isRoDetail = $detailForCheck && $this->isRo($detailForCheck);
 
             // A. PROSES USER EDITS
             foreach ($editableFields as $field) {
+                $hppEdited = $request?->has("hpp_editable_data.$detailId.$field");
+                $cossExplicit = !$isRoDetail && $request?->has("coss_data.$detailId.$field");
+
                 // Edit HPP
-                if ($request?->has("hpp_editable_data.$detailId.$field")) {
+                if ($hppEdited) {
                     $hppData[$field] = $parseNumber($request->input("hpp_editable_data.$detailId.$field"));
                 }
 
                 // Edit COSS (Hanya jika bukan RO)
-                if (!($detailForCheck && $this->isRo($detailForCheck))) {
-                    if ($request?->has("coss_data.$detailId.$field")) {
+                if (!$isRoDetail) {
+                    if (in_array($field, $syncHppToCossFields) && $hppEdited) {
+                        // HPP diedit → COSS WAJIB ikut nilai HPP yang baru
+                        // (coss_data diabaikan untuk field ini agar sinkronisasi terjamin)
+                        $cossData[$field] = $hppData[$field];
+
+                        \Log::info("Synced HPP edit to COSS", [
+                            'detail_id' => $detailId,
+                            'field' => $field,
+                            'value' => $cossData[$field],
+                        ]);
+                    } elseif ($cossExplicit) {
+                        // COSS diedit secara independen (HPP field tidak diubah) → pakai nilai COSS
                         $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
                     }
                 }
@@ -3403,8 +3420,6 @@ class QuotationStepService
             ]);
         }
 
-        // 3. EKSEKUSI DATABASE (Batch Upsert)
-        // Tentukan kolom mana saja yang diupdate jika terjadi duplikasi (semua fillable kecuali kolom kunci)
         $updateFieldsHpp = array_diff(array_keys($hppAllowed), ['id', 'created_at', 'quotation_detail_id']);
         $updateFieldsCoss = array_diff(array_keys($cossAllowed), ['id', 'created_at', 'quotation_detail_id']);
 
@@ -3769,11 +3784,6 @@ class QuotationStepService
                 'requires_recalculation' => $requiresHppCossRecalculation
             ]);
 
-            // ================================================
-            // **PENTING: CLEAR HPP/COSS NOMINAL VALUES**
-            // Jika ada perubahan wage yang affect calculation,
-            // clear nilai HPP/COSS agar dihitung ulang di step berikutnya
-            // ================================================
             if ($requiresHppCossRecalculation) {
                 $fieldsToClear = [
                     'tunjangan_hari_raya',
