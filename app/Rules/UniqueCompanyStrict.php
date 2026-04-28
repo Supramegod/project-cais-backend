@@ -16,11 +16,52 @@ class UniqueCompanyStrict implements Rule
     protected $similarCompanies = [];
     protected $geographicNames = [];
     protected $commonWords = [
-        'pt', 'cv', 'ud', 'tbk', 'persero', 'perusahaan', 'company', 'corp', 'corporation',
-        'inc', 'ltd', 'group', 'holding', 'international', 'global', 'national', 'nasional',
-        'pusat', 'cabang', 'kantor', 'toko', 'warung', 'industri', 'enterprise', 'services',
-        'service', 'solution', 'tech', 'technology', 'technologies', 'the', 'and', 'or',
-        'of', 'in', 'at', 'on', 'for', 'to', 'dan', 'atau', 'dari', 'di', 'ke', 'pada', 'untuk'
+        'pt',
+        'cv',
+        'ud',
+        'tbk',
+        'persero',
+        'perusahaan',
+        'company',
+        'corp',
+        'corporation',
+        'inc',
+        'ltd',
+        'group',
+        'holding',
+        'international',
+        'global',
+        'national',
+        'nasional',
+        'pusat',
+        'cabang',
+        'kantor',
+        'toko',
+        'warung',
+        'industri',
+        'enterprise',
+        'services',
+        'service',
+        'solution',
+        'tech',
+        'technology',
+        'technologies',
+        'the',
+        'and',
+        'or',
+        'of',
+        'in',
+        'at',
+        'on',
+        'for',
+        'to',
+        'dan',
+        'atau',
+        'dari',
+        'di',
+        'ke',
+        'pada',
+        'untuk'
     ];
 
     public function __construct($excludeId = null)
@@ -42,29 +83,77 @@ class UniqueCompanyStrict implements Rule
 
     public function passes($attribute, $value)
     {
-        // 1. Filtering awal dari database
-        $firstWord = explode(' ', trim($value))[0];
+        // --- TETAPKAN PROSES AWAL KAMU DI SINI ---
+        $value = strtoupper($value);
+        $inputNormalized = $this->normalize($value);
+
+        // Ambil data dari database (seperti kodingan awalmu)
         $query = Leads::whereNull('deleted_at');
-        if ($this->excludeId) { $query->where('id', '!=', $this->excludeId); }
+        if ($this->excludeId) {
+            $query->where('id', '!=', $this->excludeId);
+        }
+        $companies = $query->pluck('nama_perusahaan')->toArray();
 
-        $candidates = $query->where('nama_perusahaan', 'LIKE', "%{$firstWord}%")
-                            ->limit(30)
-                            ->pluck('nama_perusahaan')
-                            ->toArray();
+        foreach ($companies as $company) {
+            $companyNormalized = $this->normalize($company);
 
-        if (empty($candidates)) { return true; }
+            // 1. Cek Exact Match (Proses awalmu)
+            if ($inputNormalized === $companyNormalized) {
+                $this->similarCompanies[] = ['nama' => $company, 'alasan' => 'Nama identik'];
+                return false;
+            }
 
-        // 2. Kirim ke AI dengan konteks lengkap
-        return $this->askAI($value, $candidates);
+            // 2. Cek similar_text / Levenshtein (Proses awalmu)
+            similar_text($inputNormalized, $companyNormalized, $percent);
+            if ($percent > 85) {
+                $this->similarCompanies[] = ['nama' => $company, 'alasan' => 'Kemiripan sangat tinggi'];
+                return false;
+            }
+
+            // --- TAMBAHAN: JIKA RAGU-RAGU (Misal kemiripan 40% - 85%) ---
+            // Di sinilah kasus seperti "JNT CARGO" vs "PT YIMMY (JNT CARGO)" tertangkap
+            if ($percent > 40 && $percent <= 85) {
+                // Simpan dulu kandidat yang "mencurigakan" untuk ditanyakan ke AI nanti
+                $potentialCandidates[] = $company;
+            }
+        }
+
+        // 3. JIKA LOGIC MANUAL TIDAK YAKIN, TANYA AI
+        if (!empty($potentialCandidates)) {
+            // Ambil maksimal 10 kandidat paling mendekati saja agar hemat
+            $finalCheck = $this->askAI($value, array_slice($potentialCandidates, 0, 10));
+            return $finalCheck;
+        }
+
+        return true;
     }
+    private function normalize($text)
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        // Ubah huruf ke kecil dan trim
+        $text = strtolower(trim($text));
+
+        // Hapus tanda baca DAN angka di tahap ini
+        // Gabungkan untuk konsistensi
+        $text = preg_replace('/[^\p{L}\s]/u', ' ', $text);
+
+        // Ganti multiple spaces dengan single space
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        return trim($text);
+    }
+
 
     private function askAI($input, $candidates)
     {
         $apiKey = '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';
         $endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-        
+
         // Ringkas data untuk menghemat token
-        $geoContext = implode(',', array_slice($this->geographicNames, 0, 50)); 
+        $geoContext = implode(',', array_slice($this->geographicNames, 0, 50));
         $commonContext = implode(',', $this->commonWords);
         $listCandidates = implode("\n- ", $candidates);
 
@@ -73,11 +162,11 @@ class UniqueCompanyStrict implements Rule
                 'Authorization' => 'Bearer ' . $apiKey,
                 'Content-Type' => 'application/json',
             ])->timeout(20)->post($endpoint, [
-                'model' => 'deepseek/deepseek-chat',
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => "Anda adalah validator database perusahaan Indonesia. 
+                        'model' => 'deepseek/deepseek-chat',
+                        'messages' => [
+                            [
+                                'role' => 'system',
+                                'content' => "Anda adalah validator database perusahaan Indonesia. 
                         Tugas: Cek apakah 'Input Baru' sudah ada di 'Database' secara substansi.
                         
                         Instruksi Penting:
@@ -87,13 +176,13 @@ class UniqueCompanyStrict implements Rule
                         
                         Jika ditemukan yang mirip, balas: 'MIRIP: [Nama di Database]'.
                         Jika tidak ada yang mirip, balas: 'AMAN'."
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => "Input Baru: $input\n\nDatabase:\n- $listCandidates"
-                    ]
-                ],
-            ]);
+                            ],
+                            [
+                                'role' => 'user',
+                                'content' => "Input Baru: $input\n\nDatabase:\n- $listCandidates"
+                            ]
+                        ],
+                    ]);
 
             if ($response->successful()) {
                 $result = $response->json()['choices'][0]['message']['content'] ?? 'AMAN';
@@ -108,7 +197,8 @@ class UniqueCompanyStrict implements Rule
         return true;
     }
 
-    public function message() {
+    public function message()
+    {
         return 'Peringatan: ' . ($this->similarCompanies[0] ?? 'Nama perusahaan terdeteksi sudah ada.');
     }
 }

@@ -807,20 +807,19 @@ class QuotationService
 
             // THR
             $tunjanganHariRayaHpp = $hpp ? (float) ($hpp->tunjangan_hari_raya ?? 0) : 0;
-            $tunjanganHariRayaCoss = $coss ? (float) ($coss->tunjangan_hari_raya ?? 0) : 0;
 
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
                 $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
                     $divisor = $isGC ? $hariKerja : 12;
                     $tunjanganHariRayaHpp = $baseUpahBulanan / $divisor;
-                    $tunjanganHariRayaCoss = $baseUpahBulanan / $divisor;
                 }
             }
+   
+            $tunjanganHariRayaCoss = $tunjanganHariRayaHpp;
 
             // KOMPENSASI
             $kompensasiHpp = $hpp ? (float) ($hpp->kompensasi ?? 0) : 0;
-            $kompensasiCoss = $coss ? (float) ($coss->kompensasi ?? 0) : 0;
 
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
                 if (in_array(strtolower(trim($wage->kompensasi ?? 'Tidak Ada')), ['diprovisikan'])) {
@@ -828,9 +827,10 @@ class QuotationService
                     // Non-GC: provisi bulanan standar dibagi 12
                     $divisor = $isGC ? $hariKerja : 12;
                     $kompensasiHpp = $baseUpahBulanan / $divisor;
-                    $kompensasiCoss = $baseUpahBulanan / $divisor;
                 }
             }
+            // COSS kompensasi juga mengikuti HPP secara default
+            $kompensasiCoss = $kompensasiHpp;
 
             // TUNJANGAN HOLIDAY
             $tunjanganHolidayHpp = $hpp ? (float) ($hpp->tunjangan_hari_libur_nasional ?? 0) : 0;
