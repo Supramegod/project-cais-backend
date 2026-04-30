@@ -3369,6 +3369,10 @@ class QuotationStepService
             $cossData = $detailCalculation->coss_data;
             $detailForCheck = $detailsMap->get($detailId);
             $isRoDetail = $detailForCheck && $this->isRo($detailForCheck);
+            if ($detailForCheck) {
+                $hppData['gaji_pokok'] = $detailForCheck->nominal_upah;
+                $cossData['gaji_pokok'] = $detailForCheck->nominal_upah;
+            }
 
             // Nilai HPP & COSS sebelum reset — referensi untuk deteksi perubahan user
             $storedHpp = $hppReferenceMap->get($detailId);
@@ -3424,7 +3428,7 @@ class QuotationStepService
                                 'coss_value' => $cossData[$field],
                             ]);
                         } else {
-                            
+
                             if ($storedCoss && $storedHpp) {
                                 $preResetCossVal = (float) ($storedCoss->{$field} ?? 0);
                                 $preResetHppVal = (float) ($storedHpp->{$field} ?? 0);
@@ -4092,6 +4096,7 @@ class QuotationStepService
             'persen_bpjs_jht' => null,
             'persen_bpjs_jp' => null,
             'persen_bpjs_ks' => null,
+            'gaji_pokok' => null,
             'updated_by' => $user,
             'updated_at' => $currentDateTime,
         ];
