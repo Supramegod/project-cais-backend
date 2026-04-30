@@ -12,6 +12,7 @@ use App\Models\JabatanPic;
 use App\Models\KategoriSesuaiHc;
 use App\Models\Kebutuhan;
 use App\Models\Leads;
+use App\Models\LeadsKebutuhan;
 use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\Quotation;
@@ -229,11 +230,11 @@ class PksController extends Controller
 
                 if ($searchBy === 'nama_perusahaan') {
                     $searchTerm = str_contains($searchTerm, ' ')
-                        ? '"'.$searchTerm.'"'
-                        : $searchTerm.'*';
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
                     $query->whereRaw('MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
                 } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
-                    $query->where("sl_pks.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
+                    $query->where("sl_pks.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
                 $query->whereBetween('sl_pks.tgl_pks', [$tglDari, $tglSampai]);
@@ -285,7 +286,7 @@ class PksController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Error in PksController@index: '.$e->getMessage());
+            \Log::error('Error in PksController@index: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -393,7 +394,7 @@ class PksController extends Controller
                 'ruleThr',
             ])->find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json(['success' => false, 'message' => 'PKS not found'], 404);
             }
 
@@ -558,8 +559,8 @@ class PksController extends Controller
             return response()->json($response);
 
         } catch (\Exception $e) {
-            \Log::error('Failed to retrieve PKS details: '.$e->getMessage());
-            \Log::error('Stack trace: '.$e->getTraceAsString());
+            \Log::error('Failed to retrieve PKS details: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return response()->json([
                 'success' => false,
@@ -1019,7 +1020,7 @@ class PksController extends Controller
         try {
             $pks = Pks::find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1109,7 +1110,7 @@ class PksController extends Controller
         try {
             $pks = Pks::find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1178,7 +1179,7 @@ class PksController extends Controller
         try {
             $pks = Pks::find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1241,7 +1242,7 @@ class PksController extends Controller
             $current_date_time = Carbon::now()->toDateTimeString();
             $pks = Pks::find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1275,7 +1276,7 @@ class PksController extends Controller
             DB::rollBack();
             DB::connection('mysqlhris')->rollBack();
 
-            \Log::error('Failed to activate PKS sites: '.$e->getMessage());
+            \Log::error('Failed to activate PKS sites: ' . $e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -1321,7 +1322,7 @@ class PksController extends Controller
         try {
             $pks = Pks::with(['leads', 'sites'])->find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1759,7 +1760,7 @@ class PksController extends Controller
 
             $pks = Pks::find($id);
 
-            if (! $pks) {
+            if (!$pks) {
                 return response()->json([
                     'success' => false,
                     'message' => 'PKS not found',
@@ -1778,12 +1779,12 @@ class PksController extends Controller
             $fileName = $this->storePksFile($request->file('file'));
 
             // Generate URL yang benar
-            $fileUrl = url('document/pks/'.$fileName);
+            $fileUrl = url('document/pks/' . $fileName);
 
-            \Log::info('Generated URL: '.$fileUrl);
-            \Log::info('Filename: '.$fileName);
-            \Log::info('File path: '.Storage::disk('pks')->path($fileName));
-            \Log::info('File exists: '.(Storage::disk('pks')->exists($fileName) ? 'Yes' : 'No'));
+            \Log::info('Generated URL: ' . $fileUrl);
+            \Log::info('Filename: ' . $fileName);
+            \Log::info('File path: ' . Storage::disk('pks')->path($fileName));
+            \Log::info('File exists: ' . (Storage::disk('pks')->exists($fileName) ? 'Yes' : 'No'));
 
             $pks->update([
                 'status_pks_id' => 6, // Status Approved/Active
@@ -1831,8 +1832,6 @@ class PksController extends Controller
     private function processPksLogic($request, $tipe)
     {
         $leads = Leads::findOrFail($request->leads_id);
-        $kebutuhan = Kebutuhan::find($leads->kebutuhan_id);
-
         // Tentukan nomor PKS berdasarkan tipe
         if ($tipe === 'addendum') {
             // Untuk addendum, gunakan nomor addendum
@@ -1856,6 +1855,9 @@ class PksController extends Controller
                 $quotationId = Quotation::where('leads_id', $leads->id)->first()->id ?? null;
             }
         }
+        $quotation = Quotation::find($quotationId);
+        $layananId = $quotation ? $quotation->kebutuhan_id : $leads->kebutuhan_id;
+        $kebutuhan = Kebutuhan::find($layananId);
 
         // 1. Create PKS (Unified)
         $pks = Pks::create([
@@ -1867,7 +1869,7 @@ class PksController extends Controller
             'kode_perusahaan' => $leads->nomor,
             'nama_perusahaan' => $leads->nama_perusahaan,
             'alamat_perusahaan' => $leads->alamat,
-            'layanan_id' => $leads->kebutuhan_id,
+            'layanan_id' => $layananId,
             'layanan' => $kebutuhan->nama ?? null,
             'bidang_usaha_id' => $leads->bidang_perusahaan_id,
             'bidang_usaha' => $leads->bidang_perusahaan,
@@ -1933,11 +1935,11 @@ class PksController extends Controller
 
         foreach ($siteIds as $key => $id) {
             $sourceSite = $model::find($id);
-            if (! $sourceSite) {
+            if (!$sourceSite) {
                 continue;
             }
 
-            $nomorSite = $pksNomor.'-'.sprintf('%04d', ($key + 1));
+            $nomorSite = $pksNomor . '-' . sprintf('%04d', ($key + 1));
 
             $namaProyek = sprintf(
                 '%s-%s.%s.%s',
@@ -1995,10 +1997,10 @@ class PksController extends Controller
             // Insert agreement sections
             $templateService->insertAgreementSections($pks->id, Auth::user()->full_name);
 
-            \Log::info('PKS Perjanjian created successfully for PKS ID: '.$pks->id);
+            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id);
 
         } catch (\Exception $e) {
-            \Log::error('Failed to create PKS Perjanjian: '.$e->getMessage());
+            \Log::error('Failed to create PKS Perjanjian: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -2007,10 +2009,10 @@ class PksController extends Controller
     {
         $nomorActivity = $this->generateNomorActivity($leads->id);
         $user = Auth::user();
-        // if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-        //     // Untuk Sales, buat SalesActivity
-        //     $this->createSalesActivity($pks, $leads);
-        // } else {
+        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            // Untuk Sales, buat SalesActivity
+            $this->createSalesActivity($pks, $user->full_name);
+        } else {
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -2019,32 +2021,32 @@ class PksController extends Controller
             'tgl_activity' => now(),
             'nomor' => $nomorActivity,
             'tipe' => 'PKS',
-            'notes' => 'PKS dengan nomor :'.$pksNomor.' terbentuk',
+            'notes' => 'PKS dengan nomor :' . $pksNomor . ' terbentuk',
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
         ]);
-        // }
+        }
     }
-    // private function createSalesActivity(Quotation $pks, string $createdBy): void
-    // {
-    //     $user = Auth::user();
+    private function createSalesActivity(Quotation $pks, string $createdBy): void
+    {
+        $user = Auth::user();
 
-    //     // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari pks$pks
-    //     $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
-    //         ->where('kebutuhan_id', $pks->k)
-    //         ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
-    //         ->first();
+        // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari pks$pks
+        $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
+            ->where('kebutuhan_id', $pks->layanan_id)
+            ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+            ->first();
 
-    //     SalesActivity::create([
-    //         'leads_id' => $pks->leads_id,
-    //         'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
-    //         'tgl_activity' => Carbon::now(),
-    //         'jenis_activity' => 'PKS',
-    //         'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$pks->kebutuhan}",
-    //         'created_by' => $createdBy
-    //     ]);
-    // }
+        SalesActivity::create([
+            'leads_id' => $pks->leads_id,
+            'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
+            'tgl_activity' => Carbon::now(),
+            'jenis_activity' => 'PKS',
+            'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$pks->kebutuhan}",
+            'created_by' => $createdBy
+        ]);
+    }
 
     private function approvePks($pks, $otLevel)
     {
@@ -2080,7 +2082,7 @@ class PksController extends Controller
             $leads = $pks->leads;
 
             // Cek apakah customer sudah ada
-            if (! $leads->customer_id) {
+            if (!$leads->customer_id) {
                 // Generate nomor customer
                 $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
 
@@ -2146,7 +2148,7 @@ class PksController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Auto sync customer_active status failed: '.$e->getMessage());
+            \Log::error('Auto sync customer_active status failed: ' . $e->getMessage());
         }
     }
 
@@ -2193,7 +2195,7 @@ class PksController extends Controller
      */
     private function isKontrakBerlaku($kontrakAkhir)
     {
-        if (! $kontrakAkhir) {
+        if (!$kontrakAkhir) {
             return false;
         }
 
@@ -2211,7 +2213,7 @@ class PksController extends Controller
         $now = Carbon::now();
         $leads = Leads::find($leadsId);
 
-        if (! $companyId && $leads && $leads->company_id) {
+        if (!$companyId && $leads && $leads->company_id) {
             $companyId = $leads->company_id;
         }
 
@@ -2221,8 +2223,8 @@ class PksController extends Controller
         $nomor = 'CUST/'; // Prefix CUST untuk Customer
 
         if ($company && $dataLeads) {
-            $nomor .= $company->code.'/';
-            $nomor .= $dataLeads->nomor.'-';
+            $nomor .= $company->code . '/';
+            $nomor .= $dataLeads->nomor . '-';
         } else {
             $nomor .= 'NN/NNNNN-';
         }
@@ -2230,11 +2232,11 @@ class PksController extends Controller
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
 
         // Hitung jumlah data customer dengan pattern yang sama
-        $pattern = $nomor.$month.$now->year.'-%';
+        $pattern = $nomor . $month . $now->year . '-%';
         $jumlahData = Customer::where('nomor', 'like', $pattern)->count();
         $urutan = sprintf('%05d', $jumlahData + 1);
 
-        return $nomor.$month.$now->year.'-'.$urutan;
+        return $nomor . $month . $now->year . '-' . $urutan;
     }
 
     /**
@@ -2250,7 +2252,7 @@ class PksController extends Controller
             'tgl_activity' => now(),
             'nomor' => $nomorActivity,
             'tipe' => 'CUSTOMER',
-            'notes' => 'Customer dengan nomor :'.$customerNomor.' terbentuk dari PKS',
+            'notes' => 'Customer dengan nomor :' . $customerNomor . ' terbentuk dari PKS',
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
@@ -2390,17 +2392,17 @@ class PksController extends Controller
 
         $nomor = 'PKS/';
         if ($company) {
-            $nomor .= $company->code.'/';
-            $nomor .= $dataLeads->nomor.'-';
+            $nomor .= $company->code . '/';
+            $nomor .= $dataLeads->nomor . '-';
         } else {
             $nomor .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $jumlahData = Pks::where('nomor', 'like', $nomor.$month.$now->year.'-%')->count();
+        $jumlahData = Pks::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
         $urutan = sprintf('%05d', $jumlahData + 1);
 
-        return $nomor.$month.$now->year.'-'.$urutan;
+        return $nomor . $month . $now->year . '-' . $urutan;
     }
 
     private function generateNomorActivity($leadsId)
@@ -2417,7 +2419,7 @@ class PksController extends Controller
                 4 => 'LL/',
                 default => 'NN/'
             };
-            $prefix .= $leads->nomor.'-';
+            $prefix .= $leads->nomor . '-';
         } else {
             $prefix .= 'NN/NNNNN-';
         }
@@ -2425,10 +2427,10 @@ class PksController extends Controller
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $year = $now->year;
 
-        $count = CustomerActivity::where('nomor', 'like', $prefix.$month.$year.'-%')->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . '-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix.$month.$year.'-'.$sequence;
+        return $prefix . $month . $year . '-' . $sequence;
     }
 
     private function getAvailableLeadsData()
@@ -2498,7 +2500,7 @@ class PksController extends Controller
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)
-                    ->whereColumn($orderTable.'.id', $orderColumn)
+                    ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
             }, 'asc')
             ->get()
@@ -2585,7 +2587,7 @@ class PksController extends Controller
 
         // Get leads
         $leads = Leads::find($pks->leads_id);
-        if (! $leads) {
+        if (!$leads) {
             throw new \Exception('Leads not found');
         }
 
@@ -2651,7 +2653,7 @@ class PksController extends Controller
 
         foreach ($siteList as $site) {
             $quotation = Quotation::find($site->quotation_id);
-            if (! $quotation) {
+            if (!$quotation) {
                 continue;
             }
 
@@ -2865,7 +2867,7 @@ class PksController extends Controller
             'tgl_activity' => $current_date_time,
             'nomor' => $nomorActivity,
             'tipe' => 'PKS',
-            'notes' => 'PKS dengan nomor :'.$pks->nomor.' telah diaktifkan oleh '.Auth::user()->full_name,
+            'notes' => 'PKS dengan nomor :' . $pks->nomor . ' telah diaktifkan oleh ' . Auth::user()->full_name,
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_at' => $current_date_time,
@@ -2879,7 +2881,7 @@ class PksController extends Controller
     private function handleCustomerStatus($pks, $leads, $current_date_time)
     {
         // If customer doesn't exist, create one
-        if (! $leads->customer_id) {
+        if (!$leads->customer_id) {
             $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
 
             $customer = Customer::create([
@@ -2926,7 +2928,7 @@ class PksController extends Controller
             'tgl_activity' => $current_date_time,
             'nomor' => $nomorActivity,
             'tipe' => 'CUSTOMER',
-            'notes' => 'Customer dengan nomor :'.$customerNomor.' terbentuk dari PKS',
+            'notes' => 'Customer dengan nomor :' . $customerNomor . ' terbentuk dari PKS',
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_at' => $current_date_time,
@@ -2944,7 +2946,7 @@ class PksController extends Controller
         try {
             $jabatan = JabatanPic::where('id', $picData['jabatan'])->first();
 
-            if (! $jabatan) {
+            if (!$jabatan) {
                 throw new \Exception("Jabatan dengan ID {$picData['jabatan']} tidak ditemukan");
             }
 
@@ -2959,7 +2961,7 @@ class PksController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Failed to add detail PIC: '.$e->getMessage());
+            \Log::error('Failed to add detail PIC: ' . $e->getMessage());
             throw $e;
         }
     }
@@ -2973,7 +2975,7 @@ class PksController extends Controller
     {
         $fileExtension = $file->getClientOriginalExtension();
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = $originalFileName.date('YmdHis').rand(10000, 99999).'.'.$fileExtension;
+        $fileName = $originalFileName . date('YmdHis') . rand(10000, 99999) . '.' . $fileExtension;
 
         // Simpan file ke disk 'pks' yang sudah dikonfigurasi
         Storage::disk('pks')->put($fileName, file_get_contents($file));
@@ -2998,7 +3000,7 @@ class PksController extends Controller
             'tgl_activity' => now(),
             'nomor' => $nomorActivity,
             'tipe' => 'PKS',
-            'notes' => 'PKS dengan nomor : '.$pks->nomor.' telah diupload dan disetujui',
+            'notes' => 'PKS dengan nomor : ' . $pks->nomor . ' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
@@ -3018,11 +3020,11 @@ class PksController extends Controller
 
         // Hitung sudah berapa addendum untuk PKS induk ini
         $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
-            ->orWhere('nomor', 'like', 'ADD/'.$nomorPksInduk.'/%')
+            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
             ->count();
 
         $urutan = sprintf('%04d', $jumlahAddendum + 1);
 
-        return 'ADD/'.$nomorPksInduk.'/'.$urutan;
+        return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
 }

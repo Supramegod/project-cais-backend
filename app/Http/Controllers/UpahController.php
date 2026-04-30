@@ -165,10 +165,13 @@ class UpahController extends Controller
                     $message = 'Data UMSP provinsi berhasil diambil';
                     break;
             }
+            $umpdata = $province->activeUmp;
+
 
             return response()->json([
                 'success'    => true,
                 'data'       => $data,
+                'umpdata'   => $umpdata,
                 'pagination' => $this->paginationMeta($paginator),
                 'message'    => $message,
             ]);
@@ -250,6 +253,136 @@ class UpahController extends Controller
             return $this->serviceError('detailKota', $e);
         } catch (\Throwable $e) {
             return $this->unexpectedError('detailKota', $e);
+        }
+    }
+
+    // ── Show UMSP by ID ───────────────────────────────────────────────────────
+
+    /**
+     * @OA\Get(
+     *     path="/api/upah/umsp/{id}",
+     *     summary="Detail satu record UMSP berdasarkan ID",
+     *     tags={"Upah"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID record UMSP (termasuk yang sudah di-soft-delete)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="OK",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id",            type="integer", example=10),
+     *                 @OA\Property(property="province_id",   type="integer", example=35),
+     *                 @OA\Property(property="province_name", type="string",  example="Jawa Timur"),
+     *                 @OA\Property(property="sektor",        type="string",  example="Tekstil"),
+     *                 @OA\Property(property="nilai",         type="number",  example=2350000.00),
+     *                 @OA\Property(property="formatted",     type="string",  example="Rp 2.350.000"),
+     *                 @OA\Property(property="tgl_berlaku",   type="string",  example="2024-01-01"),
+     *                 @OA\Property(property="sumber",        type="string",  example="https://jatim.go.id/umsp2024"),
+     *                 @OA\Property(property="is_aktif",      type="boolean", example=true),
+     *                 @OA\Property(property="created_by",    type="string",  example="Admin"),
+     *                 @OA\Property(property="updated_by",    type="string",  example="Admin"),
+     *                 @OA\Property(property="created_at",    type="string",  example="2024-01-01 08:00:00"),
+     *                 @OA\Property(property="updated_at",    type="string",  example="2024-01-01 08:00:00"),
+     *                 @OA\Property(property="deleted_at",    type="string",  nullable=true, example=null)
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Data UMSP berhasil diambil")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="UMSP tidak ditemukan"),
+     *     @OA\Response(response=500, description="Internal server error")
+     * )
+     */
+    public function showUmsp(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getUmspById($id);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+                'message' => 'Data UMSP berhasil diambil',
+            ]);
+
+        } catch (ModelNotFoundException) {
+            return $this->notFound("UMSP dengan ID {$id} tidak ditemukan.");
+        } catch (\RuntimeException $e) {
+            return $this->serviceError('showUmsp', $e);
+        } catch (\Throwable $e) {
+            return $this->unexpectedError('showUmsp', $e);
+        }
+    }
+
+    // ── Show UMSK by ID ───────────────────────────────────────────────────────
+
+    /**
+     * @OA\Get(
+     *     path="/api/upah/umsk/{id}",
+     *     summary="Detail satu record UMSK berdasarkan ID",
+     *     tags={"Upah"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID record UMSK (termasuk yang sudah di-soft-delete)",
+     *         @OA\Schema(type="integer", example=5)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="OK",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id",          type="integer", example=5),
+     *                 @OA\Property(property="city_id",     type="integer", example=3578),
+     *                 @OA\Property(property="city_name",   type="string",  example="Kota Surabaya"),
+     *                 @OA\Property(property="sektor",      type="string",  example="Otomotif"),
+     *                 @OA\Property(property="nilai",       type="number",  example=4900000.00),
+     *                 @OA\Property(property="formatted",   type="string",  example="Rp 4.900.000"),
+     *                 @OA\Property(property="tgl_berlaku", type="string",  example="2024-01-01"),
+     *                 @OA\Property(property="sumber",      type="string",  example="https://jatim.go.id/umsk2024"),
+     *                 @OA\Property(property="is_aktif",    type="boolean", example=true),
+     *                 @OA\Property(property="created_by",  type="string",  example="Admin"),
+     *                 @OA\Property(property="updated_by",  type="string",  example="Admin"),
+     *                 @OA\Property(property="created_at",  type="string",  example="2024-01-01 08:00:00"),
+     *                 @OA\Property(property="updated_at",  type="string",  example="2024-01-01 08:00:00"),
+     *                 @OA\Property(property="deleted_at",  type="string",  nullable=true, example=null)
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Data UMSK berhasil diambil")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="UMSK tidak ditemukan"),
+     *     @OA\Response(response=500, description="Internal server error")
+     * )
+     */
+    public function showUmsk(int $id): JsonResponse
+    {
+        try {
+            $data = $this->service->getUmskById($id);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $data,
+                'message' => 'Data UMSK berhasil diambil',
+            ]);
+
+        } catch (ModelNotFoundException) {
+            return $this->notFound("UMSK dengan ID {$id} tidak ditemukan.");
+        } catch (\RuntimeException $e) {
+            return $this->serviceError('showUmsk', $e);
+        } catch (\Throwable $e) {
+            return $this->unexpectedError('showUmsk', $e);
         }
     }
 

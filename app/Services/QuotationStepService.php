@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\DTO\CalculationSummary;
 use App\DTO\DetailCalculation;
 use App\DTO\QuotationCalculationResult;
 use App\Jobs\EscalateQuotationJob;
@@ -14,6 +15,7 @@ use App\Models\JabatanPic;
 use App\Models\JenisBarang;
 use App\Models\JenisPerusahaan;
 use App\Models\LeadsKebutuhan;
+use App\Models\LogApproval;
 use App\Models\LogNotification;
 use App\Models\ManagementFee;
 use App\Models\Position;
@@ -495,7 +497,7 @@ class QuotationStepService
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("Error in updateStep3", [
+            \Log::error("Error in saveAllCalculationResults ", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
@@ -997,43 +999,53 @@ class QuotationStepService
             $currentDateTime = Carbon::now();
             $user = Auth::user()->full_name;
 
-            $statusData = $this->calculateFinalStatus($quotation);
+            $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
+            $summary = $calculationResult->calculation_summary;
 
-            // **PERBAIKAN: Gunakan DB::table untuk menghindari attribute yang tidak diinginkan**
+            $statusData = $this->calculateFinalStatus($quotation, $summary);
+            $dbUpdateData = array_filter($statusData, fn($key) => $key !== 'notes', ARRAY_FILTER_USE_KEY);
+
             Quotation::where('id', $quotation->id)
                 ->update(array_merge([
                     'step' => 100,
                     'updated_by' => $user,
-                    'updated_at' => $currentDateTime
-                ], $statusData));
+                    'updated_at' => $currentDateTime,
+                ], $dbUpdateData));
 
-            // Update kerjasama data - menggunakan pendekatan pengecekan seperti training
             $this->updateKerjasamaData($quotation, $request, $currentDateTime);
-
-            // Insert requirements jika belum ada
             $this->insertRequirements($quotation);
-            // Create notification untuk Dir Sales dan Dir Keu
+
+            if ($statusData['status_quotation_id'] === 8) {
+                LogApproval::create([
+                    'tabel' => 'quotation',
+                    'doc_id' => $quotation->id,
+                    'tingkat' => 0,
+                    'is_approve' => false,
+                    'user_id' => Auth::id(),
+                    'approval_date' => $currentDateTime,
+                    'note' => $statusData['notes'],
+                    'created_by' => $user,
+                ]);
+            }
 
             if ($statusData['status_quotation_id'] == 2) {
                 $this->notifyGM($quotation, $currentDateTime);
             }
+
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
-                // Cari quotation lama (referensi)
                 $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
 
                 if ($oldQuotation) {
-                    // 1. Soft delete semua relasi yang nyangkut di quotation lama
                     $this->quotationBusinessService->softDeleteQuotationRelations($oldQuotation, $user);
 
-                    // 2. Soft delete quotation lamanya itu sendiri
                     $oldQuotation->update([
                         'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
+                        'deleted_by' => $user,
                     ]);
 
                     \Log::info("Soft deleted old quotation and its relations", [
                         'old_quotation_id' => $oldQuotation->id,
-                        'new_quotation_id' => $quotation->id
+                        'new_quotation_id' => $quotation->id,
                     ]);
                 }
             }
@@ -1043,7 +1055,7 @@ class QuotationStepService
             \Log::info("Step 12 completed successfully", [
                 'quotation_id' => $quotation->id,
                 'final_status' => $statusData,
-                'step' => 100
+                'step' => 100,
             ]);
 
         } catch (\Exception $e) {
@@ -1051,7 +1063,7 @@ class QuotationStepService
             \Log::error("Error in updateStep12", [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -1512,81 +1524,244 @@ class QuotationStepService
         }
     }
 
-    public function calculateFinalStatus(Quotation $quotation): array
+    public function calculateFinalStatus(Quotation $quotation, ?CalculationSummary $summary = null): array
     {
-        // 1. Cek BPJS
-        $hasMissingBpjs = $quotation->quotationDetails()->where(function ($query) {
-            $query->where('is_bpjs_jkk', 0)
-                ->orWhere('is_bpjs_jkm', 0)
-                ->orWhere('is_bpjs_jht', 0)
-                ->orWhere('is_bpjs_jp', 0);
-        })->exists();
+        if ($summary === null) {
+            $summary = $this->getQuotationService()
+                ->calculateQuotation($quotation)
+                ->calculation_summary;
+        }
 
-        // 2. Cek Kompensasi & THR (Gunakan strtolower/trim agar lebih aman)
-        $hasUnconventionalBenefits = $quotation->quotationDetails()->whereHas('wage', function ($query) {
-            $query->where('kompensasi', 'Tidak Ada')
-                ->orWhere('thr', 'Tidak Ada')
-                ->orWhere('thr', '!=', 'Diprovisikan');
-        })->exists();
+        $quotation->loadMissing([
+            'quotationDetails.wage',
+            'quotationDetails.quotationSite',
+        ]);
 
-        // 3. Cek Upah Custom < 85% UMK
-        $isUnderMinimumWage = $quotation->quotationDetails->some(function ($detail) {
+        // ✅ TAMBAHAN: Jika user memiliki role tertentu (54,55,56), skip auto-reject
+        $user = Auth::user();
+        $skipAutoRejectRoles = [54, 55, 56]; // Sesuaikan dengan role yang diinginkan
+        if ($user && in_array((int) $user->cais_role_id, $skipAutoRejectRoles)) {
+            // Langsung ke pengecekan need approval, tanpa auto-reject
+            return $this->checkNeedsApproval($quotation)
+                ? $this->makeStatusResult(0, 2)
+                : $this->makeStatusResult(1, 3);
+        }
+
+        // Proses normal: cek auto-reject dulu
+        $rejectResult = $this->checkAutoReject($quotation, $summary);
+        if ($rejectResult !== null) {
+            return $rejectResult;
+        }
+
+        return $this->checkNeedsApproval($quotation)
+            ? $this->makeStatusResult(0, 2)
+            : $this->makeStatusResult(1, 3);
+    }
+
+    private function checkAutoReject(Quotation $quotation, CalculationSummary $summary): ?array
+    {
+        // Hanya berlaku untuk kontrak reguler
+        if (strtolower((string) $quotation->jenis_kontrak) !== 'reguler') {
+            return null;
+        }
+
+        if ($this->isBelowMinimumHc($quotation)) {
+            return $this->makeRejectResult('tidak sesuai standart untuk headconut di bawah minimum');
+        }
+        if ($this->isInvalidBpjsTk($quotation)) {
+            return $this->makeRejectResult('BPJS TK tidak memenuhi minimum program');
+        }
+
+        if ($this->isMissingBpjsKesForReguler($quotation)) {
+            return $this->makeRejectResult('BPJS Kesehatan wajib untuk kontrak reguler');
+        }
+
+        if ($this->isBelowSalesMargin($summary)) {
+            return $this->makeRejectResult('margin dibawah standard');
+        }
+
+
+        return null;
+    }
+
+    private function checkNeedsApproval(Quotation $quotation): bool
+    {
+        return (
+            $this->hasMissingBpjsDetail($quotation) ||
+            $this->hasUnconventionalBenefits($quotation) ||
+            $this->isUnderMinimumWage($quotation) ||
+            $this->isLowPercentage($quotation) ||
+            $quotation->company_id == 17 ||
+            $quotation->top === 'Lebih Dari 7 Hari'
+        );
+    }
+
+    private function isInvalidBpjsTk(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->whereRaw(
+                '(CAST(is_bpjs_jkk AS UNSIGNED)
+                + CAST(is_bpjs_jkm AS UNSIGNED)
+                + CAST(is_bpjs_jht AS UNSIGNED)
+                + CAST(is_bpjs_jp  AS UNSIGNED)) < 3'
+            )
+            ->exists();
+    }
+
+    private function isMissingBpjsKesForReguler(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->where('is_bpjs_kes', 0)
+            ->exists();
+    }
+
+    private function isBelowSalesMargin(CalculationSummary $summary): bool
+    {
+        $user = Auth::user();
+
+        if (!$user || (int) $user->cais_role_id !== 29) {
+            return false;
+        }
+
+        return (float) $summary->gpm < 2.8;
+    }
+
+    private function isBelowMinimumHc(Quotation $quotation): bool
+    {
+        $kebutuhanId = (int) $quotation->kebutuhan_id;
+
+        if (!in_array($kebutuhanId, [1, 2, 3], true)) {
+            return false;
+        }
+
+        $totalHc = QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->sum('jumlah_hc');
+
+        return match ($kebutuhanId) {
+            2 => $totalHc < 10,
+            1, 3 => $totalHc < 5,
+            default => false,
+        };
+    }
+
+    private function hasMissingBpjsDetail(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->where(function ($q) {
+                $q->where('is_bpjs_jkk', 0)
+                    ->orWhere('is_bpjs_jkm', 0)
+                    ->orWhere('is_bpjs_jht', 0)
+                    ->orWhere('is_bpjs_jp', 0);
+            })
+            ->exists();
+    }
+
+    private function hasUnconventionalBenefits(Quotation $quotation): bool
+    {
+        return QuotationDetail::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->whereHas('wage', function ($q) {
+                $q->where('kompensasi', 'Tidak Ada')
+                    ->orWhere('thr', 'Tidak Ada')
+                    ->orWhere('thr', '!=', 'Diprovisikan');
+            })
+            ->exists();
+    }
+
+    private function isUnderMinimumWage(Quotation $quotation): bool
+    {
+        foreach ($quotation->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
-            if (!$wage || !$site || $wage->upah !== 'Custom')
-                return false;
+
+            if (!$wage || !$site || $wage->upah !== 'Custom') {
+                continue;
+            }
 
             $umkData = Umk::byCity($site->kota_id)->active()->first();
-            if (!$umkData)
-                return false;
+            if (!$umkData) {
+                continue;
+            }
 
-            return (float) $wage->nominal_upah < ((float) $umkData->umk * 0.85);
-        });
+            if ((float) $wage->nominal_upah < ((float) $umkData->umk * 0.85)) {
+                return true;
+            }
+        }
 
-        // 4. Cek Persentase
-        $thresholdPersentase = ($quotation->kebutuhan_id == 1) ? 7 : 6;
-        $isLowPercentage = (float) $quotation->persentase < $thresholdPersentase;
+        return false;
+    }
 
-        // 5. Evaluasi Apakah Butuh Level 2 (Direktur Keuangan)
-        $needsApproval = (
-            $hasMissingBpjs ||
-            $hasUnconventionalBenefits ||
-            $isUnderMinimumWage ||
-            $isLowPercentage ||
-            $quotation->company_id == 17 ||
-            $quotation->top == "Lebih Dari 7 Hari"
-        );
+    private function isLowPercentage(Quotation $quotation): bool
+    {
+        $threshold = ((int) $quotation->kebutuhan_id === 1) ? 7.0 : 6.0;
 
-        // 'needs_level_2' tidak disertakan karena kolom ini tidak ada di tabel sl_quotation
+        return (float) ($quotation->persentase ?? 0) < $threshold;
+    }
+
+    private function makeRejectResult(string $notes): array
+    {
+        return $this->makeStatusResult(0, 8, 'baru', $notes);
+    }
+
+    private function makeStatusResult(
+        int $isAktif,
+        int $statusQuotationId,
+        ?string $tipeQuotation = null,
+        ?string $notes = null
+    ): array {
         return [
-            'is_aktif' => $needsApproval ? 0 : 1,
-            'status_quotation_id' => $needsApproval ? 2 : 3
+            'is_aktif' => $isAktif,
+            'status_quotation_id' => $statusQuotationId,
+            'tipe_quotation' => $tipeQuotation,
+            'notes' => $notes,
         ];
     }
 
     private function insertRequirements(Quotation $quotation): void
     {
         $currentDateTime = Carbon::now();
+        $user = Auth::user()->full_name;
 
-        foreach ($quotation->quotationDetails as $detail) {
-            $existData = $detail->quotationDetailRequirements->count();
+        // Cari detail yang belum punya requirements
+        $detailsWithoutReqs = $quotation->quotationDetails->filter(function ($detail) {
+            return $detail->quotationDetailRequirements->count() == 0;
+        });
 
-            if ($existData == 0) {
-                $requirements = DB::table('m_kebutuhan_detail_requirement')
-                    ->whereNull('deleted_at')
-                    ->where('position_id', $detail->position_id)
-                    ->get();
+        if ($detailsWithoutReqs->isEmpty()) {
+            return;
+        }
 
-                foreach ($requirements as $req) {
-                    DB::table('sl_quotation_detail_requirement')->insert([
-                        'quotation_id' => $quotation->id,
-                        'quotation_detail_id' => $detail->id,
-                        'requirement' => $req->requirement,
-                        'created_at' => $currentDateTime,
-                        'created_by' => Auth::user()->full_name
-                    ]);
-                }
+        // Ambil semua position_id yang dibutuhkan
+        $positionIds = $detailsWithoutReqs->pluck('id')->unique()->toArray();
+
+        // Satu query ambil semua requirement untuk position yang diperlukan
+        $allRequirements = QuotationDetailRequirement::whereNull('deleted_at')
+            ->whereIn('quotation_detail_id', $positionIds)
+            ->get()
+            ->groupBy('quotation_detail_id');
+
+        // Siapkan batch insert
+        $batchInsert = [];
+        foreach ($detailsWithoutReqs as $detail) {
+            $requirements = $allRequirements[$detail->id] ?? collect();
+            foreach ($requirements as $req) {
+                $batchInsert[] = [
+                    'quotation_id' => $quotation->id,
+                    'quotation_detail_id' => $detail->id,
+                    'requirement' => $req->requirement,
+                    'created_at' => $currentDateTime,
+                    'created_by' => $user,
+                ];
             }
+        }
+
+        // Batch insert
+        if (!empty($batchInsert)) {
+            QuotationDetailRequirement::insert($batchInsert);
         }
     }
     /**
@@ -2114,77 +2289,72 @@ class QuotationStepService
      */
     private function syncKerjasamaData(Quotation $quotation, array $kerjasamas, Carbon $currentDateTime, string $user): void
     {
-        \Log::info("Starting kerjasama data sync", [
-            'quotation_id' => $quotation->id,
-            'kerjasamas_count' => count($kerjasamas)
-        ]);
-
-        // Get existing kerjasama IDs untuk quotation ini
-        $existingKerjasamaIds = QuotationKerjasama::where('quotation_id', $quotation->id)
-            ->whereNull('deleted_at')
-            ->pluck('id')
-            ->toArray();
-
-        $incomingKerjasamaIds = [];
-        $createdCount = 0;
-        $updatedCount = 0;
-        $deletedCount = 0;
-
-        foreach ($kerjasamas as $kerjasamaData) {
-            // Skip jika perjanjian kosong
-            if (empty(trim($kerjasamaData['perjanjian'] ?? ''))) {
-                continue;
-            }
-
-            $kerjasamaId = $kerjasamaData['id'] ?? null;
-            $perjanjian = trim($kerjasamaData['perjanjian']);
-            $isDelete = $kerjasamaData['is_delete'] ?? 1;
-
-            // Jika ada ID, update existing
-            if ($kerjasamaId && in_array($kerjasamaId, $existingKerjasamaIds)) {
-                $kerjasama = QuotationKerjasama::find($kerjasamaId);
-                if ($kerjasama) {
-                    $kerjasama->update([
-                        'perjanjian' => $perjanjian,
-                        'is_delete' => $isDelete,
-                        'updated_at' => $currentDateTime,
-                        'updated_by' => $user
-                    ]);
-                    $updatedCount++;
-                }
-
-                $incomingKerjasamaIds[] = $kerjasamaId;
-            }
-            // Jika tidak ada ID, create baru
-            else {
-                QuotationKerjasama::create([
-                    'quotation_id' => $quotation->id,
-                    'perjanjian' => $perjanjian,
-                    'is_delete' => $isDelete,
-                    'created_at' => $currentDateTime,
-                    'created_by' => $user
-                ]);
-                $createdCount++;
-            }
-        }
-
-        // Soft delete kerjasama yang tidak ada dalam incoming data tapi masih ada di database
-        $toDeleteIds = array_diff($existingKerjasamaIds, $incomingKerjasamaIds);
-        if (!empty($toDeleteIds)) {
-            QuotationKerjasama::whereIn('id', $toDeleteIds)
+        if (empty($kerjasamas)) {
+            // Soft delete semua jika tidak ada data
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
                 ->update([
                     'deleted_at' => $currentDateTime,
                     'deleted_by' => $user
                 ]);
-            $deletedCount = count($toDeleteIds);
+            return;
         }
 
-        \Log::info("Kerjasama data sync completed", [
-            'quotation_id' => $quotation->id,
-            'created' => $createdCount,
-            'updated' => $updatedCount,
-            'deleted' => $deletedCount
-        ]);
+        // Siapkan data untuk upsert
+        $upsertData = [];
+        $incomingIds = [];
+
+        foreach ($kerjasamas as $kerjasamaData) {
+            $perjanjian = trim($kerjasamaData['perjanjian'] ?? '');
+            if ($perjanjian === '')
+                continue;
+
+            $item = [
+                'quotation_id' => $quotation->id,
+                'perjanjian' => $perjanjian,
+                'is_delete' => $kerjasamaData['is_delete'] ?? 1,
+                'updated_at' => $currentDateTime,
+                'updated_by' => $user,
+            ];
+
+            if (!empty($kerjasamaData['id'])) {
+                $item['id'] = $kerjasamaData['id'];
+                $incomingIds[] = $kerjasamaData['id'];
+            } else {
+                // Untuk insert baru, set created_at & created_by
+                $item['created_at'] = $currentDateTime;
+                $item['created_by'] = $user;
+            }
+            $upsertData[] = $item;
+        }
+
+        // Batch upsert (insert or update)
+        if (!empty($upsertData)) {
+            QuotationKerjasama::upsert(
+                $upsertData,
+                ['id'], // unique key
+                ['perjanjian', 'is_delete', 'updated_at', 'updated_by'] // fields to update
+            );
+        }
+
+        // Soft delete yang tidak ada di incoming
+        if (!empty($incomingIds)) {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNotIn('id', $incomingIds)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+        } else {
+            // Jika tidak ada id incoming, hapus semua
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $currentDateTime,
+                    'deleted_by' => $user
+                ]);
+        }
     }
 
     /**
@@ -2776,6 +2946,24 @@ class QuotationStepService
                 }
             }
 
+            // Simpan nilai HPP sebelum RESET untuk digunakan sebagai referensi perbandingan
+            // di saveAllCalculationResults. Setelah RESET, DB di-null sehingga tidak bisa dipakai.
+            $detailIdsForPreReset = $quotation->quotationDetails->pluck('id')->all();
+            $preResetHppMap = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIdsForPreReset)
+                ->get()
+                ->keyBy('quotation_detail_id');
+            $preResetCossMap = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIdsForPreReset)
+                ->get()
+                ->keyBy('quotation_detail_id');
+
+            \Log::info("Pre-reset HPP snapshot", [
+                'quotation_id' => $quotation->id,
+                'detail_ids' => $detailIdsForPreReset,
+                'snapshot_count' => $preResetHppMap->count(),
+                'thr_values' => $preResetHppMap->map(fn($h) => $h->tunjangan_hari_raya)->toArray(),
+                'kompensasi_values' => $preResetHppMap->map(fn($h) => $h->kompensasi)->toArray(),
+            ]);
+
             // FIX Bug 2: syncWageDataForStep11 dihapus — ditulis sebelum reset, efeknya nol
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
 
@@ -2789,7 +2977,7 @@ class QuotationStepService
             $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
 
             // saveAllCalculationResults sudah menangani hpp_editable_data & coss_data di dalamnya
-            $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request);
+            $this->saveAllCalculationResults($calculationResult, $user, $currentDateTime, $request, $preResetHppMap, $preResetCossMap);
 
             if ($request->has('bpjs_ks_data') && is_array($request->bpjs_ks_data)) {
                 $this->updateBpjsKsNominal($quotation, $request->bpjs_ks_data, $user, $currentDateTime);
@@ -3105,13 +3293,13 @@ class QuotationStepService
         }
     }
 
-    private function saveAllCalculationResults(QuotationCalculationResult $calculationResult, string $user, Carbon $currentDateTime, Request $request = null): void
+    private function saveAllCalculationResults(QuotationCalculationResult $calculationResult, string $user, Carbon $currentDateTime, Request $request = null, $preResetHppMap = null, $preResetCossMap = null): void
     {
-        $detailIds = array_keys($calculationResult->detail_calculations);
+        // 1. Persiapan data di luar loop (Optimasi Performa)
+        $detailsMap = $calculationResult->quotation->quotation_detail->keyBy('id');
         $summary = $calculationResult->calculation_summary;
         $persentase = $calculationResult->quotation->persentase ?? 0;
 
-        // Definisikan field yang bisa diedit agar tidak menulis ulang berkali-kali
         $editableFields = [
             'tunjangan_hari_raya',
             'kompensasi',
@@ -3123,7 +3311,17 @@ class QuotationStepService
             'provisi_chemical',
             'provisi_ohc',
             'bunga_bank',
-            'insentif'
+            'insentif',
+            'bpjs_jkk',
+            'bpjs_jkm',
+            'bpjs_jht',
+            'bpjs_jp',
+            'bpjs_ks',
+            'persen_bpjs_jkk',
+            'persen_bpjs_jkm',
+            'persen_bpjs_jht',
+            'persen_bpjs_jp',
+            'persen_bpjs_ks',
         ];
 
         $bpjsMap = [
@@ -3131,43 +3329,145 @@ class QuotationStepService
             'jkm' => 'persen_bpjs_jkm',
             'jht' => 'persen_bpjs_jht',
             'jp' => 'persen_bpjs_jp',
-            'kes' => 'persen_bpjs_kes'
+            'kes' => 'persen_bpjs_ks'
         ];
 
+        // Ambil fillable untuk filter kolom yang valid
         $hppAllowed = array_flip((new QuotationDetailHpp())->getFillable());
         $cossAllowed = array_flip((new QuotationDetailCoss())->getFillable());
 
         $hppFinalData = [];
         $cossFinalData = [];
 
+        /**
+         * Helper untuk membersihkan format angka (IDR string ke float)
+         * Contoh: "1.500.000,50" -> 1500000.50
+         */
+        $parseNumber = function ($val) {
+            if ($val === '' || $val === null)
+                return null;
+            if (is_numeric($val))
+                return (float) $val;
+
+            // Hilangkan titik (ribuan) dan ubah koma ke titik (desimal)
+            return (float) str_replace(',', '.', str_replace('.', '', $val));
+        };
+
+        // Preload HPP & COSS DB map SEBELUM RESET untuk deteksi perubahan aktual.
+        // $preResetHppMap & $preResetCossMap dikirim dari updateStep11 sebelum RESET dijalankan.
+        // Jika tidak tersedia (misal dipanggil dari context lain), fallback ke _map masing-masing.
+        $hppReferenceMap = $preResetHppMap ?? ($calculationResult->quotation->_hpp_map ?? collect());
+        $cossReferenceMap = $preResetCossMap ?? ($calculationResult->quotation->_coss_map ?? collect());
+
+        // Field yang sync-nya satu arah: HPP berubah → COSS ikut HPP.
+        // Jika HPP tidak berubah, COSS bebas di-set independent melalui coss_data.
+        $syncHppToCossFields = ['tunjangan_hari_raya', 'kompensasi'];
+
+        // 2. Loop Utama
         foreach ($calculationResult->detail_calculations as $detailId => $detailCalculation) {
-            // Ambil data dasar dari hasil kalkulasi
             $hppData = $detailCalculation->hpp_data;
             $cossData = $detailCalculation->coss_data;
+            $detailForCheck = $detailsMap->get($detailId);
+            $isRoDetail = $detailForCheck && $this->isRo($detailForCheck);
+            if ($detailForCheck) {
+                $hppData['gaji_pokok'] = $detailForCheck->nominal_upah;
+                $cossData['gaji_pokok'] = $detailForCheck->nominal_upah;
+            }
 
-            // 1. PROSES USER EDITS (HPP & COSS)
+            // Nilai HPP & COSS sebelum reset — referensi untuk deteksi perubahan user
+            $storedHpp = $hppReferenceMap->get($detailId);
+            $storedCoss = $cossReferenceMap->get($detailId);
+
+            \Log::info("saveAllCalc: detail start", [
+                'detail_id' => $detailId,
+                'has_stored_hpp' => $storedHpp !== null,
+                'stored_thr' => $storedHpp ? $storedHpp->tunjangan_hari_raya : 'N/A',
+                'stored_kompensasi' => $storedHpp ? $storedHpp->kompensasi : 'N/A',
+                'req_hpp_thr' => $request?->input("hpp_editable_data.$detailId.tunjangan_hari_raya"),
+                'req_coss_thr' => $request?->input("coss_data.$detailId.tunjangan_hari_raya"),
+                'req_hpp_kompensasi' => $request?->input("hpp_editable_data.$detailId.kompensasi"),
+                'req_coss_kompensasi' => $request?->input("coss_data.$detailId.kompensasi"),
+            ]);
+
+            // A. PROSES USER EDITS
             foreach ($editableFields as $field) {
-                // HPP Edits
-                if ($request?->has("hpp_editable_data.$detailId.$field")) {
-                    $val = $request->input("hpp_editable_data.$detailId.$field");
-                    $hppData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+                $hppEdited = $request?->has("hpp_editable_data.$detailId.$field");
+                $cossExplicit = !$isRoDetail && $request?->has("coss_data.$detailId.$field");
+
+                // Edit HPP
+                if ($hppEdited) {
+                    $hppData[$field] = $parseNumber($request->input("hpp_editable_data.$detailId.$field"));
                 }
-                // COSS Edits
-                if ($request?->has("coss_data.$detailId.$field")) {
-                    $val = $request->input("coss_data.$detailId.$field");
-                    $cossData[$field] = ($val === '' || $val === null) ? null : (is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val));
+
+                // Edit COSS (Hanya jika bukan RO)
+                if (!$isRoDetail) {
+                    if (in_array($field, $syncHppToCossFields) && $hppEdited) {
+                        // Cek apakah nilai HPP yang dikirim BENAR-BENAR berbeda dari nilai
+                        // yang tersimpan di DB SEBELUM reset (bukan post-reset yang sudah di-null).
+                        $preResetValue = $storedHpp ? (float) ($storedHpp->{$field} ?? 0) : null;
+                        $requestHppValue = (float) ($hppData[$field] ?? 0);
+                        $hppActuallyChanged = $preResetValue !== null
+                            && abs($requestHppValue - $preResetValue) > 0.01;
+
+                        if ($hppActuallyChanged) {
+                            // HPP benar-benar berubah dari nilai sebelumnya → COSS wajib mengikuti
+                            $cossData[$field] = $hppData[$field];
+                            \Log::info("Synced HPP edit to COSS (HPP changed)", [
+                                'detail_id' => $detailId,
+                                'field' => $field,
+                                'pre_reset_hpp' => $preResetValue,
+                                'new_value' => $hppData[$field],
+                            ]);
+                        } elseif ($cossExplicit) {
+                            // HPP tidak berubah (sama dengan pre-reset) → user mengubah COSS independen
+                            $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
+                            \Log::info("COSS edited independently (HPP unchanged)", [
+                                'detail_id' => $detailId,
+                                'field' => $field,
+                                'hpp_value' => $hppData[$field],
+                                'coss_value' => $cossData[$field],
+                            ]);
+                        } else {
+
+                            if ($storedCoss && $storedHpp) {
+                                $preResetCossVal = (float) ($storedCoss->{$field} ?? 0);
+                                $preResetHppVal = (float) ($storedHpp->{$field} ?? 0);
+
+                                if (abs($preResetCossVal - $preResetHppVal) < 0.01) {
+                                    // COSS masih sinkron dengan HPP → tetap ikuti nilai HPP
+                                    $cossData[$field] = $hppData[$field];
+                                    \Log::info("COSS kept in sync with HPP (was already synced)", [
+                                        'detail_id' => $detailId,
+                                        'field' => $field,
+                                        'value' => $hppData[$field],
+                                    ]);
+                                } else {
+                                    // COSS sebelumnya independen dari HPP → pertahankan nilai COSS
+                                    $cossData[$field] = $preResetCossVal;
+                                    \Log::info("COSS restored (was independent from HPP)", [
+                                        'detail_id' => $detailId,
+                                        'field' => $field,
+                                        'pre_reset_coss' => $preResetCossVal,
+                                        'pre_reset_hpp' => $preResetHppVal,
+                                    ]);
+                                }
+                            }
+                        }
+                    } elseif ($cossExplicit) {
+                        // Field non-sync: COSS diedit langsung
+                        $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
+                    }
                 }
             }
 
-            // 2. PROSES BPJS PERCENTAGE (HPP)
+            // B. PROSES BPJS PERCENTAGE (HPP)
             foreach ($bpjsMap as $reqKey => $dbKey) {
                 if ($request?->has("bpjs_persentase_data.$detailId.$reqKey")) {
-                    $val = $request->input("bpjs_persentase_data.$detailId.$reqKey");
-                    $hppData[$dbKey] = is_numeric($val) ? (float) $val : (float) str_replace(['.', ','], ['', '.'], $val);
+                    $hppData[$dbKey] = $parseNumber($request->input("bpjs_persentase_data.$detailId.$reqKey"));
                 }
             }
 
-            // 3. MERGE SUMMARY & METADATA
+            // C. MERGE METADATA & SUMMARY
             $commonMetadata = [
                 'quotation_detail_id' => $detailId,
                 'persen_management_fee' => $persentase,
@@ -3175,38 +3475,49 @@ class QuotationStepService
                 'updated_at' => $currentDateTime,
             ];
 
-            $hppData = array_merge($hppData, $commonMetadata, [
+            // HPP Final Prep
+            $hppFull = array_merge($hppData, $commonMetadata, [
                 'management_fee' => $summary->nominal_management_fee ?? 0,
                 'grand_total' => $summary->grand_total_sebelum_pajak ?? 0,
                 'ppn' => $summary->ppn ?? 0,
                 'pph' => $summary->pph ?? 0,
                 'total_invoice' => $summary->total_invoice ?? 0,
                 'pembulatan' => $summary->pembulatan ?? 0,
-                'is_pembulatan' => ($summary->pembulatan != $summary->total_invoice) ? 1 : 0,
+                'is_pembulatan' => (($summary->pembulatan ?? 0) != ($summary->total_invoice ?? 0)) ? 1 : 0,
             ]);
 
-            $cossData = array_merge($cossData, $commonMetadata, [
+            // COSS Final Prep
+            $cossFull = array_merge($cossData, $commonMetadata, [
                 'management_fee' => $summary->nominal_management_fee_coss ?? 0,
                 'grand_total' => $summary->grand_total_sebelum_pajak_coss ?? 0,
                 'ppn' => $summary->ppn_coss ?? 0,
                 'pph' => $summary->pph_coss ?? 0,
                 'total_invoice' => $summary->total_invoice_coss ?? 0,
                 'pembulatan' => $summary->pembulatan_coss ?? 0,
-                'is_pembulatan' => ($summary->pembulatan_coss != $summary->total_invoice_coss) ? 1 : 0,
+                'is_pembulatan' => (($summary->pembulatan_coss ?? 0) != ($summary->total_invoice_coss ?? 0)) ? 1 : 0,
             ]);
 
-            // 4. FILTER FILLABLE & ADD TO BATCH
-            $hppFinalData[] = array_intersect_key($hppData, $hppAllowed);
-            $cossFinalData[] = array_intersect_key($cossData, $cossAllowed);
+            // Filter hanya kolom yang ada di fillable
+            $hppFinalData[] = array_intersect_key($hppFull, $hppAllowed);
+            $cossFinalData[] = array_intersect_key($cossFull, $cossAllowed);
+            \Log::debug('HPP data to save', [
+                'detail_id' => $detailId,
+                'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 'not set',
+                'persen_bpjs_jkk' => $hppData['persen_bpjs_jkk'] ?? 'not set',
+            ]);
         }
 
-        // 5. EKSEKUSI DATABASE (Batch Upsert)
-        // Syarat: Kolom 'quotation_detail_id' harus punya Unique Index di DB
+        // 3. EKSEKUSI DATABASE (Batch Upsert)
+        // Tentukan kolom mana saja yang diupdate jika terjadi duplikasi (semua fillable kecuali kolom kunci)
+        $updateFieldsHpp = array_diff(array_keys($hppAllowed), ['id', 'created_at', 'quotation_detail_id']);
+        $updateFieldsCoss = array_diff(array_keys($cossAllowed), ['id', 'created_at', 'quotation_detail_id']);
+
         if (!empty($hppFinalData)) {
-            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], array_keys($hppAllowed));
+            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], $updateFieldsHpp);
         }
+
         if (!empty($cossFinalData)) {
-            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], array_keys($cossAllowed));
+            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], $updateFieldsCoss);
         }
     }
 
@@ -3759,17 +4070,14 @@ class QuotationStepService
             'quotation_id' => $quotation->id
         ]);
 
-        // FIX Bug 3: Ganti loop N+1 query dengan 2 bulk query (whereIn)
-        // Sebelum: 2 query per detail = 2N queries (N bisa puluhan)
-        // Sesudah: 2 query total, apapun jumlah detailnya
         $detailIds = $quotation->quotationDetails->pluck('id')->toArray();
 
         if (empty($detailIds)) {
             return;
         }
 
-        // 1 query untuk semua HPP
-        QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update([
+        // Field yang di-reset untuk HPP
+        $hppResetFields = [
             'tunjangan_hari_raya' => null,
             'kompensasi' => null,
             'tunjangan_hari_libur_nasional' => null,
@@ -3778,21 +4086,45 @@ class QuotationStepService
             'provisi_peralatan' => null,
             'provisi_chemical' => null,
             'provisi_ohc' => null,
+            'bpjs_jkk' => null,
+            'bpjs_jkm' => null,
+            'bpjs_jht' => null,
+            'bpjs_jp' => null,
+            'bpjs_ks' => null,
+            'persen_bpjs_jkk' => null,
+            'persen_bpjs_jkm' => null,
+            'persen_bpjs_jht' => null,
+            'persen_bpjs_jp' => null,
+            'persen_bpjs_ks' => null,
+            'gaji_pokok' => null,
             'updated_by' => $user,
             'updated_at' => $currentDateTime,
-        ]);
+        ];
 
-        // 1 query untuk semua COSS
-        QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update([
+        QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)->update($hppResetFields);
+
+        $cossResetFields = [
             'tunjangan_hari_raya' => null,
             'kompensasi' => null,
             'tunjangan_hari_libur_nasional' => null,
             'lembur' => null,
+            'bpjs_jkk' => null,
+            'bpjs_jkm' => null,
+            'bpjs_jht' => null,
+            'bpjs_jp' => null,
+            'bpjs_ks' => null,
+            'persen_bpjs_jkk' => null,
+            'persen_bpjs_jkm' => null,
+            'persen_bpjs_jht' => null,
+            'persen_bpjs_jp' => null,
+            'persen_bpjs_ks' => null,
             'updated_by' => $user,
             'updated_at' => $currentDateTime,
-        ]);
+        ];
 
-        \Log::info("Reset selesai untuk " . count($detailIds) . " detail (2 queries total)");
+        QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)->update($cossResetFields);
+
+        \Log::info("Reset selesai untuk " . count($detailIds) . " detail (termasuk persentase BPJS)");
     }
     /**
      * Force sync antara HPP dan COSS untuk field yang sama
@@ -3905,7 +4237,8 @@ class QuotationStepService
                         ]);
                     }
                 }
-                if ($coss) {
+                // Business rule: Jabatan RO tidak disinkronkan ke COSS
+                if ($coss && !$this->isRo($detail)) {
                     $updateData = [];
 
                     // Hanya update jika nilai di COSS null atau 0
@@ -4036,5 +4369,9 @@ class QuotationStepService
             $hpp->update($updateData);
             \Log::info("Updated HPP data from request", ['detail_id' => $detailId, 'fields' => array_keys($updateData)]);
         }
+    }
+    private function isRo($detail): bool
+    {
+        return ($detail->position_id ?? null) === 224;
     }
 }

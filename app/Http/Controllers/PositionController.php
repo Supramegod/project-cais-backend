@@ -364,7 +364,8 @@ class PositionController extends Controller
                 'description' => $request->deskripsi,
                 'layanan_id' => $request->layanan,
                 'is_active' => true,
-                'created_by' => Auth::id() ?? 0, // Gunakan user ID, bukan name
+                'created_by' => Auth::id() ?? 0, 
+                'updated_by' => Auth::id() ?? 0,// Gunakan user ID, bukan name
             ]);
 
             DB::connection('mysqlhris')->commit();
