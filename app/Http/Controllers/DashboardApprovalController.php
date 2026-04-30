@@ -76,8 +76,6 @@ class DashboardApprovalController extends Controller
      *                 property="pending_approval_summary",
      *                 type="object",
      *                 description="Jumlah quotation yang belum diapprove per role",
-     *                 @OA\Property(property="gm_operasional", type="integer", example=2),
-     *                 @OA\Property(property="gm_hcm", type="integer", example=2),
      *                 @OA\Property(property="dir_sales", type="integer", example=3),
      *                 @OA\Property(property="dir_keu", type="integer", example=5)
      *             )
@@ -109,10 +107,6 @@ class DashboardApprovalController extends Controller
 
         $user = Auth::user();
 
-        // TODO: HAPUS SETELAH 2025-04-16 — tanggal mulai sistem GM aktif
-        $gmStartDate = Carbon::parse('2026-03-16')->startOfDay();
-        // END TODO
-
         // Base query factory — kondisi dasar yang berlaku untuk semua keperluan
         $baseQuery = fn() => Quotation::query()
             ->where('is_aktif', 0)
@@ -124,8 +118,8 @@ class DashboardApprovalController extends Controller
         // query COUNT() ringan — tanpa fetch record ke PHP.
         // Frontend cukup panggil 1x API dan baca key yang dibutuhkan.
         // ---------------------------------------------------------------
-        $counts = $this->getAllCaseCounts($baseQuery, $user, $gmStartDate);
-        $pendingSummary = $this->getPendingApprovalSummary($baseQuery, $gmStartDate);
+        $counts = $this->getAllCaseCounts($baseQuery, $user);
+        $pendingSummary = $this->getPendingApprovalSummary($baseQuery);
 
         // Query list data (dengan select & eager load)
         $query = $baseQuery()
@@ -158,37 +152,17 @@ class DashboardApprovalController extends Controller
         // Apply filter tambahan berdasarkan tipe — hanya memengaruhi $data
         switch ($request->tipe) {
             case 'menunggu-anda':
-                $this->applyMenungguAndaFilter($query, $user, $gmStartDate);
+                $this->applyMenungguAndaFilter($query, $user);
                 break;
 
             case 'menunggu-approval':
                 $query->where('step', 100)
                     ->where('is_aktif', 0)
                     ->where('status_quotation_id', 2)
-                    ->where(function ($q) use ($gmStartDate) {
-                        // Menunggu GM 1 (hanya quotation baru)
-                        $q->where(function ($subQ) use ($gmStartDate) {
-                            $subQ->whereNull('ot3')
-                                ->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')]);
-                        })
-                            // Menunggu GM 2 (hanya quotation baru)
-                            ->orWhere(function ($subQ) use ($gmStartDate) {
-                            $subQ->whereNull('ot4')
-                                ->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')]);
-                        })
-                            // Menunggu Dir Sales — quotation lama langsung, quotation baru wajib GM dulu
-                            ->orWhere(function ($subQ) use ($gmStartDate) {
-                            $subQ->whereNull('ot1')
-                                ->where(function ($inner) use ($gmStartDate) {
-                                    // Quotation lama → langsung antri Dir Sales
-                                    $inner->whereRaw("tgl_quotation < ?", [$gmStartDate->format('Y-m-d')])
-                                        // Quotation baru → wajib ot3 & ot4 dulu
-                                        ->orWhere(function ($new) use ($gmStartDate) {
-                                        $new->whereRaw("tgl_quotation >= ?", [$gmStartDate->format('Y-m-d')])
-                                            ->whereNotNull('ot3')
-                                            ->whereNotNull('ot4');
-                                    });
-                                });
+                    ->where(function ($q) {
+                        // Menunggu Dir Sales
+                        $q->where(function ($subQ) {
+                            $subQ->whereNull('ot1');
                         })
                             // Menunggu Dir Keu
                             ->orWhere(function ($subQ) {
@@ -491,7 +465,7 @@ class DashboardApprovalController extends Controller
     {
         $user = Auth::user();
         $unreadCount = LogNotification::getUnreadCount($user->id);
-
+        
         return response()->json([
             'success' => true,
             'data' => [
@@ -504,16 +478,14 @@ class DashboardApprovalController extends Controller
     // PRIVATE HELPERS
     // ============================================================
 
-    private function getAllCaseCounts(\Closure $baseQuery, $user, Carbon $gmStartDate): array
+    private function getAllCaseCounts(\Closure $baseQuery, $user): array
     {
-        $gmDate = $gmStartDate->format('Y-m-d');
-
         // semua → base query tanpa filter tambahan
         $countSemua = $baseQuery()->count();
 
         // menunggu-anda → step 100 + kondisi per role
         $qMenungguAnda = $baseQuery()->where('step', 100);
-        $this->applyMenungguAndaFilter($qMenungguAnda, $user, $gmStartDate);
+        $this->applyMenungguAndaFilter($qMenungguAnda, $user);
         $countMenungguAnda = $qMenungguAnda->count();
 
         $baseConditions = $baseQuery()
@@ -521,29 +493,9 @@ class DashboardApprovalController extends Controller
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
-        // GM 1 — hanya quotation mulai gmStartDate
-        $countGM1 = (clone $baseConditions)
-            ->whereNull('ot3')
-            ->whereRaw("tgl_quotation >= ?", [$gmDate])
-            ->count();
-
-        // GM 2 — hanya quotation mulai gmStartDate
-        $countGM2 = (clone $baseConditions)
-            ->whereNull('ot4')
-            ->whereRaw("tgl_quotation >= ?", [$gmDate])
-            ->count();
-
-        // Dir Sales — quotation lama langsung antri, quotation baru wajib ot3 & ot4 dulu
+        // Dir Sales — semua quotation langsung antri
         $countDirSales = (clone $baseConditions)
             ->whereNull('ot1')
-            ->where(function ($q) use ($gmDate) {
-                $q->whereRaw("tgl_quotation < ?", [$gmDate])
-                    ->orWhere(function ($new) use ($gmDate) {
-                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
-                            ->whereNotNull('ot3')
-                            ->whereNotNull('ot4');
-                    });
-            })
             ->count();
 
         // Dir Keu — tetap sama
@@ -558,7 +510,7 @@ class DashboardApprovalController extends Controller
             })
             ->count();
 
-        $countMenungguApproval = $countGM1 + $countGM2 + $countDirSales + $countDirKeu;
+        $countMenungguApproval = $countDirSales + $countDirKeu;
 
         // quotation-belum-lengkap
         $countBelumLengkap = $baseQuery()
@@ -574,38 +526,16 @@ class DashboardApprovalController extends Controller
         ];
     }
 
-    private function getPendingApprovalSummary(\Closure $baseQuery, Carbon $gmStartDate): array
+    private function getPendingApprovalSummary(\Closure $baseQuery): array
     {
-        $gmDate = $gmStartDate->format('Y-m-d');
-
         $baseConditions = fn() => $baseQuery()
             ->where('is_aktif', 0)
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
         return [
-            'gm_operasional' => (clone $baseConditions())
-                ->whereNull('ot3')
-                ->whereRaw("tgl_quotation >= ?", [$gmDate])
-                ->count(),
-
-            'gm_hcm' => (clone $baseConditions())
-                ->whereNull('ot4')
-                ->whereRaw("tgl_quotation >= ?", [$gmDate])
-                ->count(),
-
             'dir_sales' => (clone $baseConditions())
                 ->whereNull('ot1')
-                ->where(function ($q) use ($gmDate) {
-                    // Quotation lama → langsung
-                    $q->whereRaw("tgl_quotation <= ?", [$gmDate])
-                        // Quotation baru → wajib ot3 & ot4 dulu
-                        ->orWhere(function ($new) use ($gmDate) {
-                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
-                            ->whereNotNull('ot3')
-                            ->whereNotNull('ot4');
-                    });
-                })
                 ->count(),
 
             'dir_keu' => (clone $baseConditions())
@@ -624,47 +554,18 @@ class DashboardApprovalController extends Controller
     /**
      * Apply filter untuk tipe "menunggu-anda" berdasarkan role user
      */
-    private function applyMenungguAndaFilter($query, $user, Carbon $gmStartDate): void
+    private function applyMenungguAndaFilter($query, $user): void
     {
-        $gmDate = $gmStartDate->format('Y-m-d');
-
         $query->where('step', 100)
             ->where('is_aktif', 0)
             ->where('status_quotation_id', 2);
 
         $conditions = [];
 
-        // GM 1 (role 10) — hanya quotation mulai gmStartDate
-        if ($user->cais_role_id == 10) {
-            $conditions[] = function ($q) use ($gmDate) {
-                $q->whereNull('ot3')
-                    ->whereRaw("tgl_quotation >= ?", [$gmDate]);
-            };
-        }
-
-        // GM 2 (role 53) — hanya quotation mulai gmStartDate
-        if ($user->cais_role_id == 53) {
-            $conditions[] = function ($q) use ($gmDate) {
-                $q->whereNull('ot4')
-                    ->whereRaw("tgl_quotation >= ?", [$gmDate]);
-            };
-        }
-
-        // Dir Sales (role 96) — quotation lama langsung, quotation baru wajib GM dulu
+        // Dir Sales (role 96) — semua quotation langsung antri
         if ($user->cais_role_id == 96) {
-            $conditions[] = function ($q) use ($gmDate) {
-                // Quotation lama → langsung antri Dir Sales
-                $q->where(function ($old) use ($gmDate) {
-                    $old->whereRaw("tgl_quotation <= ?", [$gmDate])
-                        ->whereNull('ot1');
-                })
-                    // Quotation baru → wajib ot3 & ot4 dulu baru antri Dir Sales
-                    ->orWhere(function ($new) use ($gmDate) {
-                        $new->whereRaw("tgl_quotation >= ?", [$gmDate])
-                            ->whereNotNull('ot3')
-                            ->whereNotNull('ot4')
-                            ->whereNull('ot1');
-                    });
+            $conditions[] = function ($q) {
+                $q->whereNull('ot1');
             };
         }
 
