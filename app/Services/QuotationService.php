@@ -321,7 +321,7 @@ class QuotationService
 
     private function initializeDetail($detail, $hpp, $site, $wage, $quotation): void
     {
-        $detail->nominal_upah = $detail->nominal_upah ?? $hpp->gaji_pokok ?? $site->nominal_upah;
+        $detail->nominal_upah = $detail->nominal_upah ?? $site->nominal_upah;
         $detail->umk = $site->umk ?? 0;
         $detail->ump = $site->ump ?? 0;
 
@@ -810,7 +810,7 @@ class QuotationService
             $tunjanganHariRayaCoss = $coss ? (float) ($coss->tunjangan_hari_raya ?? 0) : 0;
 
             if ($tunjanganHariRayaHpp == 0 && $wage && isset($wage->thr)) {
-                $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada ya'));
+                $thrWageValue = strtolower(trim($wage->thr ?? 'Tidak Ada'));
                 if (in_array($thrWageValue, ['diprovisikan'])) {
                     $divisor = $isGC ? $hariKerja : 12;
                     $tunjanganHariRayaHpp = $baseUpahBulanan / $divisor;
@@ -823,7 +823,7 @@ class QuotationService
             $kompensasiCoss = $coss ? (float) ($coss->kompensasi ?? 0) : 0;
 
             if ($kompensasiHpp == 0 && $wage && isset($wage->kompensasi)) {
-                if (in_array(strtolower(trim($wage->kompensasi ?? 'Tidak Ada ya')), ['diprovisikan'])) {
+                if (in_array(strtolower(trim($wage->kompensasi ?? 'Tidak Ada')), ['diprovisikan'])) {
                     $divisor = $isGC ? $hariKerja : 12;
                     $kompensasiHpp = $baseUpahBulanan / $divisor;
                     $kompensasiCoss = $baseUpahBulanan / $divisor;
