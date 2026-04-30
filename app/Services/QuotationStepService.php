@@ -1029,7 +1029,7 @@ class QuotationStepService
             }
 
             if ($statusData['status_quotation_id'] == 2) {
-                $this->notifyGM($quotation, $currentDateTime);
+                $this->notifyDirSales($quotation, $currentDateTime);
             }
 
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
@@ -1172,7 +1172,41 @@ class QuotationStepService
 
         return $perjanjian;
     }
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
+    {
+        $dirSales = [27927, 127822];
 
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
+
+        foreach ($dirSales as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $currentDateTime,
+                'created_by' => $creatorName
+            ]);
+        }
+
+        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
+        $this->quotationNotificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+        );
+        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
+            ->delay(now()->addDay());
+    }
 
 
     private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
@@ -3322,8 +3356,7 @@ class QuotationStepService
         $cossFinalData = [];
 
         /**
-         * Helper untuk membersihkan format angka (IDR string ke float)
-         * Contoh: "1.500.000,50" -> 1500000.50
+
          */
         $parseNumber = function ($val) {
             if ($val === '' || $val === null)
@@ -3334,6 +3367,7 @@ class QuotationStepService
             // Hilangkan titik (ribuan) dan ubah koma ke titik (desimal)
             return (float) str_replace(',', '.', str_replace('.', '', $val));
         };
+        $hppDbMap = $calculationResult->quotation->_hpp_map ?? collect();
 
         $syncHppToCossFields = ['tunjangan_hari_raya', 'kompensasi'];
 
@@ -3343,6 +3377,9 @@ class QuotationStepService
             $cossData = $detailCalculation->coss_data;
             $detailForCheck = $detailsMap->get($detailId);
             $isRoDetail = $detailForCheck && $this->isRo($detailForCheck);
+
+            // Ambil nilai HPP yang tersimpan di DB untuk deteksi perubahan
+            $storedHpp = $hppDbMap->get($detailId);
 
             // A. PROSES USER EDITS
             foreach ($editableFields as $field) {
@@ -3357,17 +3394,34 @@ class QuotationStepService
                 // Edit COSS (Hanya jika bukan RO)
                 if (!$isRoDetail) {
                     if (in_array($field, $syncHppToCossFields) && $hppEdited) {
-                        // HPP diedit → COSS WAJIB ikut nilai HPP yang baru
-                        // (coss_data diabaikan untuk field ini agar sinkronisasi terjamin)
-                        $cossData[$field] = $hppData[$field];
+                        // Cek apakah nilai HPP yang dikirim BENAR-BENAR berbeda dari DB.
+                        // Frontend selalu mengirim semua field termasuk yang tidak diubah,
+                        // sehingga kehadiran field di request tidak cukup sebagai indikator perubahan.
+                        $storedHppValue = $storedHpp ? (float) ($storedHpp->{$field} ?? 0) : null;
+                        $requestHppValue = (float) ($hppData[$field] ?? 0);
+                        $hppActuallyChanged = $storedHppValue !== null
+                            && abs($requestHppValue - $storedHppValue) > 0.01;
 
-                        \Log::info("Synced HPP edit to COSS", [
-                            'detail_id' => $detailId,
-                            'field' => $field,
-                            'value' => $cossData[$field],
-                        ]);
+                        if ($hppActuallyChanged) {
+                            // HPP benar-benar berubah → COSS wajib mengikuti nilai HPP baru
+                            $cossData[$field] = $hppData[$field];
+                            \Log::info("Synced HPP edit to COSS (HPP changed)", [
+                                'detail_id' => $detailId,
+                                'field' => $field,
+                                'stored_hpp' => $storedHppValue,
+                                'new_value' => $hppData[$field],
+                            ]);
+                        } elseif ($cossExplicit) {
+                            // HPP tidak berubah → user mengubah COSS secara independen
+                            $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
+                            \Log::info("COSS edited independently (HPP unchanged)", [
+                                'detail_id' => $detailId,
+                                'field' => $field,
+                                'coss_value' => $cossData[$field],
+                            ]);
+                        }
                     } elseif ($cossExplicit) {
-                        // COSS diedit secara independen (HPP field tidak diubah) → pakai nilai COSS
+                        // Field non-sync: COSS diedit langsung
                         $cossData[$field] = $parseNumber($request->input("coss_data.$detailId.$field"));
                     }
                 }
@@ -3420,6 +3474,8 @@ class QuotationStepService
             ]);
         }
 
+        // 3. EKSEKUSI DATABASE (Batch Upsert)
+        // Tentukan kolom mana saja yang diupdate jika terjadi duplikasi (semua fillable kecuali kolom kunci)
         $updateFieldsHpp = array_diff(array_keys($hppAllowed), ['id', 'created_at', 'quotation_detail_id']);
         $updateFieldsCoss = array_diff(array_keys($cossAllowed), ['id', 'created_at', 'quotation_detail_id']);
 
@@ -3621,9 +3677,6 @@ class QuotationStepService
                 $updateData[$field] = $data[$field];
             }
         }
-
-        // Update persentase BPJS per detail (jika ada perubahan, HPP/COSS nominal akan di-clear
-        // agar dihitung ulang oleh calculateQuotation pada step berikutnya)
         $bpjsPercentFields = [
             'persen_bpjs_jkk',
             'persen_bpjs_jkm',
@@ -3692,8 +3745,6 @@ class QuotationStepService
         $hasUpdate = false;
         $requiresHppCossRecalculation = false;
 
-        // 1. Update upah jika nominal_upah diubah dan custom (dari detail_data)
-        // ✅ PERBAIKAN KRITIS: Deteksi perubahan nominal_upah dan trigger recalculation
         if (isset($data['nominal_upah'])) {
             $newNominalUpah = $this->convertToFloat($data['nominal_upah']);
             $oldNominalUpah = (float) $detail->nominal_upah;
@@ -3727,8 +3778,6 @@ class QuotationStepService
             'tunjangan_holiday' => 'tunjangan_holiday',
             'nominal_tunjangan_holiday' => 'nominal_tunjangan_holiday',
             'lembur_ditagihkan' => 'lembur_ditagihkan'
-            // CATATAN: 'hitungan_upah' TIDAK ada di sini - field ini read-only di Step 11
-            // hitungan_upah hanya bisa diset di Step 4 saat membuat wage
         ];
 
         // Field yang kalau berubah, HPP/COSS perlu di-recalculate
@@ -3740,7 +3789,6 @@ class QuotationStepService
             'tunjangan_hari_raya',
             'kompensasi',
             'lembur_ditagihkan'
-            // CATATAN: 'hitungan_upah' TIDAK included - tidak trigger recalculation di Step 11
         ];
 
         foreach ($wageFieldMapping as $inputField => $wageField) {
@@ -3783,7 +3831,6 @@ class QuotationStepService
                 'updated_fields' => array_keys($wageUpdateData),
                 'requires_recalculation' => $requiresHppCossRecalculation
             ]);
-
             if ($requiresHppCossRecalculation) {
                 $fieldsToClear = [
                     'tunjangan_hari_raya',
