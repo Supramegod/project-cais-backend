@@ -7948,14 +7948,6 @@
                                         "pending_approval_summary": {
                                             "description": "Jumlah quotation yang belum diapprove per role",
                                             "properties": {
-                                                "gm_operasional": {
-                                                    "type": "integer",
-                                                    "example": 2
-                                                },
-                                                "gm_hcm": {
-                                                    "type": "integer",
-                                                    "example": 2
-                                                },
                                                 "dir_sales": {
                                                     "type": "integer",
                                                     "example": 3
@@ -22869,216 +22861,59 @@
                 "tags": [
                     "Sales Revenue"
                 ],
-                "summary": "Get monthly revenue data without pagination",
-                "description": "Calculate accumulated invoice values for sales (Role ID: 29-33) grouped by user and month. Returns array without pagination.",
-                "operationId": "getMonthlyRevenue",
+                "summary": "Get monthly revenue data",
+                "operationId": "dc552c7589cd074920635c31342e8d22",
                 "parameters": [
                     {
                         "name": "year",
                         "in": "query",
-                        "description": "Year filter (e.g., 2024)",
-                        "required": false,
                         "schema": {
                             "type": "integer",
-                            "maximum": 2100,
-                            "minimum": 2000,
                             "example": 2024
                         }
                     },
                     {
                         "name": "month",
                         "in": "query",
-                        "description": "Month filter (1-12)",
-                        "required": false,
                         "schema": {
                             "type": "integer",
                             "maximum": 12,
-                            "minimum": 1,
-                            "example": 6
+                            "minimum": 1
                         }
                     },
                     {
                         "name": "user_id",
                         "in": "query",
-                        "description": "Filter by specific user ID",
-                        "required": false,
                         "schema": {
-                            "type": "integer",
-                            "example": 123
+                            "type": "integer"
                         }
                     },
                     {
                         "name": "start_date",
                         "in": "query",
-                        "description": "Start date (YYYY-MM-DD)",
-                        "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date",
-                            "example": "2024-01-01"
+                            "format": "date"
                         }
                     },
                     {
                         "name": "end_date",
                         "in": "query",
-                        "description": "End date (YYYY-MM-DD)",
-                        "required": false,
                         "schema": {
                             "type": "string",
-                            "format": "date",
-                            "example": "2024-12-31"
+                            "format": "date"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Monthly revenue data retrieved successfully"
-                                        },
-                                        "timestamp": {
-                                            "type": "string",
-                                            "format": "date-time"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "user_id": {
-                                                        "type": "integer",
-                                                        "example": 123
-                                                    },
-                                                    "user_name": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "user_role": {
-                                                        "type": "integer",
-                                                        "example": 29
-                                                    },
-                                                    "month": {
-                                                        "type": "string",
-                                                        "example": "2024-06"
-                                                    },
-                                                    "month_name": {
-                                                        "type": "string",
-                                                        "example": "June 2024"
-                                                    },
-                                                    "revenue": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 10000000
-                                                    },
-                                                    "revenue_formatted": {
-                                                        "type": "string",
-                                                        "example": "Rp 10.000.000"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "summary": {
-                                            "properties": {
-                                                "total_revenue": {
-                                                    "type": "number",
-                                                    "example": 120000000
-                                                },
-                                                "total_revenue_formatted": {
-                                                    "type": "string",
-                                                    "example": "Rp 120.000.000"
-                                                },
-                                                "user_count": {
-                                                    "type": "integer",
-                                                    "example": 5
-                                                },
-                                                "month_count": {
-                                                    "type": "integer",
-                                                    "example": 12
-                                                },
-                                                "average_per_user": {
-                                                    "type": "number",
-                                                    "example": 24000000
-                                                },
-                                                "average_per_month": {
-                                                    "type": "number",
-                                                    "example": 10000000
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "metadata": {
-                                            "properties": {
-                                                "total_records": {
-                                                    "type": "integer",
-                                                    "example": 50
-                                                },
-                                                "generated_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "filters_applied": {
-                                                    "type": "object"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "OK"
                     },
                     "400": {
-                        "description": "Bad request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation failed"
-                                        },
-                                        "errors": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error"
                     },
                     "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Server error occurred"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Server error"
                     }
                 },
                 "security": [
@@ -23093,35 +22928,19 @@
                 "tags": [
                     "Sales Revenue"
                 ],
-                "summary": "Get revenue summary by user",
-                "description": "Get aggregated revenue summary grouped by sales user",
-                "operationId": "getRevenueSummary",
+                "summary": "Get revenue summary per user",
+                "operationId": "56057a0568e0c10cfb9d1de4218533f7",
                 "parameters": [
                     {
                         "name": "year",
                         "in": "query",
-                        "description": "Year filter",
-                        "required": false,
                         "schema": {
-                            "type": "integer",
-                            "example": 2024
+                            "type": "integer"
                         }
                     },
                     {
                         "name": "month",
                         "in": "query",
-                        "description": "Month filter",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 6
-                        }
-                    },
-                    {
-                        "name": "user_id",
-                        "in": "query",
-                        "description": "Filter by user ID",
-                        "required": false,
                         "schema": {
                             "type": "integer"
                         }
@@ -23129,153 +22948,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Revenue summary retrieved successfully"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "user_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "user_name": {
-                                                        "type": "string"
-                                                    },
-                                                    "user_role": {
-                                                        "type": "integer"
-                                                    },
-                                                    "total_revenue": {
-                                                        "type": "number"
-                                                    },
-                                                    "total_revenue_formatted": {
-                                                        "type": "string"
-                                                    },
-                                                    "month_count": {
-                                                        "type": "integer"
-                                                    },
-                                                    "average_monthly": {
-                                                        "type": "number"
-                                                    },
-                                                    "average_monthly_formatted": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        },
-                                        "grand_total": {
-                                            "type": "number"
-                                        },
-                                        "grand_total_formatted": {
-                                            "type": "string"
-                                        },
-                                        "total_users": {
-                                            "type": "integer"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/sales-revenue/by-user": {
-            "get": {
-                "tags": [
-                    "Sales Revenue"
-                ],
-                "summary": "Get revenue grouped by user",
-                "description": "Get revenue data grouped by user with monthly breakdown",
-                "operationId": "getRevenueByUser",
-                "parameters": [
-                    {
-                        "name": "year",
-                        "in": "query",
-                        "description": "Year filter",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "example": 2024
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "user_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "user_name": {
-                                                        "type": "string"
-                                                    },
-                                                    "user_role": {
-                                                        "type": "integer"
-                                                    },
-                                                    "total_revenue": {
-                                                        "type": "number"
-                                                    },
-                                                    "total_revenue_formatted": {
-                                                        "type": "string"
-                                                    },
-                                                    "monthly_breakdown": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "properties": {
-                                                                "month": {
-                                                                    "type": "string"
-                                                                },
-                                                                "month_name": {
-                                                                    "type": "string"
-                                                                },
-                                                                "revenue": {
-                                                                    "type": "number"
-                                                                },
-                                                                "revenue_formatted": {
-                                                                    "type": "string"
-                                                                }
-                                                            },
-                                                            "type": "object"
-                                                        }
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "OK"
                     }
                 },
                 "security": [
@@ -23290,77 +22963,467 @@
                 "tags": [
                     "Sales Revenue"
                 ],
-                "summary": "Get revenue grouped by month",
-                "description": "Get revenue data grouped by month with user breakdown",
-                "operationId": "getRevenueByMonth",
+                "summary": "Get revenue grouped by month for a year",
+                "operationId": "e2b14208752401ac25e1524dc5dc4aa1",
                 "parameters": [
                     {
                         "name": "year",
                         "in": "query",
-                        "description": "Year filter",
                         "required": true,
                         "schema": {
-                            "type": "integer",
-                            "example": 2024
+                            "type": "integer"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful response",
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-revenue/kpi": {
+            "get": {
+                "tags": [
+                    "Sales Revenue"
+                ],
+                "summary": "KPI: actual revenue vs sales target per user per month",
+                "description": "Menghitung pencapaian target (personal/branch/company) untuk setiap sales berdasarkan revenue aktual PKS.",
+                "operationId": "fa0acc044d55de090f47096622af4ae9",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2025
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "period_type",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "monthly",
+                            "enum": [
+                                "monthly",
+                                "yearly"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "success": {
-                                            "type": "boolean",
-                                            "example": true
+                                            "type": "boolean"
                                         },
                                         "data": {
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "month": {
+                                                    "user_id": {
                                                         "type": "string"
+                                                    },
+                                                    "user_name": {
+                                                        "type": "string"
+                                                    },
+                                                    "month": {
+                                                        "type": "string",
+                                                        "example": "2025-06"
                                                     },
                                                     "month_name": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "example": "June 2025"
                                                     },
-                                                    "total_revenue": {
+                                                    "actual_revenue": {
                                                         "type": "number"
                                                     },
-                                                    "total_revenue_formatted": {
+                                                    "actual_formatted": {
                                                         "type": "string"
                                                     },
-                                                    "user_breakdown": {
-                                                        "type": "array",
-                                                        "items": {
-                                                            "properties": {
-                                                                "user_id": {
-                                                                    "type": "integer"
-                                                                },
-                                                                "user_name": {
-                                                                    "type": "string"
-                                                                },
-                                                                "revenue": {
-                                                                    "type": "number"
-                                                                },
-                                                                "revenue_formatted": {
-                                                                    "type": "string"
-                                                                }
-                                                            },
-                                                            "type": "object"
-                                                        }
+                                                    "target_personal": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "target_branch": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "target_company": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "achievement_personal": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "achievement_branch": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "achievement_company": {
+                                                        "type": "number",
+                                                        "nullable": true
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "achieved",
+                                                            "on_track",
+                                                            "under_target",
+                                                            "no_target"
+                                                        ]
+                                                    },
+                                                    "rank": {
+                                                        "type": "integer"
                                                     }
                                                 },
                                                 "type": "object"
                                             }
+                                        },
+                                        "summary": {
+                                            "properties": {
+                                                "total_actual": {
+                                                    "type": "number"
+                                                },
+                                                "total_actual_formatted": {
+                                                    "type": "string"
+                                                },
+                                                "total_target_personal": {
+                                                    "type": "number"
+                                                },
+                                                "total_target_formatted": {
+                                                    "type": "string"
+                                                },
+                                                "avg_achievement_personal": {
+                                                    "type": "number",
+                                                    "nullable": true
+                                                },
+                                                "status_breakdown": {
+                                                    "properties": {
+                                                        "achieved": {
+                                                            "type": "integer"
+                                                        },
+                                                        "on_track": {
+                                                            "type": "integer"
+                                                        },
+                                                        "under_target": {
+                                                            "type": "integer"
+                                                        },
+                                                        "no_target": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Validation error"
+                    },
+                    "500": {
+                        "description": "Server error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-target": {
+            "get": {
+                "tags": [
+                    "Sales Target"
+                ],
+                "summary": "Daftar target penjualan",
+                "operationId": "4b2f24cdb3cb7cc8fbf4809595a6d1bb",
+                "parameters": [
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "personal",
+                                "branch",
+                                "company"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "user_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Sales Target"
+                ],
+                "summary": "Buat target penjualan baru",
+                "operationId": "8a664641a45d938311929de7a728a74e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "period_type",
+                                    "year",
+                                    "target_amount"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "personal",
+                                            "branch",
+                                            "company"
+                                        ]
+                                    },
+                                    "period_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "monthly",
+                                            "yearly"
+                                        ]
+                                    },
+                                    "year": {
+                                        "type": "integer",
+                                        "example": 2025
+                                    },
+                                    "month": {
+                                        "type": "integer",
+                                        "example": 6,
+                                        "nullable": true
+                                    },
+                                    "target_amount": {
+                                        "type": "number",
+                                        "example": 50000000
+                                    },
+                                    "user_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "branch_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Target berhasil dibuat"
+                    },
+                    "422": {
+                        "description": "Validasi gagal"
+                    },
+                    "409": {
+                        "description": "Target sudah ada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-target/{id}": {
+            "get": {
+                "tags": [
+                    "Sales Target"
+                ],
+                "summary": "Detail target penjualan",
+                "operationId": "662f43352de2ea9c919574b30e074741",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Sales Target"
+                ],
+                "summary": "Update target penjualan",
+                "operationId": "89c51973c21fa267c89ad4c3bf8894ad",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "target_amount": {
+                                        "type": "number",
+                                        "example": 75000000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Sales Target"
+                ],
+                "summary": "Hapus target penjualan",
+                "operationId": "132b1174548ce5d539365521d3232196",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not found"
                     }
                 },
                 "security": [
@@ -31278,6 +31341,10 @@
         {
             "name": "Sales Revenue",
             "description": "API untuk menghitung akumulasi total nilai invoice sales berdasarkan PKS"
+        },
+        {
+            "name": "Sales Target",
+            "description": "CRUD endpoint untuk manajemen KPI Sales Target"
         },
         {
             "name": "Site",
