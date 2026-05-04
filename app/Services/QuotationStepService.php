@@ -1029,7 +1029,7 @@ class QuotationStepService
             }
 
             if ($statusData['status_quotation_id'] == 2) {
-                $this->notifyGM($quotation, $currentDateTime);
+                $this->notifyDirSales($quotation, $currentDateTime);
             }
 
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
@@ -1174,10 +1174,9 @@ class QuotationStepService
     }
 
 
-
-    private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
+ private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
-        $gmUserIds = [127824, 16932, 16991];
+        $dirSales = [27927, 127822];
 
         $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
             ->where('leads_id', $quotation->leads_id)
@@ -1185,9 +1184,9 @@ class QuotationStepService
             ->first();
 
         $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
-        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan GM.";
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
 
-        foreach ($gmUserIds as $userId) {
+        foreach ($dirSales as $userId) {
             LogNotification::create([
                 'user_id' => $userId,
                 'doc_id' => $quotation->id,
@@ -1196,30 +1195,66 @@ class QuotationStepService
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName,
+                'created_by' => $creatorName
             ]);
         }
 
         $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
-
-        // Email ke GM Operasional
         $this->quotationNotificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::GM_OPERASIONAL
+            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
         );
-
-        // Email ke GM HRM
-        $this->quotationNotificationService->sendApprovalNotification(
-            quotation: $quotation,
-            creatorName: $creatorName,
-            approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::GM_HRM
-        );
-        dispatch(new EscalateQuotationJob($quotation->id, 'GM', $currentDateTime))
+        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
             ->delay(now()->addDay());
     }
+
+    // private function notifyGM(Quotation $quotation, Carbon $currentDateTime): void
+    // {
+    //     $gmUserIds = [127824, 16932, 16991];
+
+    //     $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+    //         ->where('leads_id', $quotation->leads_id)
+    //         ->where('kebutuhan_id', $quotation->kebutuhan_id)
+    //         ->first();
+
+    //     $creatorName = $leadsKebutuhan->timSalesD->nama ?? Auth::user()->full_name;
+    //     $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan GM.";
+
+    //     foreach ($gmUserIds as $userId) {
+    //         LogNotification::create([
+    //             'user_id' => $userId,
+    //             'doc_id' => $quotation->id,
+    //             'transaksi' => 'Quotation',
+    //             'tabel' => 'sl_quotation',
+    //             'pesan' => $msg,
+    //             'is_read' => 0,
+    //             'created_at' => $currentDateTime,
+    //             'created_by' => $creatorName,
+    //         ]);
+    //     }
+
+    //     $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
+
+    //     // Email ke GM Operasional
+    //     $this->quotationNotificationService->sendApprovalNotification(
+    //         quotation: $quotation,
+    //         creatorName: $creatorName,
+    //         approvalUrl: $approvalUrl,
+    //         overrideRecipients: QuotationNotificationService::GM_OPERASIONAL
+    //     );
+
+    //     // Email ke GM HRM
+    //     $this->quotationNotificationService->sendApprovalNotification(
+    //         quotation: $quotation,
+    //         creatorName: $creatorName,
+    //         approvalUrl: $approvalUrl,
+    //         overrideRecipients: QuotationNotificationService::GM_HRM
+    //     );
+    //     dispatch(new EscalateQuotationJob($quotation->id, 'GM', $currentDateTime))
+    //         ->delay(now()->addDay());
+    // }
 
     private function validateStep2(Request $request): void
     {

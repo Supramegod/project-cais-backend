@@ -13,6 +13,7 @@ use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesActivityController;
+use App\Http\Controllers\SalesTargetController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -468,7 +469,12 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/summary', 'getRevenueSummary');
         Route::get('/by-user', 'getRevenueByUser');
         Route::get('/by-month', 'getRevenueByMonth');
+        Route::get('/kpi', 'getkpi');
+
     });
+      Route::apiResource('sales-target', SalesTargetController::class)->only([
+        'index', 'store', 'show', 'update', 'destroy',
+    ]);
 
     // Target Management
     Route::prefix('targets')->controller(TargetController::class)->group(function () {
