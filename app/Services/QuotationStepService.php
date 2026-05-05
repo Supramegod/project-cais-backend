@@ -678,6 +678,7 @@ class QuotationStepService
             'note_harga_jual_added' => is_null($quotation->note_harga_jual) ? 'yes' : 'already_exists'
         ]);
     }
+
     public function updateStep6(Quotation $quotation, Request $request): void
     {
         DB::beginTransaction();
@@ -689,7 +690,9 @@ class QuotationStepService
                 $aplikasiIds = $request->aplikasi_pendukung;
 
                 // Preload semua aplikasi pendukung yang dipilih
-                $aplikasiList = AplikasiPendukung::whereIn('id', $aplikasiIds)->get()->keyBy('id');
+                $aplikasiList = AplikasiPendukung::whereIn('id', $aplikasiIds)
+                    ->get()
+                    ->keyBy('id');
 
                 // Hitung jumlah HC per site dari database
                 $siteHcMap = QuotationDetail::where('quotation_id', $quotation->id)
@@ -699,8 +702,14 @@ class QuotationStepService
                     ->pluck('total_hc', 'quotation_site_id')
                     ->toArray();
 
-                // 1. Update atau create QuotationAplikasi
+                // =========================================================
+                // Step 1 — Update atau create QuotationAplikasi
+                //          Sekaligus bangun map qaId → aplikasi_pendukung_id
+                //          agar tidak perlu find() lagi di step 3 (fix N+1)
+                // =========================================================
                 $quotationAplikasiIds = [];
+                $qaAplikasiMap = []; // fix N+1: map qaId → aplikasiId
+
                 foreach ($aplikasiIds as $aplikasiId) {
                     $app = $aplikasiList->get($aplikasiId);
                     if (!$app)
@@ -719,25 +728,25 @@ class QuotationStepService
                             'deleted_at' => null,
                         ]
                     );
+
                     $quotationAplikasiIds[] = $qa->id;
+                    $qaAplikasiMap[$qa->id] = $aplikasiId; // simpan mapping
                 }
 
-                // 2. Hapus semua devices yang terkait dengan aplikasi pendukung (soft delete)
+            
                 QuotationDevices::where('quotation_id', $quotation->id)
-                    ->whereNotNull('quotation_aplikasi_id')
+                    ->where('jenis_barang_id', 17) // 17 = Aplikasi Pendukung
                     ->update([
                         'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
+                        'deleted_by' => $user,
                     ]);
 
-                // 3. Siapkan data untuk batch insert devices
                 $devicesToInsert = [];
-                foreach ($quotationAplikasiIds as $qaId) {
-                    $qa = QuotationAplikasi::find($qaId);
-                    if (!$qa)
-                        continue;
 
-                    $app = $aplikasiList->get($qa->aplikasi_pendukung_id);
+                foreach ($quotationAplikasiIds as $qaId) {
+                    $aplikasiId = $qaAplikasiMap[$qaId] ?? null;
+                    $app = $aplikasiId ? $aplikasiList->get($aplikasiId) : null;
+
                     if (!$app)
                         continue;
 
@@ -747,7 +756,7 @@ class QuotationStepService
 
                         $devicesToInsert[] = [
                             'quotation_id' => $quotation->id,
-                            'quotation_aplikasi_id' => $qaId,
+                            'quotation_aplikasi_id' => $qaId,        // ✅ selalu diisi
                             'quotation_site_id' => $siteId,
                             'barang_id' => $app->barang_id,
                             'jumlah' => $jumlahHc,
@@ -763,46 +772,45 @@ class QuotationStepService
                     }
                 }
 
-                // Batch insert devices
                 if (!empty($devicesToInsert)) {
                     QuotationDevices::insert($devicesToInsert);
                 }
-
-                // Hapus aplikasi pendukung yang tidak dipilih (soft delete)
                 QuotationAplikasi::where('quotation_id', $quotation->id)
                     ->whereNotIn('aplikasi_pendukung_id', $aplikasiIds)
                     ->update([
                         'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
+                        'deleted_by' => $user,
                     ]);
 
             } else {
-                // Tidak ada aplikasi pendukung dipilih – hapus semua
-                QuotationAplikasi::where('quotation_id', $quotation->id)->update([
-                    'deleted_at' => $currentDateTime,
-                    'deleted_by' => $user
-                ]);
-                QuotationDevices::where('quotation_id', $quotation->id)
-                    ->whereNotNull('quotation_aplikasi_id')
+                QuotationAplikasi::where('quotation_id', $quotation->id)
                     ->update([
                         'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user
+                        'deleted_by' => $user,
+                    ]);
+
+                // ✅ FIX: Samakan kondisi delete dengan bagian atas (by jenis_barang_id)
+                QuotationDevices::where('quotation_id', $quotation->id)
+                    ->where('jenis_barang_id', 8)
+                    ->update([
+                        'deleted_at' => $currentDateTime,
+                        'deleted_by' => $user,
                     ]);
             }
 
             // Update timestamp quotation
             $quotation->update([
                 'updated_by' => $user,
-                'updated_at' => $currentDateTime
+                'updated_at' => $currentDateTime,
             ]);
 
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("Error in updateStep6", [
+            \Log::error('Error in updateStep6', [
                 'quotation_id' => $quotation->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -1168,7 +1176,7 @@ class QuotationStepService
     }
 
 
- private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
+    private function notifyDirSales(Quotation $quotation, Carbon $currentDateTime): void
     {
         $dirSales = [27927, 127822];
 
