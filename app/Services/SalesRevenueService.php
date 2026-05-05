@@ -309,6 +309,7 @@ class SalesRevenueService
     private function fetchSalesUsers(array $filters): Collection
     {
         return User::whereIn('cais_role_id', [29, 30, 31, 32, 33])
+            ->where('id', '!=', 96986)
             ->when(isset($filters['user_id']), fn($q) => $q->where('id', $filters['user_id']))
             ->when(isset($filters['branch_id']), fn($q) => $q->where('branch_id', $filters['branch_id']))
             ->get(['id', 'full_name', 'role_id', 'branch_id']);
@@ -319,7 +320,7 @@ class SalesRevenueService
         $linkedPksIds = DB::table('sl_pks as p')
             ->select('p.id as pks_id', 'tsd.user_id as sales_user_id')
             ->join('sl_leads as l', 'p.leads_id', '=', 'l.id')
-            ->join('sl_tim_sales_details as tsd', 'l.tim_sales_d_id', '=', 'tsd.id')
+            ->join('m_tim_sales_d as tsd', 'l.tim_sales_d_id', '=', 'tsd.id')
             ->whereIn('tsd.user_id', $userIds)
             ->where('p.is_aktif', 1)
             ->whereNull('p.deleted_at')
@@ -333,13 +334,13 @@ class SalesRevenueService
                 $q->where('p.kontrak_awal', '<=', $date->endOfMonth())
                     ->where('p.kontrak_akhir', '>=', $date->startOfMonth());
             })
-            ->whereExists(function ($q) {
-                $q->select(DB::raw(1))
-                    ->from('sl_spk_site as ss')
-                    ->join('sl_site as s', 'ss.site_id', '=', 's.id')
-                    ->whereColumn('ss.spk_id', 'p.spk_id')
-                    ->where('s.is_active', 1);
-            })
+            // ->whereExists(function ($q) {
+            //     $q->select(DB::raw(1))
+            //         ->from('sl_spk_site as ss')
+            //         ->join('sl_site as s', 'ss.site_id', '=', 's.id')
+            //         ->whereColumn('ss.spk_id', 'p.spk_id');
+            //         // ->where('s.is_active', 1);
+            // })
             ->when(
                 isset($filters['start_date']),
                 fn($q) =>
@@ -370,15 +371,7 @@ class SalesRevenueService
         });
     }
 
-    /**
-     * Ambil total invoice untuk SEMUA PKS sekaligus — 3 query total, bukan N*M query.
-     *
-     * Query 1: semua quotation via leads_id
-     * Query 2: sum(total_invoice) per quotation_id
-     * (Query 3 adalah direct quotation_id yang sudah ada di model PKS — tidak perlu query)
-     *
-     * Return: [ pks_id => total_invoice ]
-     */
+
     private function getBulkInvoiceTotals(Collection $allPks): array
     {
         $directQuotationIds = $allPks->pluck('quotation_id')->filter()->unique()->values()->all();
