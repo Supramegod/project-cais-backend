@@ -258,11 +258,9 @@ class QuotationBusinessService
                 ]);
             }
         }
-        if (!$quotation->deleted_at) {
-            $quotation->deleted_at = Carbon::now(); // ← pakai assignment langsung, bukan update()
-            $quotation->deleted_by = $deletedBy;
-            $quotation->save();
-        }
+        $quotation->deleted_at = Carbon::now(); // ← pakai assignment langsung, bukan update()
+        $quotation->deleted_by = $deletedBy;
+        $quotation->save();
     }
 
     /**
