@@ -735,7 +735,7 @@ class QuotationStepService
 
             
                 QuotationDevices::where('quotation_id', $quotation->id)
-                    ->where('jenis_barang_id', 8) // 8 = Aplikasi Pendukung
+                    ->where('jenis_barang_id', 17) // 17 = Aplikasi Pendukung
                     ->update([
                         'deleted_at' => $currentDateTime,
                         'deleted_by' => $user,
