@@ -146,7 +146,7 @@ class QuotationBusinessService
         }
     }
 
-   
+
     public function createInitialActivity(
         Quotation $quotation,
         string $createdBy,
@@ -258,6 +258,10 @@ class QuotationBusinessService
                 ]);
             }
         }
+        $quotation->update([
+            'deleted_at' => Carbon::now(),
+            'deleted_by' => $deletedBy,
+        ]);
     }
 
     /**
