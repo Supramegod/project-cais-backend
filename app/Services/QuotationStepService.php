@@ -1037,12 +1037,6 @@ class QuotationStepService
 
                 if ($oldQuotation) {
                     $this->quotationBusinessService->softDeleteQuotationRelations($oldQuotation, $user);
-
-                    $oldQuotation->update([
-                        'deleted_at' => $currentDateTime,
-                        'deleted_by' => $user,
-                    ]);
-
                     \Log::info("Soft deleted old quotation and its relations", [
                         'old_quotation_id' => $oldQuotation->id,
                         'new_quotation_id' => $quotation->id,
