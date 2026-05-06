@@ -41,13 +41,13 @@ class QuotationStepRequest extends BaseRequest
                 $userRole = auth()->user()->cais_role_id ?? null;
 
                 if (!in_array($userRole, $excludedRoles)) {
-                    $rules['mulai_kontrak'] = FluentRule::date()->required()->afterOrEqual('today');
-                    $rules['kontrak_selesai'] = FluentRule::date()->required()->afterOrEqual('mulai_kontrak');
+                    $rules['mulai_kontrak'] = FluentRule::date()->required()->rule('after_or_equal:today');
+                    $rules['kontrak_selesai'] = FluentRule::date()->required()->rule('after_or_equal:mulai_kontrak');
                     $rules['tgl_penempatan'] = FluentRule::date()->required();
                 }
 
                 $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
-                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule','id');
+                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
                 $rules['jumlah_hari_invoice'] = FluentRule::integer()->requiredIf('top', 'Lebih Dari 7 Hari')->min(1);
                 $rules['tipe_hari_invoice'] = FluentRule::string()->requiredIf('top', 'Lebih Dari 7 Hari')->in(['Kerja', 'Kalender']);
                 $rules['evaluasi_kontrak'] = FluentRule::string()->required();
@@ -84,12 +84,12 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 4:
-                $rules['is_ppn'] = FluentRule::integer()->required()->in([0, 1]); 
+                $rules['is_ppn'] = FluentRule::integer()->required()->in([0, 1]);
                 $rules['ppn_pph_dipotong'] = FluentRule::string()->required()->in(['Total Invoice', 'Management Fee']);
-                $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee','id');
+                $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee', 'id');
                 $rules['persentase'] = FluentRule::numeric()->required()->min(0)->max(100);
                 $rules['position_data'] = FluentRule::array()->required()->min(1)->each([
-                    'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail','id'),
+                    'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail', 'id'),
                     'upah' => FluentRule::string()->required()->in(['UMP', 'UMK', 'Custom']),
                     'hitungan_upah' => FluentRule::string()->requiredIf('upah', 'Custom')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
                     'nominal_upah' => FluentRule::numeric()->requiredIf('upah', 'Custom')->min(0),
