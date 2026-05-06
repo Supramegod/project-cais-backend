@@ -1,11 +1,11 @@
 <?php
-// app/Http/Requests/StoreUmskRequest.php
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
-class StoreUmskRequest extends FormRequest
+class StoreUmskRequest extends BaseRequest
 {
     public function authorize(): bool
     {
@@ -15,12 +15,12 @@ class StoreUmskRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'city_id' => ['required', 'integer', 'min:1'],
-            'city_name' => ['required', 'string', 'max:150'],
-            'sektor' => ['required', 'string', 'max:100'],
-            'umsk' => ['required', 'numeric', 'min:1'],
-            'tgl_berlaku' => ['required', 'date_format:Y-m-d'],
-            'sumber' => ['required', 'string', 'max:500'],
+            'city_id' => FluentRule::integer()->required()->min(1),
+            'city_name' => FluentRule::string()->required()->max(150),
+            'sektor' => FluentRule::string()->required()->max(100),
+            'umsk' => FluentRule::numeric()->required()->min(1),
+            'tgl_berlaku' => FluentRule::string()->required()->dateFormat('Y-m-d'),
+            'sumber' => FluentRule::string()->required()->max(500),
         ];
     }
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RefreshTokenRequest;
 use App\Models\RefreshTokens;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -99,20 +101,13 @@ class AuthController extends Controller
      *     )
      * )
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
         try {
-            $request->validate([
-                'username' => 'required|string',
-                'password' => 'required|string',
-            ]);
-
-
+            // Data sudah tervalidasi, tidak perlu ->validate() manual
             $inputUsername = $request->username;
 
-            // 2. Cari pengguna
             $user = User::checkLogin($request->username, $request->password)->first();
-
 
             if (!$user) {
                 return response()->json([
@@ -121,11 +116,7 @@ class AuthController extends Controller
                 ], 401);
             }
 
-
-            // 3. 🔥 HAPUS SEMUA TOKEN LAMA USER INI
             $this->revokeAllUserTokens($user);
-
-            // 4. Buat token pair baru
             $tokenPair = $user->createTokenPair('auth_token');
 
             Log::info('User login - semua session lama dihapus', [
@@ -134,7 +125,6 @@ class AuthController extends Controller
                 'timestamp' => now()
             ]);
 
-            // 5. Kembalikan Response
             return response()->json([
                 'success' => true,
                 'message' => 'Login berhasil',
@@ -160,13 +150,6 @@ class AuthController extends Controller
                         ->format('Y-m-d H:i:s'),
                 ]
             ], 200);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak valid',
-                'errors' => $e->errors()
-            ], 422);
 
         } catch (Exception $e) {
             Log::error('Login error', [
@@ -364,13 +347,9 @@ class AuthController extends Controller
      *     )
      * )
      */
-    public function refresh(Request $request)
+    public function refresh(RefreshTokenRequest $request)
     {
         try {
-            $request->validate([
-                'refresh_token' => 'required|string'
-            ]);
-
             $hashedToken = hash('sha256', $request->refresh_token);
             $refreshTokenModel = RefreshTokens::where('token', $hashedToken)->first();
 

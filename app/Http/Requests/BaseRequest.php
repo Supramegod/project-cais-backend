@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Http\Requests; // Ubah namespace-nya ke folder App
+namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest as LaravelFormRequest; // Alias-kan file aslinya
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
+use Illuminate\Foundation\Http\FormRequest as LaravelFormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-// Kita tetap "extends" file aslinya, tapi kita timpa (override) fungsinya
 class BaseRequest extends LaravelFormRequest
 {
-    /**
-     * Copy paste fungsi failedValidation yang kamu modifikasi tadi ke sini
-     */
+    use HasFluentRules;
+
     protected function failedValidation(Validator $validator)
     {
         $messages = $validator->errors()->toArray();
@@ -22,7 +22,4 @@ class BaseRequest extends LaravelFormRequest
             ], 422)
         );
     }
-    
-    // Kamu tidak perlu meng-copy semua 200 baris kode lainnya, 
-    // karena secara otomatis sudah "dipinjam" dari LaravelFormRequest (extends).
 }

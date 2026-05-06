@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use SanderMuller\FluentValidation\FluentRule;
 
 class QuotationApproveRequest extends BaseRequest
 {
@@ -13,9 +14,9 @@ class QuotationApproveRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'id' => 'required|exists:sl_quotation,id',
-            'approve' => 'required|boolean',
-            'alasan' => 'required_if:approve,false|string|max:500'
+            'id' => FluentRule::integer()->required()->exists('sl_quotation', 'id'),
+            'is_approved' => FluentRule::boolean()->required(),
+            'alasan' => FluentRule::string()->requiredIf('is_approved', 'false')->max(500),
         ];
     }
 
@@ -24,9 +25,19 @@ class QuotationApproveRequest extends BaseRequest
         return [
             'id.required' => 'Quotation ID harus diisi',
             'id.exists' => 'Quotation tidak ditemukan',
-            'approve.required' => 'Status approve harus diisi',
-            'approve.boolean' => 'Status approve harus true atau false',
+            'is_approved.required' => 'Status approve harus diisi',
+            'is_approved.boolean' => 'Status approve harus true atau false',
             'alasan.required_if' => 'Alasan harus diisi ketika menolak',
         ];
+    }
+
+    /**
+     * Ambil ID dari route parameter dan masukkan ke data request.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'id' => $this->route('id'),
+        ]);
     }
 }

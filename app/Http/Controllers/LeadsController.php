@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreLeadRequest;
+use App\Http\Requests\UpdateLeadRequest;
 use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\City;
@@ -510,34 +512,11 @@ class LeadsController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(StoreLeadRequest $request)
     {
         try {
             DB::beginTransaction();
-            $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
-                'pic' => 'required',
-                'branch' => 'required',
-                'kebutuhan' => 'required|array|min:1',
-                'provinsi' => 'required',
-                'kota' => 'required'
-            ], [
-                'min' => 'Masukkan :attribute minimal :min',
-                'max' => 'Masukkan :attribute maksimal :max',
-                'required' => ':attribute harus di isi',
-                'kebutuhan.required' => 'Kebutuhan harus dipilih minimal 1',
-                'kebutuhan.array' => 'Kebutuhan harus berupa array',
-                'kebutuhan.min' => 'Kebutuhan harus dipilih minimal 1',
-            ]);
-            if ($validator->fails()) {
-                \Log::info('Validation failed', [
-                    'errors' => $validator->errors()->toArray()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()->toArray()
-                ], 400);
-            }
+            $lead = $request->validated();
 
             // \Log::info('Validation passed', [
             //     'nama_perusahaan' => $request->nama_perusahaan
@@ -793,7 +772,7 @@ class LeadsController extends Controller
      * 
      * )
      */
-    public function update(Request $request, $id)
+    public function update(UpdateLeadRequest $request, $id)
     {
         try {
             DB::beginTransaction();
@@ -806,21 +785,7 @@ class LeadsController extends Controller
                 ], 404);
             }
 
-            $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['sometimes', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
-                'pic' => 'required',
-                'branch' => 'required',
-                'kebutuhan' => 'required|array|min:1',
-                'provinsi' => 'required',
-                'kota' => 'required'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()->toArray()
-                ], 400);
-            }
+            $lead = $request->validated();
 
             $current_date_time = Carbon::now()->toDateTimeString();
 

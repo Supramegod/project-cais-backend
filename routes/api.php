@@ -11,6 +11,7 @@ use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesActivityController;
 use App\Http\Controllers\SalesTargetController;
@@ -472,8 +473,12 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/kpi', 'getkpi');
 
     });
-      Route::apiResource('sales-target', SalesTargetController::class)->only([
-        'index', 'store', 'show', 'update', 'destroy',
+    Route::apiResource('sales-target', SalesTargetController::class)->only([
+        'index',
+        'store',
+        'show',
+        'update',
+        'destroy',
     ]);
 
     // Target Management
@@ -503,6 +508,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+    // Sales Report Routes
+    Route::prefix('sales-report')->controller(ReportController::class)->group(function () {
+        Route::get('/monthly', 'monthly');
+        Route::get('/weekly', 'weekly');
     });
 
 });

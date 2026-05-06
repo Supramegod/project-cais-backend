@@ -733,7 +733,7 @@ class QuotationStepService
                     $qaAplikasiMap[$qa->id] = $aplikasiId; // simpan mapping
                 }
 
-            
+
                 QuotationDevices::where('quotation_id', $quotation->id)
                     ->where('jenis_barang_id', 17) // 17 = Aplikasi Pendukung
                     ->update([
@@ -1602,9 +1602,9 @@ class QuotationStepService
             return null;
         }
 
-        if ($this->isBelowMinimumHc($quotation)) {
-            return $this->makeRejectResult('tidak sesuai standart untuk headconut di bawah minimum');
-        }
+        // if ($this->isBelowMinimumHc($quotation)) {
+        //     return $this->makeRejectResult('tidak sesuai standart untuk headconut di bawah minimum');
+        // }
         if ($this->isInvalidBpjsTk($quotation)) {
             return $this->makeRejectResult('BPJS TK tidak memenuhi minimum program');
         }
@@ -1616,14 +1616,13 @@ class QuotationStepService
         if ($this->isBelowSalesMargin($summary)) {
             return $this->makeRejectResult('margin dibawah standard');
         }
-
-
         return null;
     }
 
     private function checkNeedsApproval(Quotation $quotation): bool
     {
         return (
+            $this->isBelowMinimumHc($quotation) ||
             $this->hasMissingBpjsDetail($quotation) ||
             $this->hasUnconventionalBenefits($quotation) ||
             $this->isUnderMinimumWage($quotation) ||
@@ -1714,6 +1713,11 @@ class QuotationStepService
         foreach ($quotation->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
+            $jenis_kontrak = strtolower((string) $quotation->jenis_kontrak);
+
+            if ($jenis_kontrak !== 'reguler') {
+                continue; // Cek upah minimum hanya untuk kontrak reguler
+            }
 
             if (!$wage || !$site || $wage->upah !== 'Custom') {
                 continue;

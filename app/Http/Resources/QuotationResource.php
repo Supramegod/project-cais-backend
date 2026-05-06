@@ -115,11 +115,15 @@ class QuotationResource extends JsonResource
             return $detail->wage && $detail->quotationSite && $detail->wage->upah === 'Custom';
         })->map(function ($detail) {
             $umkData = Umk::byCity($detail->quotationSite->kota_id)->active()->first();
-            if (!$umkData)
+            $jenis_kontrak = strtolower((string) $this->resource->jenis_kontrak);
+            if (!$umkData || $jenis_kontrak !== 'reguler') {
                 return null;
+            }
 
             $nominalUpah = (float) $detail->nominal_upah;
             $batasMinimal = (float) $umkData->umk * 0.85;
+
+
 
             return $nominalUpah < $batasMinimal ? [
                 'position' => $detail->jabatan_kebutuhan,
@@ -178,6 +182,30 @@ class QuotationResource extends JsonResource
             ];
         }
 
+        // 7. Cek Minimum HC
+        $kebutuhanId = (int) $this->resource->kebutuhan_id;
+        $minHcMap = [1 => 5, 2 => 10, 3 => 5];
+        $isBelowMinHc = false;
+
+        if (isset($minHcMap[$kebutuhanId])) {
+            $minHc = $minHcMap[$kebutuhanId];
+            $totalHc = $details->sum('jumlah_hc');
+            $isBelowMinHc = $totalHc < $minHc;
+
+            if ($isBelowMinHc) {
+                $highlights[] = [
+                    'field' => 'headcount',
+                    'message' => "Total HC ({$totalHc}) di bawah minimum yang ditentukan ({$minHc})",
+                    'type' => 'warning',
+                    'value' => "{$totalHc} HC",
+                    'details' => [
+                        'total_hc' => $totalHc,
+                        'minimum' => $minHc,
+                    ]
+                ];
+            }
+        }
+
         // Evaluasi akhir
         $needsApprovalLevel2 = (
             $bpjsDetails->isNotEmpty() ||
@@ -185,7 +213,8 @@ class QuotationResource extends JsonResource
             !empty($underMinimumWageDetails) ||
             $this->resource->top == "Lebih Dari 7 Hari" ||
             $isLowPercentage ||
-            $this->resource->company_id == 17
+            $this->resource->company_id == 17 ||
+            $isBelowMinHc
         );
 
         return [
