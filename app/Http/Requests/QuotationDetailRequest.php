@@ -15,33 +15,27 @@ class QuotationDetailRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'quotation_id'      => FluentRule::make()->required()->exists('sl_quotation', 'id'),
-            'site_id'           => FluentRule::make()->required()->exists('sl_quotation_site', 'id'),
-            'position_id'       => FluentRule::make()->required()->exists('mysqlhris.m_position', 'id'),
-            'jumlah_hc'         => FluentRule::integer()->required()->min(1),
+            'quotation_id'     => FluentRule::integer()->required()->exists('sl_quotation'),
+            'site_id'          => FluentRule::integer()->required()->exists('sl_quotation_site'),
+            'position_id'      => FluentRule::integer()->required()->exists('mysqlhris.m_position'),
+            'jumlah_hc'        => FluentRule::integer()->required()->min(1),
 
-            // Untuk tambahan requirement
-            'requirement'       => FluentRule::string()->sometimes()->max(500),
+            'requirement'      => FluentRule::string()->sometimes()->max(500),
+            'namaTunjangan'    => FluentRule::string()->sometimes()->max(255),
+            'nominalTunjangan' => FluentRule::numeric()->sometimes()->min(0),
+            'nama'             => FluentRule::string()->sometimes()->max(255),
+            'jabatan'          => FluentRule::integer()->sometimes()->exists('m_jabatan_pic'),
+            'no_telp'          => FluentRule::string()->sometimes()->max(20),
+            'email'            => FluentRule::string()->sometimes()->email()->max(255),
 
-            // Untuk tunjangan
-            'namaTunjangan'     => FluentRule::string()->sometimes()->max(255),
-            'nominalTunjangan'  => FluentRule::numeric()->sometimes()->min(0),
+            'training_id'      => FluentRule::array()->sometimes()->children([
+                '*' => FluentRule::integer()->exists('m_training'),
+            ]),
 
-            // Untuk PIC
-            'nama'              => FluentRule::string()->sometimes()->max(255),
-            'jabatan'           => FluentRule::make()->sometimes()->exists('m_jabatan_pic', 'id'),
-            'no_telp'           => FluentRule::string()->sometimes()->max(20),
-            'email'             => FluentRule::make()->sometimes()->email()->max(255),
-
-            // Untuk training
-            'training_id'       => FluentRule::array()->sometimes(),
-            'training_id.*'     => FluentRule::make()->exists('m_training', 'id'),
-
-            // Untuk barang/kaporlap
-            'barang'            => FluentRule::make()->sometimes()->exists('m_barang', 'id'),
-            'jumlah'            => FluentRule::integer()->sometimes()->min(0),
-            'harga'             => FluentRule::numeric()->sometimes()->min(0),
-            'masa_pakai'        => FluentRule::integer()->sometimes()->min(1),
+            'barang'           => FluentRule::integer()->sometimes()->exists('m_barang'),
+            'jumlah'           => FluentRule::integer()->sometimes()->min(0),
+            'harga'            => FluentRule::numeric()->sometimes()->min(0),
+            'masa_pakai'       => FluentRule::integer()->sometimes()->min(1),
         ];
     }
 
