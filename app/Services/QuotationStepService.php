@@ -1713,6 +1713,11 @@ class QuotationStepService
         foreach ($quotation->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
+            $jenis_kontrak = strtolower((string) $quotation->jenis_kontrak);
+
+            if ($jenis_kontrak !== 'reguler') {
+                continue; // Cek upah minimum hanya untuk kontrak reguler
+            }
 
             if (!$wage || !$site || $wage->upah !== 'Custom') {
                 continue;
