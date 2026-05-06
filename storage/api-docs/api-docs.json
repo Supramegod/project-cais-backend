@@ -21219,6 +21219,436 @@
                 ]
             }
         },
+        "/api/sales-report/monthly": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Sales Bulanan",
+                "description": "Menampilkan laporan bulanan aktivitas sales per orang, membandingkan bulan ini vs bulan lalu...",
+                "operationId": "5d875829e922d652b003da5ffd1cba41",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan bulanan berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "05-2026"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Nuryono Hariyadi"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 2"
+                                                    },
+                                                    "bulan_ini": {
+                                                        "properties": {
+                                                            "jumlah_kirim_proposal": {
+                                                                "type": "integer",
+                                                                "example": 12
+                                                            },
+                                                            "jumlah_appointment": {
+                                                                "type": "integer",
+                                                                "example": 6
+                                                            },
+                                                            "jumlah_visit": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "jumlah_quotation": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "jumlah_spk": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "jumlah_pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "jumlah_follow_up": {
+                                                                "type": "integer",
+                                                                "example": 25
+                                                            },
+                                                            "jumlah_aktual_penempatan": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "pct_proposal_to_appt": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_appt_to_visit": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_visit_to_quot": {
+                                                                "type": "string",
+                                                                "example": "66.7%"
+                                                            },
+                                                            "pct_quot_to_spk": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_spk_to_pks": {
+                                                                "type": "string",
+                                                                "example": "0%"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "bulan_lalu": {
+                                                        "properties": {
+                                                            "jumlah_kirim_proposal": {
+                                                                "type": "integer",
+                                                                "example": 8
+                                                            },
+                                                            "jumlah_appointment": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "jumlah_visit": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "jumlah_quotation": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "jumlah_spk": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "jumlah_pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "jumlah_follow_up": {
+                                                                "type": "integer",
+                                                                "example": 20
+                                                            },
+                                                            "jumlah_aktual_penempatan": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "pct_proposal_to_appt": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_appt_to_visit": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_visit_to_quot": {
+                                                                "type": "string",
+                                                                "example": "50.0%"
+                                                            },
+                                                            "pct_quot_to_spk": {
+                                                                "type": "string",
+                                                                "example": "0%"
+                                                            },
+                                                            "pct_spk_to_pks": {
+                                                                "type": "string",
+                                                                "example": "0%"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month field is required."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/weekly": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Sales Mingguan",
+                "description": "Menampilkan laporan mingguan aktivitas sales per orang dalam satu bulan...",
+                "operationId": "0cf14392f1c414db8be7c189bbe96a73",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan mingguan berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Nuryono Hariyadi"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 2"
+                                                    },
+                                                    "w1": {
+                                                        "properties": {
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "visit": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "quot": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "spk": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w2": {
+                                                        "properties": {
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "visit": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "quot": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "spk": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w3": {
+                                                        "properties": {
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "visit": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "quot": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "spk": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w4": {
+                                                        "properties": {
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "visit": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "quot": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "spk": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            },
+                                                            "pks": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month field is required."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/roles/list": {
             "get": {
                 "tags": [
@@ -26421,314 +26851,6 @@
                 ]
             }
         },
-        "/api/targets/list": {
-            "get": {
-                "tags": [
-                    "Target"
-                ],
-                "summary": "Mendapatkan daftar target",
-                "description": "Endpoint untuk mengambil daftar target dengan filter tahun opsional",
-                "operationId": "e7bbe62537e3b82b6069b29463bc9b40",
-                "parameters": [
-                    {
-                        "name": "tahun",
-                        "in": "query",
-                        "description": "Filter berdasarkan tahun (format: YYYY)",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 2024
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Berhasil mengambil data target",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "user_id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "tahun": {
-                                                        "type": "integer",
-                                                        "example": 2024
-                                                    },
-                                                    "branch_id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "target": {
-                                                        "type": "number",
-                                                        "example": 1000000
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "cais_role_id": {
-                                                        "type": "integer",
-                                                        "example": 29
-                                                    },
-                                                    "user": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "full_name": {
-                                                                "type": "string",
-                                                                "example": "John Doe"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "branch": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "name": {
-                                                                "type": "string",
-                                                                "example": "Jakarta"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/targets/add": {
-            "post": {
-                "tags": [
-                    "Target"
-                ],
-                "summary": "Membuat atau mengupdate target",
-                "description": "Endpoint untuk membuat target baru atau mengupdate target yang sudah ada berdasarkan user_id dan tahun",
-                "operationId": "9f8d95001c759e351eb1be490735aa83",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "user_id",
-                                    "tahun",
-                                    "branch_id",
-                                    "target",
-                                    "nama"
-                                ],
-                                "properties": {
-                                    "user_id": {
-                                        "description": "ID user yang akan diberi target",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "tahun": {
-                                        "description": "Tahun target (format: YYYY)",
-                                        "type": "integer",
-                                        "example": 2024
-                                    },
-                                    "branch_id": {
-                                        "description": "ID branch/cabang",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "target": {
-                                        "description": "Nilai target",
-                                        "type": "number",
-                                        "example": 1000000
-                                    },
-                                    "nama": {
-                                        "description": "Nama user",
-                                        "type": "string",
-                                        "example": "John Doe"
-                                    },
-                                    "cais_role_id": {
-                                        "description": "ID role user (opsional)",
-                                        "type": "integer",
-                                        "example": 29
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Target berhasil dibuat atau diupdate",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Target baru tahun 2024 berhasil dibuat"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "user_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "tahun": {
-                                                    "type": "integer",
-                                                    "example": 2024
-                                                },
-                                                "branch_id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "target": {
-                                                    "type": "number",
-                                                    "example": 1000000
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "John Doe"
-                                                },
-                                                "cais_role_id": {
-                                                    "type": "integer",
-                                                    "example": 29
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "Admin User"
-                                                },
-                                                "updated_by": {
-                                                    "type": "string",
-                                                    "example": "Admin User"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validation Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "user_id": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The user id field is required."
-                                                    }
-                                                },
-                                                "tahun": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The tahun must be 4 digits."
-                                                    }
-                                                },
-                                                "target": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The target must be a number."
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -31327,6 +31449,10 @@
             "description": "API Endpoints for Quotation Management"
         },
         {
+            "name": "Sales Report",
+            "description": "API Endpoints untuk Dashboard Sales Report"
+        },
+        {
             "name": "Roles",
             "description": "API Endpoints for Role Management"
         },
@@ -31361,10 +31487,6 @@
         {
             "name": "System Announcements",
             "description": "API Endpoints untuk Log Update Aplikasi dan Pengumuman Sistem"
-        },
-        {
-            "name": "Target",
-            "description": "API untuk manajemen target sales/user"
         },
         {
             "name": "Tim Sales",
