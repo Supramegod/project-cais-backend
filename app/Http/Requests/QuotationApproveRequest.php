@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class QuotationApproveRequest extends BaseRequest
 {
@@ -13,9 +15,9 @@ class QuotationApproveRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'id' => 'required|exists:sl_quotation,id',
-            'approve' => 'required|boolean',
-            'alasan' => 'required_if:approve,false|string|max:500'
+            'id' => FluentRule::integer()->required()->exists('sl_quotation'),
+            'approve' => FluentRule::boolean()->required(),
+            'alasan' => FluentRule::string()->requiredIf('approve', 'false')->max(500),
         ];
     }
 

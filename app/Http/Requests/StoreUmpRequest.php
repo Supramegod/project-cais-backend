@@ -2,9 +2,10 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
-class StoreUmpRequest extends FormRequest
+class StoreUmpRequest extends BaseRequest
 {
     public function authorize(): bool
     {
@@ -14,11 +15,11 @@ class StoreUmpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'province_id' => ['required', 'integer', 'min:1'],
-            'province_name' => ['required', 'string', 'max:150'],
-            'ump' => ['required', 'numeric', 'min:1'],
-            'tgl_berlaku' => ['required', 'date_format:Y-m-d'],
-            'sumber' => ['required', 'string', 'max:500'],
+            'province_id' => FluentRule::integer()->required()->min(1),
+            'province_name' => FluentRule::string()->required()->max(150),
+            'ump' => FluentRule::numeric()->required()->min(1),
+            'tgl_berlaku' => FluentRule::string()->required()->dateFormat('Y-m-d'),
+            'sumber' => FluentRule::string()->required()->max(500),
         ];
     }
 

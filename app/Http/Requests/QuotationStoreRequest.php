@@ -3,6 +3,8 @@
 namespace App\Http\Requests;
 
 use App\Models\QuotationSite;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 use Illuminate\Validation\Rule;
 
 class QuotationStoreRequest extends BaseRequest
@@ -18,29 +20,29 @@ class QuotationStoreRequest extends BaseRequest
         $tipe_quotation = $this->route('tipe_quotation') ?? 'baru';
 
         $rules = [
-            'perusahaan_id' => 'required|exists:sl_leads,id',
-            'entitas' => 'required|exists:mysqlhris.m_company,id',
-            'layanan' => 'required|exists:m_kebutuhan,id',
-            'jumlah_site' => 'required|string|in:Single Site,Multi Site',
+            'perusahaan_id' => FluentRule::make()->required()->exists('sl_leads', 'id'),
+            'entitas'        => FluentRule::make()->required()->exists('mysqlhris.m_company', 'id'),
+            'layanan'        => FluentRule::make()->required()->exists('m_kebutuhan', 'id'),
+            'jumlah_site'    => FluentRule::string()->required()->in(['Single Site', 'Multi Site']),
         ];
 
         // Validasi eksistensi hanya jika ada nilai
-        $rules['quotation_referensi_id'] = 'nullable|exists:sl_quotation,id';
+        $rules['quotation_referensi_id'] = FluentRule::make()->nullable()->exists('sl_quotation', 'id');
 
-        // SINGLE SITE: Wajib hanya jika jumlah_site = 'Single Site' 
+        // SINGLE SITE: Wajib hanya jika jumlah_site = 'Single Site'
         // DAN (tipe_quotation = 'baru' ATAU ada nama_site dalam request)
         if ($this->jumlah_site == 'Single Site') {
             if ($this->has('nama_site') && !empty($this->nama_site)) {
-                $rules['nama_site'] = 'required|string|max:255';
-                $rules['provinsi'] = 'required|exists:mysqlhris.m_province,id';
-                $rules['kota'] = 'required|exists:mysqlhris.m_city,id';
-                $rules['penempatan'] = 'required|string|max:255';
+                $rules['nama_site']  = FluentRule::string()->required()->max(255);
+                $rules['provinsi']   = FluentRule::make()->required()->exists('mysqlhris.m_province', 'id');
+                $rules['kota']       = FluentRule::make()->required()->exists('mysqlhris.m_city', 'id');
+                $rules['penempatan'] = FluentRule::string()->required()->max(255);
             } else {
                 // Jika tidak ada site baru, maka field site tidak diperlukan
-                $rules['nama_site'] = 'nullable';
-                $rules['provinsi'] = 'nullable';
-                $rules['kota'] = 'nullable';
-                $rules['penempatan'] = 'nullable';
+                $rules['nama_site']  = FluentRule::make()->nullable();
+                $rules['provinsi']   = FluentRule::make()->nullable();
+                $rules['kota']       = FluentRule::make()->nullable();
+                $rules['penempatan'] = FluentRule::make()->nullable();
             }
         }
 
@@ -48,30 +50,30 @@ class QuotationStoreRequest extends BaseRequest
         // DAN (tipe_quotation = 'baru' ATAU ada multisite dalam request)
         if ($this->jumlah_site == 'Multi Site') {
             if ($this->has('multisite') && !empty($this->multisite)) {
-                $rules['multisite'] = 'required|array|min:1';
-                $rules['multisite.*'] = 'required|string|max:255';
-                $rules['provinsi_multi'] = 'required|array|min:1';
-                $rules['provinsi_multi.*'] = 'required|exists:mysqlhris.m_province,id';
-                $rules['kota_multi'] = 'required|array|min:1';
-                $rules['kota_multi.*'] = 'required|exists:mysqlhris.m_city,id';
-                $rules['penempatan_multi'] = 'required|array|min:1';
-                $rules['penempatan_multi.*'] = 'required|string|max:255';
+                $rules['multisite']        = FluentRule::array()->required()->min(1);
+                $rules['multisite.*']      = FluentRule::string()->required()->max(255);
+                $rules['provinsi_multi']   = FluentRule::array()->required()->min(1);
+                $rules['provinsi_multi.*'] = FluentRule::make()->required()->exists('mysqlhris.m_province', 'id');
+                $rules['kota_multi']       = FluentRule::array()->required()->min(1);
+                $rules['kota_multi.*']     = FluentRule::make()->required()->exists('mysqlhris.m_city', 'id');
+                $rules['penempatan_multi']   = FluentRule::array()->required()->min(1);
+                $rules['penempatan_multi.*'] = FluentRule::string()->required()->max(255);
             } else {
                 // Jika tidak ada site baru, maka array tidak diperlukan
-                $rules['multisite'] = 'nullable|array';
-                $rules['provinsi_multi'] = 'nullable|array';
-                $rules['kota_multi'] = 'nullable|array';
-                $rules['penempatan_multi'] = 'nullable|array';
+                $rules['multisite']      = FluentRule::array()->nullable();
+                $rules['provinsi_multi'] = FluentRule::array()->nullable();
+                $rules['kota_multi']     = FluentRule::array()->nullable();
+                $rules['penempatan_multi'] = FluentRule::array()->nullable();
             }
         }
 
         // Validasi ukuran array harus sama untuk multi site (jika ada)
         if ($this->jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
             $siteCount = count($this->multisite);
-            $rules['multisite'] = 'required|array|min:1|size:' . $siteCount;
-            $rules['provinsi_multi'] = 'required|array|min:1|size:' . $siteCount;
-            $rules['kota_multi'] = 'required|array|min:1|size:' . $siteCount;
-            $rules['penempatan_multi'] = 'required|array|min:1|size:' . $siteCount;
+            $rules['multisite']      = FluentRule::array()->required()->min(1)->size($siteCount);
+            $rules['provinsi_multi'] = FluentRule::array()->required()->min(1)->size($siteCount);
+            $rules['kota_multi']     = FluentRule::array()->required()->min(1)->size($siteCount);
+            $rules['penempatan_multi'] = FluentRule::array()->required()->min(1)->size($siteCount);
         }
 
         return $rules;
@@ -83,40 +85,39 @@ class QuotationStoreRequest extends BaseRequest
 
         $messages = [
             'perusahaan_id.required' => 'Perusahaan wajib dipilih',
-            'perusahaan_id.exists' => 'Perusahaan tidak valid',
-            'entitas.required' => 'Entitas wajib dipilih',
-            'entitas.exists' => 'Entitas tidak valid',
-            'layanan.required' => 'Layanan wajib dipilih',
-            'layanan.exists' => 'Layanan tidak valid',
-            'jumlah_site.required' => 'Jumlah site wajib dipilih',
-            'jumlah_site.in' => 'Jumlah site harus Single Site atau Multi Site',
+            'perusahaan_id.exists'   => 'Perusahaan tidak valid',
+            'entitas.required'       => 'Entitas wajib dipilih',
+            'entitas.exists'         => 'Entitas tidak valid',
+            'layanan.required'       => 'Layanan wajib dipilih',
+            'layanan.exists'         => 'Layanan tidak valid',
+            'jumlah_site.required'   => 'Jumlah site wajib dipilih',
+            'jumlah_site.in'         => 'Jumlah site harus Single Site atau Multi Site',
         ];
         $messages['site_existing_allowed'] = 'Site ini sudah ada di database. Data dari referensi akan disalin ke site ini.';
-        $messages['site_new_required'] = 'Untuk quotation baru tanpa referensi, data site wajib diisi.';
-
+        $messages['site_new_required']     = 'Untuk quotation baru tanpa referensi, data site wajib diisi.';
 
         // Pesan untuk revisi/rekontrak
         if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
             $messages['quotation_referensi_id.required'] = 'Quotation referensi wajib dipilih untuk revisi/rekontrak';
-            $messages['quotation_referensi_id.exists'] = 'Quotation referensi tidak valid';
+            $messages['quotation_referensi_id.exists']   = 'Quotation referensi tidak valid';
             $messages['site_count_mismatch'] = 'Karena jumlah site berbeda dengan referensi, data site baru wajib diisi.';
         }
 
         // Pesan untuk multisite
         if ($this->jumlah_site == 'Multi Site' && $this->has('multisite')) {
-            $messages['multisite.size'] = 'Jumlah data multisite harus sama dengan data provinsi, kota, dan penempatan';
-            $messages['provinsi_multi.size'] = 'Jumlah provinsi multisite harus sama dengan data site';
-            $messages['kota_multi.size'] = 'Jumlah kota multisite harus sama dengan data site';
+            $messages['multisite.size']        = 'Jumlah data multisite harus sama dengan data provinsi, kota, dan penempatan';
+            $messages['provinsi_multi.size']   = 'Jumlah provinsi multisite harus sama dengan data site';
+            $messages['kota_multi.size']       = 'Jumlah kota multisite harus sama dengan data site';
             $messages['penempatan_multi.size'] = 'Jumlah penempatan multisite harus sama dengan data site';
         }
 
         // Pesan untuk array elements
         if ($this->has('multisite')) {
-            $messages['multisite.*.required'] = 'Nama site multisite wajib diisi';
+            $messages['multisite.*.required']      = 'Nama site multisite wajib diisi';
             $messages['provinsi_multi.*.required'] = 'Provinsi multisite wajib dipilih';
-            $messages['provinsi_multi.*.exists'] = 'Provinsi multisite tidak valid';
-            $messages['kota_multi.*.required'] = 'Kota multisite wajib dipilih';
-            $messages['kota_multi.*.exists'] = 'Kota multisite tidak valid';
+            $messages['provinsi_multi.*.exists']   = 'Provinsi multisite tidak valid';
+            $messages['kota_multi.*.required']     = 'Kota multisite wajib dipilih';
+            $messages['kota_multi.*.exists']       = 'Kota multisite tidak valid';
             $messages['penempatan_multi.*.required'] = 'Penempatan multisite wajib diisi';
         }
 
@@ -126,9 +127,9 @@ class QuotationStoreRequest extends BaseRequest
     public function attributes(): array
     {
         return [
-            'multisite.*' => 'nama site',
-            'provinsi_multi.*' => 'provinsi',
-            'kota_multi.*' => 'kota',
+            'multisite.*'        => 'nama site',
+            'provinsi_multi.*'   => 'provinsi',
+            'kota_multi.*'       => 'kota',
             'penempatan_multi.*' => 'penempatan',
         ];
     }
@@ -147,17 +148,17 @@ class QuotationStoreRequest extends BaseRequest
         // ✅ Pastikan array untuk multi site selalu ada (meski empty)
         if ($this->jumlah_site == 'Multi Site') {
             $this->merge([
-                'multisite' => $this->multisite ?? [],
+                'multisite'      => $this->multisite ?? [],
                 'provinsi_multi' => $this->provinsi_multi ?? [],
-                'kota_multi' => $this->kota_multi ?? [],
+                'kota_multi'     => $this->kota_multi ?? [],
                 'penempatan_multi' => $this->penempatan_multi ?? [],
             ]);
         } else {
             // Untuk single site, hapus field multi site jika ada
             $this->merge([
-                'multisite' => null,
+                'multisite'      => null,
                 'provinsi_multi' => null,
-                'kota_multi' => null,
+                'kota_multi'     => null,
                 'penempatan_multi' => null,
             ]);
         }
@@ -169,10 +170,10 @@ class QuotationStoreRequest extends BaseRequest
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
-            $tipe_quotation = $this->tipe_quotation ?? 'baru';
-            $jumlah_site = $this->jumlah_site;
-            $perusahaan_id = $this->perusahaan_id;
-            $hasReferensi = $this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id);
+            $tipe_quotation  = $this->tipe_quotation ?? 'baru';
+            $jumlah_site     = $this->jumlah_site;
+            $perusahaan_id   = $this->perusahaan_id;
+            $hasReferensi    = $this->has('quotation_referensi_id') && !empty($this->quotation_referensi_id);
 
             // Validasi tambahan untuk quotation_referensi_id
             if ($hasReferensi) {
@@ -193,9 +194,9 @@ class QuotationStoreRequest extends BaseRequest
 
             // ✅ SINGLE SITE: Validasi kelengkapan field jika ada
             if ($jumlah_site == 'Single Site') {
-                $hasSiteField = $this->has('nama_site') && !empty($this->nama_site);
-                $hasProvinceField = $this->has('provinsi') && !empty($this->provinsi);
-                $hasCityField = $this->has('kota') && !empty($this->kota);
+                $hasSiteField      = $this->has('nama_site') && !empty($this->nama_site);
+                $hasProvinceField  = $this->has('provinsi') && !empty($this->provinsi);
+                $hasCityField      = $this->has('kota') && !empty($this->kota);
                 $hasPenempatanField = $this->has('penempatan') && !empty($this->penempatan);
 
                 $siteFieldsCount = ($hasSiteField ? 1 : 0) + ($hasProvinceField ? 1 : 0) +
@@ -213,9 +214,9 @@ class QuotationStoreRequest extends BaseRequest
 
             // ✅ MULTI SITE: validasi konsistensi array
             if ($jumlah_site == 'Multi Site' && $this->has('multisite') && !empty($this->multisite)) {
-                $siteCount = count($this->multisite);
-                $provinceCount = count($this->provinsi_multi ?? []);
-                $cityCount = count($this->kota_multi ?? []);
+                $siteCount      = count($this->multisite);
+                $provinceCount  = count($this->provinsi_multi ?? []);
+                $cityCount      = count($this->kota_multi ?? []);
                 $penempatanCount = count($this->penempatan_multi ?? []);
 
                 if ($siteCount !== $provinceCount || $siteCount !== $cityCount || $siteCount !== $penempatanCount) {
