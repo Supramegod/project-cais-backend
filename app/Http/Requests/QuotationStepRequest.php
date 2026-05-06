@@ -38,13 +38,15 @@ class QuotationStepRequest extends BaseRequest
 
             case 2:
                 $excludedRoles = [53, 54, 55, 56, 2];
-                $userRole = auth()->user()->cais_role_id ?? null;
+                $userRole = auth()->user()?->cais_role_id;
 
-                if (!in_array($userRole, $excludedRoles)) {
-                    $rules['mulai_kontrak'] = FluentRule::date()->required()->rule('after_or_equal:today');
-                    $rules['kontrak_selesai'] = FluentRule::date()->required()->rule('after_or_equal:mulai_kontrak');
-                    $rules['tgl_penempatan'] = FluentRule::date()->required();
-                }
+                // Aturan dasar selalu: date (jika ada input)
+                $rules['mulai_kontrak'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
+                $rules['kontrak_selesai'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
+                $rules['tgl_penempatan'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
 
                 $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
                 $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
