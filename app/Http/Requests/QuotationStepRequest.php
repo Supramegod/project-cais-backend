@@ -47,7 +47,7 @@ class QuotationStepRequest extends BaseRequest
                 }
 
                 $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
-                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule');
+                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule','id');
                 $rules['jumlah_hari_invoice'] = FluentRule::integer()->requiredIf('top', 'Lebih Dari 7 Hari')->min(1);
                 $rules['tipe_hari_invoice'] = FluentRule::string()->requiredIf('top', 'Lebih Dari 7 Hari')->in(['Kerja', 'Kalender']);
                 $rules['evaluasi_kontrak'] = FluentRule::string()->required();
@@ -84,12 +84,12 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 4:
-                $rules['is_ppn'] = FluentRule::boolean()->required()->in([0, 1]);
+                $rules['is_ppn'] = FluentRule::integer()->required()->in([0, 1]); 
                 $rules['ppn_pph_dipotong'] = FluentRule::string()->required()->in(['Total Invoice', 'Management Fee']);
-                $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee');
+                $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee','id');
                 $rules['persentase'] = FluentRule::numeric()->required()->min(0)->max(100);
                 $rules['position_data'] = FluentRule::array()->required()->min(1)->children([
-                    'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail'),
+                    'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail','id'),
                     'upah' => FluentRule::string()->required()->in(['UMP', 'UMK', 'Custom']),
                     'hitungan_upah' => FluentRule::string()->requiredIf('upah', 'Custom')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
                     'nominal_upah' => FluentRule::numeric()->requiredIf('upah', 'Custom')->min(0),
@@ -107,8 +107,8 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 5:
-                $rules['jenis-perusahaan'] = FluentRule::integer()->required()->exists('m_jenis_perusahaan');
-                $rules['bidang-perusahaan'] = FluentRule::integer()->required()->exists('m_bidang_perusahaan');
+                $rules['jenis-perusahaan'] = FluentRule::integer()->required()->exists('m_jenis_perusahaan', 'id');
+                $rules['bidang-perusahaan'] = FluentRule::integer()->required()->exists('m_bidang_perusahaan', 'id');
                 $rules['resiko'] = FluentRule::string()->required();
                 $rules['program-bpjs'] = FluentRule::string()->required();
                 $rules['penjamin'] = FluentRule::array()->sometimes()->children([
@@ -133,20 +133,18 @@ class QuotationStepRequest extends BaseRequest
 
             case 6:
                 $rules['aplikasi_pendukung'] = FluentRule::array()->sometimes()->children([
-                    '*' => FluentRule::integer()->exists('m_aplikasi_pendukung'),
+                    '*' => FluentRule::integer()->exists('m_aplikasi_pendukung', 'id'),
                 ]);
                 break;
 
             case 9:
-                // Single chemical
-                $rules['barang_id'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang');
+                $rules['barang_id'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang', 'id');
                 $rules['jumlah'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->min(0);
                 $rules['masa_pakai'] = FluentRule::integer()->sometimes()->min(1);
                 $rules['harga'] = FluentRule::numeric()->sometimes()->min(0);
 
-                // Multiple chemicals
                 $rules['chemicals'] = FluentRule::array()->sometimes()->children([
-                    'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang'),
+                    'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang', 'id'),
                     'jumlah' => FluentRule::integer()->requiredWith('chemicals')->min(0),
                     'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
                     'harga' => FluentRule::numeric()->sometimes()->min(0),
@@ -176,12 +174,12 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 12:
-                // Tidak ada field khusus
                 break;
         }
 
         return $rules;
     }
+
 
     public function messages(): array
     {

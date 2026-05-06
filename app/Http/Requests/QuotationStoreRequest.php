@@ -17,23 +17,23 @@ class QuotationStoreRequest extends BaseRequest
         $tipe_quotation = $this->route('tipe_quotation') ?? 'baru';
 
         $rules = [
-            'perusahaan_id'          => FluentRule::integer()->required()->exists('sl_leads'),
-            'entitas'                => FluentRule::integer()->required()->exists('mysqlhris.m_company'),
-            'layanan'                => FluentRule::integer()->required()->exists('m_kebutuhan'),
-            'jumlah_site'            => FluentRule::string()->required()->in(['Single Site', 'Multi Site']),
-            'quotation_referensi_id' => FluentRule::integer()->nullable()->exists('sl_quotation'),
+            'perusahaan_id' => FluentRule::integer()->required()->exists('sl_leads', 'id'),
+            'entitas' => FluentRule::integer()->required()->exists('mysqlhris.m_company', 'id'),
+            'layanan' => FluentRule::integer()->required()->exists('m_kebutuhan', 'id'),
+            'quotation_referensi_id' => FluentRule::integer()->nullable()->exists('sl_quotation', 'id'),
+            'jumlah_site' => FluentRule::string()->required()->in(['Single Site', 'Multi Site']),
         ];
 
         if ($this->jumlah_site == 'Single Site') {
             if ($this->has('nama_site') && !empty($this->nama_site)) {
-                $rules['nama_site']  = FluentRule::string()->required()->max(255);
-                $rules['provinsi']   = FluentRule::integer()->required()->exists('mysqlhris.m_province');
-                $rules['kota']       = FluentRule::integer()->required()->exists('mysqlhris.m_city');
+                $rules['nama_site'] = FluentRule::string()->required()->max(255);
+                $rules['provinsi'] = FluentRule::integer()->required()->exists('mysqlhris.m_province', 'id');
+                $rules['kota'] = FluentRule::integer()->required()->exists('mysqlhris.m_city', 'id');
                 $rules['penempatan'] = FluentRule::string()->required()->max(255);
             } else {
-                $rules['nama_site']  = FluentRule::string()->nullable();
-                $rules['provinsi']   = FluentRule::integer()->nullable();
-                $rules['kota']       = FluentRule::integer()->nullable();
+                $rules['nama_site'] = FluentRule::string()->nullable();
+                $rules['provinsi'] = FluentRule::integer()->nullable();
+                $rules['kota'] = FluentRule::integer()->nullable();
                 $rules['penempatan'] = FluentRule::string()->nullable();
             }
         }
@@ -46,18 +46,18 @@ class QuotationStoreRequest extends BaseRequest
                     '*' => FluentRule::string()->required()->max(255),
                 ]);
                 $rules['provinsi_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
-                    '*' => FluentRule::integer()->required()->exists('mysqlhris.m_province'),
+                    '*' => FluentRule::integer()->required()->exists('mysqlhris.m_province', 'id'),
                 ]);
                 $rules['kota_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
-                    '*' => FluentRule::integer()->required()->exists('mysqlhris.m_city'),
+                    '*' => FluentRule::integer()->required()->exists('mysqlhris.m_city', 'id'),
                 ]);
                 $rules['penempatan_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
                     '*' => FluentRule::string()->required()->max(255),
                 ]);
             } else {
-                $rules['multisite']        = FluentRule::array()->nullable();
-                $rules['provinsi_multi']   = FluentRule::array()->nullable();
-                $rules['kota_multi']       = FluentRule::array()->nullable();
+                $rules['multisite'] = FluentRule::array()->nullable();
+                $rules['provinsi_multi'] = FluentRule::array()->nullable();
+                $rules['kota_multi'] = FluentRule::array()->nullable();
                 $rules['penempatan_multi'] = FluentRule::array()->nullable();
             }
         }
@@ -71,36 +71,36 @@ class QuotationStoreRequest extends BaseRequest
 
         $messages = [
             'perusahaan_id.required' => 'Perusahaan wajib dipilih',
-            'perusahaan_id.exists'   => 'Perusahaan tidak valid',
-            'entitas.required'       => 'Entitas wajib dipilih',
-            'entitas.exists'         => 'Entitas tidak valid',
-            'layanan.required'       => 'Layanan wajib dipilih',
-            'layanan.exists'         => 'Layanan tidak valid',
-            'jumlah_site.required'   => 'Jumlah site wajib dipilih',
-            'jumlah_site.in'         => 'Jumlah site harus Single Site atau Multi Site',
-            'site_existing_allowed'  => 'Site ini sudah ada di database. Data dari referensi akan disalin ke site ini.',
-            'site_new_required'      => 'Untuk quotation baru tanpa referensi, data site wajib diisi.',
+            'perusahaan_id.exists' => 'Perusahaan tidak valid',
+            'entitas.required' => 'Entitas wajib dipilih',
+            'entitas.exists' => 'Entitas tidak valid',
+            'layanan.required' => 'Layanan wajib dipilih',
+            'layanan.exists' => 'Layanan tidak valid',
+            'jumlah_site.required' => 'Jumlah site wajib dipilih',
+            'jumlah_site.in' => 'Jumlah site harus Single Site atau Multi Site',
+            'site_existing_allowed' => 'Site ini sudah ada di database. Data dari referensi akan disalin ke site ini.',
+            'site_new_required' => 'Untuk quotation baru tanpa referensi, data site wajib diisi.',
         ];
 
         if (in_array($tipe_quotation, ['revisi', 'rekontrak'])) {
             $messages['quotation_referensi_id.required'] = 'Quotation referensi wajib dipilih untuk revisi/rekontrak';
-            $messages['quotation_referensi_id.exists']   = 'Quotation referensi tidak valid';
-            $messages['site_count_mismatch']             = 'Karena jumlah site berbeda dengan referensi, data site baru wajib diisi.';
+            $messages['quotation_referensi_id.exists'] = 'Quotation referensi tidak valid';
+            $messages['site_count_mismatch'] = 'Karena jumlah site berbeda dengan referensi, data site baru wajib diisi.';
         }
 
         if ($this->jumlah_site == 'Multi Site' && $this->has('multisite')) {
-            $messages['multisite.size']          = 'Jumlah data multisite harus sama dengan data provinsi, kota, dan penempatan';
-            $messages['provinsi_multi.size']     = 'Jumlah provinsi multisite harus sama dengan data site';
-            $messages['kota_multi.size']         = 'Jumlah kota multisite harus sama dengan data site';
-            $messages['penempatan_multi.size']   = 'Jumlah penempatan multisite harus sama dengan data site';
+            $messages['multisite.size'] = 'Jumlah data multisite harus sama dengan data provinsi, kota, dan penempatan';
+            $messages['provinsi_multi.size'] = 'Jumlah provinsi multisite harus sama dengan data site';
+            $messages['kota_multi.size'] = 'Jumlah kota multisite harus sama dengan data site';
+            $messages['penempatan_multi.size'] = 'Jumlah penempatan multisite harus sama dengan data site';
         }
 
         if ($this->has('multisite')) {
-            $messages['multisite.*.required']       = 'Nama site multisite wajib diisi';
-            $messages['provinsi_multi.*.required']   = 'Provinsi multisite wajib dipilih';
-            $messages['provinsi_multi.*.exists']     = 'Provinsi multisite tidak valid';
-            $messages['kota_multi.*.required']       = 'Kota multisite wajib dipilih';
-            $messages['kota_multi.*.exists']         = 'Kota multisite tidak valid';
+            $messages['multisite.*.required'] = 'Nama site multisite wajib diisi';
+            $messages['provinsi_multi.*.required'] = 'Provinsi multisite wajib dipilih';
+            $messages['provinsi_multi.*.exists'] = 'Provinsi multisite tidak valid';
+            $messages['kota_multi.*.required'] = 'Kota multisite wajib dipilih';
+            $messages['kota_multi.*.exists'] = 'Kota multisite tidak valid';
             $messages['penempatan_multi.*.required'] = 'Penempatan multisite wajib diisi';
         }
 
@@ -110,10 +110,10 @@ class QuotationStoreRequest extends BaseRequest
     public function attributes(): array
     {
         return [
-            'multisite.*'       => 'nama site',
-            'provinsi_multi.*'  => 'provinsi',
-            'kota_multi.*'      => 'kota',
-            'penempatan_multi.*'=> 'penempatan',
+            'multisite.*' => 'nama site',
+            'provinsi_multi.*' => 'provinsi',
+            'kota_multi.*' => 'kota',
+            'penempatan_multi.*' => 'penempatan',
         ];
     }
 
@@ -129,16 +129,16 @@ class QuotationStoreRequest extends BaseRequest
 
         if ($this->jumlah_site == 'Multi Site') {
             $this->merge([
-                'multisite'        => $this->multisite ?? [],
-                'provinsi_multi'   => $this->provinsi_multi ?? [],
-                'kota_multi'       => $this->kota_multi ?? [],
+                'multisite' => $this->multisite ?? [],
+                'provinsi_multi' => $this->provinsi_multi ?? [],
+                'kota_multi' => $this->kota_multi ?? [],
                 'penempatan_multi' => $this->penempatan_multi ?? [],
             ]);
         } else {
             $this->merge([
-                'multisite'        => null,
-                'provinsi_multi'   => null,
-                'kota_multi'       => null,
+                'multisite' => null,
+                'provinsi_multi' => null,
+                'kota_multi' => null,
                 'penempatan_multi' => null,
             ]);
         }
