@@ -28,7 +28,7 @@ class CheckTokenExpiry
      * karena sudah diatur oleh session lifetime Laravel.
      */
     if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
-        if ($token->expires_at && now()->gt($token->expires_at)) {
+        if ($token->expires_at && now()->greaterThan($token->expires_at)) {
             Log::warning('Access token expired attempt', [
                 'user_id' => $user->id,
                 'username' => $user->username,

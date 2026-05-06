@@ -103,7 +103,7 @@ class User extends Authenticatable
         $this->tokens()->where('expires_at', '<', now())->delete();
 
         // Buat access token dengan Sanctum (2 jam expiry)
-        $accessToken = $this->createToken($name, $abilities, now()->addHours(2));
+        $accessToken = $this->createToken($name, $abilities, now()->addDay());
 
         // Buat refresh token
         $refreshToken = RefreshTokens::create([
