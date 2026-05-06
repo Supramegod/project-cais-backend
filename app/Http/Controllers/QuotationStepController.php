@@ -216,10 +216,8 @@ class QuotationStepController extends Controller
     public function updateStep(QuotationStepRequest $request, $id, $step): JsonResponse
     {
         $startTime = microtime(true);
-        set_time_limit(0);
 
         $updateMethod = 'updateStep' . $step;
-
         if (!method_exists($this->quotationStepService, $updateMethod)) {
             return response()->json([
                 'success' => false,
@@ -227,12 +225,9 @@ class QuotationStepController extends Controller
             ], 404);
         }
 
-        DB::beginTransaction();
-
-        try {
+        // Gunakan closure transaction – otomatis rollback jika exception
+        DB::transaction(function () use ($request, $id, $step, $updateMethod, $startTime) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
-
-
             $this->quotationStepService->$updateMethod($quotation, $request);
 
             if ($quotation->step < 12) {
@@ -241,30 +236,15 @@ class QuotationStepController extends Controller
                     'updated_by' => Auth::user()->full_name,
                 ]);
             }
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationStepResource($quotation, $step),
-                'message' => "Step {$step} updated successfully",
-                'processing_time' => $this->elapsedMs($startTime),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error("QuotationStepController@updateStep [{$step}]: " . $e->getMessage(), [
-                'id' => $id,
-                'step' => $step,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => "Failed to update step {$step}",
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // Hanya sukses jika transaction selesai tanpa exception
+        return response()->json([
+            'success' => true,
+            'data' => new QuotationStepResource(Quotation::notDeleted()->findOrFail($id), $step),
+            'message' => "Step {$step} updated successfully",
+            'processing_time' => $this->elapsedMs($startTime),
+        ]);
     }
 
     // =========================================================================
@@ -612,7 +592,7 @@ class QuotationStepController extends Controller
         $quotationDetails = [];
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             foreach ($calculatedQuotation->quotation->quotationDetails as $detail) {
-                $isRoDetail =$this->isRo($detail);
+                $isRoDetail = $this->isRo($detail);
                 \Log::info('RO Check', [
                     'detail_id' => $detail->id,
                     'jabatan' => $detail->jabatan_kebutuhan,
@@ -1278,8 +1258,8 @@ class QuotationStepController extends Controller
     {
         return round((microtime(true) - $startTime) * 1000, 2) . 'ms';
     }
-      private function isRo($detail): bool
-{
-    return ($detail->position_id ?? null) === 224;
-}
+    private function isRo($detail): bool
+    {
+        return ($detail->position_id ?? null) === 224;
+    }
 }
