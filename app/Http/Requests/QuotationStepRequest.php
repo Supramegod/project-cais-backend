@@ -74,7 +74,7 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 3:
-                $rules['headCountData'] = FluentRule::array()->required()->children([
+                $rules['headCountData'] = FluentRule::array()->required()->each([
                     'quotation_site_id' => FluentRule::integer()->required(),
                     'position_id' => FluentRule::integer()->required(),
                     'jumlah_hc' => FluentRule::integer()->required()->min(1),
