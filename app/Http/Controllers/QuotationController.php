@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\QuotationApproveRequest;
 use App\Jobs\EscalateQuotationJob;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
@@ -203,7 +204,7 @@ class QuotationController extends Controller
                         ? '"' . $searchTerm . '"'
                         : $searchTerm . '*';
                     $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by','jenis_kontrak'])) {
+                } elseif (in_array($searchBy, ['nomor', 'kebutuhan', 'created_by', 'jenis_kontrak'])) {
                     $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
@@ -213,7 +214,7 @@ class QuotationController extends Controller
             }
 
             if ($request->filled('branch'))
-                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));  
+                $query->whereHas('leads', fn($q) => $q->where('branch_id', $request->branch));
             if ($request->filled('platform'))
                 $query->whereHas('leads', fn($q) => $q->where('platform_id', $request->platform));
             if ($request->filled('status'))
@@ -728,29 +729,26 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function submitForApproval(Request $request, string $id): JsonResponse
+    public function submitForApproval(QuotationApproveRequest $request): JsonResponse
     {
         try {
-            // TAMBAHKAN: with(['quotationDetails.wage']) agar data THR terbaca di Service
+            $id = $request->validated('id');                // sudah pasti valid
+
             $quotation = Quotation::notDeleted()
                 ->with(['quotationDetails.wage'])
                 ->findOrFail($id);
 
-            $validator = Validator::make($request->all(), [
-                'is_approved' => 'required|boolean',
-                'notes' => 'nullable|string'
-            ]);
+            $data = $request->validated();                  // ['id', 'is_approved', 'alasan']
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors() // Lebih rapi jika dipisah
-                ], 422);
-            }
-
-            // Panggil service yang sudah kita update logikanya tadi
-            $result = $this->submitApproval($quotation, $request->all(), Auth::user());
+            // Service masih menerima 'is_approved' & 'notes', jadi mapping 'alasan' → 'notes'
+            $result = $this->submitApproval(
+                $quotation,
+                [
+                    'is_approved' => $data['is_approved'],
+                    'notes' => $data['alasan'] ?? null,
+                ],
+                Auth::user()
+            );
 
             if (!$result['success']) {
                 return response()->json($result, 400);
@@ -758,16 +756,18 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => $request->is_approved ? 'Quotation approved successfully' : 'Quotation rejected successfully',
-                'data' => $result['data'] ?? null
+                'message' => $data['is_approved']
+                    ? 'Quotation approved successfully'
+                    : 'Quotation rejected successfully',
+                'data' => $result['data'] ?? null,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan sistem',
-                'debug_error' => $e->getMessage(), // Tambahkan ini untuk melihat error aslinya
-                'line' => $e->getLine()
+                'debug_error' => $e->getMessage(),
+                'line' => $e->getLine(),
             ], 500);
         }
     }
@@ -1209,8 +1209,8 @@ class QuotationController extends Controller
         $notes = $data['notes'] ?? null;
 
         return match ($user->cais_role_id) {
-            // self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
-            // self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+                // self::ROLE_GM_1 => $this->handleGM1Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
+                // self::ROLE_GM_2 => $this->handleGM2Approval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_SALES => $this->handleSalesApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             self::ROLE_DIREKTUR_KEUANGAN => $this->handleKeuanganApproval($quotation, $isApproved, $notes, $user, $currentDateTime),
             default => ['success' => false, 'message' => 'User tidak memiliki akses approval.'],
@@ -1228,7 +1228,7 @@ class QuotationController extends Controller
 //         Carbon $now
 //     ): array {
 
-//         $quotation->update([
+    //         $quotation->update([
 //             'ot3' => $isApproved ? $user->full_name : null,
 //             'status_quotation_id' => $isApproved ? 2 : 8,
 //             'is_aktif' => 0,
@@ -1236,22 +1236,22 @@ class QuotationController extends Controller
 //             'updated_by' => $user->full_name,
 //         ]);
 
-//         $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+    //         $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
 
-//         $freshQuotation = $quotation->fresh();
+    //         $freshQuotation = $quotation->fresh();
 //         if (!empty($freshQuotation->ot4)) {
 //             $this->notifyDirSales($freshQuotation, $now);
 //         }
 
-//         // Jika reject, notifikasi sales agar tahu quotation ditolak
+    //         // Jika reject, notifikasi sales agar tahu quotation ditolak
 //         if (!$isApproved) {
 //             $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
 //         }
 
-//         return ['success' => true, 'data' => $quotation->fresh()];
+    //         return ['success' => true, 'data' => $quotation->fresh()];
 //     }
 
-//     // ============================================================
+    //     // ============================================================
 // // LEVEL 4 - GM 2
 // // ============================================================
 //     private function handleGM2Approval(
@@ -1269,20 +1269,20 @@ class QuotationController extends Controller
 //             'updated_by' => $user->full_name,
 //         ]);
 
-//         $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
+    //         $this->logApproval($quotation, $user, $isApproved, $notes, tingkat: 1, now: $now);
 
-//         $freshQuotation = $quotation->fresh();
+    //         $freshQuotation = $quotation->fresh();
 //         if (!empty($freshQuotation->ot3)) {
 //             $this->notifyDirSales($freshQuotation, $now);
 //         }
 
 
-//         // Jika reject, notifikasi sales agar tahu quotation ditolak
+    //         // Jika reject, notifikasi sales agar tahu quotation ditolak
 //         if (!$isApproved) {
 //             $this->sendNotificationToSales($quotation->fresh(), $user, $isApproved, $notes);
 //         }
 
-//         return ['success' => true, 'data' => $quotation->fresh()];
+    //         return ['success' => true, 'data' => $quotation->fresh()];
 //     }
 
     // ============================================================
@@ -1632,11 +1632,11 @@ class QuotationController extends Controller
 
             case 'rekontrak':
                 $query->whereIn('status_quotation_id', [3, 6])
-                    ->whereHas('sites', function ($siteQuery) { 
-                        $siteQuery->whereHas('pks', function ($pksQuery) { 
+                    ->whereHas('sites', function ($siteQuery) {
+                        $siteQuery->whereHas('pks', function ($pksQuery) {
                             $pksQuery->where('is_aktif', 1);
-                                
-                                // ->where('kontrak_akhir', '<=', now()->addMonths(3));
+
+                            // ->where('kontrak_akhir', '<=', now()->addMonths(3));
                         });
                     });
                 break;
