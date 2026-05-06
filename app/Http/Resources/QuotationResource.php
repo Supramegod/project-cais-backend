@@ -115,11 +115,15 @@ class QuotationResource extends JsonResource
             return $detail->wage && $detail->quotationSite && $detail->wage->upah === 'Custom';
         })->map(function ($detail) {
             $umkData = Umk::byCity($detail->quotationSite->kota_id)->active()->first();
-            if (!$umkData)
+            $jenis_kontrak = strtolower((string) $this->resource->jenis_kontrak);
+            if (!$umkData || $jenis_kontrak !== 'reguler') {
                 return null;
+            }
 
             $nominalUpah = (float) $detail->nominal_upah;
             $batasMinimal = (float) $umkData->umk * 0.85;
+
+
 
             return $nominalUpah < $batasMinimal ? [
                 'position' => $detail->jabatan_kebutuhan,
