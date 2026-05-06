@@ -88,7 +88,7 @@ class QuotationStepRequest extends BaseRequest
                 $rules['ppn_pph_dipotong'] = FluentRule::string()->required()->in(['Total Invoice', 'Management Fee']);
                 $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee','id');
                 $rules['persentase'] = FluentRule::numeric()->required()->min(0)->max(100);
-                $rules['position_data'] = FluentRule::array()->required()->min(1)->children([
+                $rules['position_data'] = FluentRule::array()->required()->min(1)->each([
                     'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail','id'),
                     'upah' => FluentRule::string()->required()->in(['UMP', 'UMK', 'Custom']),
                     'hitungan_upah' => FluentRule::string()->requiredIf('upah', 'Custom')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
@@ -143,7 +143,7 @@ class QuotationStepRequest extends BaseRequest
                 $rules['masa_pakai'] = FluentRule::integer()->sometimes()->min(1);
                 $rules['harga'] = FluentRule::numeric()->sometimes()->min(0);
 
-                $rules['chemicals'] = FluentRule::array()->sometimes()->children([
+                $rules['chemicals'] = FluentRule::array()->sometimes()->each([
                     'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang', 'id'),
                     'jumlah' => FluentRule::integer()->requiredWith('chemicals')->min(0),
                     'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
