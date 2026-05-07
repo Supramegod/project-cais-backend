@@ -167,10 +167,10 @@ class QuotationStepRequest extends BaseRequest
 
             case 11:
                 $rules['penagihan'] = FluentRule::string()->required();
-                $rules['tunjangan_data'] = FluentRule::array()->sometimes()->each([
-                    '*' => FluentRule::array()->sometimes()->each([
-                        'nama_tunjangan' => FluentRule::string()->requiredWith('tunjangan_data.*')->max(255),
-                        'nominal' => FluentRule::numeric()->requiredWith('tunjangan_data.*')->min(0),
+                $rules['tunjangan_data'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::array()->sometimes()->each([   // ← pakai each() karena array numerik
+                        'nama_tunjangan' => FluentRule::string()->required()->max(255),
+                        'nominal' => FluentRule::numeric()->required()->min(0),
                     ]),
                 ]);
                 break;
