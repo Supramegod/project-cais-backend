@@ -21,6 +21,7 @@ WORKDIR /var/www/laravel
 COPY composer.json composer.lock ./
 
 RUN composer install \
+    --no-dev \
     --optimize-autoloader \
     --no-scripts \
     --no-interaction \
