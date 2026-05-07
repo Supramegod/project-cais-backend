@@ -26,7 +26,7 @@ class StoreLeadRequest extends BaseRequest
             'bidang_perusahaan'=> FluentRule::numeric('Bidang Perusahaan')->nullable(),
             'platform'         => FluentRule::numeric('Platform')->nullable(),
             'alamat_perusahaan'=> FluentRule::string('Alamat Perusahaan')->nullable(),
-            'jabatan_pic'     => FluentRule::string('Jabatan PIC')->nullable(),
+            'jabatan_pic' => FluentRule::field('Jabatan PIC')->nullable(),
             'no_telp'         => FluentRule::string('No Telp')->nullable(),
             'email'           => FluentRule::email('Email')->nullable(),
             'pma'             => FluentRule::string('PMA')->nullable(),
