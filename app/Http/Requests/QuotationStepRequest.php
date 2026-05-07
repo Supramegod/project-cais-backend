@@ -369,10 +369,10 @@ class QuotationStepRequest extends BaseRequest
             'penagihan.string' => 'Metode penagihan harus berupa teks',
             'tunjangan_data.array' => 'Data tunjangan harus berupa array',
             'tunjangan_data.*.array' => 'Data tunjangan per detail harus berupa array',
-            'tunjangan_data.*.*.nama_tunjangan.required_with' => 'Nama tunjangan harus diisi',
+            'tunjangan_data.*.*.nama_tunjangan.required' => 'Nama tunjangan harus diisi',
             'tunjangan_data.*.*.nama_tunjangan.string' => 'Nama tunjangan harus berupa teks',
             'tunjangan_data.*.*.nama_tunjangan.max' => 'Nama tunjangan maksimal 255 karakter',
-            'tunjangan_data.*.*.nominal.required_with' => 'Nominal tunjangan harus diisi',
+            'tunjangan_data.*.*.nominal.required' => 'Nominal tunjangan harus diisi',
             'tunjangan_data.*.*.nominal.numeric' => 'Nominal tunjangan harus berupa angka',
             'tunjangan_data.*.*.nominal.min' => 'Nominal tunjangan tidak boleh kurang dari 0',
         ];
