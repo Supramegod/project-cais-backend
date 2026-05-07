@@ -18,11 +18,9 @@ class StoreLeadRequest extends BaseRequest
 
             'pic'          => FluentRule::string('PIC')->required(),
             'branch'       => FluentRule::numeric('Branch')->required(),
-            // ✅ perbaikan
             'kebutuhan'    => FluentRule::array(label: 'Kebutuhan')->required()->min(1),
             'provinsi'     => FluentRule::numeric('Provinsi')->required(),
             'kota'         => FluentRule::numeric('Kota')->required(),
-
             'telp_perusahaan'  => FluentRule::string('Telp Perusahaan')->nullable(),
             'jenis_perusahaan' => FluentRule::numeric('Jenis Perusahaan')->nullable(),
             'bidang_perusahaan'=> FluentRule::numeric('Bidang Perusahaan')->nullable(),
