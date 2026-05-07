@@ -168,9 +168,9 @@ class QuotationStepRequest extends BaseRequest
             case 11:
                 $rules['penagihan'] = FluentRule::string()->required();
                 $rules['tunjangan_data'] = FluentRule::array()->sometimes()->children([
-                    '*' => FluentRule::array()->sometimes()->children([
-                        'nama_tunjangan' => FluentRule::string()->requiredWith('tunjangan_data.*')->max(255),
-                        'nominal' => FluentRule::numeric()->requiredWith('tunjangan_data.*')->min(0),
+                    '*' => FluentRule::array()->sometimes()->each([   // ← pakai each() karena array numerik
+                        'nama_tunjangan' => FluentRule::string()->required()->max(255),
+                        'nominal' => FluentRule::numeric()->required()->min(0),
                     ]),
                 ]);
                 break;
@@ -369,10 +369,10 @@ class QuotationStepRequest extends BaseRequest
             'penagihan.string' => 'Metode penagihan harus berupa teks',
             'tunjangan_data.array' => 'Data tunjangan harus berupa array',
             'tunjangan_data.*.array' => 'Data tunjangan per detail harus berupa array',
-            'tunjangan_data.*.*.nama_tunjangan.required_with' => 'Nama tunjangan harus diisi',
+            'tunjangan_data.*.*.nama_tunjangan.required' => 'Nama tunjangan harus diisi',
             'tunjangan_data.*.*.nama_tunjangan.string' => 'Nama tunjangan harus berupa teks',
             'tunjangan_data.*.*.nama_tunjangan.max' => 'Nama tunjangan maksimal 255 karakter',
-            'tunjangan_data.*.*.nominal.required_with' => 'Nominal tunjangan harus diisi',
+            'tunjangan_data.*.*.nominal.required' => 'Nominal tunjangan harus diisi',
             'tunjangan_data.*.*.nominal.numeric' => 'Nominal tunjangan harus berupa angka',
             'tunjangan_data.*.*.nominal.min' => 'Nominal tunjangan tidak boleh kurang dari 0',
         ];
