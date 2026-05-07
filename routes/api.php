@@ -11,8 +11,10 @@ use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesActivityController;
+use App\Http\Controllers\SalesTargetController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -42,6 +44,8 @@ use App\Http\Controllers\SystemAnnouncementController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+Route::get('/admin-panel/consultations', [AdminPanelController::class, 'getConsultations']);
+Route::post('/admin-panel/consultations', [AdminPanelController::class, 'storeConsultation']);
 
 Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
@@ -189,11 +193,15 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
     // Upah (Unified wage management: UMP, UMK & UMSK)
     Route::prefix('upah')->controller(UpahController::class)->group(function () {
         Route::get('/provinsi', 'listProvinsi');
-        Route::get('/provinsi/{provinceId}/kota', 'listKota');
+        Route::get('/provinsi/{provinceId}', 'getProvinceDetail');
         Route::get('/kota/{cityId}', 'detailKota');
+        Route::get('/umsp/{id}', 'showUmsp');
+        Route::get('/umsk/{id}', 'showUmsk');
+        Route::post('/umsp', 'storeUmsp');
         Route::post('/ump', 'storeUmp');
         Route::post('/umk', 'storeUmk');
         Route::post('/umsk', 'storeUmsk');
+
     });
 
     // Supplier
@@ -342,7 +350,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
         Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
-        
+
         // Submit Checklist
         Route::post('/{id}/submit-checklist', 'submitChecklist');
     });
@@ -462,7 +470,16 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/summary', 'getRevenueSummary');
         Route::get('/by-user', 'getRevenueByUser');
         Route::get('/by-month', 'getRevenueByMonth');
+        Route::get('/kpi', 'getkpi');
+
     });
+    Route::apiResource('sales-target', SalesTargetController::class)->only([
+        'index',
+        'store',
+        'show',
+        'update',
+        'destroy',
+    ]);
 
     // Target Management
     Route::prefix('targets')->controller(TargetController::class)->group(function () {
@@ -491,6 +508,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+    // Sales Report Routes
+    Route::prefix('sales-report')->controller(ReportController::class)->group(function () {
+        Route::get('/monthly', 'monthly');
+        Route::get('/weekly', 'weekly');
     });
 
 });

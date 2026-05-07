@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
     
         // Tambahkan ini untuk memastikan web session terbaca di rute API
         $middleware->group('api', [
+            \App\Http\Middleware\ApiResponseMiddleware::class,
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
             \Illuminate\Session\Middleware\StartSession::class,

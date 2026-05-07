@@ -308,6 +308,7 @@ class SpkController extends Controller
         try {
             $data = Quotation::with(['leads.timSalesD'])
                 ->whereNull('deleted_at')
+                ->where('status_quotation_id', 3)
                 ->where('is_aktif', 1)
                 ->whereHas('leads.timSalesD', function ($query) {
                     $query->where('user_id', Auth::user()->id);
@@ -380,6 +381,7 @@ class SpkController extends Controller
                 })
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
+                        ->where('status_quotation_id', 3)
                         ->where('is_aktif', 1);
                 });
 

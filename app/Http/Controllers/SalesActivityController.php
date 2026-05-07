@@ -825,7 +825,6 @@ class SalesActivityController extends Controller
 
             // Query activity berdasarkan kebutuhan yang di-assign ke user
             $query = SalesActivity::whereIn('leads_kebutuhan_id', $kebutuhanIds);
-
             // Filter berdasarkan tanggal
             if ($request->has('start_date') && $request->has('end_date')) {
                 $query->whereBetween('tgl_activity', [

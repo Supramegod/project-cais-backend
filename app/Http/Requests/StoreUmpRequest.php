@@ -1,36 +1,39 @@
 <?php
-// app/Http/Requests/StoreUmpRequest.php
 
 namespace App\Http\Requests;
 
-use Illuminate\Foundation\Http\FormRequest;
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
-class StoreUmpRequest extends FormRequest
+class StoreUmpRequest extends BaseRequest
 {
-    public function authorize(): bool { return true; }
+    public function authorize(): bool
+    {
+        return true;
+    }
 
     public function rules(): array
     {
         return [
-            'province_id'   => ['required', 'integer', 'min:1'],
-            'province_name' => ['required', 'string', 'max:255'],
-            'ump'           => ['required', 'numeric', 'min:0'],
-            'tgl_berlaku'   => ['required', 'date'],
-            'sumber'        => ['required', 'url', 'max:500'],
+            'province_id' => FluentRule::integer()->required()->min(1),
+            'province_name' => FluentRule::string()->required()->max(150),
+            'ump' => FluentRule::numeric()->required()->min(1),
+            'tgl_berlaku' => FluentRule::string()->required()->dateFormat('Y-m-d'),
+            'sumber' => FluentRule::string()->required()->max(500),
         ];
     }
 
     public function messages(): array
     {
         return [
-            'province_id.required'   => 'Province ID harus diisi.',
-            'province_name.required' => 'Nama provinsi harus diisi.',
-            'ump.required'           => 'Nilai UMP harus diisi.',
-            'ump.numeric'            => 'Nilai UMP harus berupa angka.',
-            'tgl_berlaku.required'   => 'Tanggal berlaku harus diisi.',
-            'tgl_berlaku.date'       => 'Format tanggal tidak valid.',
-            'sumber.required'        => 'Sumber harus diisi.',
-            'sumber.url'             => 'Sumber harus berupa URL yang valid.',
+            'province_id.required' => 'Province ID wajib diisi.',
+            'province_name.required' => 'Nama provinsi wajib diisi.',
+            'ump.required' => 'Nilai UMP wajib diisi.',
+            'ump.numeric' => 'Nilai UMP harus berupa angka.',
+            'ump.min' => 'Nilai UMP harus lebih dari 0.',
+            'tgl_berlaku.required' => 'Tanggal berlaku wajib diisi.',
+            'tgl_berlaku.date_format' => 'Format tanggal harus YYYY-MM-DD.',
+            'sumber.required' => 'Sumber/referensi wajib diisi.',
         ];
     }
 }

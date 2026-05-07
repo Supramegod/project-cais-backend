@@ -3,596 +3,232 @@
 namespace App\Services;
 
 use App\Models\Pks;
-use App\Models\Quotation;
-use App\Models\QuotationDetailCoss;
+use App\Models\SalesTarget;
 use App\Models\User;
-use App\Models\Spk;
-use App\Models\SpkSite;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SalesRevenueService
 {
-    /**
-     * Menghitung akumulasi total invoice per sales per bulan
-     * Versi yang sudah diperbaiki dengan multiple paths
-     */
-    public function calculateMonthlyRevenue(array $filters = [])
+    // ─── Public API ───────────────────────────────────────────────────────────
+
+
+    public function calculateMonthlyRevenue(array $filters = []): array
     {
-        Log::info('Starting calculateMonthlyRevenue with filters:', $filters);
 
-        // 1. Ambil semua user dengan role sales
-        $salesUsers = User::whereIn('role_id', [29, 30, 31, 32, 33])
-            ->when(isset($filters['user_id']), function ($query) use ($filters) {
-                return $query->where('id', $filters['user_id']);
-            })
-            ->get(['id', 'full_name', 'role_id']);
+        $salesUsers = $this->fetchSalesUsers($filters);
 
-        Log::info('Sales users found:', ['count' => $salesUsers->count()]);
-
-        $result = [];
-
-        foreach ($salesUsers as $user) {
-            Log::info('Processing user:', ['user_id' => $user->id, 'name' => $user->full_name]);
-
-            // 2. Ambil PKS yang terkait dengan user ini
-            $pksList = $this->getPksBySalesUser($user, $filters);
-
-            Log::info('PKS found for user:', ['user_id' => $user->id, 'count' => $pksList->count()]);
-
-            $userMonthlyRevenue = [];
-
-            foreach ($pksList as $pks) {
-                Log::info('Processing PKS:', [
-                    'pks_id' => $pks->id,
-                    'nomor' => $pks->nomor,
-                    'leads_id' => $pks->leads_id,
-                    'quotation_id' => $pks->quotation_id,
-                    'spk_id' => $pks->spk_id
-                ]);
-
-                // 3. Hitung total invoice dari quotationdetailcoss untuk PKS ini
-                $totalInvoice = $this->calculateTotalInvoiceForPks($pks);
-
-                Log::info('Total invoice for PKS:', ['pks_id' => $pks->id, 'total_invoice' => $totalInvoice]);
-
-                if ($totalInvoice <= 0) {
-                    Log::info('Skipping PKS - no invoice', ['pks_id' => $pks->id]);
-                    continue;
-                }
-
-                // 4. Hitung durasi kontrak dalam bulan
-                $contractDuration = $this->calculateContractDuration($pks);
-
-                Log::info('Contract duration:', ['pks_id' => $pks->id, 'duration' => $contractDuration]);
-
-                if ($contractDuration <= 0) {
-                    Log::info('Skipping PKS - invalid duration', ['pks_id' => $pks->id]);
-                    continue;
-                }
-
-                // 5. Hitung perolehan per bulan
-                $monthlyRevenue = $totalInvoice / $contractDuration;
-
-                Log::info('Monthly revenue:', ['pks_id' => $pks->id, 'monthly_revenue' => $monthlyRevenue]);
-
-                // 6. Generate bulan-bulan dalam masa kontrak
-                $monthlyBreakdown = $this->generateMonthlyBreakdown(
-                    $pks->kontrak_awal,
-                    $pks->kontrak_akhir,
-                    $monthlyRevenue,
-                    $filters
-                );
-
-                Log::info('Monthly breakdown:', ['pks_id' => $pks->id, 'breakdown_count' => count($monthlyBreakdown)]);
-
-                // 7. Akumulasikan ke hasil
-                foreach ($monthlyBreakdown as $month => $revenue) {
-                    if (!isset($userMonthlyRevenue[$month])) {
-                        $userMonthlyRevenue[$month] = 0;
-                    }
-                    $userMonthlyRevenue[$month] += $revenue;
-                }
-            }
-
-            if (!empty($userMonthlyRevenue)) {
-                $result[] = [
-                    'user_id' => $user->id,
-                    'user_name' => $user->full_name,
-                    'user_role' => $user->role_id,
-                    'monthly_revenue' => $userMonthlyRevenue,
-                    'total_revenue' => array_sum($userMonthlyRevenue),
-                ];
-
-                Log::info('User revenue calculated:', [
-                    'user_id' => $user->id,
-                    'months_count' => count($userMonthlyRevenue),
-                    'total_revenue' => array_sum($userMonthlyRevenue)
-                ]);
-            } else {
-                Log::info('No revenue data for user:', ['user_id' => $user->id]);
-            }
-        }
-
-        // 8. Format dan sort hasil
-        $formattedResult = $this->formatResult($result, $filters);
-
-        Log::info('Final formatted result count:', ['count' => count($formattedResult)]);
-
-        return $formattedResult;
-    }
-
-    /**
-     * Mendapatkan PKS berdasarkan sales user dengan multiple paths
-     */
-    private function getPksBySalesUser(User $user, array $filters = [])
-    {
-        Log::info('Getting PKS for user:', ['user_id' => $user->id]);
-
-        // Query builder untuk mendapatkan PKS yang terkait dengan sales
-        $query = Pks::query()
-            ->with(['leads', 'quotations', 'spk'])
-            ->where('is_aktif', 1) // Hanya PKS aktif
-            ->where(function ($query) use ($user) {
-                // Path 1: Melalui leads langsung (tim_sales_d_id)
-                $query->whereHas('leads', function ($q) use ($user) {
-                    $q->whereHas('timSalesD', function ($subQ) use ($user) {
-                        $subQ->where('user_id', $user->id);
-                    });
-                })
-                    // Path 2: Melalui leads_kebutuhan (jika ada relasi ini)
-                    ->orWhereHas('leads.leadsKebutuhan.timSalesD', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
-            });
-
-        // Apply filters
-        if (isset($filters['year'])) {
-            $query->whereYear('kontrak_awal', '<=', $filters['year'])
-                ->whereYear('kontrak_akhir', '>=', $filters['year']);
-        }
-
-        if (isset($filters['month'])) {
-            $year = $filters['year'] ?? date('Y');
-            $date = Carbon::create($year, $filters['month'], 1);
-            $query->where('kontrak_awal', '<=', $date->endOfMonth())
-                ->where('kontrak_akhir', '>=', $date->startOfMonth());
-        }
-
-        if (isset($filters['start_date'])) {
-            $query->where('kontrak_akhir', '>=', $filters['start_date']);
-        }
-
-        if (isset($filters['end_date'])) {
-            $query->where('kontrak_awal', '<=', $filters['end_date']);
-        }
-
-        $result = $query->orderBy('kontrak_awal', 'desc')->get();
-
-        Log::info('PKS query result:', [
-            'count' => $result->count(),
-            'user_id' => $user->id,
-            'filters' => $filters
-        ]);
-
-        // Debug: Log semua PKS yang ditemukan
-        foreach ($result as $pks) {
-            Log::debug('PKS found:', [
-                'id' => $pks->id,
-                'nomor' => $pks->nomor,
-                'kontrak_awal' => $pks->kontrak_awal,
-                'kontrak_akhir' => $pks->kontrak_akhir,
-                'leads_id' => $pks->leads_id,
-                'quotation_id' => $pks->quotation_id,
-                'spk_id' => $pks->spk_id,
-                'is_aktif' => $pks->is_aktif
-            ]);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Menghitung total invoice dari quotationdetailcoss untuk PKS tertentu
-     * PERBAIKAN: Mencari melalui SPK dan SpkSite
-     */
-    private function calculateTotalInvoiceForPks(Pks $pks): float
-    {
-        Log::debug('SalesRevenueService: Calculating total invoice for PKS', [
-            'pks_id' => $pks->id,
-            'leads_id' => $pks->leads_id,
-            'quotation_id' => $pks->quotation_id,
-            'spk_id' => $pks->spk_id
-        ]);
-
-        $totalInvoice = 0;
-        $quotationIds = [];
-
-        // PATH 1: Jika PKS memiliki quotation_id langsung
-        // if ($pks->quotation_id) {
-        //     $quotationIds[] = $pks->quotation_id;
-        //     Log::debug('SalesRevenueService: Path 1 - Direct quotation from PKS', [
-        //         'pks_id' => $pks->id,
-        //         'quotation_id' => $pks->quotation_id
-        //     ]);
-        // }
-
-        // PATH 2: Jika PKS memiliki spk_id, cari melalui SPK dan SpkSite
-        if ($pks->spk_id) {
-            Log::debug('SalesRevenueService: Path 2 - Looking through SPK', [
-                'pks_id' => $pks->id,
-                'spk_id' => $pks->spk_id
-            ]);
-
-            // 2a: Cari quotation langsung dari SPK (jika ada relasi langsung)
-            $spkQuotations = Quotation::where('id', $pks->spk_id)->pluck('id');
-            if ($spkQuotations->isNotEmpty()) {
-                $quotationIds = array_merge($quotationIds, $spkQuotations->toArray());
-                Log::debug('SalesRevenueService: Found quotations directly from SPK', [
-                    'pks_id' => $pks->id,
-                    'quotation_ids' => $spkQuotations->toArray()
-                ]);
-            }
-
-            // 2b: Cari melalui SpkSite
-            $spkSiteQuotations = SpkSite::where('spk_id', $pks->spk_id)
-                ->whereNotNull('quotation_id')
-                ->pluck('quotation_id');
-
-            if ($spkSiteQuotations->isNotEmpty()) {
-                $quotationIds = array_merge($quotationIds, $spkSiteQuotations->toArray());
-                Log::debug('SalesRevenueService: Found quotations through SpkSite', [
-                    'pks_id' => $pks->id,
-                    'quotation_ids' => $spkSiteQuotations->toArray()
-                ]);
-            }
-
-            // 2c: Cari SPK yang terkait, lalu cari quotation dari SPK tersebut
-            $spk = Spk::find($pks->spk_id);
-            if ($spk && $spk->quotation_id) {
-                $quotationIds[] = $spk->quotation_id;
-                Log::debug('SalesRevenueService: Found quotation from SPK model', [
-                    'pks_id' => $pks->id,
-                    'spk_id' => $spk->id,
-                    'quotation_id' => $spk->quotation_id
-                ]);
-            }
-        }
-
-        // PATH 3: Cari melalui leads_id (quotation dengan leads yang sama)
-        if ($pks->leads_id) {
-            Log::debug('SalesRevenueService: Path 3 - Looking through leads', [
-                'pks_id' => $pks->id,
-                'leads_id' => $pks->leads_id
-            ]);
-
-            $leadsQuotations = Quotation::where('leads_id', $pks->leads_id)
-                ->pluck('id');
-
-            if ($leadsQuotations->isNotEmpty()) {
-                $quotationIds = array_merge($quotationIds, $leadsQuotations->toArray());
-                Log::debug('SalesRevenueService: Found quotations through leads', [
-                    'pks_id' => $pks->id,
-                    'quotation_ids' => $leadsQuotations->toArray()
-                ]);
-            }
-        }
-
-        // PATH 4: Cari melalui SPK yang terkait dengan leads yang sama (jika ada spk_id di PKS)
-        if ($pks->leads_id && !$pks->spk_id) {
-            // Cari SPK yang terkait dengan leads ini
-            $relatedSpks = Spk::where('leads_id', $pks->leads_id)->pluck('id');
-
-            if ($relatedSpks->isNotEmpty()) {
-                foreach ($relatedSpks as $spkId) {
-                    // Cari quotation dari SpkSite
-                    $spkSiteQuotations = SpkSite::where('spk_id', $spkId)
-                        ->whereNotNull('quotation_id')
-                        ->pluck('quotation_id');
-
-                    if ($spkSiteQuotations->isNotEmpty()) {
-                        $quotationIds = array_merge($quotationIds, $spkSiteQuotations->toArray());
-                        Log::debug('SalesRevenueService: Found quotations through related SPKs', [
-                            'pks_id' => $pks->id,
-                            'spk_id' => $spkId,
-                            'quotation_ids' => $spkSiteQuotations->toArray()
-                        ]);
-                    }
-
-                    // Cari quotation langsung dari SPK
-                    $spk = Spk::find($spkId);
-                    if ($spk && $spk->quotation_id) {
-                        $quotationIds[] = $spk->quotation_id;
-                    }
-                }
-            }
-        }
-
-        // Remove duplicates and empty values
-        $quotationIds = array_unique(array_filter($quotationIds));
-
-        Log::debug('SalesRevenueService: Final quotation IDs to check', [
-            'pks_id' => $pks->id,
-            'quotation_ids' => $quotationIds,
-            'count' => count($quotationIds)
-        ]);
-
-        if (empty($quotationIds)) {
-            Log::debug('SalesRevenueService: No quotation IDs found for PKS', ['pks_id' => $pks->id]);
-            return 0.0;
-        }
-
-        // Hitung total invoice dari semua quotation yang ditemukan
-        $totalInvoice = QuotationDetailCoss::whereIn('quotation_id', $quotationIds)
-            ->sum('total_invoice');
-
-        Log::debug('SalesRevenueService: Total invoice calculated', [
-            'pks_id' => $pks->id,
-            'quotation_ids' => $quotationIds,
-            'total_invoice' => $totalInvoice
-        ]);
-
-        return (float) $totalInvoice;
-    }
-
-    /**
-     * Versi simplified dari calculateTotalInvoiceForPks untuk debugging
-     */
-    private function calculateTotalInvoiceForPksSimple(Pks $pks): float
-    {
-        Log::debug('SalesRevenueService: Simplified calculation for PKS', [
-            'pks_id' => $pks->id,
-            'leads_id' => $pks->leads_id,
-            'quotation_id' => $pks->quotation_id,
-            'spk_id' => $pks->spk_id
-        ]);
-
-        // Coba semua kemungkinan path secara berurutan
-        $paths = [];
-
-        // Path 1: Direct quotation_id
-        if ($pks->quotation_id) {
-            $invoice = QuotationDetailCoss::where('quotation_id', $pks->quotation_id)
-                ->sum('total_invoice');
-            if ($invoice > 0) {
-                Log::debug('SalesRevenueService: Path 1 success', [
-                    'pks_id' => $pks->id,
-                    'quotation_id' => $pks->quotation_id,
-                    'invoice' => $invoice
-                ]);
-                return (float) $invoice;
-            }
-            $paths[] = ['path' => 'direct_quotation', 'invoice' => $invoice];
-        }
-
-        // Path 2: Through SpkSite
-        if ($pks->spk_id) {
-            $quotationIds = SpkSite::where('spk_id', $pks->spk_id)
-                ->whereNotNull('quotation_id')
-                ->pluck('quotation_id');
-
-            if ($quotationIds->isNotEmpty()) {
-                $invoice = QuotationDetailCoss::whereIn('quotation_id', $quotationIds)
-                    ->sum('total_invoice');
-                if ($invoice > 0) {
-                    Log::debug('SalesRevenueService: Path 2 success', [
-                        'pks_id' => $pks->id,
-                        'spk_id' => $pks->spk_id,
-                        'quotation_ids' => $quotationIds->toArray(),
-                        'invoice' => $invoice
-                    ]);
-                    return (float) $invoice;
-                }
-                $paths[] = ['path' => 'spk_site', 'invoice' => $invoice, 'quotation_ids' => $quotationIds->toArray()];
-            }
-        }
-
-        // Path 3: Through leads
-        if ($pks->leads_id) {
-            $quotationIds = Quotation::where('leads_id', $pks->leads_id)
-                ->pluck('id');
-
-            if ($quotationIds->isNotEmpty()) {
-                $invoice = QuotationDetailCoss::whereIn('quotation_id', $quotationIds)
-                    ->sum('total_invoice');
-                if ($invoice > 0) {
-                    Log::debug('SalesRevenueService: Path 3 success', [
-                        'pks_id' => $pks->id,
-                        'leads_id' => $pks->leads_id,
-                        'quotation_ids' => $quotationIds->toArray(),
-                        'invoice' => $invoice
-                    ]);
-                    return (float) $invoice;
-                }
-                $paths[] = ['path' => 'leads', 'invoice' => $invoice, 'quotation_ids' => $quotationIds->toArray()];
-            }
-        }
-
-        // Path 4: Find SPK from leads and then SpkSite
-        if ($pks->leads_id) {
-            // Cari SPK yang terkait dengan leads ini
-            $spkIds = Spk::where('leads_id', $pks->leads_id)->pluck('id');
-
-            if ($spkIds->isNotEmpty()) {
-                $allQuotationIds = [];
-                foreach ($spkIds as $spkId) {
-                    $siteQuotationIds = SpkSite::where('spk_id', $spkId)
-                        ->whereNotNull('quotation_id')
-                        ->pluck('quotation_id');
-                    $allQuotationIds = array_merge($allQuotationIds, $siteQuotationIds->toArray());
-                }
-
-                $allQuotationIds = array_unique(array_filter($allQuotationIds));
-
-                if (!empty($allQuotationIds)) {
-                    $invoice = QuotationDetailCoss::whereIn('quotation_id', $allQuotationIds)
-                        ->sum('total_invoice');
-                    if ($invoice > 0) {
-                        Log::debug('SalesRevenueService: Path 4 success', [
-                            'pks_id' => $pks->id,
-                            'leads_id' => $pks->leads_id,
-                            'spk_ids' => $spkIds->toArray(),
-                            'quotation_ids' => $allQuotationIds,
-                            'invoice' => $invoice
-                        ]);
-                        return (float) $invoice;
-                    }
-                    $paths[] = ['path' => 'leads_to_spk_to_site', 'invoice' => $invoice, 'quotation_ids' => $allQuotationIds];
-                }
-            }
-        }
-
-        Log::debug('SalesRevenueService: All paths failed', [
-            'pks_id' => $pks->id,
-            'paths_tried' => $paths
-        ]);
-
-        return 0.0;
-    }
-
-    /**
-     * Menghitung durasi kontrak dalam bulan
-     */
-    private function calculateContractDuration(Pks $pks): int
-    {
-        if (!$pks->kontrak_awal || !$pks->kontrak_akhir) {
-            return 0;
-        }
-
-        try {
-            $start = Carbon::parse($pks->kontrak_awal);
-            $end = Carbon::parse($pks->kontrak_akhir);
-
-            // Hitung selisih bulan
-            $duration = $start->diffInMonths($end);
-
-            // Jika tanggal akhir lebih besar dari tanggal awal dalam bulan yang sama,
-            // tambahkan 1 bulan untuk bulan pertama
-            if ($start->day > 1 || $end->day > $start->day) {
-                $duration += 1;
-            }
-
-            return max(1, $duration); // Minimal 1 bulan
-        } catch (\Exception $e) {
-            Log::error('Error calculating contract duration:', [
-                'pks_id' => $pks->id,
-                'kontrak_awal' => $pks->kontrak_awal,
-                'kontrak_akhir' => $pks->kontrak_akhir,
-                'error' => $e->getMessage()
-            ]);
-            return 0;
-        }
-    }
-
-    /**
-     * Generate breakdown per bulan selama masa kontrak
-     */
-    private function generateMonthlyBreakdown(
-        $contractStart,
-        $contractEnd,
-        float $monthlyRevenue,
-        array $filters = []
-    ): array {
-        if (!$contractStart || !$contractEnd) {
+        if ($salesUsers->isEmpty()) {
             return [];
         }
 
-        try {
-            $start = Carbon::parse($contractStart)->startOfMonth();
-            $end = Carbon::parse($contractEnd)->endOfMonth();
+        $userIds = $salesUsers->pluck('id')->all();
 
-            $period = CarbonPeriod::create($start, '1 month', $end);
-            $breakdown = [];
+        // Step 2: Semua PKS untuk semua user → 2 query (linked + model)
+        $allPks = $this->getAllPksBySalesUsers($userIds, $filters);
 
-            foreach ($period as $date) {
-                $monthKey = $date->format('Y-m');
-
-                // Apply filters jika ada
-                $includeMonth = true;
-
-                if (isset($filters['year']) && $date->year != $filters['year']) {
-                    $includeMonth = false;
-                }
-                if (isset($filters['month']) && $date->month != $filters['month']) {
-                    $includeMonth = false;
-                }
-                if (isset($filters['start_date']) && $date->format('Y-m-d') < $filters['start_date']) {
-                    $includeMonth = false;
-                }
-                if (isset($filters['end_date']) && $date->format('Y-m-d') > $filters['end_date']) {
-                    $includeMonth = false;
-                }
-
-                if ($includeMonth) {
-                    $breakdown[$monthKey] = $monthlyRevenue;
-                }
-            }
-
-            return $breakdown;
-        } catch (\Exception $e) {
-            Log::error('Error generating monthly breakdown:', [
-                'contractStart' => $contractStart,
-                'contractEnd' => $contractEnd,
-                'error' => $e->getMessage()
-            ]);
+        if ($allPks->isEmpty()) {
             return [];
         }
-    }
 
-    /**
-     * Format hasil akhir
-     */
-    private function formatResult(array $result, array $filters = []): array
-    {
-        $formatted = [];
+        // Step 3: Semua total_invoice untuk semua PKS → 3 query
+        $invoiceByPks = $this->getBulkInvoiceTotals($allPks);
 
-        foreach ($result as $userData) {
-            foreach ($userData['monthly_revenue'] as $month => $revenue) {
-                $formatted[] = [
-                    'user_id' => $userData['user_id'],
-                    'user_name' => $userData['user_name'],
-                    'user_role' => $userData['user_role'],
-                    'month' => $month,
-                    'month_name' => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
-                    'revenue' => round($revenue, 2),
-                    'revenue_formatted' => 'Rp ' . number_format($revenue, 0, ',', '.'),
-                ];
+        // Step 4: Lookup map (di memory, 0 query)
+        $userBranchMap = $salesUsers->pluck('branch_id', 'id');
+
+        // Step 5: Semua kalkulasi di memory
+        $userMonthlyRevenue = [];
+
+        foreach ($allPks as $pks) {
+            $totalInvoice = $invoiceByPks[$pks->id] ?? 0;
+
+            if ($totalInvoice <= 0) {
+                continue;
+            }
+
+            $contractDuration = $this->calculateContractDuration($pks);
+
+            if ($contractDuration <= 0) {
+                continue;
+            }
+
+            $monthlyRevenue = $totalInvoice / $contractDuration;
+
+            $breakdown = $this->generateMonthlyBreakdown(
+                $pks->kontrak_awal,
+                $pks->kontrak_akhir,
+                $monthlyRevenue,
+                $filters
+            );
+
+            if (empty($breakdown)) {
+                continue;
+            }
+
+            // _sales_user_id di-inject oleh getAllPksBySalesUsers
+            $userId = $pks->_sales_user_id;
+
+            foreach ($breakdown as $month => $revenue) {
+                $userMonthlyRevenue[$userId][$month]
+                    = ($userMonthlyRevenue[$userId][$month] ?? 0) + $revenue;
             }
         }
 
-        // Sort by user_id dan bulan
-        usort($formatted, function ($a, $b) {
-            if ($a['user_id'] == $b['user_id']) {
-                return $a['month'] <=> $b['month'];
-            }
-            return $a['user_id'] <=> $b['user_id'];
-        });
-
-        return $formatted;
+        // Step 6: Format flat array — lookup dari Collection, 0 query
+        return $this->formatResult($userMonthlyRevenue, $salesUsers, $userBranchMap);
     }
 
     /**
-     * Versi optimized menggunakan Query Builder langsung
+     * KPI Comparison: aktual vs target per user per bulan.
+     *
+     * Tidak ada query di dalam loop — semua data diambil sekaligus
+     * lalu di-map di memory dengan Collection::keyBy.
      */
-    public function calculateMonthlyRevenueOptimized(array $filters = [])
+    public function getKpiComparison(array $filters = []): array
     {
-        Log::info('Starting calculateMonthlyRevenueOptimized with filters:', $filters);
+        // Reuse calculateMonthlyRevenue — tidak ada query ulang
+        $revenueRows = $this->calculateMonthlyRevenue($filters);
 
+        if (empty($revenueRows)) {
+            return $this->buildEmptyKpiResponse();
+        }
+
+        $userIds = array_unique(array_column($revenueRows, 'user_id'));
+        $branchIds = array_filter(array_unique(array_column($revenueRows, 'branch_id')));
+        $months = array_unique(array_column($revenueRows, 'month'));
+        $years = array_unique(array_map(fn($m) => (int) substr($m, 0, 4), $months));
+
+        // Ambil semua target dalam 1 query
+        $allTargets = $this->fetchAllTargets($userIds, $branchIds, $years, $filters);
+
+        // Build lookup maps — O(1) access, tidak ada query di loop
+        $personalMap = $allTargets
+            ->where('type', 'personal')
+            ->keyBy(fn($t) => SalesTarget::buildKey('personal', $t->user_id, null, $t->year, $t->month));
+
+        $branchMap = $allTargets
+            ->where('type', 'branch')
+            ->keyBy(fn($t) => SalesTarget::buildKey('branch', null, $t->branch_id, $t->year, $t->month));
+
+        $companyMap = $allTargets
+            ->where('type', 'company')
+            ->keyBy(fn($t) => SalesTarget::buildKey('company', null, null, $t->year, $t->month));
+
+        $kpiRows = [];
+
+        foreach ($revenueRows as $row) {
+            $year = (int) substr($row['month'], 0, 4);
+            $month = (int) substr($row['month'], 5, 2);
+
+            $targetPersonal = $personalMap->get(
+                SalesTarget::buildKey('personal', $row['user_id'], null, $year, $month)
+            )?->target_amount;
+
+            $targetBranch = $branchMap->get(
+                SalesTarget::buildKey('branch', null, $row['branch_id'] ?? null, $year, $month)
+            )?->target_amount;
+
+            $targetCompany = $companyMap->get(
+                SalesTarget::buildKey('company', null, null, $year, $month)
+            )?->target_amount;
+
+            $actual = $row['revenue'];
+
+            $kpiRows[] = [
+                'user_id' => $row['user_id'],
+                'user_name' => $row['user_name'],
+                'month' => $row['month'],
+                'month_name' => $row['month_name'],
+                'actual_revenue' => $actual,
+                'actual_formatted' => $this->formatRupiah($actual),
+                'target_personal' => $targetPersonal,
+                'target_branch' => $targetBranch,
+                'target_company' => $targetCompany,
+                'achievement_personal' => $this->calcAchievement($actual, $targetPersonal),
+                'achievement_branch' => $this->calcAchievement($actual, $targetBranch),
+                'achievement_company' => $this->calcAchievement($actual, $targetCompany),
+                'status' => $this->resolveStatus(
+                    $actual,
+                    $targetPersonal ?? $targetBranch ?? $targetCompany
+                ),
+            ];
+        }
+
+        usort(
+            $kpiRows,
+            fn($a, $b) =>
+            $a['user_id'] <=> $b['user_id'] ?: $a['month'] <=> $b['month']
+        );
+
+        $kpiRows = $this->appendRanking($kpiRows);
+
+        return [
+            'data' => $kpiRows,
+            'summary' => $this->buildKpiSummary($kpiRows),
+        ];
+    }
+
+    /**
+     * Summary revenue per sales.
+     */
+    public function getSalesRevenueSummary(array $filters = []): array
+    {
+        $monthlyData = $this->calculateMonthlyRevenue($filters);
+        $summary = [];
+
+        foreach ($monthlyData as $data) {
+            $uid = $data['user_id'];
+
+            if (!isset($summary[$uid])) {
+                $summary[$uid] = [
+                    'user_id' => $uid,
+                    'user_name' => $data['user_name'],
+                    'total_revenue' => 0,
+                    'month_count' => 0,
+                    'months' => [],
+                ];
+            }
+
+            $summary[$uid]['total_revenue'] += $data['revenue'];
+            $summary[$uid]['month_count']++;
+            $summary[$uid]['months'][$data['month']] = $data['revenue'];
+        }
+
+        foreach ($summary as &$s) {
+            $s['total_revenue_formatted'] = $this->formatRupiah($s['total_revenue']);
+            $s['average_monthly'] = $s['month_count'] > 0
+                ? $s['total_revenue'] / $s['month_count'] : 0;
+            $s['average_monthly_formatted'] = $this->formatRupiah($s['average_monthly']);
+        }
+
+        return array_values($summary);
+    }
+
+    /**
+     * Versi query builder langsung (optimized).
+     *
+     * PERBAIKAN: User::find() dalam loop dihapus.
+     * user_name & role_id langsung dari JOIN, disimpan bersama revenue data.
+     */
+    public function calculateMonthlyRevenueOptimized(array $filters = []): array
+    {
         $query = DB::table('sl_pks as p')
             ->select([
                 'u.id as user_id',
-                'u.name as user_name',
+                'u.full_name as user_name',
                 'u.role_id',
                 DB::raw('DATE_FORMAT(p.kontrak_awal, "%Y-%m") as month_start'),
                 DB::raw('DATE_FORMAT(p.kontrak_akhir, "%Y-%m") as month_end'),
                 DB::raw('TIMESTAMPDIFF(MONTH, p.kontrak_awal, p.kontrak_akhir) + 1 as contract_months'),
-                DB::raw('COALESCE(SUM(qdc.total_invoice), 0) as total_invoice')
+                DB::raw('COALESCE(SUM(qdc.total_invoice), 0) as total_invoice'),
             ])
             ->join('sl_leads as l', 'p.leads_id', '=', 'l.id')
             ->leftJoin('sl_tim_sales_details as tsd', 'l.tim_sales_d_id', '=', 'tsd.id')
-            ->leftJoin('users as u', 'tsd.user_id', '=', 'u.id')
+            ->leftJoin('m_user as u', 'tsd.user_id', '=', 'u.id')
             ->leftJoin('sl_quotation as q', function ($join) {
                 $join->on('p.quotation_id', '=', 'q.id')
                     ->orOn('q.leads_id', '=', 'p.leads_id');
@@ -603,9 +239,8 @@ class SalesRevenueService
             ->whereNotNull('p.kontrak_awal')
             ->whereNotNull('p.kontrak_akhir')
             ->where('qdc.total_invoice', '>', 0)
-            ->groupBy('u.id', 'p.id', 'p.kontrak_awal', 'p.kontrak_akhir');
+            ->groupBy('u.id', 'u.full_name', 'u.role_id', 'p.id', 'p.kontrak_awal', 'p.kontrak_akhir');
 
-        // Apply filters
         if (isset($filters['user_id'])) {
             $query->where('u.id', $filters['user_id']);
         }
@@ -622,95 +257,398 @@ class SalesRevenueService
                 ->where('p.kontrak_akhir', '>=', $date->startOfMonth());
         }
 
-        $results = $query->get();
-
-        Log::info('Optimized query results count:', ['count' => $results->count()]);
-
+        $rows = $query->get();
         $result = [];
 
-        foreach ($results as $row) {
-            $contractMonths = max(1, $row->contract_months);
-            $monthlyRevenue = $row->total_invoice / $contractMonths;
-
-            // Generate monthly breakdown
+        foreach ($rows as $row) {
+            $months = max(1, (int) $row->contract_months);
+            $monthly = $row->total_invoice / $months;
             $start = Carbon::parse($row->month_start . '-01');
             $end = Carbon::parse($row->month_end . '-01');
 
-            $period = CarbonPeriod::create($start, '1 month', $end);
-
-            foreach ($period as $date) {
-                $monthKey = $date->format('Y-m');
-
-                if (!isset($result[$row->user_id][$monthKey])) {
-                    $result[$row->user_id][$monthKey] = 0;
-                }
-
-                $result[$row->user_id][$monthKey] += $monthlyRevenue;
-            }
-        }
-
-        // Format result
-        $formatted = [];
-        foreach ($result as $userId => $monthlyData) {
-            $user = User::find($userId);
-
-            foreach ($monthlyData as $month => $revenue) {
-                $formatted[] = [
-                    'user_id' => $userId,
-                    'user_name' => $user->full_name ?? 'Unknown',
-                    'user_role' => $user->role_id ?? 0,
-                    'month' => $month,
-                    'month_name' => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
-                    'revenue' => round($revenue, 2),
-                    'revenue_formatted' => 'Rp ' . number_format($revenue, 0, ',', '.'),
-                ];
-            }
-        }
-
-        Log::info('Optimized calculation complete:', ['result_count' => count($formatted)]);
-
-        return $formatted;
-    }
-
-    /**
-     * Mendapatkan summary revenue per sales
-     */
-    public function getSalesRevenueSummary(array $filters = []): array
-    {
-        Log::info('Getting sales revenue summary with filters:', $filters);
-
-        $monthlyData = $this->calculateMonthlyRevenue($filters);
-
-        $summary = [];
-        foreach ($monthlyData as $data) {
-            $userId = $data['user_id'];
-
-            if (!isset($summary[$userId])) {
-                $summary[$userId] = [
-                    'user_id' => $userId,
-                    'user_name' => $data['user_name'],
-                    'total_revenue' => 0,
-                    'month_count' => 0,
+            // ✅ Simpan meta bersama data — tidak perlu User::find() nanti
+            if (!isset($result[$row->user_id])) {
+                $result[$row->user_id] = [
+                    'meta' => [
+                        'user_name' => $row->user_name,
+                        'role_id' => $row->role_id,
+                    ],
                     'months' => [],
                 ];
             }
 
-            $summary[$userId]['total_revenue'] += $data['revenue'];
-            $summary[$userId]['month_count']++;
-            $summary[$userId]['months'][$data['month']] = $data['revenue'];
+            foreach (CarbonPeriod::create($start, '1 month', $end) as $date) {
+                $key = $date->format('Y-m');
+                $result[$row->user_id]['months'][$key]
+                    = ($result[$row->user_id]['months'][$key] ?? 0) + $monthly;
+            }
         }
 
-        // Format summary
-        foreach ($summary as &$userSummary) {
-            $userSummary['total_revenue_formatted'] = 'Rp ' . number_format($userSummary['total_revenue'], 0, ',', '.');
-            $userSummary['average_monthly'] = $userSummary['month_count'] > 0
-                ? $userSummary['total_revenue'] / $userSummary['month_count']
-                : 0;
-            $userSummary['average_monthly_formatted'] = 'Rp ' . number_format($userSummary['average_monthly'], 0, ',', '.');
+        $formatted = [];
+
+        // ✅ Tidak ada User::find() di sini
+        foreach ($result as $userId => $data) {
+            foreach ($data['months'] as $month => $revenue) {
+                $formatted[] = [
+                    'user_id' => $userId,
+                    'user_name' => $data['meta']['user_name'] ?? 'Unknown',
+                    'user_role' => $data['meta']['role_id'] ?? 0,
+                    'month' => $month,
+                    'month_name' => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
+                    'revenue' => round($revenue, 2),
+                    'revenue_formatted' => $this->formatRupiah($revenue),
+                ];
+            }
         }
 
-        Log::info('Sales revenue summary calculated:', ['user_count' => count($summary)]);
+        return $formatted;
+    }
 
-        return array_values($summary);
+    // ─── Private: Revenue Helpers ─────────────────────────────────────────────
+
+    private function fetchSalesUsers(array $filters): Collection
+    {
+        return User::whereIn('cais_role_id', [29, 30, 31, 32, 33])
+            ->where('id', '!=', 96986)
+            ->when(isset($filters['user_id']), fn($q) => $q->where('id', $filters['user_id']))
+            ->when(isset($filters['branch_id']), fn($q) => $q->where('branch_id', $filters['branch_id']))
+            ->get(['id', 'full_name', 'role_id', 'branch_id']);
+    }
+
+    private function getAllPksBySalesUsers(array $userIds, array $filters = []): Collection
+    {
+        $linkedPksIds = DB::table('sl_pks as p')
+            ->select('p.id as pks_id', 'tsd.user_id as sales_user_id')
+            ->join('sl_leads as l', 'p.leads_id', '=', 'l.id')
+            ->join('m_tim_sales_d as tsd', 'l.tim_sales_d_id', '=', 'tsd.id')
+            ->whereIn('tsd.user_id', $userIds)
+            ->where('p.is_aktif', 1)
+            ->whereNull('p.deleted_at')
+            ->when(isset($filters['year']), function ($q) use ($filters) {
+                $q->whereYear('p.kontrak_awal', '<=', $filters['year'])
+                    ->whereYear('p.kontrak_akhir', '>=', $filters['year']);
+            })
+            ->when(isset($filters['month']), function ($q) use ($filters) {
+                $year = $filters['year'] ?? date('Y');
+                $date = Carbon::create($year, $filters['month'], 1);
+                $q->where('p.kontrak_awal', '<=', $date->endOfMonth())
+                    ->where('p.kontrak_akhir', '>=', $date->startOfMonth());
+            })
+            // ->whereExists(function ($q) {
+            //     $q->select(DB::raw(1))
+            //         ->from('sl_spk_site as ss')
+            //         ->join('sl_site as s', 'ss.site_id', '=', 's.id')
+            //         ->whereColumn('ss.spk_id', 'p.spk_id');
+            //         // ->where('s.is_active', 1);
+            // })
+            ->when(
+                isset($filters['start_date']),
+                fn($q) =>
+                $q->where('p.kontrak_akhir', '>=', $filters['start_date'])
+            )
+            ->when(
+                isset($filters['end_date']),
+                fn($q) =>
+                $q->where('p.kontrak_awal', '<=', $filters['end_date'])
+            )
+            ->get()
+            ->pluck('sales_user_id', 'pks_id'); // [ pks_id => sales_user_id ]
+
+        if ($linkedPksIds->isEmpty()) {
+            return collect();
+        }
+
+        $pksIds = $linkedPksIds->keys()->all();
+
+        // Ambil model Pks — hanya kolom yang diperlukan
+        $pksList = Pks::whereIn('id', $pksIds)
+            ->select(['id', 'leads_id', 'quotation_id', 'kontrak_awal', 'kontrak_akhir'])
+            ->get();
+
+        // Inject sales_user_id di memory — 0 query tambahan
+        return $pksList->each(function ($pks) use ($linkedPksIds) {
+            $pks->_sales_user_id = $linkedPksIds->get($pks->id);
+        });
+    }
+
+
+    private function getBulkInvoiceTotals(Collection $allPks): array
+    {
+        $directQuotationIds = $allPks->pluck('quotation_id')->filter()->unique()->values()->all();
+        $leadsIds = $allPks->pluck('leads_id')->filter()->unique()->values()->all();
+
+        // Query 1: cari quotation tambahan via leads_id
+        $quotationsByLeads = DB::table('sl_quotation')
+            ->whereIn('leads_id', $leadsIds)
+            ->whereNull('deleted_at')
+            ->select('id', 'leads_id')
+            ->get()
+            ->groupBy('leads_id')
+            ->map(fn($q) => $q->pluck('id')); // [ leads_id => [quotation_ids] ]
+
+        // Gabungkan semua quotation_id yang relevan
+        $allQuotationIds = collect($directQuotationIds)
+            ->merge($quotationsByLeads->flatten())
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($allQuotationIds)) {
+            return [];
+        }
+
+        // Query 2: sum per quotation_id
+        $invoiceByQuotation = DB::table('sl_quotation_detail_coss')
+            ->whereIn('quotation_id', $allQuotationIds)
+            ->whereNull('deleted_at')
+            ->groupBy('quotation_id')
+            ->pluck(DB::raw('SUM(total_invoice)'), 'quotation_id')
+            ->toArray();
+
+        // Map ke pks_id di memory — 0 query
+        $invoiceByPks = [];
+
+        foreach ($allPks as $pks) {
+            $total = 0.0;
+
+            // Direct quotation_id
+            if ($pks->quotation_id && isset($invoiceByQuotation[$pks->quotation_id])) {
+                $total += (float) $invoiceByQuotation[$pks->quotation_id];
+            }
+
+            // Quotation lain via leads_id (hindari double-count)
+            if ($pks->leads_id && isset($quotationsByLeads[$pks->leads_id])) {
+                foreach ($quotationsByLeads[$pks->leads_id] as $qid) {
+                    if ($qid != $pks->quotation_id && isset($invoiceByQuotation[$qid])) {
+                        $total += (float) $invoiceByQuotation[$qid];
+                    }
+                }
+            }
+
+            $invoiceByPks[$pks->id] = $total;
+        }
+
+        return $invoiceByPks;
+    }
+
+    private function calculateContractDuration(Pks $pks): int
+    {
+        if (!$pks->kontrak_awal || !$pks->kontrak_akhir) {
+            return 0;
+        }
+
+        try {
+            $start = Carbon::parse($pks->kontrak_awal)->startOfMonth();
+            $end = Carbon::parse($pks->kontrak_akhir)->startOfMonth();
+
+            return $end->lt($start) ? 0 : max(1, $start->diffInMonths($end) + 1);
+        } catch (\Exception $e) {
+            Log::error('calculateContractDuration error', [
+                'pks_id' => $pks->id,
+                'error' => $e->getMessage(),
+            ]);
+            return 0;
+        }
+    }
+
+    private function generateMonthlyBreakdown(
+        mixed $contractStart,
+        mixed $contractEnd,
+        float $monthlyRevenue,
+        array $filters = []
+    ): array {
+        if (!$contractStart || !$contractEnd) {
+            return [];
+        }
+
+        try {
+            $start = Carbon::parse($contractStart)->startOfMonth();
+            $end = Carbon::parse($contractEnd)->endOfMonth();
+            $period = CarbonPeriod::create($start, '1 month', $end);
+
+            $breakdown = [];
+
+            foreach ($period as $date) {
+                if (isset($filters['year']) && $date->year != $filters['year'])
+                    continue;
+                if (isset($filters['month']) && $date->month != $filters['month'])
+                    continue;
+                if (isset($filters['start_date']) && $date->format('Y-m-d') < $filters['start_date'])
+                    continue;
+                if (isset($filters['end_date']) && $date->format('Y-m-d') > $filters['end_date'])
+                    continue;
+
+                $breakdown[$date->format('Y-m')] = $monthlyRevenue;
+            }
+
+            return $breakdown;
+        } catch (\Exception $e) {
+            Log::error('generateMonthlyBreakdown error', ['error' => $e->getMessage()]);
+            return [];
+        }
+    }
+
+    /**
+     * Format dari [ user_id => [ month => revenue ] ] ke flat array.
+     * Lookup dari Collection — 0 query.
+     */
+    private function formatResult(
+        array $userMonthlyRevenue,
+        Collection $salesUsers,
+        Collection $userBranchMap
+    ): array {
+        $userMap = $salesUsers->keyBy('id'); // O(1) lookup
+        $formatted = [];
+
+        foreach ($userMonthlyRevenue as $userId => $months) {
+            $user = $userMap->get($userId);
+
+            foreach ($months as $month => $revenue) {
+                $formatted[] = [
+                    'user_id' => $userId,
+                    'user_name' => $user?->full_name ?? 'Unknown',
+                    'user_role' => $user?->role_id ?? 0,
+                    'branch_id' => $userBranchMap->get($userId),
+                    'month' => $month,
+                    'month_name' => Carbon::createFromFormat('Y-m', $month)->format('F Y'),
+                    'revenue' => round($revenue, 2),
+                    'revenue_formatted' => $this->formatRupiah($revenue),
+                ];
+            }
+        }
+
+        usort(
+            $formatted,
+            fn($a, $b) =>
+            $a['user_id'] <=> $b['user_id'] ?: $a['month'] <=> $b['month']
+        );
+
+        return $formatted;
+    }
+
+    // ─── Private: KPI Helpers ─────────────────────────────────────────────────
+
+    private function fetchAllTargets(
+        array $userIds,
+        array $branchIds,
+        array $years,
+        array $filters
+    ): Collection {
+        $periodType = $filters['period_type'] ?? 'monthly';
+
+        return SalesTarget::where('period_type', $periodType)
+            ->whereIn('year', $years)
+            ->when(isset($filters['month']), fn($q) => $q->where('month', $filters['month']))
+            ->where(function ($q) use ($userIds, $branchIds) {
+                $q->where(function ($q2) use ($userIds) {
+                    $q2->where('type', 'personal')->whereIn('user_id', $userIds);
+                })->orWhere(function ($q2) use ($branchIds) {
+                    $q2->where('type', 'branch')
+                        ->when(!empty($branchIds), fn($q3) => $q3->whereIn('branch_id', $branchIds));
+                })->orWhere('type', 'company');
+            })
+            ->get(['id', 'type', 'user_id', 'branch_id', 'year', 'month', 'target_amount']);
+    }
+
+    private function calcAchievement(float $actual, ?float $target): ?float
+    {
+        if ($target === null || $target === 0.0) {
+            return null;
+        }
+        return round(($actual / $target) * 100, 2);
+    }
+
+    private function resolveStatus(float $actual, ?float $target): string
+    {
+        $pct = $this->calcAchievement($actual, $target);
+
+        if ($pct === null)
+            return 'no_target';
+        if ($pct >= 100)
+            return 'achieved';
+        if ($pct >= 80)
+            return 'on_track';
+        return 'under_target';
+    }
+
+    private function appendRanking(array $kpiRows): array
+    {
+        $byMonth = [];
+        foreach ($kpiRows as $i => $_) {
+            $byMonth[$kpiRows[$i]['month']][] = &$kpiRows[$i];
+        }
+
+        foreach ($byMonth as &$rows) {
+            usort($rows, function ($a, $b) {
+                $achA = $a['achievement_personal'] ?? $a['achievement_branch'] ?? $a['achievement_company'] ?? -1;
+                $achB = $b['achievement_personal'] ?? $b['achievement_branch'] ?? $b['achievement_company'] ?? -1;
+                return $achB <=> $achA;
+            });
+            foreach ($rows as $rank => &$row) {
+                $row['rank'] = $rank + 1;
+            }
+        }
+
+        usort(
+            $kpiRows,
+            fn($a, $b) =>
+            $a['user_id'] <=> $b['user_id'] ?: $a['month'] <=> $b['month']
+        );
+
+        return $kpiRows;
+    }
+
+    private function buildKpiSummary(array $kpiRows): array
+    {
+        if (empty($kpiRows)) {
+            return $this->buildEmptyKpiResponse()['summary'];
+        }
+
+        $totalActual = array_sum(array_column($kpiRows, 'actual_revenue'));
+        $totalTargetP = array_sum(array_filter(array_column($kpiRows, 'target_personal')));
+        $achievementsP = array_filter(array_column($kpiRows, 'achievement_personal'));
+
+        $statusCounts = array_count_values(array_column($kpiRows, 'status'));
+
+        return [
+            'total_actual' => $totalActual,
+            'total_actual_formatted' => $this->formatRupiah($totalActual),
+            'total_target_personal' => $totalTargetP,
+            'total_target_formatted' => $this->formatRupiah($totalTargetP),
+            'avg_achievement_personal' => count($achievementsP) > 0
+                ? round(array_sum($achievementsP) / count($achievementsP), 2)
+                : null,
+            'status_breakdown' => [
+                'achieved' => $statusCounts['achieved'] ?? 0,
+                'on_track' => $statusCounts['on_track'] ?? 0,
+                'under_target' => $statusCounts['under_target'] ?? 0,
+                'no_target' => $statusCounts['no_target'] ?? 0,
+            ],
+        ];
+    }
+
+    private function buildEmptyKpiResponse(): array
+    {
+        return [
+            'data' => [],
+            'summary' => [
+                'total_actual' => 0,
+                'total_actual_formatted' => 'Rp 0',
+                'total_target_personal' => 0,
+                'total_target_formatted' => 'Rp 0',
+                'avg_achievement_personal' => null,
+                'status_breakdown' => [
+                    'achieved' => 0,
+                    'on_track' => 0,
+                    'under_target' => 0,
+                    'no_target' => 0,
+                ],
+            ],
+        ];
+    }
+
+    private function formatRupiah(float $amount): string
+    {
+        return 'Rp ' . number_format($amount, 0, ',', '.');
     }
 }

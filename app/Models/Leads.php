@@ -251,14 +251,8 @@ class Leads extends Model
                 }
             }
             // Untuk role 30, 32, 33 (Sales lainnya) - tidak ada filter khusus
-        }
-        // RO division
-        elseif (in_array($user->cais_role_id, [4, 5, 6, 8])) {
-            // RO - filter berdasarkan ro_id (jika kolom ada)
-            if (in_array($user->cais_role_id, [4, 5])) {
-                $query->where('ro_id', $user->id);
-            }
-            // Role 6,8 - tanpa filter (lihat semua)
+        } elseif (in_array($user->cais_role_id, [4, 5, 6, 8])) {
+            $query->where('branch_id', $user->branch_id);
         }
         // CRM division
         elseif (in_array($user->cais_role_id, [54, 55, 56])) {
