@@ -11,7 +11,7 @@ class UpdateLeadRequest extends BaseRequest
     {
         return [
             'nama_perusahaan' => FluentRule::string('Nama Perusahaan')
-                ->required()
+                ->nullable()
                 ->min(3)
                 ->max(100)
                 ->rule(new UniqueCompanyStrict($this->route('id'))),
