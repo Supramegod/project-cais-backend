@@ -516,8 +516,6 @@ class LeadsController extends Controller
     {
         try {
             DB::beginTransaction();
-            $lead = $request->validated();
-
             // \Log::info('Validation passed', [
             //     'nama_perusahaan' => $request->nama_perusahaan
             // ]);
@@ -784,9 +782,6 @@ class LeadsController extends Controller
                     'message' => 'Lead tidak ditemukan'
                 ], 404);
             }
-
-            $lead = $request->validated();
-
             $current_date_time = Carbon::now()->toDateTimeString();
 
             $provinsi = Province::find($request->provinsi);
