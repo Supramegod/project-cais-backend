@@ -2014,37 +2014,42 @@ class PksController extends Controller
             $this->createSalesActivity($pks, $user->full_name);
         } else {
 
-        CustomerActivity::create([
-            'leads_id' => $leads->id,
-            'pks_id' => $pks->id,
-            'branch_id' => $leads->branch_id,
-            'tgl_activity' => now(),
-            'nomor' => $nomorActivity,
-            'tipe' => 'PKS',
-            'notes' => 'PKS dengan nomor :' . $pksNomor . ' terbentuk',
-            'is_activity' => 0,
-            'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name,
-        ]);
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'pks_id' => $pks->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $nomorActivity,
+                'tipe' => 'PKS',
+                'notes' => 'PKS dengan nomor :' . $pksNomor . ' terbentuk',
+                'is_activity' => 0,
+                'user_id' => Auth::id(),
+                'created_by' => Auth::user()->full_name,
+            ]);
         }
     }
-    private function createSalesActivity(Quotation $pks, string $createdBy): void
+    private function createSalesActivity(Pks $pks, string $createdBy): void
     {
         $user = Auth::user();
 
-        // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari pks$pks
+        // Ambil kebutuhan dari Quotation yang terhubung ke PKS ini
+        $quotation = $pks->quotations; // relasi belongsTo ke Quotation
+
+        $kebutuhanId = $quotation?->kebutuhan_id ?? $pks->layanan_id;
+        $kebutuhanNama = $quotation?->kebutuhan ?? $pks->layanan;
+
         $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
-            ->where('kebutuhan_id', $pks->layanan_id)
-            ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+            ->where('kebutuhan_id', $kebutuhanId)
+            ->where('tim_sales_d_id', $user->id)
             ->first();
 
         SalesActivity::create([
             'leads_id' => $pks->leads_id,
-            'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
+            'leads_kebutuhan_id' => $leadsKebutuhan?->id,
             'tgl_activity' => Carbon::now(),
             'jenis_activity' => 'PKS',
-            'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$pks->kebutuhan}",
-            'created_by' => $createdBy
+            'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$kebutuhanNama}",
+            'created_by' => $createdBy,
         ]);
     }
 
