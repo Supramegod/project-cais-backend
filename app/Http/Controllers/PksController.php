@@ -125,6 +125,16 @@ class PksController extends Controller
      *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     * @OA\Parameter(
+     *     name="status_berlaku",
+     *     in="query",
+     *     description="Filter status berlaku kontrak",
+     *     required=false,
+     *     @OA\Schema(
+     *         type="string",
+     *         enum={"kontrak_habis", "berakhir_2_bulan", "berakhir_3_bulan", "lebih_3_bulan"}
+     *     )
+     * ),
      *
      *     @OA\Response(
      *         response=200,
@@ -247,6 +257,30 @@ class PksController extends Controller
             // ✅ Pakai JOIN bukan whereHas — sudah JOIN di atas
             if ($request->filled('branch')) {
                 $query->where('sl_leads.branch_id', $request->branch);
+            }
+            // Setelah bagian search dan branch filter, tambahkan:
+
+            if ($request->filled('status_berlaku')) {
+                $now = Carbon::now()->toDateString();
+                $duaBulan = Carbon::now()->addDays(60)->toDateString();
+                $tigaBulan = Carbon::now()->addDays(90)->toDateString();
+
+                switch ($request->status_berlaku) {
+                    case 'kontrak_habis':
+                        $query->whereDate('sl_pks.kontrak_akhir', '<=', $now);
+                        break;
+                    case 'berakhir_2_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $now)
+                            ->whereDate('sl_pks.kontrak_akhir', '<=', $duaBulan);
+                        break;
+                    case 'berakhir_3_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $duaBulan)
+                            ->whereDate('sl_pks.kontrak_akhir', '<=', $tigaBulan);
+                        break;
+                    case 'lebih_3_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $tigaBulan);
+                        break;
+                }
             }
 
             $pksList = $query->paginate($request->get('per_page', 15));
