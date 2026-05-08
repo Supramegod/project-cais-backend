@@ -17069,6 +17069,21 @@
                             "type": "integer",
                             "example": 1
                         }
+                    },
+                    {
+                        "name": "status_berlaku",
+                        "in": "query",
+                        "description": "Filter status berlaku kontrak",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "kontrak_habis",
+                                "berakhir_2_bulan",
+                                "berakhir_3_bulan",
+                                "lebih_3_bulan"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
