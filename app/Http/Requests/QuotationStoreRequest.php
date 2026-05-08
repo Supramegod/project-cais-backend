@@ -3,7 +3,6 @@
 namespace App\Http\Requests;
 
 use SanderMuller\FluentValidation\FluentRule;
-use SanderMuller\FluentValidation\HasFluentRules;
 
 class QuotationStoreRequest extends BaseRequest
 {
@@ -24,6 +23,7 @@ class QuotationStoreRequest extends BaseRequest
             'jumlah_site' => FluentRule::string()->required()->in(['Single Site', 'Multi Site']),
         ];
 
+        // SINGLE SITE
         if ($this->jumlah_site == 'Single Site') {
             if ($this->has('nama_site') && !empty($this->nama_site)) {
                 $rules['nama_site'] = FluentRule::string()->required()->max(255);
@@ -38,20 +38,21 @@ class QuotationStoreRequest extends BaseRequest
             }
         }
 
+        // MULTI SITE
         if ($this->jumlah_site == 'Multi Site') {
             if ($this->has('multisite') && !empty($this->multisite)) {
                 $siteCount = count($this->multisite);
 
-                $rules['multisite'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
+                $rules['multisite'] = FluentRule::array()->required()->min(1)->rule('size:' . $siteCount)->children([
                     '*' => FluentRule::string()->required()->max(255),
                 ]);
-                $rules['provinsi_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
+                $rules['provinsi_multi'] = FluentRule::array()->required()->min(1)->rule('size:' . $siteCount)->children([
                     '*' => FluentRule::integer()->required()->exists('mysqlhris.m_province', 'id'),
                 ]);
-                $rules['kota_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
+                $rules['kota_multi'] = FluentRule::array()->required()->min(1)->rule('size:' . $siteCount)->children([
                     '*' => FluentRule::integer()->required()->exists('mysqlhris.m_city', 'id'),
                 ]);
-                $rules['penempatan_multi'] = FluentRule::array()->required()->min(1)->size($siteCount)->children([
+                $rules['penempatan_multi'] = FluentRule::array()->required()->min(1)->rule('size:' . $siteCount)->children([
                     '*' => FluentRule::string()->required()->max(255),
                 ]);
             } else {
