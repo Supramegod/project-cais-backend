@@ -19,7 +19,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['https://cais2.shelterapp2.co.id','https://caisshelter.pages.dev'],
+    'allowed_origins' => ['https://cais2.shelterapp2.co.id','https://caisshelter.pages.dev','http://localhost:5173'],
 
     'allowed_origins_patterns' => [],
 
