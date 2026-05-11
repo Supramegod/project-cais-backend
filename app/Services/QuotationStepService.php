@@ -2874,6 +2874,8 @@ class QuotationStepService
     private function syncTunjanganData(Quotation $quotation, array $tunjanganData, Carbon $currentDateTime, string $user): void
     {
         $detailIds = array_keys($tunjanganData);
+
+        // 1. Ambil semua tunjangan yang ada saat ini
         $existingTunjangans = QuotationDetailTunjangan::whereIn('quotation_detail_id', $detailIds)
             ->whereNull('deleted_at')
             ->get()
@@ -2881,20 +2883,19 @@ class QuotationStepService
 
         $insertData = [];
         $updateData = [];
-        $deleteDetailIds = [];
 
         foreach ($tunjanganData as $detailId => $tunjangans) {
             $existing = $existingTunjangans->get($detailId, collect())->keyBy('nama_tunjangan');
             $processed = [];
 
-            foreach ($tunjangans as $item) {
+            // Pastikan $tunjangans adalah array
+            foreach ($tunjangans ?? [] as $item) {
                 $nama = trim($item['nama_tunjangan'] ?? '');
                 if (empty($nama))
                     continue;
 
                 $nominal = $this->parseNominal($item['nominal'] ?? 0);
                 $nominalCoss = $this->parseNominal($item['nominal_coss'] ?? 0);
-
                 $processed[] = $nama;
 
                 if ($existing->has($nama)) {
@@ -2918,11 +2919,13 @@ class QuotationStepService
                 }
             }
 
-            // Delete tunjangan that are not in processed list for this detail
+           
             $toDelete = $existing->keys()->diff($processed);
+
             if ($toDelete->isNotEmpty()) {
                 QuotationDetailTunjangan::where('quotation_detail_id', $detailId)
                     ->whereIn('nama_tunjangan', $toDelete->toArray())
+                    ->whereNull('deleted_at') // Tambahkan ini agar tidak update yang sudah delete
                     ->update([
                         'deleted_at' => $currentDateTime,
                         'deleted_by' => $user,
@@ -2935,9 +2938,11 @@ class QuotationStepService
             QuotationDetailTunjangan::insert($insertData);
         }
 
-        // Batch update (per row)
+        // Batch update
         foreach ($updateData as $data) {
-            QuotationDetailTunjangan::where('id', $data['id'])->update($data);
+            $id = $data['id'];
+            unset($data['id']); // Hapus ID dari array data agar tidak di-update kolom ID-nya
+            QuotationDetailTunjangan::where('id', $id)->update($data);
         }
     }
 
