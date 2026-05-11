@@ -924,8 +924,7 @@ class QuotationController extends Controller
                         ->whereHas('quotations', function ($q) {
                             // Menggunakan nested parameter grouping untuk logic OR
                             $q->where(function ($innerQuery) {
-                                $innerQuery->whereIn('status_quotation_id', [3, 6])
-                                    ->orWhereNotNull('ot1');
+                                $innerQuery->whereIn('status_quotation_id', [3, 6]);
                             });
 
                             // Contoh jika kontrak_akhir ingin diaktifkan kembali:
