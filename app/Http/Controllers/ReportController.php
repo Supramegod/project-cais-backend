@@ -169,10 +169,12 @@ class ReportController extends Controller
                 ->locale('id')
                 ->monthName
         ) . ' - ' . $year;
+        $count = count($data);
 
         return response()->json([
             'periode' => $periode,
             'data' => $data,
+            'count' => $count,
         ]);
     }
 
@@ -355,11 +357,13 @@ class ReportController extends Controller
                 ->locale('id')
                 ->monthName
         ) . ' - ' . $year;
+        $count = count($data);
 
 
         return response()->json([
             'periode' => $periode,
             'data' => $data,
+            'count' => $count,
         ]);
     }
 
@@ -371,6 +375,7 @@ class ReportController extends Controller
     private function getSalesNames($branchId = null)
     {
         $userIds = DB::table('m_tim_sales_d')
+        ->where('user_id', '!=', 96986)
             ->whereNull('deleted_at')
             ->pluck('user_id')
             ->unique()
@@ -383,6 +388,7 @@ class ReportController extends Controller
         // 2. Ambil full_name dan branch dari mysqlhris
         $query = DB::connection('mysqlhris')
             ->table('m_user as u')
+            ->where('u.cais_role_id', '!=',30) // Exclude admin
             ->leftJoin('m_branch as b', 'b.id', '=', 'u.branch_id')
             ->whereIn('u.id', $userIds)
             // ->whereNull('u.deleted_at')
