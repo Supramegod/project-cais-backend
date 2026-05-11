@@ -317,6 +317,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/spk/{id}', 'getSpkByLead');
         Route::get('/pks/{id}', 'getPksByLead');
         Route::get('/customeractivity/{id}', 'getCustomerActivityByLead');
+        Route::get('/quotation/{id}', 'getQuotationByLead');
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');
