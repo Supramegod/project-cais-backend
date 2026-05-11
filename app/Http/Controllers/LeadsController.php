@@ -18,6 +18,7 @@ use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
 use App\Models\Pks;
 use App\Models\Province;
+use App\Models\Quotation;
 use App\Models\SalesActivity;
 use App\Models\Spk;
 use App\Models\StatusLeads;
@@ -2736,6 +2737,135 @@ class LeadsController extends Controller
                 'message' => 'Data aktivitas berhasil diambil',
                 'data' => $allActivities
             ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/leads/quotation/{id}",
+     *     summary="Mendapatkan daftar Quotation berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua Quotation yang terkait dengan leads tertentu, termasuk summary (total, aktif, revisi).",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data Quotation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data Quotation berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="Q/SG/AAAAB/01/2025"),
+     *                     @OA\Property(property="tgl_quotation", type="string", example="01-01-2025"),
+     *                     @OA\Property(property="revisi", type="integer", example=0),
+     *                     @OA\Property(property="is_aktif", type="integer", example=1),
+     *                     @OA\Property(property="status_quotation_id", type="integer", example=2),
+     *                     @OA\Property(property="nama_status", type="string", example="Disetujui"),
+     *                     @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                     @OA\Property(property="layanan", type="string", example="Security"),
+     *                     @OA\Property(property="mulai_kontrak", type="string", example="01-02-2025"),
+     *                     @OA\Property(property="kontrak_selesai", type="string", example="01-02-2026"),
+     *                     @OA\Property(property="sisa_kontrak", type="string", example="8 bulan, 15 hari")
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="summary",
+     *                 type="object",
+     *                 @OA\Property(property="total", type="integer", example=5),
+     *                 @OA\Property(property="aktif", type="integer", example=3),
+     *                 @OA\Property(property="tidak_aktif", type="integer", example=2),
+     *                 @OA\Property(property="revisi_count", type="integer", example=2)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lead tidak ditemukan"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error"
+     *     )
+     * )
+     */
+    public function getQuotationByLead($id, Request $request)
+    {
+        try {
+            $leadExists = Leads::whereKey($id)->exists();
+            if (!$leadExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // ✅ Tambahkan 'tipe_quotation' ke select
+            $quotations = Quotation::with('statusQuotation:id,nama')
+                ->where('leads_id', $id)
+                ->select([
+                    'id',
+                    'nomor',
+                    'leads_id',
+                    'tgl_quotation',
+                    'revisi',
+                    'is_aktif',
+                    'status_quotation_id',
+                    'kebutuhan_id',
+                    'layanan',
+                    'mulai_kontrak',
+                    'kontrak_selesai',
+                    'tipe_quotation',        // ← tambahan
+                    'created_by'
+                ])
+                ->orderBy('tgl_quotation', 'desc')
+                ->get();
+
+            $now = Carbon::now();
+
+            // ✅ Summary dari collection (tanpa query baru)
+            $summary = [
+                'total' => $quotations->count(),
+                'aktif' => $quotations->where('is_aktif', 1)->count(),
+                'tidak_aktif' => $quotations->where('is_aktif', 0)->count(),
+                'per_tipe' => $quotations->groupBy('tipe_quotation')->map->count(), // ← hitung per tipe
+            ];
+
+            $data = $quotations->map(function ($item) use ($now) {
+                return [
+                    'id' => $item->id,
+                    'nomor' => $item->nomor,
+                    'tgl_quotation' => $item->getRawOriginal('tgl_quotation')
+                        ? Carbon::parse($item->getRawOriginal('tgl_quotation'))->isoFormat('D MMMM Y')
+                        : null,
+                    'tipe_quotation' => $item->tipe_quotation,
+                    'is_aktif' => $item->is_aktif,
+                    'status_quotation_id' => $item->status_quotation_id,
+                    'nama_status' => $item->statusQuotation->nama ?? null,
+                    'created_by' => $item->created_by,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Quotation berhasil diambil',
+                'data' => $data,
+                'summary' => $summary,  
+            ]);
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

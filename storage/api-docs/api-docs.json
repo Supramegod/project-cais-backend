@@ -13752,6 +13752,146 @@
                 ]
             }
         },
+        "/api/leads/quotation/{id}": {
+            "get": {
+                "tags": [
+                    "Leads"
+                ],
+                "summary": "Mendapatkan daftar Quotation berdasarkan leads_id",
+                "description": "Endpoint ini digunakan untuk mengambil semua Quotation yang terkait dengan leads tertentu, termasuk summary (total, aktif, revisi).",
+                "operationId": "543f2d67f39a3c68f68ed0c61c6730ed",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID lead",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Berhasil mengambil data Quotation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Data Quotation berhasil diambil"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "Q/SG/AAAAB/01/2025"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT ABC Indonesia"
+                                                    },
+                                                    "tgl_quotation": {
+                                                        "type": "string",
+                                                        "example": "01-01-2025"
+                                                    },
+                                                    "total_harga": {
+                                                        "type": "number",
+                                                        "example": 50000000
+                                                    },
+                                                    "revisi": {
+                                                        "type": "integer",
+                                                        "example": 0
+                                                    },
+                                                    "is_aktif": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "status_quotation_id": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    },
+                                                    "nama_status": {
+                                                        "type": "string",
+                                                        "example": "Disetujui"
+                                                    },
+                                                    "kebutuhan_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "layanan": {
+                                                        "type": "string",
+                                                        "example": "Security"
+                                                    },
+                                                    "mulai_kontrak": {
+                                                        "type": "string",
+                                                        "example": "01-02-2025"
+                                                    },
+                                                    "kontrak_selesai": {
+                                                        "type": "string",
+                                                        "example": "01-02-2026"
+                                                    },
+                                                    "sisa_kontrak": {
+                                                        "type": "string",
+                                                        "example": "8 bulan, 15 hari"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "summary": {
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "aktif": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "tidak_aktif": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "revisi_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Lead tidak ditemukan"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/management-fee/list": {
             "get": {
                 "tags": [
