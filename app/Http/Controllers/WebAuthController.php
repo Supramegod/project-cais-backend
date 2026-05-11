@@ -37,13 +37,12 @@ class WebAuthController extends Controller
 
         // Buat dummy access token (khusus untuk web, tidak digunakan untuk auth API)
         // Token ini akan terikat ke user dan tidak expired (atau expired lama)
-        $dummyToken = HrisPersonalAccessToken::create([
-            'tokenable_type' => User::class,
-            'tokenable_id' => $user->id,
+        // Buat token lewat relasi user
+        $dummyToken = $user->tokens()->create([
             'name' => 'web_dummy_token',
             'token' => hash('sha256', $plainDummyToken = Str::random(40)),
             'abilities' => json_encode(['*']),
-            'expires_at' => now()->addDays(30), // expired lama, tidak masalah
+            'expires_at' => now()->addDays(30),
         ]);
 
         // Buat refresh token untuk web (disimpan di cookie), terkait dengan dummy token

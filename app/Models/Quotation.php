@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -298,6 +299,15 @@ class Quotation extends Model
         return $this->belongsTo(RuleThr::class, 'rule_thr_id');
     }
 
+
+    public function logApprovals()
+    {
+        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'quotation');
+    }
+    public function logNotifications()
+    {
+        return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
+    }
     // ACCESSOR/METHOD BARU YANG DIPERLUKAN:
 
     // Accessor untuk mendapatkan PIC utama (is_kuasa = 1)
@@ -322,6 +332,10 @@ class Quotation extends Model
     public function hasSpk()
     {
         return $this->spk()->exists();
+    }
+    public function scopeByLeadsId(Builder $query, int $leadsId): Builder
+    {
+        return $query->where('leads_id', $leadsId);
     }
 
     // Method untuk mengecek apakah quotation aktif
@@ -436,13 +450,23 @@ class Quotation extends Model
         return $this->hasMany(QuotationDetailWage::class);
     }
 
-    public function logApprovals()
+    public static function getSummaryByLeadsId(int $leadsId): array
     {
-        return $this->hasMany(LogApproval::class, 'doc_id')->where('tabel', 'quotation');
-    }
-    public function logNotifications()
-    {
-        return $this->hasMany(LogNotification::class, 'doc_id')->where('tabel', 'sl_quotation');
+        // Gunakan satu query dengan groupBy untuk menghindari 3 COUNT terpisah
+        $rows = self::where('leads_id', $leadsId)
+            ->selectRaw('
+            COUNT(*) as total,
+            SUM(CASE WHEN is_aktif = 1 THEN 1 ELSE 0 END) as aktif,
+            SUM(CASE WHEN revisi > 0 THEN 1 ELSE 0 END) as revisi_count
+        ')
+            ->first();
+
+        return [
+            'total' => (int) ($rows->total ?? 0),
+            'aktif' => (int) ($rows->aktif ?? 0),
+            'tidak_aktif' => (int) (($rows->total ?? 0) - ($rows->aktif ?? 0)),
+            'revisi_count' => (int) ($rows->revisi_count ?? 0),
+        ];
     }
 
 }
