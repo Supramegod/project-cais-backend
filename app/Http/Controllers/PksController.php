@@ -2532,10 +2532,14 @@ class PksController extends Controller
             $orderTable = 'sl_quotation';
             $orderColumn = 'quotation_id';
         }
+        $query->whereNull('deleted_at');
 
-        return $query->whereNull('deleted_at')
-            ->whereDoesntHave('site')
-            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
+
+        if ($isBaru) {
+            $query->whereDoesntHave('site');
+        }
+
+        return $query->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)

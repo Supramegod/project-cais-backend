@@ -64,6 +64,10 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class, 'cais_role_id', 'id');
     }
+    public function tokens()
+    {
+        return $this->morphMany(HrisPersonalAccessToken::class, 'tokenable');
+    }
 
     // Relasi ke branch
     public function branch()
