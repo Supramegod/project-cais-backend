@@ -200,7 +200,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'details'        => 'nullable|string',
                 'is_active'      => 'nullable|in:0,1,true,false',
                 'attachments'    => 'nullable|array',
-                'attachments.*'  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+                'attachments.*'  => 'nullable|file|max:10240',
             ]);
 
             if ($validator->fails()) {
@@ -290,7 +290,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'details'        => 'nullable|string',
                 'is_active'      => 'nullable|in:0,1,true,false',
                 'attachments'    => 'nullable|array',
-                'attachments.*'  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+                'attachments.*'  => 'nullable|file|max:10240',
             ]);
 
             if ($validator->fails()) {
