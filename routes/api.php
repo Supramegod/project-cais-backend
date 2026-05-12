@@ -514,6 +514,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
     Route::prefix('sales-report')->controller(ReportController::class)->group(function () {
         Route::get('/monthly', 'monthly');
         Route::get('/weekly', 'weekly');
+        Route::get('/activity-detail/{user_id}', 'activityDetail');
     });
 
 });
