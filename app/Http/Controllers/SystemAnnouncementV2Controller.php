@@ -198,7 +198,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'release_date'   => 'nullable|date',
                 'description'    => 'nullable|string',
                 'details'        => 'nullable|string',
-                'is_active'      => 'boolean',
+                'is_active'      => 'nullable|in:0,1,true,false',
                 'attachments'    => 'nullable|array',
                 'attachments.*'  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
             ]);
@@ -218,7 +218,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'release_date' => $request->release_date ?? now()->toDateString(),
                 'description'  => $request->description,
                 'details'      => $request->details,
-                'is_active'    => $request->has('is_active') ? $request->is_active : true,
+                'is_active'    => $request->has('is_active') ? filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN) : true,
                 'created_by'   => Auth::check() ? Auth::id() : null,
             ]);
 
@@ -288,7 +288,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'release_date'   => 'nullable|date',
                 'description'    => 'nullable|string',
                 'details'        => 'nullable|string',
-                'is_active'      => 'boolean',
+                'is_active'      => 'nullable|in:0,1,true,false',
                 'attachments'    => 'nullable|array',
                 'attachments.*'  => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
             ]);
@@ -308,7 +308,7 @@ class SystemAnnouncementV2Controller extends Controller
                 'release_date' => $request->release_date ?? $announcement->release_date,
                 'description'  => $request->description,
                 'details'      => $request->details,
-                'is_active'    => $request->has('is_active') ? $request->is_active : $announcement->is_active,
+                'is_active'    => $request->has('is_active') ? filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN) : $announcement->is_active,
             ]);
 
             if ($request->hasFile('attachments')) {
