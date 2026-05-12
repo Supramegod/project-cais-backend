@@ -41,6 +41,7 @@ use App\Http\Controllers\SiteController;
 use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
 use App\Http\Controllers\SystemAnnouncementController;
+use App\Http\Controllers\SystemAnnouncementV2Controller;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -509,6 +510,17 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::post('/add', 'add');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+    });
+
+    // System Announcements V2 — rich content, image upload, file attachment
+    Route::prefix('v2/system-announcements')->controller(SystemAnnouncementV2Controller::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::post('/upload-image', 'uploadImage');
+        Route::post('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+        Route::delete('/delete-file/{fileId}', 'deleteFile');
     });
     // Sales Report Routes
     Route::prefix('sales-report')->controller(ReportController::class)->group(function () {
