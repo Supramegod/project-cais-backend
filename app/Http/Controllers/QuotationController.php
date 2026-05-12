@@ -438,7 +438,6 @@ class QuotationController extends Controller
     public function store(QuotationStoreRequest $request, string $tipe_quotation): JsonResponse
     {
         DB::beginTransaction();
-        set_time_limit(0);
         try {
             $user = Auth::user();
 

@@ -158,6 +158,7 @@ class ReportController extends Controller
 
             $data[] = [
                 'no' => $no++,
+                'user_id' => $sales->user_id ?? null,
                 'nama_sales' => $nama,
                 'cabang' => $sales->cabang,
                 'aggregat' => $thisMonthData,
@@ -343,6 +344,7 @@ class ReportController extends Controller
             $data[] = [
                 'no' => $no++,
                 'nama_sales' => $nama,
+                'user_id' => $sales->user_id ?? null,
                 'cabang' => $sales->cabang,
                 'w1' => $w1,
                 'w2' => $w2,
@@ -367,6 +369,226 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/sales-report/activity-detail/{user_id}",
+     *     summary="Detail Aktivitas Sales",
+     *     description="Menampilkan daftar aktivitas sales secara flat per bulan/tahun berdasarkan user_id sales. Field `aksi` berisi ID dokumen terkait jika jenis aktivitas adalah Leads/Quotation/SPK/PKS, null untuk jenis lainnya.",
+     *     tags={"Sales Report"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="user_id",
+     *         in="path",
+     *         required=true,
+     *         description="ID user sales. Harus terdaftar sebagai sales aktif.",
+     *         @OA\Schema(type="integer", example=101)
+     *     ),
+     *     @OA\Parameter(
+     *         name="month",
+     *         in="query",
+     *         required=false,
+     *         description="Bulan laporan (1–12). Default: bulan berjalan.",
+     *         @OA\Schema(type="integer", minimum=1, maximum=12, example=9)
+     *     ),
+     *     @OA\Parameter(
+     *         name="year",
+     *         in="query",
+     *         required=false,
+     *         description="Tahun laporan (4 digit). Default: tahun berjalan.",
+     *         @OA\Schema(type="integer", example=2025)
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch_id",
+     *         in="query",
+     *         required=false,
+     *         description="Filter berdasarkan ID cabang.",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data detail aktivitas berhasil diambil.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="user_id", type="integer", example=101),
+     *             @OA\Property(property="sales_name", type="string", example="S. Wulandari Ayuningdiah"),
+     *             @OA\Property(property="cabang", type="string", example="East"),
+     *             @OA\Property(property="periode", type="string", example="SEPTEMBER - 2025"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="tgl_activity", type="string", example="2 September 2025"),
+     *                     @OA\Property(property="nomor", type="string", example="CAT/CS/AAB8I-092025-00001"),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="Universitas Katolik Widya Mandala Surabaya"),
+     *                     @OA\Property(
+     *                         property="tipe",
+     *                         type="string",
+     *                         enum={"Leads", "Appointment", "Visit", "Quotation", "SPK", "PKS", "Follow Up", "Kirim Berkas", "Email"},
+     *                         example="Visit"
+     *                     ),
+     *                     @OA\Property(property="notes", type="string", example="Presentasi dan submit compro"),
+     *                     @OA\Property(property="created_by", type="string", example="S. Wulandari Ayuningdiah"),
+     *                     @OA\Property(property="created_at", type="string", example="02-09-2025 15:02:26"),
+     *                     @OA\Property(
+     *                         property="aksi",
+     *                         type="integer",
+     *                         nullable=true,
+     *                         description="ID dokumen terkait: Leads→leads_id, Quotation→quotation_id, SPK→spk_id, PKS→pks_id. null untuk jenis lain.",
+     *                         example=47
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="user_id tidak ditemukan dalam daftar sales aktif.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="User ID tidak ditemukan dalam daftar sales aktif.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validasi input gagal.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="The month must be between 1 and 12.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=500, description="Server Error")
+     * )
+     */
+    public function activityDetail(Request $request, int $userId)
+    {
+        // ── 1. Validasi query params ──────────────────────────────────────────
+        $validator = Validator::make($request->all(), [
+            'month' => 'nullable|integer|between:1,12',
+            'year' => 'nullable|integer|digits:4',
+            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // ── 2. Resolusi parameter ─────────────────────────────────────────────
+        $month = (int) ($request->month ?? now()->month);
+        $year = (int) ($request->year ?? now()->year);
+        $branchId = $request->branch_id;
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfDay();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
+
+        $periode = strtoupper(
+            Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
+        ) . ' - ' . $year;
+
+        // ── 3. Validasi user_id ada di daftar sales aktif ─────────────────────
+        $salesCollection = $this->getSalesNames($branchId);
+        $matched = $salesCollection->firstWhere('user_id', $userId);
+
+        if (!$matched) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User ID tidak ditemukan dalam daftar sales aktif.',
+            ], 404);
+        }
+
+        $salesName = $matched->nama_sales;
+        $cabang = $matched->cabang;
+
+        // ── 4. Query aktivitas ────────────────────────────────────────────────
+        $activities = DB::table('sl_activity_sales as sa')
+            ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id') // Ambil nama perusahaan dari sini
+            ->select(
+                'sa.id',
+                'sa.leads_id',
+                'sa.tgl_activity',
+                'sa.jenis_activity',
+                DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                'sa.created_by',
+                'sa.created_at',
+                'l.nama_perusahaan' // Ambil dari tabel leads
+            )
+            ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+            ->where('sa.created_by', $salesName)
+            ->orderBy('sa.tgl_activity', 'asc')
+            ->orderBy('sa.created_at', 'asc')
+            ->get();
+
+        // ── 5. Batch-lookup ID dokumen per leads_id (anti N+1) ────────────────
+        $leadsIdsNeedLookup = $activities
+            ->whereIn('jenis_activity', ['Leads', 'Quotation', 'SPK', 'PKS'])
+            ->pluck('leads_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $quotationMap = DB::table('sl_quotation')
+            ->selectRaw('leads_id, MAX(id) as doc_id')
+            ->whereIn('leads_id', $leadsIdsNeedLookup)
+            ->whereNull('deleted_at')
+            ->groupBy('leads_id')
+            ->pluck('doc_id', 'leads_id');
+
+        $spkMap = DB::table('sl_spk')
+            ->selectRaw('leads_id, MAX(id) as doc_id')
+            ->whereIn('leads_id', $leadsIdsNeedLookup)
+            ->whereNull('deleted_at')
+            ->groupBy('leads_id')
+            ->pluck('doc_id', 'leads_id');
+
+        $pksMap = DB::table('sl_pks')
+            ->selectRaw('leads_id, MAX(id) as doc_id')
+            ->whereIn('leads_id', $leadsIdsNeedLookup)
+            ->whereNull('deleted_at')
+            ->groupBy('leads_id')
+            ->pluck('doc_id', 'leads_id');
+
+        
+        $data = $activities->map(function ($row, $index) use ($quotationMap, $spkMap, $pksMap) {
+            // Mapping ID Dokumen untuk tombol aksi di frontend
+            $aksi = match ($row->jenis_activity) {
+                'Leads' => $row->leads_id,
+                'Quotation' => $quotationMap->get($row->leads_id),
+                'SPK' => $spkMap->get($row->leads_id),
+                'PKS' => $pksMap->get($row->leads_id),
+                default => null,
+            };
+
+            return [
+                'id' => $row->id,
+                'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
+                'nomor' => $index + 1,
+                'nama_perusahaan' => $row->nama_perusahaan,
+                'tipe' => $row->jenis_activity ?? '',
+                'notes' => $row->notulen,
+                'created_by' => $row->created_by,
+                'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
+                'aksi' => $aksi,
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $userId,
+            'sales_name' => $salesName,
+            'cabang' => $cabang,
+            'periode' => $periode,
+            'data' => $data,
+        ]);
+    }
     // ──────────────────────────────────────────────
     //  Helper Methods (diperbarui)
     // ──────────────────────────────────────────────
@@ -375,7 +597,7 @@ class ReportController extends Controller
     private function getSalesNames($branchId = null)
     {
         $userIds = DB::table('m_tim_sales_d')
-        ->where('user_id', '!=', 96986)
+            ->where('user_id', '!=', 96986)
             ->whereNull('deleted_at')
             ->pluck('user_id')
             ->unique()
@@ -388,12 +610,12 @@ class ReportController extends Controller
         // 2. Ambil full_name dan branch dari mysqlhris
         $query = DB::connection('mysqlhris')
             ->table('m_user as u')
-            ->where('u.cais_role_id', '!=',30) // Exclude admin
+            ->where('u.cais_role_id', '!=', 30) // Exclude admin
             ->leftJoin('m_branch as b', 'b.id', '=', 'u.branch_id')
             ->whereIn('u.id', $userIds)
             // ->whereNull('u.deleted_at')
-            ->select('u.full_name as nama_sales', 'b.name as cabang')
-            ->groupBy('u.full_name', 'b.name');
+            ->select('u.full_name as nama_sales', 'b.name as cabang', 'u.id as user_id')
+            ->groupBy('u.full_name', 'b.name', 'u.id');
 
         if ($branchId) {
             $query->where('u.branch_id', $branchId);

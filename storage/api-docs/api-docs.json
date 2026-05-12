@@ -13799,17 +13799,9 @@
                                                         "type": "string",
                                                         "example": "Q/SG/AAAAB/01/2025"
                                                     },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT ABC Indonesia"
-                                                    },
                                                     "tgl_quotation": {
                                                         "type": "string",
                                                         "example": "01-01-2025"
-                                                    },
-                                                    "total_harga": {
-                                                        "type": "number",
-                                                        "example": 50000000
                                                     },
                                                     "revisi": {
                                                         "type": "integer",
@@ -21786,6 +21778,199 @@
                                         "message": {
                                             "type": "string",
                                             "example": "The month field is required."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/activity-detail/{user_id}": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Detail Aktivitas Sales",
+                "description": "Menampilkan daftar aktivitas sales secara flat per bulan/tahun berdasarkan user_id sales. Field `aksi` berisi ID dokumen terkait jika jenis aktivitas adalah Leads/Quotation/SPK/PKS, null untuk jenis lainnya.",
+                "operationId": "40e807038c91c121cdf76163dfae5472",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "description": "ID user sales. Harus terdaftar sebagai sales aktif.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 101
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1–12). Default: bulan berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "example": 9
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit). Default: tahun berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2025
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data detail aktivitas berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "user_id": {
+                                            "type": "integer",
+                                            "example": 101
+                                        },
+                                        "sales_name": {
+                                            "type": "string",
+                                            "example": "S. Wulandari Ayuningdiah"
+                                        },
+                                        "cabang": {
+                                            "type": "string",
+                                            "example": "East"
+                                        },
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "SEPTEMBER - 2025"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "example": "2 September 2025"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "CAT/CS/AAB8I-092025-00001"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "Universitas Katolik Widya Mandala Surabaya"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Leads",
+                                                            "Appointment",
+                                                            "Visit",
+                                                            "Quotation",
+                                                            "SPK",
+                                                            "PKS",
+                                                            "Follow Up",
+                                                            "Kirim Berkas",
+                                                            "Email"
+                                                        ],
+                                                        "example": "Visit"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Presentasi dan submit compro"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "S. Wulandari Ayuningdiah"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "02-09-2025 15:02:26"
+                                                    },
+                                                    "aksi": {
+                                                        "description": "ID dokumen terkait: Leads→leads_id, Quotation→quotation_id, SPK→spk_id, PKS→pks_id. null untuk jenis lain.",
+                                                        "type": "integer",
+                                                        "example": 47,
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "user_id tidak ditemukan dalam daftar sales aktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID tidak ditemukan dalam daftar sales aktif."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi input gagal.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month must be between 1 and 12."
                                         }
                                     },
                                     "type": "object"
