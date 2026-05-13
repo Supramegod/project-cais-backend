@@ -1958,6 +1958,33 @@ class PksController extends Controller
             SalaryRule::find($request->salary_rule),
             $pksNomor
         );
+        // Update status SPK → "Generated PKS" (id: 3)
+        Spk::where('leads_id', $leads->id)
+            ->whereNotIn('status_spk_id', [100]) // skip Terminated
+            ->update([
+                'status_spk_id' => 3,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
+        // Update status Quotation → "Generated PKS" (id: 5)
+        if ($quotationId) {
+            Quotation::where('id', $quotationId)
+                ->where('status_quotation_id', '!=', 100) // skip Terminated
+                ->update([
+                    'status_quotation_id' => 5,
+                    'updated_by' => Auth::user()->full_name,
+                ]);
+        }
+
+        // Update status Leads → "Deal" (id: 99)
+        $statusTerminalLeads = [100, 101]; // Tidak Deal, Bukan Leads
+        if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
+            $leads->update([
+                'status_leads_id' => 99,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+        }
+
 
         return $pks;
     }
@@ -2480,7 +2507,10 @@ class PksController extends Controller
                     ->whereHas('spk', function ($subQuery) {
                         $subQuery->whereNull('sl_spk.deleted_at');
                     })
-                    ->whereDoesntHave('site');
+                    // Tambahkan closure di sini untuk memfilter soft deletes pada site
+                    ->whereDoesntHave('site', function ($siteQuery) {
+                        $siteQuery->whereNull('sl_site.deleted_at');
+                    });
             })
             ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
             ->distinct()
@@ -2607,7 +2637,7 @@ class PksController extends Controller
      */
     private function updateStatus($pks, $current_date_time)
     {
-        // Update PKS status
+        // Update PKS status → Aktif (id: 7)
         $pks->update([
             'ot5' => Auth::user()->full_name,
             'status_pks_id' => 7,
@@ -2616,7 +2646,7 @@ class PksController extends Controller
             'updated_by' => Auth::user()->full_name,
         ]);
 
-        // Update quotation status if quotation_id exists
+        // Update Quotation status → "Site Telah Aktif" (id: 6)
         if ($pks->quotation_id) {
             $quotation = Quotation::find($pks->quotation_id);
             if ($quotation) {
@@ -2628,27 +2658,28 @@ class PksController extends Controller
             }
         }
 
+        // Update SPK status → "Site Telah Aktif" (id: 4)
+        Spk::where('leads_id', $pks->leads_id)
+            ->whereNotIn('status_spk_id', [100]) // skip Terminated
+            ->update([
+                'status_spk_id' => 4,
+                'updated_at' => $current_date_time,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
         // Get leads
         $leads = Leads::find($pks->leads_id);
         if (!$leads) {
             throw new \Exception('Leads not found');
         }
 
-        // Check RO and supervisor fields
-        if ($leads->ro_id_1 == null) {
-            $leads->ro_id_1 = 0;
-        }
-        if ($leads->ro_id_2 == null) {
-            $leads->ro_id_2 = 0;
-        }
-        if ($leads->ro_id_3 == null) {
-            $leads->ro_id_3 = 0;
-        }
-        if ($leads->ro_id == null) {
-            $leads->ro_id = 0;
-        }
+        // Pastikan field RO tidak null (diperlukan untuk sync HRIS)
+        $leads->ro_id_1 = $leads->ro_id_1 ?? 0;
+        $leads->ro_id_2 = $leads->ro_id_2 ?? 0;
+        $leads->ro_id_3 = $leads->ro_id_3 ?? 0;
+        $leads->ro_id = $leads->ro_id ?? 0;
 
-        // Update leads status
+        // Update Leads status → "Generated Customer" (id: 102)
         $leads->update([
             'status_leads_id' => 102,
             'updated_at' => $current_date_time,

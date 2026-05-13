@@ -913,28 +913,34 @@ class QuotationController extends Controller
             // Filter berdasarkan tipe quotation menggunakan switch case
             switch ($tipe_quotation) {
                 case 'baru':
-                    // Leads baru: status_leads_id = 1 (New Lead)
-                    $query;
-                    break;
-
-                case 'rekontrak':
-                    // Leads rekontrak: status_leads_id = 102
-                    $query->where('status_leads_id', 102)
-                        ->whereHas('quotations', function ($q) {
-                            // Menggunakan nested parameter grouping untuk logic OR
-                            $q->where(function ($innerQuery) {
-                                $innerQuery->whereIn('status_quotation_id', [3, 6]);
-                            });
-
-                            // Contoh jika kontrak_akhir ingin diaktifkan kembali:
-                            // $q->whereBetween('kontrak_akhir', [now(), now()->addMonths(1)]);
-                        });
+                    // Leads yang belum deal / masih dalam proses
+                    // $query->whereNotIn('status_leads_id', [99, 100, 101, 102]);
                     break;
 
                 case 'revisi':
-                    // Leads revisi: status_leads_id bukan 3 (misalnya exclude Draft)
-                    // Atau bisa juga status tertentu untuk revisi
-                    $query->where('status_leads_id', '!=', 3);
+                    // Leads yang sudah punya quotation aktif (status 3 = Quotation Aktif)
+                    $query->whereHas('quotations', function ($q) {
+                        $q->where('status_quotation_id', 3)
+                            ->whereNull('deleted_at');
+                    });
+                    break;
+
+                case 'rekontrak':
+                    // Leads yang sudah jadi customer dan punya quotation aktif/site aktif
+                    $query->where('status_leads_id', 102)
+                        ->whereHas('quotations', function ($q) {
+                            $q->whereIn('status_quotation_id', [3, 6])
+                                ->whereNull('deleted_at');
+                        });
+                    break;
+
+                case 'addendum':
+                    // Leads yang sudah jadi customer dan punya PKS aktif
+                    $query->where('status_leads_id', 102)
+                        ->whereHas('pks', function ($q) {
+                            $q->where('is_aktif', 1)
+                                ->whereNull('deleted_at');
+                        });
                     break;
             }
 
@@ -1609,12 +1615,12 @@ class QuotationController extends Controller
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 6, 8]);
 
                 break;
             case 'addendum':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 8]);
+                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5,6, 8]);
                 // ->where(function ($q) {
                 //     $q->whereHas('sites', function ($siteQuery) {
                 //         $siteQuery->whereHas('pks', function ($pksQuery) {
