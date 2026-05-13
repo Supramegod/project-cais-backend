@@ -115,7 +115,7 @@ class User extends Authenticatable
             'token' => hash('sha256', $plainRefreshToken = \Illuminate\Support\Str::random(40)),
             'tokenable_id' => $this->id,           // ✅ PENTING: Simpan user id
             'tokenable_type' => get_class($this),  // ✅ PENTING: Simpan user class (App\Models\U
-            // 'expires_at' => now()->addDays(7)
+            'expires_at' => now()->addDays(7)
         ]);
 
         return [

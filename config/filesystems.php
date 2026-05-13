@@ -89,6 +89,20 @@ return [
             'visibility' => 'public',
             'throw' => false,
         ],
+        'announcement-images' => [
+            'driver' => 'local',
+            'root' => public_path('document/announcement-images'),
+            'url' => env('APP_URL') . '/document/announcement-images',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
+        'announcement-files' => [
+            'driver' => 'local',
+            'root' => public_path('document/announcement-files'),
+            'url' => env('APP_URL') . '/document/announcement-files',
+            'visibility' => 'public',
+            'throw' => false,
+        ],
 
     ],
 

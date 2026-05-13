@@ -11,6 +11,15 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
     protected $table = 'personal_access_tokens';
     protected $connection = 'mysql';
 
+    protected $fillable = [
+        'name',
+        'token',
+        'abilities',
+        'expires_at',
+        'tokenable_id',
+        'tokenable_type',
+    ];
+
     // Token expires dalam 2 jam
     protected $expirationTime = 24 * 60; // 24 jam dalam menit
 

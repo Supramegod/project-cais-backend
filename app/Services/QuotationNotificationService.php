@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Mail;
 class QuotationNotificationService
 {
     const DIR_SALES = [
-        //  ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino@shelterindonesia.id', 'role' => 'Direktur Sales'],
-        ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
+         ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino@shelterindonesia.id', 'role' => 'Direktur Sales'],
+        // ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
     ];
 
     const DIR_KEU = [

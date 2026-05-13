@@ -19,4 +19,9 @@ class SystemAnnouncement extends Model
         'is_active',
         'created_by'
     ];
+
+    public function files()
+    {
+        return $this->hasMany(SystemAnnouncementFile::class, 'system_announcement_id');
+    }
 }
