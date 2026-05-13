@@ -33,6 +33,10 @@ class QuotationBusinessService
         $leads = Leads::findOrFail($request->perusahaan_id);
         $kebutuhan = Kebutuhan::findOrFail($request->layanan);
         $company = Company::findOrFail($request->entitas);
+        $statusTerminal = [99, 100, 101, 102]; // Deal, Tidak Deal, Bukan Leads, Generated Customer
+        if (!in_array($leads->status_leads_id, $statusTerminal) && $request->tipe_quotation === 'baru') {
+            $leads->update(['status_leads_id' => 4, 'updated_by' => Auth::user()?->full_name]);
+        }
 
         return [
             'tgl_quotation' => Carbon::now()->toDateString(),

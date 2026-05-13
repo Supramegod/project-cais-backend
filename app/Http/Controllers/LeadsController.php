@@ -2278,7 +2278,7 @@ class LeadsController extends Controller
         try {
             DB::beginTransaction();
 
-            // Cek lead
+            // 1. Cek lead
             $lead = Leads::find($id);
             if (!$lead) {
                 return response()->json([
@@ -2287,10 +2287,9 @@ class LeadsController extends Controller
                 ], 404);
             }
 
-            // Cek authorization - hanya user dengan cais_role_id tertentu yang bisa assign sales
+            // 2. Cek authorization
             $user = Auth::user();
             $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
-
             if (!in_array($user->cais_role_id, $allowedRoles)) {
                 return response()->json([
                     'success' => false,
@@ -2298,7 +2297,7 @@ class LeadsController extends Controller
                 ], 403);
             }
 
-            // Validasi input
+            // 3. Validasi input
             $validator = Validator::make($request->all(), [
                 'assignments' => 'required|array|min:1',
                 'assignments.*.tim_sales_d_id' => 'required|exists:m_tim_sales_d,id',
@@ -2314,7 +2313,7 @@ class LeadsController extends Controller
                 ], 400);
             }
 
-            // ✅ FIX #1: Pre-load semua kebutuhan untuk menghilangkan N+1 query
+            // 4. Pre-load Data untuk optimasi (Anti N+1)
             $kebutuhanIds = [];
             foreach ($request->assignments as $assignment) {
                 $kebutuhanIds = array_merge($kebutuhanIds, $assignment['kebutuhan_ids']);
@@ -2322,33 +2321,31 @@ class LeadsController extends Controller
             $kebutuhanIds = array_unique($kebutuhanIds);
             $kebutuhanMap = Kebutuhan::whereIn('id', $kebutuhanIds)->pluck('nama', 'id');
 
-            $assignmentResults = [];
-            $allAssignedKebutuhan = [];
-            $allAssignedKebutuhanNames = [];
-            $allAssignedSalesNames = []; // ✅ FIX #4: Kumpulkan semua sales untuk activity log
-
             $timSalesDIds = array_column($request->assignments, 'tim_sales_d_id');
             $timSalesDMap = TimSalesDetail::with('user', 'timSales')
                 ->whereIn('id', $timSalesDIds)
                 ->get()
                 ->keyBy('id');
 
-            // Ganti find() di dalam foreach:
+            $assignmentResults = [];
+            $allAssignedKebutuhanNames = [];
+            $allAssignedSalesNames = [];
+
+            // 5. Proses Assignment
             foreach ($request->assignments as $assignment) {
                 $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']);
 
-                if (!$timSalesD) {
-                    continue; // Skip jika sales tidak ditemukan
-                }
+                if (!$timSalesD)
+                    continue;
 
-                // ✅ FIX #4: Kumpulkan nama sales
-                $allAssignedSalesNames[] = $timSalesD->user->full_name ?? $timSalesD->nama;
+                $salesName = $timSalesD->user->full_name ?? $timSalesD->nama;
+                $allAssignedSalesNames[] = $salesName;
 
-                // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
-                $assignedKebutuhan = [];
+                $assignedKebutuhanForThisSales = [];
+
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
 
-                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
+                    LeadsKebutuhan::updateOrCreate(
                         [
                             'leads_id' => $lead->id,
                             'kebutuhan_id' => $kebutuhan_id,
@@ -2359,10 +2356,15 @@ class LeadsController extends Controller
                         ]
                     );
 
-                    $assignedKebutuhan[] = $kebutuhan_id;
-                    $allAssignedKebutuhan[] = $kebutuhan_id;
+                    // ✅ FIX UNTUK DATA DOUBLE (Hapus "no assigned"):
+                    // Menghapus record placeholder yang sales-nya masih kosong (NULL) untuk kebutuhan ini
+                    LeadsKebutuhan::where('leads_id', $lead->id)
+                        ->where('kebutuhan_id', $kebutuhan_id)
+                        ->whereNull('tim_sales_d_id')
+                        ->delete();
 
-                    // ✅ FIX #1: Ambil nama kebutuhan dari pre-loaded map (bukan query)
+                    $assignedKebutuhanForThisSales[] = $kebutuhan_id;
+
                     if (isset($kebutuhanMap[$kebutuhan_id])) {
                         $allAssignedKebutuhanNames[] = $kebutuhanMap[$kebutuhan_id];
                     }
@@ -2371,15 +2373,15 @@ class LeadsController extends Controller
                 $assignmentResults[] = [
                     'sales_assigned' => [
                         'tim_sales_d_id' => $timSalesD->id,
-                        'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
+                        'sales_name' => $salesName,
                         'tim_sales_id' => $timSalesD->tim_sales_id,
                         'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
                     ],
-                    'kebutuhan_assigned' => $assignedKebutuhan
+                    'kebutuhan_assigned' => $assignedKebutuhanForThisSales
                 ];
             }
 
-            // ✅ FIX #4: Buat activity untuk mencatat perubahan semua sales (bukan cuma yang terakhir)
+            // 6. Buat Activity Log
             $nomorActivity = $this->generateNomorActivity($lead->id);
             CustomerActivity::create([
                 'leads_id' => $lead->id,
@@ -2863,7 +2865,7 @@ class LeadsController extends Controller
                 'success' => true,
                 'message' => 'Data Quotation berhasil diambil',
                 'data' => $data,
-                'summary' => $summary,  
+                'summary' => $summary,
             ]);
 
         } catch (\Exception $e) {
@@ -3047,15 +3049,9 @@ class LeadsController extends Controller
     // ✅ SESUDAH — pre-load semua TimSalesDetail sekaligus, response tetap sama
     private function manualAssignSalesToKebutuhan($lead, $assignments)
     {
-        $user = Auth::user();
         $assignmentResults = [];
-        $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-        if (!in_array($user->cais_role_id, $allowedRoles)) {
-            return $assignmentResults;
-        }
-
-        // Pre-load semua TimSalesDetail yang dibutuhkan dalam SATU query
+        // Pre-load data sales untuk efisiensi
         $timSalesDIds = array_column($assignments, 'tim_sales_d_id');
         $timSalesDMap = TimSalesDetail::with('user', 'timSales')
             ->whereIn('id', $timSalesDIds)
@@ -3063,37 +3059,43 @@ class LeadsController extends Controller
             ->keyBy('id');
 
         foreach ($assignments as $assignment) {
-            $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']); // ← dari collection, no query
+            $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']);
 
             if ($timSalesD) {
+                $assignedKebutuhan = [];
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
+
+                    // ✅ FIX: Gunakan tim_sales_d_id sebagai kunci pencarian agar mendukung multi-sales
                     LeadsKebutuhan::updateOrCreate(
-                        ['leads_id' => $lead->id, 'kebutuhan_id' => $kebutuhan_id],
-                        ['tim_sales_id' => $timSalesD->tim_sales_id, 'tim_sales_d_id' => $timSalesD->id]
+                        [
+                            'leads_id' => $lead->id,
+                            'kebutuhan_id' => $kebutuhan_id,
+                            'tim_sales_d_id' => $timSalesD->id
+                        ],
+                        [
+                            'tim_sales_id' => $timSalesD->tim_sales_id
+                        ]
                     );
+
+                    // ✅ FIX: Hapus record "no assigned" (yang tim_sales_d_id nya NULL) 
+                    // agar tidak muncul double di UI
+                    LeadsKebutuhan::where('leads_id', $lead->id)
+                        ->where('kebutuhan_id', $kebutuhan_id)
+                        ->whereNull('tim_sales_d_id')
+                        ->delete();
+
+                    $assignedKebutuhan[] = $kebutuhan_id;
                 }
 
                 $assignmentResults[] = [
-                    'type' => 'manual_assign',
                     'sales_assigned' => [
                         'tim_sales_d_id' => $timSalesD->id,
                         'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
                         'tim_sales_id' => $timSalesD->tim_sales_id,
                         'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
                     ],
-                    'kebutuhan_assigned' => $assignment['kebutuhan_ids']
+                    'kebutuhan_assigned' => $assignedKebutuhan
                 ];
-            }
-        }
-
-        // Ambil dari map yang sudah di-load, tidak perlu query lagi
-        if (!empty($assignments[0]['tim_sales_d_id'])) {
-            $firstTimSalesD = $timSalesDMap->get($assignments[0]['tim_sales_d_id']);
-            if ($firstTimSalesD) {
-                $lead->update([
-                    'tim_sales_id' => $firstTimSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $firstTimSalesD->id
-                ]);
             }
         }
 
@@ -3105,16 +3107,15 @@ class LeadsController extends Controller
      */
     private function syncKebutuhanTanpaSales($lead, $kebutuhanIds)
     {
-        $user = Auth::user();
         $kebutuhanData = [];
         foreach ($kebutuhanIds as $kebutuhan_id) {
             $kebutuhanData[$kebutuhan_id] = [
-                'tim_sales_d_id' => $user->id,
-                'tim_sales_id' => 2
+                'tim_sales_d_id' => null, // Biarkan NULL agar muncul sebagai "no assigned" yang benar
+                'tim_sales_id' => null
             ];
         }
 
-        // Sync kebutuhan dengan data initialized
+        // Sync kebutuhan dengan status kosong (menunggu assignment)
         $lead->kebutuhan()->sync($kebutuhanData);
         return [];
     }
