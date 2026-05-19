@@ -357,7 +357,7 @@ class ReportController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/sales-report/monthly/role30",
+     *     path="/api/sales-report/monthly/tele",
      *     summary="Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
      *     description="Menampilkan laporan bulanan khusus user dengan cais_role_id=30.
      *     Hanya menghitung alur: Leads → Assignment → Appointment.
@@ -497,7 +497,7 @@ class ReportController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/sales-report/weekly/role30",
+     *     path="/api/sales-report/weekly/tele",
      *     summary="Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
      *     description="Menampilkan laporan mingguan khusus user dengan cais_role_id=30.
      *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.
@@ -982,7 +982,7 @@ class ReportController extends Controller
 
         $query = DB::connection('mysqlhris')
             ->table('m_user as u')
-            ->where('u.cais_role_id', '!=', 30) // Exclude admin/role30
+            ->where('u.cais_role_id', '!=', 30) // Exclude admin/tele
             ->leftJoin('m_branch as b', 'b.id', '=', 'u.branch_id')
             ->whereIn('u.id', $userIds)
             ->select('u.full_name as nama_sales', 'b.name as cabang', 'u.id as user_id')

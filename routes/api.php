@@ -527,8 +527,8 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/monthly', 'monthly');
         Route::get('/weekly', 'weekly');
         Route::get('/activity-detail/{user_id}', 'activityDetail');
-        Route::get('/monthly/role30', 'monthlyRole30');
-        Route::get('/weekly/role30', 'weeklyRole30');
+        Route::get('/monthly/tele', 'monthlyRole30');
+        Route::get('/weekly/tele', 'weeklyRole30');
 
     });
 

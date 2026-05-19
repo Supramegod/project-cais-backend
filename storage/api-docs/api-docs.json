@@ -21796,14 +21796,14 @@
                 ]
             }
         },
-        "/api/sales-report/monthly/role30": {
+        "/api/sales-report/monthly/tele": {
             "get": {
                 "tags": [
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
                 "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
-                "operationId": "6c969397b75f9151ed42e2da7a41838c",
+                "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
                 "parameters": [
                     {
                         "name": "month",
@@ -21925,14 +21925,14 @@
                 ]
             }
         },
-        "/api/sales-report/weekly/role30": {
+        "/api/sales-report/weekly/tele": {
             "get": {
                 "tags": [
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
                 "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
-                "operationId": "1f34bfea8921b5e19b12f854bad994cf",
+                "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
                 "parameters": [
                     {
                         "name": "month",
