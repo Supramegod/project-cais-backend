@@ -920,28 +920,27 @@ class QuotationController extends Controller
                 case 'revisi':
                     // Leads yang sudah punya quotation aktif (status 3 = Quotation Aktif)
                     $query->whereHas('quotations', function ($q) {
-                        $q->where('status_quotation_id', 3)
+                        $q->where('status_quotation_id', [2, 3, 4, 5, 6, 7, 8])
                             ->whereNull('deleted_at');
                     });
                     break;
 
                 case 'rekontrak':
+                case 'addendum':
                     // Leads yang sudah jadi customer dan punya quotation aktif/site aktif
                     $query->where('status_leads_id', 102)
                         ->whereHas('quotations', function ($q) {
                             $q->whereIn('status_quotation_id', [3, 6])
-                                ->whereNull('deleted_at');
+                                ->whereHas('sites', function ($siteQuery) {
+                                    $siteQuery->whereHas('pks', function ($pksQuery) {
+                                        $pksQuery->where('is_aktif', 1);
+
+                                        // ->where('kontrak_akhir', '<=', now()->addMonths(3));
+                                    });
+                                });
                         });
                     break;
 
-                case 'addendum':
-                    // Leads yang sudah jadi customer dan punya PKS aktif
-                    $query->where('status_leads_id', 102)
-                        ->whereHas('pks', function ($q) {
-                            $q->where('is_aktif', 1)
-                                ->whereNull('deleted_at');
-                        });
-                    break;
             }
 
             // Order by terbaru
@@ -1605,35 +1604,16 @@ class QuotationController extends Controller
                 $query
                     // Bukan revisi
                     ->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 4, 5, 8])
-                    // Bukan rekontrak (tidak punya PKS aktif yang akan berakhir ≤ 3 bulan)
-                    ->whereDoesntHave('pks', function ($q) {
-                        $q->where('is_aktif', 1)
-                            ->whereBetween('kontrak_akhir', [now(), now()->addMonths(3)]);
-                    });
+                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 7, 8]);
+
                 break;
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5, 6, 8]);
+                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 6, 7, 8]);
 
                 break;
             case 'addendum':
-                $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [1, 2, 3, 4, 5,6, 8]);
-                // ->where(function ($q) {
-                //     $q->whereHas('sites', function ($siteQuery) {
-                //         $siteQuery->whereHas('pks', function ($pksQuery) {
-                //             $pksQuery->where('is_aktif', 1)
-                //                 ->whereBetween('kontrak_akhir', [now(), now()->addMonths(11)]);
-                //         });
-                //     })
-                //     ->orWhereHas('sites', function ($siteQuery) {
-                //         $siteQuery->whereNull('pks_id');
-                //     });
-                // });
-                break;
-
             case 'rekontrak':
                 $query->whereIn('status_quotation_id', [3, 6])
                     ->whereHas('sites', function ($siteQuery) {

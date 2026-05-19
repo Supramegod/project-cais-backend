@@ -21796,6 +21796,302 @@
                 ]
             }
         },
+        "/api/sales-report/monthly/role30": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "operationId": "6c969397b75f9151ed42e2da7a41838c",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan bulanan role-30 berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 1"
+                                                    },
+                                                    "aggregat": {
+                                                        "properties": {
+                                                            "jumlah_leads": {
+                                                                "description": "Jumlah leads yang sudah melalui proses assignment",
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "jumlah_assignment": {
+                                                                "description": "Jumlah assignment (1 per leads yang di-assign)",
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "jumlah_appointment": {
+                                                                "description": "Jumlah appointment yang terjadi setelah assignment",
+                                                                "type": "integer",
+                                                                "example": 6
+                                                            },
+                                                            "pct_leads_to_assignment": {
+                                                                "description": "Persentase leads yang berhasil di-assign",
+                                                                "type": "string",
+                                                                "example": "100.0%"
+                                                            },
+                                                            "pct_assignment_to_appointment": {
+                                                                "description": "Persentase assignment yang berhasil jadi appointment",
+                                                                "type": "string",
+                                                                "example": "60.0%"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/weekly/role30": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "operationId": "1f34bfea8921b5e19b12f854bad994cf",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan mingguan role-30 berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 1"
+                                                    },
+                                                    "w1": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w2": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w3": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w4": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/sales-report/activity-detail/{user_id}": {
             "get": {
                 "tags": [
@@ -27191,6 +27487,353 @@
                 ]
             }
         },
+        "/api/v2/system-announcements/list": {
+            "get": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "List announcements (paginated)",
+                "operationId": "50c6b6d4c14a88a45c304a125f6f2946",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "is_active",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/view/{id}": {
+            "get": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Get announcement detail with files",
+                "operationId": "5dfa6d04b8b5286175a5ed46f710a757",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/upload-image": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Upload inline image untuk editor",
+                "description": "Upload gambar dan dapatkan URL untuk disisipkan ke konten HTML editor",
+                "operationId": "06ef6ff3746d3f38801ac380ec62362d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "image": {
+                                        "description": "File gambar (jpg,jpeg,png,gif,webp), max 5MB",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "URL gambar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "url": {
+                                            "type": "string",
+                                            "example": "http://example.com/document/announcement-images/image20260512123456.jpg"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/add": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Buat announcement baru dengan file attachment",
+                "operationId": "59b33f970fd8c0cc1eb5056ec7c3a32e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "details": {
+                                        "description": "HTML content dari rich editor",
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    },
+                                    "attachments[]": {
+                                        "description": "File attachment (pdf,doc,docx,jpg,jpeg,png), max 10MB each",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Announcement created successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/update/{id}": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Update announcement dan tambah attachment baru",
+                "operationId": "75a2085b6f59de33c5878e34b2da9688",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "details": {
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    },
+                                    "attachments[]": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Announcement updated successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Hapus announcement beserta semua file-nya",
+                "operationId": "76d0d0af5711a2740a3f563cbad55bb3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/delete-file/{fileId}": {
+            "delete": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Hapus satu file attachment",
+                "operationId": "1905897d7474c3b4f146e61ebdea8a75",
+                "parameters": [
+                    {
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -31827,6 +32470,10 @@
         {
             "name": "System Announcements",
             "description": "API Endpoints untuk Log Update Aplikasi dan Pengumuman Sistem"
+        },
+        {
+            "name": "System Announcements V2",
+            "description": "API v2 — Announcement dengan rich content, image upload, dan file attachment"
         },
         {
             "name": "Tim Sales",
