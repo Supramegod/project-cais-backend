@@ -14,7 +14,7 @@ class PksPerjanjian extends Model
     protected $fillable = [
         'pks_id',
         'pasal',
-        'judul', 
+        'judul',
         'raw_text',
         'created_by',
         'updated_by'
@@ -25,5 +25,10 @@ class PksPerjanjian extends Model
     public function pks()
     {
         return $this->belongsTo(Pks::class, 'pks_id');
+    }
+    // Di dalam class PksPerjanjian, setelah relasi pks()
+    public function histories()
+    {
+        return $this->hasMany(PksPerjanjianHistory::class, 'pks_perjanjian_id');
     }
 }

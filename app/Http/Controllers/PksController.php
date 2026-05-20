@@ -15,6 +15,8 @@ use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\Loyalty;
 use App\Models\Pks;
+use App\Models\PksPerjanjian;
+use App\Models\PksPerjanjianHistory;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
@@ -37,6 +39,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use SebastianBergmann\Diff\Differ;
+use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;
 
 /**
  * @OA\Tag(
@@ -1859,6 +1863,259 @@ class PksController extends Controller
             ], 500);
         }
     }
+    /**
+     * @OA\Put(
+     *     path="/api/pks/perjanjian/{id}",
+     *     summary="Update perjanjian PKS (menyimpan history versi lama)",
+     *     description="Memperbarui konten perjanjian PKS. Sebelum update, data lama akan disimpan ke tabel history untuk keperluan komparasi.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID perjanjian (sl_pks_perjanjian.id)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"raw_text"},
+     *             @OA\Property(property="judul", type="string", example="Ruang Lingkup Pekerjaan (Revisi)"),
+     *             @OA\Property(property="raw_text", type="string", example="<p>Isi kontrak yang sudah diperbarui...</p>")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Perjanjian berhasil diperbarui",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Perjanjian berhasil diperbarui"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=10),
+     *                 @OA\Property(property="pasal", type="string", example="Pasal 1"),
+     *                 @OA\Property(property="judul", type="string", example="Ruang Lingkup Pekerjaan (Revisi)"),
+     *                 @OA\Property(property="raw_text", type="string", example="<p>Isi kontrak yang sudah diperbarui...</p>"),
+     *                 @OA\Property(property="created_by", type="string", example="Admin"),
+     *                 @OA\Property(property="updated_by", type="string", example="John Doe")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Perjanjian tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi error")
+     * )
+     */
+    public function updatePerjanjian(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'judul' => 'nullable|string',
+                'raw_text' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
+
+            $perjanjian = PksPerjanjian::findOrFail($id);
+
+            $judulBaru = $request->judul ?? $perjanjian->judul;
+            $rawTextBaru = $request->raw_text;
+
+            // Cek apakah ada perubahan
+            if ($perjanjian->raw_text === $rawTextBaru && $perjanjian->judul === $judulBaru) {
+                return response()->json(['success' => true, 'message' => 'Tidak ada perubahan', 'data' => $perjanjian]);
+            }
+
+            DB::beginTransaction();
+
+            // Simpan data LAMA ke history
+            PksPerjanjianHistory::create([
+                'pks_perjanjian_id' => $perjanjian->id,
+                'pks_id' => $perjanjian->pks_id,
+                'pasal' => $perjanjian->pasal,
+                'judul' => $perjanjian->judul,
+                'raw_text' => $perjanjian->raw_text,
+                'snapshot' => json_encode($perjanjian->toArray(), JSON_PRETTY_PRINT),
+                'changed_by' => Auth::user()->full_name,
+            ]);
+
+            // Update data utama
+            $perjanjian->update([
+                'judul' => $judulBaru,
+                'raw_text' => $rawTextBaru,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
+            DB::commit();
+
+            // Catat aktivitas (opsional, gunakan method yang sudah ada atau buat helper)
+            $this->logPerjanjianChange($perjanjian);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Perjanjian berhasil diperbarui',
+                'data' => $perjanjian
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Update perjanjian error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/pks/perjanjian/{id}/history",
+     *     summary="Daftar riwayat perubahan perjanjian",
+     *     description="Mengembalikan daftar history perubahan untuk suatu perjanjian (berdasarkan ID perjanjian, bukan ID history).",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID perjanjian (sl_pks_perjanjian.id)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List riwayat perubahan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=101),
+     *                     @OA\Property(property="judul", type="string", example="RUANG LINGKUP PEKERJAAN"),
+     *                     @OA\Property(property="changed_by", type="string", example="John Doe"),
+     *                     @OA\Property(property="waktu", type="string", example="20-05-2026 14:30:00")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Perjanjian tidak ditemukan")
+     * )
+     */
+    public function getPerjanjianHistory($id)
+    {
+        $perjanjian = PksPerjanjian::find($id);
+        if (!$perjanjian) {
+            return response()->json(['success' => false, 'message' => 'Perjanjian not found'], 404);
+        }
+
+        $history = PksPerjanjianHistory::where('pks_perjanjian_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'judul', 'changed_by', 'created_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $history->map(fn($h) => [
+                'id' => $h->id,
+                'judul' => $h->judul,
+                'changed_by' => $h->changed_by,
+                'waktu' => $h->created_at->format('d-m-Y H:i:s'),
+            ])
+        ]);
+    }
+    /**
+     * @OA\Post(
+     *     path="/api/pks/perjanjian/compare",
+     *     summary="Bandingkan dua versi perjanjian (highlight perubahan)",
+     *     description="Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"history_id_1"},
+     *             @OA\Property(property="history_id_1", type="integer", description="ID history (versi lama)", example=101),
+     *             @OA\Property(property="history_id_2", type="integer", description="ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama", example=100)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Hasil komparasi",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="version_label_old", type="string", example="Sebelum edit (20-05-2026 14:30:00)"),
+     *                 @OA\Property(property="version_label_new", type="string", example="Saat ini (terbaru)"),
+     *                 @OA\Property(property="diff_unified", type="string", example="--- Original\n+++ New\n@@ -1,3 +1,3 @@\n..."),
+     *                 @OA\Property(property="old_text", type="string", example="<p>teks lama</p>"),
+     *                 @OA\Property(property="new_text", type="string", example="<p>teks baru</p>")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validasi error, history_id_1 harus ada"),
+     *     @OA\Response(response=404, description="History tidak ditemukan")
+     * )
+     */
+    public function comparePerjanjian(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'history_id_1' => 'required|exists:sl_pks_perjanjian_history,id',
+            'history_id_2' => 'nullable|exists:sl_pks_perjanjian_history,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $history1 = PksPerjanjianHistory::find($request->history_id_1);
+
+        // Bandingkan dengan versi lain atau versi terbaru
+        if ($request->filled('history_id_2')) {
+            $history2 = PksPerjanjianHistory::find($request->history_id_2);
+            $oldText = $history1->raw_text;
+            $newText = $history2->raw_text;
+            $oldJudul = $history1->judul;
+            $newJudul = $history2->judul;
+            $labelOld = "Versi " . $history1->created_at->format('d-m-Y H:i');
+            $labelNew = "Versi " . $history2->created_at->format('d-m-Y H:i');
+        } else {
+            $perjanjian = PksPerjanjian::find($history1->pks_perjanjian_id);
+            if (!$perjanjian) {
+                return response()->json(['success' => false, 'message' => 'Perjanjian tidak ditemukan'], 404);
+            }
+            $oldText = $history1->raw_text;
+            $newText = $perjanjian->raw_text;
+            $oldJudul = $history1->judul;
+            $newJudul = $perjanjian->judul;
+            $labelOld = "Sebelum edit (" . $history1->created_at->format('d-m-Y H:i') . ")";
+            $labelNew = "Saat ini (terbaru)";
+        }
+
+        // Deteksi perubahan judul
+        $judulChanged = ($oldJudul !== $newJudul);
+
+        // Generate diff untuk isi (raw_text) - opsional, bisa juga kirim null jika tidak perlu
+        $diff = null;
+        if ($oldText !== $newText) {
+            try {
+                $oldLines = preg_split('/\r\n|\r|\n/', $oldText);
+                $newLines = preg_split('/\r\n|\r|\n/', $newText);
+                $outputBuilder = new UnifiedDiffOutputBuilder("--- Original\n+++ New\n");
+                $differ = new Differ($outputBuilder);
+                $diff = $differ->diff($oldLines, $newLines);
+            } catch (\Exception $e) {
+                $diff = null; // Fallback, biar frontend yang handle diff
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'version_label_old' => $labelOld,
+                'version_label_new' => $labelNew,
+                'judul_old' => $oldJudul,
+                'judul_new' => $newJudul,
+                'judul_changed' => $judulChanged,
+                'diff_unified' => $diff,
+                'old_text' => $oldText,
+                'new_text' => $newText,
+            ]
+        ]);
+    }
 
     // ======================================================================
     // PRIVATE METHODS - Business Logic
@@ -3100,5 +3357,24 @@ class PksController extends Controller
         $urutan = sprintf('%04d', $jumlahAddendum + 1);
 
         return 'ADD/' . $nomorPksInduk . '/' . $urutan;
+    }
+    private function logPerjanjianChange($perjanjian)
+    {
+        $pks = Pks::find($perjanjian->pks_id);
+        if ($pks && $pks->leads_id) {
+            $leads = Leads::find($pks->leads_id);
+            if ($leads) {
+                $nomorActivity = $this->generateNomorActivity($leads->id);
+                CustomerActivity::create([
+                    'leads_id' => $leads->id,
+                    'pks_id' => $perjanjian->pks_id,
+                    'tgl_activity' => now(),
+                    'nomor' => $nomorActivity,
+                    'tipe' => 'PKS_PERJANJIAN',
+                    'notes' => "Perubahan pasal {$perjanjian->pasal} diedit oleh " . Auth::user()->full_name,
+                    'created_by' => Auth::user()->full_name,
+                ]);
+            }
+        }
     }
 }

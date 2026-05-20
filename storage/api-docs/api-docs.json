@@ -18348,6 +18348,274 @@
                 ]
             }
         },
+        "/api/pks/perjanjian/{id}": {
+            "put": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Update perjanjian PKS (menyimpan history versi lama)",
+                "description": "Memperbarui konten perjanjian PKS. Sebelum update, data lama akan disimpan ke tabel history untuk keperluan komparasi.",
+                "operationId": "463e1791354053e9c49468c57f9c3282",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID perjanjian (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "judul": {
+                                        "type": "string",
+                                        "example": "Ruang Lingkup Pekerjaan (Revisi)"
+                                    },
+                                    "raw_text": {
+                                        "type": "string",
+                                        "example": "<p>Isi kontrak yang sudah diperbarui...</p>"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Perjanjian berhasil diperbarui",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Perjanjian berhasil diperbarui"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "pasal": {
+                                                    "type": "string",
+                                                    "example": "Pasal 1"
+                                                },
+                                                "judul": {
+                                                    "type": "string",
+                                                    "example": "Ruang Lingkup Pekerjaan (Revisi)"
+                                                },
+                                                "raw_text": {
+                                                    "type": "string",
+                                                    "example": "<p>Isi kontrak yang sudah diperbarui...</p>"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Perjanjian tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/perjanjian/{id}/history": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Daftar riwayat perubahan perjanjian",
+                "description": "Mengembalikan daftar history perubahan untuk suatu perjanjian (berdasarkan ID perjanjian, bukan ID history).",
+                "operationId": "89d5f9cc96ec6c33720902fde119584f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID perjanjian (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List riwayat perubahan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "judul": {
+                                                        "type": "string",
+                                                        "example": "RUANG LINGKUP PEKERJAAN"
+                                                    },
+                                                    "changed_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "waktu": {
+                                                        "type": "string",
+                                                        "example": "20-05-2026 14:30:00"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Perjanjian tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/perjanjian/compare": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Bandingkan dua versi perjanjian (highlight perubahan)",
+                "description": "Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+                "operationId": "2f9e228be39de44abb36ced169747e41",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "history_id_1"
+                                ],
+                                "properties": {
+                                    "history_id_1": {
+                                        "description": "ID history (versi lama)",
+                                        "type": "integer",
+                                        "example": 101
+                                    },
+                                    "history_id_2": {
+                                        "description": "ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama",
+                                        "type": "integer",
+                                        "example": 100
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Hasil komparasi",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "version_label_old": {
+                                                    "type": "string",
+                                                    "example": "Sebelum edit (20-05-2026 14:30:00)"
+                                                },
+                                                "version_label_new": {
+                                                    "type": "string",
+                                                    "example": "Saat ini (terbaru)"
+                                                },
+                                                "diff_unified": {
+                                                    "type": "string",
+                                                    "example": "--- Original\\n+++ New\\n@@ -1,3 +1,3 @@\\n..."
+                                                },
+                                                "old_text": {
+                                                    "type": "string",
+                                                    "example": "<p>teks lama</p>"
+                                                },
+                                                "new_text": {
+                                                    "type": "string",
+                                                    "example": "<p>teks baru</p>"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi error, history_id_1 harus ada"
+                    },
+                    "404": {
+                        "description": "History tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/position/list": {
             "get": {
                 "tags": [

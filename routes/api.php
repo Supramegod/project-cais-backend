@@ -384,7 +384,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/available-sites/{leadsId}/{tipe}', 'getAvailableSites');
         Route::post('/{id}/submit-checklist', 'submitChecklist');
         Route::post('/upload/{id}', 'uploadPks');
-        // });
+
+        // ==================== PERJANJIAN (edit, history, compare) ====================
+        Route::put('/perjanjian/{id}', 'updatePerjanjian');               // Update konten perjanjian
+        Route::get('/perjanjian/{id}/history', 'getPerjanjianHistory');   // Lihat daftar riwayat perubahan
+        Route::post('/perjanjian/compare', 'comparePerjanjian');          // Bandingkan dua versi
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
