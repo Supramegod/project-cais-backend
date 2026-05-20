@@ -32627,6 +32627,12 @@
                 "type": "http",
                 "bearerFormat": "Token",
                 "scheme": "bearer"
+            },
+            "sanctum": {
+                "type": "apiKey",
+                "description": "Masukkan token: Bearer {token}",
+                "name": "Authorization",
+                "in": "header"
             }
         }
     },
@@ -32774,6 +32780,11 @@
         {
             "name": "User Email Config",
             "description": "User Email Config"
+        }
+    ],
+    "security": [
+        {
+            "sanctum": []
         }
     ]
 }
