@@ -38,8 +38,8 @@ use App\Http\Controllers\UpahController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
+use App\Http\Controllers\SubmissionController;
 use App\Http\Controllers\SystemAnnouncementController;
 use App\Http\Controllers\SystemAnnouncementV2Controller;
 
@@ -290,6 +290,14 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/recommendations', 'getRecommendations');
     });
 
+    // Submission Routes (Sales > Submission)
+    Route::prefix('submission')->controller(SubmissionController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/convert', 'convert');
+        Route::post('/delete', 'delete');
+    });
+
     // Leads Routes
     Route::prefix('leads')->controller(LeadsController::class)->group(function () {
         // Basic CRUD
@@ -482,12 +490,6 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         'update',
         'destroy',
     ]);
-
-    // Target Management
-    Route::prefix('targets')->controller(TargetController::class)->group(function () {
-        Route::get('/list', 'index');
-        Route::post('/add', 'storeOrUpdate');
-    });
 
     // Admin Panel Routes - untuk update step quotation secara khusus
     Route::prefix('admin-panel')->controller(AdminPanelController::class)->group(function () {
