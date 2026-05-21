@@ -483,8 +483,10 @@ class SubmissionV2Controller extends Controller
     {
         if (!$v) return null;
         $v = trim($v);
-        // expected M/D/YY or M/D/YYYY
-        foreach (['n/j/y', 'n/j/Y', 'Y-m-d', 'd/m/Y', 'd-m-Y'] as $fmt) {
+
+        // Sheet pakai format Indonesia: D/M/Y atau D/M/YY (e.g. "29/1/26", "5/1/26")
+        // Prioritaskan D/M dulu — kalau slot pertama > 12 jelas itu day bukan month
+        foreach (['j/n/y', 'j/n/Y', 'd/m/y', 'd/m/Y', 'd-m-Y', 'Y-m-d'] as $fmt) {
             try {
                 $d = Carbon::createFromFormat($fmt, $v);
                 if ($d && $d->year > 2000 && $d->year < 2100) {
@@ -494,8 +496,10 @@ class SubmissionV2Controller extends Controller
                 // try next
             }
         }
+
+        // Fallback: tebak dengan Carbon dengan asumsi DMY (Indonesian locale)
         try {
-            return Carbon::parse($v)->toDateString();
+            return Carbon::parse($v, null)->toDateString();
         } catch (\Exception $e) {
             return null;
         }
