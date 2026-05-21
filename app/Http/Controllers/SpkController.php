@@ -308,6 +308,7 @@ class SpkController extends Controller
         try {
             $data = Quotation::with(['leads.timSalesD'])
                 ->whereNull('deleted_at')
+                ->where('status_quotation_id', 3)
                 ->where('is_aktif', 1)
                 ->whereHas('leads.timSalesD', function ($query) {
                     $query->where('user_id', Auth::user()->id);
@@ -380,6 +381,7 @@ class SpkController extends Controller
                 })
                 ->whereHas('quotations', function ($query) {
                     $query->whereNull('deleted_at')
+                        ->where('status_quotation_id', 3)
                         ->where('is_aktif', 1);
                 });
 
@@ -502,6 +504,24 @@ class SpkController extends Controller
 
             $this->createSpkSites($spk, $siteIds);
             $this->createCustomerActivity($leads, $spk, $spkNomor);
+            // Update status quotation ke "Generated SPK" (id: 4)
+            if ($quotationId) {
+                Quotation::where('id', $quotationId)
+                    ->where('status_quotation_id', '!=', 100) // skip Terminated
+                    ->update([
+                        'status_quotation_id' => 4,
+                        'updated_by' => Auth::user()->full_name ?? 'System',
+                    ]);
+            }
+
+            // Update status leads ke "SPK / Closing" (id: 3)
+            $statusTerminalLeads = [99, 100, 101, 102];
+            if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
+                $leads->update([
+                    'status_leads_id' => 3,
+                    'updated_by' => Auth::user()->full_name ?? 'System',
+                ]);
+            }
 
             DB::commit();
 

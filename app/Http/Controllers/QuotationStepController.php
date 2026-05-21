@@ -20,6 +20,8 @@ use App\Models\Top;
 use App\Models\Training;
 use App\Models\Umk;
 use App\Models\Ump;
+use App\Models\Umsk;
+use App\Models\Umsp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -150,7 +152,7 @@ class QuotationStepController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => new QuotationStepResource($stepData),
+                'data' => $stepData,
                 'message' => 'Step data retrieved successfully',
                 'processing_time' => $this->elapsedMs($startTime),
             ]);
@@ -214,10 +216,8 @@ class QuotationStepController extends Controller
     public function updateStep(QuotationStepRequest $request, $id, $step): JsonResponse
     {
         $startTime = microtime(true);
-        set_time_limit(0);
 
         $updateMethod = 'updateStep' . $step;
-
         if (!method_exists($this->quotationStepService, $updateMethod)) {
             return response()->json([
                 'success' => false,
@@ -225,12 +225,9 @@ class QuotationStepController extends Controller
             ], 404);
         }
 
-        DB::beginTransaction();
-
-        try {
+        // Gunakan closure transaction – otomatis rollback jika exception
+        DB::transaction(function () use ($request, $id, $step, $updateMethod, $startTime) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
-
-
             $this->quotationStepService->$updateMethod($quotation, $request);
 
             if ($quotation->step < 12) {
@@ -239,30 +236,15 @@ class QuotationStepController extends Controller
                     'updated_by' => Auth::user()->full_name,
                 ]);
             }
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'data' => new QuotationStepResource($quotation, $step),
-                'message' => "Step {$step} updated successfully",
-                'processing_time' => $this->elapsedMs($startTime),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            Log::error("QuotationStepController@updateStep [{$step}]: " . $e->getMessage(), [
-                'id' => $id,
-                'step' => $step,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => "Failed to update step {$step}",
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // Hanya sukses jika transaction selesai tanpa exception
+        return response()->json([
+            'success' => true,
+            'data' => new QuotationStepResource(Quotation::notDeleted()->findOrFail($id), $step),
+            'message' => "Step {$step} updated successfully",
+            'processing_time' => $this->elapsedMs($startTime),
+        ]);
     }
 
     // =========================================================================
@@ -286,17 +268,18 @@ class QuotationStepController extends Controller
             ? $this->$stepDataMethod($quotation, $additionalData)
             : [];
 
-        return [
-            'quotation' => $quotation,
+        $baseData = [
+            'id' => $quotation->id,
             'step' => $step,
-            'step_data' => $stepData,       
+            'step_data' => $stepData,
             'additional_data' => $additionalData,
-            'metadata' => [
-                'actual_step' => $quotation->step,
-                'is_final' => $quotation->step >= 100,
-                'readonly' => $quotation->step >= 100,
-            ],
+            'metadata' => $quotation->step,
         ];
+        if (in_array($step, [1])) {
+            $baseData['nama_perusahaan'] = $this->nama_perusahaan ?? $quotation->nama_perusahaan;
+            $baseData['kebutuhan'] = $this->kebutuhan ?? $quotation->kebutuhan;
+        }
+        return $baseData;
     }
     private function buildStepDataStep1(Quotation $quotation, array $additionalData): array
     {
@@ -368,24 +351,26 @@ class QuotationStepController extends Controller
     {
         $positionData = [];
 
+        // Pastikan relasi utama dimuat untuk menghindari N+1 query
         if ($quotation->relationLoaded('quotationDetails')) {
             foreach ($quotation->quotationDetails as $detail) {
                 $wage = $detail->wage;
                 $site = $detail->quotationSite;
 
-                $keteranganMinUpah = 'Data UMK tidak ditemukan';
+                // 1. Logika Penentuan Keterangan Minimal Upah
+                $keteranganMinUpah = "Data UMK tidak ditemukan";
 
                 if ($site && $site->kota_id) {
+                    // Mencari data UMK aktif berdasarkan kota_id dari site
                     $umkData = Umk::byCity($site->kota_id)->active()->first();
 
                     if ($umkData) {
                         $minUpahNominal = $umkData->umk * 0.85;
-                        $keteranganMinUpah = 'Upah kurang dari 85% UMK ( Rp '
-                            . number_format($minUpahNominal, 0, ',', '.')
-                            . ' ) membutuhkan approval ';
+                        $keteranganMinUpah = "Upah kurang dari 85% UMK ( Rp " . number_format($minUpahNominal, 0, ',', '.') . " ) membutuhkan approval ";
                     }
                 }
 
+                // 2. Mapping Data Posisi
                 $positionData[] = [
                     'quotation_detail_id' => $detail->id,
                     'position_id' => $detail->position_id,
@@ -395,6 +380,8 @@ class QuotationStepController extends Controller
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nominal_upah' => $detail->nominal_upah,
                     'keterangan_minimal_upah' => $keteranganMinUpah,
+
+                    // Data dari relasi wage (dengan fallback null/0)
                     'upah' => $wage->upah ?? null,
                     'hitungan_upah' => $wage->hitungan_upah ?? null,
                     'lembur' => $wage->lembur ?? null,
@@ -407,6 +394,8 @@ class QuotationStepController extends Controller
                     'tunjangan_holiday' => $wage->tunjangan_holiday ?? null,
                     'nominal_tunjangan_holiday' => $wage->nominal_tunjangan_holiday ?? 0,
                     'jenis_bayar_tunjangan_holiday' => $wage->jenis_bayar_tunjangan_holiday ?? null,
+
+                    // Data BPJS & Penjamin
                     'is_bpjs_jkk' => $detail->is_bpjs_jkk ?? null,
                     'is_bpjs_jkm' => $detail->is_bpjs_jkm ?? null,
                     'is_bpjs_jht' => $detail->is_bpjs_jht ?? null,
@@ -416,14 +405,15 @@ class QuotationStepController extends Controller
             }
         }
 
+        // 3. Return Struktur Akhir (Step Data & Global Data)
         return [
             'position_data' => $positionData,
             'global_data' => [
-                'is_ppn' => $quotation->is_ppn,
-                'jenis_kontrak' => $quotation->jenis_kontrak,
-                'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-                'management_fee_id' => $quotation->management_fee_id,
-                'persentase' => $quotation->persentase,
+                'is_ppn' => $quotation->is_ppn ?? false,
+                'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+                'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
+                'management_fee_id' => $quotation->management_fee_id ?? null,
+                'persentase' => $quotation->persentase ?? 0,
             ],
         ];
     }
@@ -527,32 +517,18 @@ class QuotationStepController extends Controller
             'quotation_trainings' => $quotationTrainings,
         ];
     }
+
     private function buildStepDataStep11(Quotation $quotation, array $additionalData): array
     {
-        try {
-            $calculatedQuotation = $additionalData['calculated_quotation'] ?? null;
-            Log::info('Calculated quotation', ['quotation_id' => $quotation->id, 'calculated' => !!$calculatedQuotation]);
-
-            if (!$calculatedQuotation) {
-                Log::error('calculateQuotation returned null', ['quotation_id' => $quotation->id]);
-            }
-        } catch (\Exception $e) {
-            Log::error('Error calculating quotation in step 11', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            $calculatedQuotation = null;
-        }
-
+        $calculatedQuotation = $additionalData['calculated_quotation'] ?? null;
+        $summary = null;
         $persenBpjsTotalHpp = 0;
-        $persenBpjsTotalCoss = 0;
         $persenBpjsBreakdownHpp = [];
+        $persenBpjsTotalCoss = 0;
         $persenBpjsBreakdownCoss = [];
 
-        if ($calculatedQuotation && isset($summary)) {
+        if ($calculatedQuotation && $calculatedQuotation->calculation_summary) {
             $summary = $calculatedQuotation->calculation_summary;
-
             $persenBpjsTotalHpp = round($summary->persen_bpjs_ketenagakerjaan ?? 0, 2);
             $persenBpjsBreakdownHpp = [
                 'persen_bpjs_jkk' => round($summary->persen_bpjs_jkk ?? 0, 2),
@@ -560,7 +536,6 @@ class QuotationStepController extends Controller
                 'persen_bpjs_jht' => round($summary->persen_bpjs_jht ?? 0, 2),
                 'persen_bpjs_jp' => round($summary->persen_bpjs_jp ?? 0, 2),
             ];
-
             $persenBpjsTotalCoss = round($summary->persen_bpjs_ketenagakerjaan_coss ?? 0, 2);
             $persenBpjsBreakdownCoss = [
                 'persen_bpjs_jkk' => round($summary->persen_bpjs_jkk_coss ?? 0, 2),
@@ -569,6 +544,8 @@ class QuotationStepController extends Controller
                 'persen_bpjs_jp' => round($summary->persen_bpjs_jp_coss ?? 0, 2),
             ];
         }
+
+        // Load relasi jika perlu
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             $calculatedQuotation->quotation->quotationDetails->loadMissing([
                 'quotationDetailHpps',
@@ -578,14 +555,169 @@ class QuotationStepController extends Controller
             ]);
         }
 
+        // Helper untuk mengecek RO
+        // $isRo = fn($detail) => strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
+
+
+        // Helper untuk resolve tampilan tunjangan
+        $resolveDisplay = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkan = null) {
+            if (!$wage) {
+                return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
+            }
+            $jenis = strtolower(trim($wage->$jenisField ?? ''));
+            if ($fieldDitagihkan && isset($wage->$fieldDitagihkan)) {
+                $ditagihkan = strtolower(trim($wage->$fieldDitagihkan));
+                if ($ditagihkan === 'ditagihkan terpisah') {
+                    return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
+                }
+                if (in_array($ditagihkan, ['diberikan langsung', 'diberikan langsung oleh client'])) {
+                    return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
+                }
+            }
+            if (in_array($jenis, ['normatif', 'ditagihkan'])) {
+                return ['hpp' => 'Ditagihkan terpisah', 'coss' => 'Ditagihkan terpisah'];
+            }
+            if (in_array($jenis, ['flat', 'diprovisikan'])) {
+                return [
+                    'hpp' => $hppValue > 0 ? $hppValue : 'Tidak Ada',
+                    'coss' => $cossValue > 0 ? $cossValue : 'Tidak Ada',
+                ];
+            }
+            if (in_array($jenis, ['diberikan langsung', 'diberikan langsung oleh client'])) {
+                return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
+            }
+            return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
+        };
+
+        $quotationDetails = [];
+        if ($calculatedQuotation && $calculatedQuotation->quotation) {
+            foreach ($calculatedQuotation->quotation->quotationDetails as $detail) {
+                $isRoDetail = $this->isRo($detail);
+                \Log::info('RO Check', [
+                    'detail_id' => $detail->id,
+                    'jabatan' => $detail->jabatan_kebutuhan,
+                    'is_ro' => $isRoDetail,
+                    'will_add_coss' => !$isRoDetail
+                ]);
+                $wage = $detail->wage ?? null;
+                $detailCalc = $calculatedQuotation->detail_calculations[$detail->id] ?? null;
+
+                if ($detailCalc) {
+                    $hppData = $detailCalc->hpp_data ?? [];
+                    $cossData = $detailCalc->coss_data ?? [];
+                } else {
+                    $hpp = $detail->quotationDetailHpps->first();
+                    $coss = $detail->quotationDetailCosses->first();
+                    $hppData = $hpp ? $hpp->toArray() : [];
+                    $cossData = $coss ? $coss->toArray() : [];
+                }
+
+                $tunjanganData = $detail->quotationDetailTunjangans->map(fn($t) => [
+                    'nama_tunjangan' => $t->nama_tunjangan,
+                    'nominal' => $t->nominal,
+                    'nominal_coss' => $t->nominal_coss,
+                ])->values()->toArray();
+
+                $thrDisplay = $resolveDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
+                $kompDisplay = $resolveDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
+                $lemburDisplay = $resolveDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
+                $holidayDisplay = $resolveDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
+
+                $isRoDetail = $this->isRo($detail);
+
+                // Data HPP (selalu ada)
+                $hppArray = [
+                    'nominal_upah' => $hppData['gaji_pokok'] ?? 0,
+                    'total_tunjangan' => $hppData['total_tunjangan'] ?? 0,
+                    'tunjangan_hari_raya' => $thrDisplay['hpp'],
+                    'kompensasi' => $kompDisplay['hpp'],
+                    'lembur' => $lemburDisplay['hpp'],
+                    'tunjangan_holiday' => $holidayDisplay['hpp'],
+                    'bpjs_ketenagakerjaan' => ($hppData['bpjs_jkk'] ?? 0) + ($hppData['bpjs_jkm'] ?? 0) + ($hppData['bpjs_jht'] ?? 0) + ($hppData['bpjs_jp'] ?? 0),
+                    'bpjs_kesehatan' => $hppData['bpjs_ks'] ?? 0,
+                    'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 0,
+                    'bpjs_jkm' => $hppData['bpjs_jkm'] ?? 0,
+                    'bpjs_jht' => $hppData['bpjs_jht'] ?? 0,
+                    'bpjs_jp' => $hppData['bpjs_jp'] ?? 0,
+                    'bpjs_kes' => $hppData['bpjs_ks'] ?? 0,
+                    'persen_bpjs_jkk' => $hppData['persen_bpjs_jkk'] ?? 0,
+                    'persen_bpjs_jkm' => $hppData['persen_bpjs_jkm'] ?? 0,
+                    'persen_bpjs_jht' => $hppData['persen_bpjs_jht'] ?? 0,
+                    'persen_bpjs_jp' => $hppData['persen_bpjs_jp'] ?? 0,
+                    'persen_bpjs_kes' => $hppData['persen_bpjs_ks'] ?? 0,
+                    'potongan_bpu' => $hppData['potongan_bpu'] ?? 0,
+                    'personil_kaporlap' => $hppData['provisi_seragam'] ?? 0,
+                    'personil_devices' => $hppData['provisi_peralatan'] ?? 0,
+                    'personil_ohc' => $hppData['provisi_ohc'] ?? 0,
+                    'personil_chemical' => $hppData['provisi_chemical'] ?? 0,
+                    'total_personil' => $hppData['total_biaya_per_personil'] ?? 0,
+                    'sub_total_personil' => $hppData['total_biaya_all_personil'] ?? 0,
+                    'bunga_bank' => $hppData['bunga_bank'] ?? 0,
+                    'insentif' => $hppData['insentif'] ?? 0,
+                ];
+
+                // Bangun array dasar untuk setiap detail
+                $detailItem = [
+                    'id' => $detail->id,
+                    'position_name' => $detail->jabatan_kebutuhan,
+                    'nama_site' => $detail->nama_site,
+                    'quotation_site_id' => $detail->quotation_site_id,
+                    'penjamin_kesehatan' => $detail->penjamin_kesehatan,
+                    'upah' => $wage?->upah ?? 0,
+                    'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
+                    'jumlah_hc_coss' => $isRoDetail ? 0 : ($cossData['jumlah_hc'] ?? 0),
+                    'tunjangan_data' => $tunjanganData,
+                    'hpp' => $hppArray,
+                ];
+
+                // **Hanya tambahkan key 'coss' jika bukan RO**
+                if (!$isRoDetail) {
+                    $detailItem['coss'] = [
+                        'nominal_upah' => $cossData['gaji_pokok'] ?? 0,
+                        'total_tunjangan' => $cossData['total_tunjangan'] ?? 0,
+                        'tunjangan_hari_raya' => $thrDisplay['coss'],
+                        'kompensasi' => $kompDisplay['coss'],
+                        'lembur' => $lemburDisplay['coss'],
+                        'tunjangan_holiday' => $holidayDisplay['coss'],
+                        'bpjs_ketenagakerjaan' => ($cossData['bpjs_jkk'] ?? 0) + ($cossData['bpjs_jkm'] ?? 0) + ($cossData['bpjs_jht'] ?? 0) + ($cossData['bpjs_jp'] ?? 0),
+                        'bpjs_kesehatan' => $cossData['bpjs_ks'] ?? 0,
+                        'bpjs_jkk' => $cossData['bpjs_jkk'] ?? 0,
+                        'bpjs_jkm' => $cossData['bpjs_jkm'] ?? 0,
+                        'bpjs_jht' => $cossData['bpjs_jht'] ?? 0,
+                        'bpjs_jp' => $cossData['bpjs_jp'] ?? 0,
+                        'bpjs_kes' => $cossData['bpjs_ks'] ?? 0,
+                        'persen_bpjs_jkk' => $cossData['persen_bpjs_jkk'] ?? 0,
+                        'persen_bpjs_jkm' => $cossData['persen_bpjs_jkm'] ?? 0,
+                        'persen_bpjs_jht' => $cossData['persen_bpjs_jht'] ?? 0,
+                        'persen_bpjs_jp' => $cossData['persen_bpjs_jp'] ?? 0,
+                        'persen_bpjs_kes' => $cossData['persen_bpjs_ks'] ?? 0,
+                        'potongan_bpu' => $cossData['potongan_bpu'] ?? 0,
+                        'personil_kaporlap_coss' => $cossData['provisi_seragam'] ?? 0,
+                        'personil_devices_coss' => $cossData['provisi_peralatan'] ?? 0,
+                        'personil_ohc_coss' => $cossData['provisi_ohc'] ?? 0,
+                        'personil_chemical_coss' => $cossData['provisi_chemical'] ?? 0,
+                        'total_personil' => $cossData['total_personil_coss'] ?? 0,
+                        'sub_total_personil' => $cossData['sub_total_personil_coss'] ?? 0,
+                        'total_base_manpower' => $cossData['total_base_manpower'] ?? 0,
+                        'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,
+                        'bunga_bank' => $cossData['bunga_bank'] ?? 0,
+                        'insentif' => $cossData['insentif'] ?? 0,
+                    ];
+                }
+
+                $quotationDetails[] = $detailItem;
+            }
+        }
+
         return [
-            'hari_kerja' => $quotation->hari_kerja,
-            'penagihan' => $quotation->penagihan,
-            'nama_perusahaan' => $quotation->nama_perusahaan,
-            'persentase' => $quotation->persentase,
+            'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
+            'hari_kerja' => $quotation->hari_kerja ?? 0,
+            'penagihan' => $quotation->penagihan ?? '',
+            'nama_perusahaan' => $quotation->nama_perusahaan ?? '',
+            'persentase' => $quotation->persentase ?? 0,
             'management_fee_nama' => $quotation->managementFee->nama ?? null,
-            'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong,
-            'note_harga_jual' => $quotation->note_harga_jual,
+            'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
+            'note_harga_jual' => $quotation->note_harga_jual ?? '',
             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
             'persen_insentif' => $quotation->persen_insentif ?? 0,
             'quotation_pics' => $quotation->relationLoaded('quotationPics')
@@ -598,7 +730,7 @@ class QuotationStepController extends Controller
                     'is_kuasa' => $pic->is_kuasa,
                 ])->values()->toArray()
                 : [],
-            'calculation' => $calculatedQuotation ? [
+            'calculation' => ($calculatedQuotation && $summary) ? [
                 'bpu' => [
                     'total_potongan_bpu' => $summary->total_potongan_bpu ?? 0,
                     'potongan_bpu_per_orang' => $summary->potongan_bpu_per_orang ?? 0,
@@ -637,107 +769,7 @@ class QuotationStepController extends Controller
                     'persen_bpjs_ketenagakerjaan' => $persenBpjsTotalCoss,
                     'breakdown_bpjs' => $persenBpjsBreakdownCoss,
                 ],
-                'quotation_details' => $calculatedQuotation->quotation
-                    ? $calculatedQuotation->quotation->quotationDetails->map(
-                        function ($detail) use ($calculatedQuotation) {
-                            $wage = $detail->wage ?? null;
-                            $detailCalc = $calculatedQuotation->detail_calculations[$detail->id] ?? null;
-
-                            if ($detailCalc) {
-                                $hppData = $detailCalc->hpp_data ?? [];
-                                $cossData = $detailCalc->coss_data ?? [];
-                            } else {
-                                $hpp = $detail->quotationDetailHpps->first();
-                                $coss = $detail->quotationDetailCosses->first();
-                                $hppData = $hpp ? $hpp->toArray() : [];
-                                $cossData = $coss ? $coss->toArray() : [];
-                            }
-
-                            $tunjanganData = $detail->quotationDetailTunjangans->map(fn($t) => [
-                                'nama_tunjangan' => $t->nama_tunjangan,
-                                'nominal' => $t->nominal,
-                                'nominal_coss' => $t->nominal_coss,
-                            ])->values()->toArray();
-
-                            $thrDisplay = $this->resolveTunjanganDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
-                            $kompDisplay = $this->resolveTunjanganDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
-                            $lemburDisplay = $this->resolveTunjanganDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
-                            $holidayDisplay = $this->resolveTunjanganDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
-
-                            return [
-                                'id' => $detail->id,
-                                'position_name' => $detail->jabatan_kebutuhan,
-                                'nama_site' => $detail->nama_site,
-                                'quotation_site_id' => $detail->quotation_site_id,
-                                'penjamin_kesehatan' => $detail->penjamin_kesehatan,
-                                'upah' => $wage?->upah ?? 0,
-                                'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
-                                'jumlah_hc_coss' => $cossData['jumlah_hc'] ?? 0,
-                                'tunjangan_data' => $tunjanganData,
-                                'hpp' => [
-                                    'nominal_upah' => $hppData['gaji_pokok'] ?? 0,
-                                    'total_tunjangan' => $hppData['total_tunjangan'] ?? 0,
-                                    'tunjangan_hari_raya' => $thrDisplay['hpp'],
-                                    'kompensasi' => $kompDisplay['hpp'],
-                                    'lembur' => $lemburDisplay['hpp'],
-                                    'tunjangan_holiday' => $holidayDisplay['hpp'],
-                                    'bpjs_ketenagakerjaan' => ($hppData['bpjs_jkk'] ?? 0) + ($hppData['bpjs_jkm'] ?? 0) + ($hppData['bpjs_jht'] ?? 0) + ($hppData['bpjs_jp'] ?? 0),
-                                    'bpjs_kesehatan' => $hppData['bpjs_ks'] ?? 0,
-                                    'bpjs_jkk' => $hppData['bpjs_jkk'] ?? 0,
-                                    'bpjs_jkm' => $hppData['bpjs_jkm'] ?? 0,
-                                    'bpjs_jht' => $hppData['bpjs_jht'] ?? 0,
-                                    'bpjs_jp' => $hppData['bpjs_jp'] ?? 0,
-                                    'bpjs_kes' => $hppData['bpjs_ks'] ?? 0,
-                                    'persen_bpjs_jkk' => $hppData['persen_bpjs_jkk'] ?? 0,
-                                    'persen_bpjs_jkm' => $hppData['persen_bpjs_jkm'] ?? 0,
-                                    'persen_bpjs_jht' => $hppData['persen_bpjs_jht'] ?? 0,
-                                    'persen_bpjs_jp' => $hppData['persen_bpjs_jp'] ?? 0,
-                                    'persen_bpjs_kes' => $hppData['persen_bpjs_ks'] ?? 0,
-                                    'potongan_bpu' => $hppData['potongan_bpu'] ?? 0,
-                                    'personil_kaporlap' => $hppData['provisi_seragam'] ?? 0,
-                                    'personil_devices' => $hppData['provisi_peralatan'] ?? 0,
-                                    'personil_ohc' => $hppData['provisi_ohc'] ?? 0,
-                                    'personil_chemical' => $hppData['provisi_chemical'] ?? 0,
-                                    'total_personil' => $hppData['total_biaya_per_personil'] ?? 0,
-                                    'sub_total_personil' => $hppData['total_biaya_all_personil'] ?? 0,
-                                    'bunga_bank' => $hppData['bunga_bank'] ?? 0,
-                                    'insentif' => $hppData['insentif'] ?? 0,
-                                ],
-                                'coss' => [
-                                    'nominal_upah' => $cossData['gaji_pokok'] ?? 0,
-                                    'total_tunjangan' => $cossData['total_tunjangan'] ?? 0,
-                                    'tunjangan_hari_raya' => $thrDisplay['coss'],
-                                    'kompensasi' => $kompDisplay['coss'],
-                                    'lembur' => $lemburDisplay['coss'],
-                                    'tunjangan_holiday' => $holidayDisplay['coss'],
-                                    'bpjs_ketenagakerjaan' => ($cossData['bpjs_jkk'] ?? 0) + ($cossData['bpjs_jkm'] ?? 0) + ($cossData['bpjs_jht'] ?? 0) + ($cossData['bpjs_jp'] ?? 0),
-                                    'bpjs_kesehatan' => $cossData['bpjs_ks'] ?? 0,
-                                    'bpjs_jkk' => $cossData['bpjs_jkk'] ?? 0,
-                                    'bpjs_jkm' => $cossData['bpjs_jkm'] ?? 0,
-                                    'bpjs_jht' => $cossData['bpjs_jht'] ?? 0,
-                                    'bpjs_jp' => $cossData['bpjs_jp'] ?? 0,
-                                    'bpjs_kes' => $cossData['bpjs_ks'] ?? 0,
-                                    'persen_bpjs_jkk' => $cossData['persen_bpjs_jkk'] ?? 0,
-                                    'persen_bpjs_jkm' => $cossData['persen_bpjs_jkm'] ?? 0,
-                                    'persen_bpjs_jht' => $cossData['persen_bpjs_jht'] ?? 0,
-                                    'persen_bpjs_jp' => $cossData['persen_bpjs_jp'] ?? 0,
-                                    'persen_bpjs_kes' => $cossData['persen_bpjs_ks'] ?? 0,
-                                    'potongan_bpu' => $cossData['potongan_bpu'] ?? 0,
-                                    'personil_kaporlap_coss' => $cossData['provisi_seragam'] ?? 0,
-                                    'personil_devices_coss' => $cossData['provisi_peralatan'] ?? 0,
-                                    'personil_ohc_coss' => $cossData['provisi_ohc'] ?? 0,
-                                    'personil_chemical_coss' => $cossData['provisi_chemical'] ?? 0,
-                                    'total_personil' => $cossData['total_personil_coss'] ?? 0,
-                                    'sub_total_personil' => $cossData['sub_total_personil_coss'] ?? 0,
-                                    'total_base_manpower' => $cossData['total_base_manpower'] ?? 0,
-                                    'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,
-                                    'bunga_bank' => $cossData['bunga_bank'] ?? 0,
-                                    'insentif' => $cossData['insentif'] ?? 0,
-                                ],
-                            ];
-                        }
-                    )->toArray()
-                    : null,
+                'quotation_details' => $quotationDetails,
             ] : null,
         ];
     }
@@ -809,7 +841,10 @@ class QuotationStepController extends Controller
     {
         return [
             'positions' => Position::where('is_active', 1)
-                ->where('layanan_id', $quotation->kebutuhan_id)
+                ->where(function ($query) use ($quotation) {
+                    $query->where('layanan_id', $quotation->kebutuhan_id)
+                        ->orWhere('id', 224); // Ganti 99 dengan ID posisi tertentu tersebut
+                })
                 ->orderBy('name', 'asc')
                 ->select('id', 'name')
                 ->get(),
@@ -824,33 +859,12 @@ class QuotationStepController extends Controller
 
     private function buildAdditionalDataStep4(Quotation $quotation): array
     {
-        $umkPerSite = [];
         $umpPerSite = [];
+        $umspPerSite = [];
+        $umkPerSite = [];
+        $umskPerSite = [];
 
-        if ($quotation->relationLoaded('quotationSites')) {
-            foreach ($quotation->quotationSites as $site) {
-                $umk = Umk::byCity($site->kota_id)->active()->first();
-                $ump = Ump::byProvince($site->provinsi_id)->active()->first();
-
-                $umkPerSite[$site->id] = [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'city_id' => $site->kota_id,
-                    'city_name' => $site->kota,
-                    'umk_value' => $umk?->umk ?? 0,
-                    'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
-                ];
-
-                $umpPerSite[$site->id] = [
-                    'site_id' => $site->id,
-                    'site_name' => $site->nama_site,
-                    'province_id' => $site->provinsi_id,
-                    'province_name' => $site->provinsi,
-                    'ump_value' => $ump?->ump ?? 0,
-                    'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
-                ];
-            }
-        }
+        // Memastikan relasi quotationSites dimuat
         if (!$quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
@@ -859,16 +873,85 @@ class QuotationStepController extends Controller
             ]);
         }
 
+        foreach ($quotation->quotationSites as $site) {
+            $umk = Umk::byCity($site->kota_id)->active()->first();
+            $ump = Ump::byProvince($site->provinsi_id)->active()->first();
+            $umsk = Umsk::byCity($site->kota_id)->active()->first();
+            $umsp = Umsp::byProvince($site->provinsi_id)->active()->first();
+
+            $umpPerSite[] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'province_id' => $site->provinsi_id,
+                'province_name' => $site->provinsi,
+                'ump_value' => $ump?->ump ?? 0,
+                'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
+            ];
+            $umspPerSite[] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'province_id' => $site->provinsi_id,
+                'province_name' => $site->provinsi,
+                'umsp_value' => $umsp?->umsp ?? 0,
+                'formatted_umsp' => $umsp ? $umsp->formatUmsp() : 'UMSP : Rp. 0',
+            ];
+
+            $umkPerSite[] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'city_id' => $site->kota_id,
+                'city_name' => $site->kota,
+                'umk_value' => $umk?->umk ?? 0,
+                'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
+            ];
+
+            $umskPerSite[] = [
+                'site_id' => $site->id,
+                'site_name' => $site->nama_site,
+                'city_id' => $site->kota_id,
+                'city_name' => $site->kota,
+                'umsk_value' => $umsk?->umsk ?? 0,
+                'formatted_umsk' => $umsk ? $umsk->formatUmsk() : 'UMSK : Rp. 0',
+            ];
+        }
 
         return [
+            // Master Data & Options
             'management_fees' => ManagementFee::select('id', 'nama')->get(),
-            'umk_per_site' => $umkPerSite,
+            'upah_options' => ['UMP', 'UMK', 'Custom'],
+            'hitungan_upah_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
+            'jenis_bayar_options' => ['Per Bulan', 'Per Hari', 'Per Jam'],
+            'lembur_options' => ['Tidak', 'Flat'],
+            'kompensasi_options' => ['Tidak', 'Diprovisikan'],
+            'thr_options' => ['Tidak', 'Diprovisikan'],
+            'tunjangan_holiday_options' => ['Tidak', 'Flat'],
+            'lembur_ditagihkan_options' => ['Tidak Ditagihkan', 'Ditagihkan Terpisah'],
+            'is_ppn_options' => ['Ya', 'Tidak'],
+            'ppn_pph_dipotong_options' => ['Management Fee', 'Lainnya'],
+
+            // Data Dinamis Per Site (Sudah berbentuk Array Sequential)
             'ump_per_site' => $umpPerSite,
-            'quotation_sites' => $quotation->relationLoaded('quotationSites')
-                ? $quotation->quotationSites->map(fn($site) => [
-                    'id' => $site->id,
-                    'nama_site' => $site->nama_site,
-                ])->toArray()
+            'umsp_per_site' => $umspPerSite,
+            'umk_per_site' => $umkPerSite,
+            'umsk_per_site' => $umskPerSite,
+
+            // Data Site (Disederhanakan)
+            'quotation_sites' => $quotation->quotationSites->map(fn($site) => [
+                'id' => $site->id,
+                'nama_site' => $site->nama_site,
+            ])->values()->toArray(), // Tambahkan values() untuk memastikan array
+
+            // Data Details
+            'quotation_details' => $quotation->relationLoaded('quotationDetails')
+                ? $quotation->quotationDetails->map(fn($detail) => [
+                    'id' => $detail->id,
+                    'position_id' => $detail->position_id,
+                    'position_name' => $detail->jabatan_kebutuhan,
+                    'site_id' => $detail->quotation_site_id,
+                    'site_name' => $detail->nama_site,
+                    'jumlah_hc' => $detail->jumlah_hc,
+                    'nominal_upah' => $detail->nominal_upah,
+                ])->values()->toArray() // Tambahkan values() di sini juga
                 : [],
         ];
     }
@@ -1174,5 +1257,9 @@ class QuotationStepController extends Controller
     private function elapsedMs(float $startTime): string
     {
         return round((microtime(true) - $startTime) * 1000, 2) . 'ms';
+    }
+    private function isRo($detail): bool
+    {
+        return ($detail->position_id ?? null) === 224;
     }
 }

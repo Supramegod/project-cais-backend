@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Services;
+
 use App\Models\LeadsKebutuhan;
 use App\Models\Pks;
 use App\Models\Province;
@@ -15,6 +16,8 @@ use App\Models\Leads;
 use App\Models\QuotationSite;
 use App\Models\QuotationPic;
 use App\Models\CustomerActivity;
+use App\Models\Umsk;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -30,6 +33,10 @@ class QuotationBusinessService
         $leads = Leads::findOrFail($request->perusahaan_id);
         $kebutuhan = Kebutuhan::findOrFail($request->layanan);
         $company = Company::findOrFail($request->entitas);
+        $statusTerminal = [99, 100, 101, 102]; // Deal, Tidak Deal, Bukan Leads, Generated Customer
+        if (!in_array($leads->status_leads_id, $statusTerminal) && $request->tipe_quotation === 'baru') {
+            $leads->update(['status_leads_id' => 4, 'updated_by' => Auth::user()?->full_name]);
+        }
 
         return [
             'tgl_quotation' => Carbon::now()->toDateString(),
@@ -43,7 +50,6 @@ class QuotationBusinessService
             'step' => 1,
             'status_quotation_id' => 1,
             'tipe_quotation' => $request->tipe_quotation,
-
         ];
     }
 
@@ -52,12 +58,12 @@ class QuotationBusinessService
      */
     public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy): void
     {
-        if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) { // Nama site
+        if ($request->jumlah_site == 'Multi Site') {
+            foreach ($request->multisite as $key => $value) {
                 $this->createQuotationSite($quotation, $request, $key, true, $createdBy);
             }
         } else {
-            $this->createQuotationSite($quotation, $request, null, false, $createdBy); // Single site
+            $this->createQuotationSite($quotation, $request, null, false, $createdBy);
         }
     }
 
@@ -69,117 +75,106 @@ class QuotationBusinessService
         $provinceId = $isMulti ? $request->provinsi_multi[$index] : $request->provinsi;
         $cityId = $isMulti ? $request->kota_multi[$index] : $request->kota;
 
-        // Menggunakan Model Eloquent
         $province = Province::findOrFail($provinceId);
         $city = City::findOrFail($cityId);
 
-        // Menggunakan scope yang sudah didefinisikan di model
-        $ump = Ump::where('province_id', $province->id)
-            ->active()
-            ->first();
-
-        $umk = Umk::where('city_id', $city->id)
-            ->active()
-            ->first();
+        $ump = Ump::where('province_id', $province->id)->active()->first();
+        $umk = Umk::where('city_id', $city->id)->active()->first();
+        $umsk = Umsk::where('city_id', $city->id)->active()->first();
 
         QuotationSite::create([
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $isMulti ? $request->multisite[$index] : $request->nama_site,
             'provinsi_id' => $provinceId,
-            'provinsi' => $province->nama,
+            'provinsi' => $province->name,
             'kota_id' => $cityId,
             'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
             'umk' => $umk ? $umk->umk : 0,
+            'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
-            'created_by' => $createdBy
+            'created_by' => $createdBy,
         ]);
     }
-    // Di QuotationBusinessService
-    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy)
+
+    /**
+     * Create quotation site from a reference site (copy nilai UMP/UMK terbaru)
+     */
+    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy): QuotationSite
     {
-        // Ambil UMP & UMK berdasarkan provinsi & kota dari refSite
         $province = Province::findOrFail($refSite->provinsi_id);
         $city = City::findOrFail($refSite->kota_id);
 
-        $ump = Ump::where('province_id', $province->id)
-            ->active()
-            ->first();
-
-        $umk = Umk::where('city_id', $city->id)
-            ->active()
-            ->first();
+        $ump = Ump::where('province_id', $province->id)->active()->first();
+        $umk = Umk::where('city_id', $city->id)->active()->first();
+        $umsk = Umsk::where('city_id', $city->id)->active()->first();
 
         return QuotationSite::create([
             'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id,
             'nama_site' => $refSite->nama_site,
             'provinsi_id' => $refSite->provinsi_id,
-            'provinsi' => $province->nama,
+            'provinsi' => $province->name,
             'kota_id' => $refSite->kota_id,
             'kota' => $city->name,
             'ump' => $ump ? $ump->ump : 0,
-            'umk' => $umk ? $umk->umk : 0, // ✅ UMK TERBARU
+            'umk' => $umk ? $umk->umk : 0,
+            'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $refSite->penempatan,
-            'created_by' => $createdBy
+            'created_by' => $createdBy,
         ]);
     }
 
+    /**
+     * Create initial PIC dari data leads
+     */
     public function createInitialPic(Quotation $quotation, string $createdBy): void
     {
-        try {
-            // Get leads data
-            $leads = $quotation->leads;
+        $leads = $quotation->leads;
 
-            if (!$leads) {
-                \Log::warning('Leads not found for quotation', [
-                    'quotation_id' => $quotation->id
-                ]);
-                return;
-            }
+        if (!$leads) {
+            \Log::warning('createInitialPic: leads tidak ditemukan', ['quotation_id' => $quotation->id]);
+            return;
+        }
 
-            // Create PIC from leads contact person
-            if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
-                $quotation->quotationPics()->create([
-                    'leads_id' => $leads->id,
-                    'nama' => $leads->pic ?? 'Unknown',
-                    'jabatan' => $leads->jabatan ?? 'Contact Person',
-                    'email' => $leads->email ?? '',
-                    'no_hp' => $leads->telp_perusahaan ?? '',
-                    'created_by' => $createdBy
-                ]);
-
-                \Log::info('Initial PIC created from leads', [
-                    'quotation_id' => $quotation->id,
-                    'pic_name' => $leads->pic
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            \Log::error('Failed to create initial PIC', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage()
+        if ($leads->pic || $leads->email || $leads->telp_perusahaan) {
+            $quotation->quotationPics()->create([
+                'leads_id' => $leads->id,
+                'nama' => $leads->pic ?? 'Unknown',
+                'jabatan' => $leads->jabatan ?? 'Contact Person',
+                'email' => $leads->email ?? '',
+                'no_hp' => $leads->telp_perusahaan ?? '',
+                'created_by' => $createdBy,
             ]);
-            // Don't throw, just log the error
         }
     }
-    public function createInitialActivity(Quotation $quotation, string $createdBy, int $userId, string $tipe = 'baru', ?Quotation $quotationReferensi = null): void
-    {
+
+
+    public function createInitialActivity(
+        Quotation $quotation,
+        string $createdBy,
+        int $userId,
+        string $tipe = 'baru',
+        ?Quotation $quotationReferensi = null,
+        $user = null
+    ): void {
+        // ✅ Gunakan user yang dipasskan. Fallback ke Auth::user() hanya untuk konteks non-queue.
+        $user = $user ?? Auth::user() ?? User::find($userId);
+
+        if (!$user) {
+            \Log::error('createInitialActivity: user tidak ditemukan', ['user_id' => $userId]);
+            return;
+        }
+
         $leads = $quotation->leads;
         $nomorActivity = $this->generateActivityNomor($quotation->leads_id);
-
-        // Buat notes berdasarkan tipe quotation
         $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
 
-        // ✅ Cek role user - jika Sales (role 29), buat SalesActivity
-        $user = Auth::user();
-
-        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-            // Untuk Sales, buat SalesActivity dengan tipe baru tanpa referensi
-            $this->createSalesActivity($quotation, $createdBy);
+        // Sales role IDs: 29, 30, 31, 32, 33
+        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            $this->createSalesActivity($quotation, $createdBy, $user);
         } else {
-            // Untuk role lain, buat CustomerActivity seperti biasa
             CustomerActivity::create([
                 'leads_id' => $quotation->leads_id,
                 'quotation_id' => $quotation->id,
@@ -190,73 +185,55 @@ class QuotationBusinessService
                 'notes' => $notes,
                 'is_activity' => 0,
                 'user_id' => $userId,
-                'created_by' => $createdBy
+                'created_by' => $createdBy,
             ]);
         }
     }
 
     /**
-     * Create sales activity for quotation
+     * ✅ FIX: Menerima $user object eksplisit — tidak lagi bergantung pada Auth::user().
      */
-    private function createSalesActivity(Quotation $quotation, string $createdBy): void
+    private function createSalesActivity(Quotation $quotation, string $createdBy, $user): void
     {
-        $user = Auth::user();
-
-        // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari quotation
         $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
+            ->where('tim_sales_d_id', $user->id)
             ->first();
 
         SalesActivity::create([
             'leads_id' => $quotation->leads_id,
-            'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
+            'leads_kebutuhan_id' => $leadsKebutuhan?->id,
             'tgl_activity' => Carbon::now(),
             'jenis_activity' => 'Quotation',
             'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
-            'created_by' => $createdBy
+            'created_by' => $createdBy,
         ]);
     }
 
-    /**
-     * Generate activity notes based on quotation type
-     */
     private function generateActivityNotes(Quotation $quotation, string $tipe, ?Quotation $quotationReferensi): string
     {
-        switch ($tipe) {
-            case 'revisi':
-                return "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
-            case 'rekontrak':
-                return "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}";
-            case 'addendum':
-                return "Quotation addendum {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}";
-            case 'baru_dengan_referensi':
-                return "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}";
-            default: // 'baru'
-                return "Quotation baru {$quotation->nomor} dibuat dari awal";
-        }
+        return match ($tipe) {
+            'revisi' => "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}",
+            'rekontrak' => "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}",
+            'addendum' => "Quotation addendum {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}",
+            'baru_dengan_referensi' => "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}",
+            default => "Quotation baru {$quotation->nomor} dibuat dari awal",
+        };
     }
-    /**
-     * Get activity type based on quotation type
-     */
+
     private function getActivityType(string $tipe): string
     {
-        switch ($tipe) {
-            case 'revisi':
-                return 'Quotation Revisi';
-            case 'rekontrak':
-                return 'Quotation Rekontrak';
-            case 'addendum':
-                return 'Quotation addendum';
-            case 'baru_dengan_referensi':
-                return 'Quotation copy';
-            default: // 'baru'
-                return 'Quotation';
-        }
+        return match ($tipe) {
+            'revisi' => 'Quotation Revisi',
+            'rekontrak' => 'Quotation Rekontrak',
+            'addendum' => 'Quotation addendum',
+            'baru_dengan_referensi' => 'Quotation copy',
+            default => 'Quotation',
+        };
     }
 
     /**
-     * Soft delete quotation relations
+     * Soft delete semua relasi quotation
      */
     public function softDeleteQuotationRelations(Quotation $quotation, string $deletedBy): void
     {
@@ -274,76 +251,72 @@ class QuotationBusinessService
             'quotationPics',
             'quotationTrainings',
             'quotationKerjasamas',
-            'quotationSites'
+            'quotationSites',
         ];
 
         foreach ($relations as $relation) {
             if ($quotation->$relation()->exists()) {
                 $quotation->$relation()->update([
                     'deleted_at' => Carbon::now(),
-                    'deleted_by' => $deletedBy
+                    'deleted_by' => $deletedBy,
                 ]);
             }
         }
+        $quotation->deleted_at = Carbon::now(); // ← pakai assignment langsung, bukan update()
+        $quotation->deleted_by = $deletedBy;
+        $quotation->save();
     }
+
     /**
-     * Generate quotation number
+     * Generate quotation number (legacy — gunakan generateNomorByType untuk kasus baru)
      */
-    public function generateNomor($leadsId, $companyId): string
+    public function generateNomor(int $leadsId, int $companyId): string
     {
         $now = Carbon::now();
-        $nomor = "QUOT/";
-
+        $nomor = 'QUOT/';
         $dataLeads = Leads::findOrFail($leadsId);
-        $company = Company::find($companyId); // Menggunakan model Company
+        $company = Company::find($companyId);
 
         if ($company) {
-            $nomor .= $company->code . "/";
-            $nomor .= $dataLeads->nomor . "-";
+            $nomor .= $company->code . '/' . $dataLeads->nomor . '-';
         } else {
-            $nomor .= "NN/NNNNN-";
+            $nomor .= 'NN/NNNNN-';
         }
 
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-        $urutan = "00001";
+        $month = $now->format('m');
+        $jumlah = Quotation::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
+        $urutan = str_pad($jumlah + 1, 5, '0', STR_PAD_LEFT);
 
-        $jumlahData = Quotation::where('nomor', 'like', $nomor . $month . $now->year . "-%")->count();
-        $urutan = sprintf("%05d", $jumlahData + 1);
-
-        return $nomor . $month . $now->year . "-" . $urutan;
+        return $nomor . $month . $now->year . '-' . $urutan;
     }
+
     /**
-     * Generate nomor quotation berdasarkan jenis
+     * Generate nomor quotation berdasarkan tipe
      */
-    public function generateNomorByType($leadsId, $companyId, $tipeQuotation, $quotationReferensi = null): string
+    public function generateNomorByType(int $leadsId, int $companyId, string $tipeQuotation, ?Quotation $quotationReferensi = null): string
     {
         $now = Carbon::now();
         $year = $now->year;
         $month = $now->format('m');
 
-        // 1. Logic Khusus untuk Addendum
+        // Addendum: prefix ADD/<nomor_ref>/<counter>
         if ($tipeQuotation === 'addendum' && $quotationReferensi) {
-            // Ambil nomor referensi (contoh: QUOT/ABC/001-022026-00001)
             $nomorRef = $quotationReferensi->nomor;
-
-            // Hitung sudah berapa kali quotation ini di-addendum
             $counter = Quotation::where('tipe_quotation', 'addendum')
                 ->where('nomor', 'like', "ADD/{$nomorRef}/%")
                 ->count() + 1;
 
-            return "ADD/" . $nomorRef . "/" . str_pad($counter, 5, '0', STR_PAD_LEFT);
+            return 'ADD/' . $nomorRef . '/' . str_pad($counter, 5, '0', STR_PAD_LEFT);
         }
 
-        // 2. Logic Standar untuk tipe lain (Baru, Revisi, Rekontrak)
+        // Standar: QUOT/<code>/<nomor_leads>-<bulan><tahun>-<urutan>
         $dataLeads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
 
-        $base = "QUOT/";
-        if ($company) {
-            $base .= $company->code . "/" . $dataLeads->nomor . "-" . $month . $year . "-";
-        } else {
-            $base .= "NN/NNNNN-" . $month . $year . "-";
-        }
+        $base = 'QUOT/';
+        $base .= $company
+            ? $company->code . '/' . $dataLeads->nomor . '-' . $month . $year . '-'
+            : 'NN/NNNNN-' . $month . $year . '-';
 
         $counter = Quotation::where('tipe_quotation', $tipeQuotation)
             ->whereYear('created_at', $year)
@@ -354,65 +327,51 @@ class QuotationBusinessService
     }
 
     /**
-     * Generate activity number
+     * Generate activity nomor
      */
-    public function generateActivityNomor($leadsId): string
+    public function generateActivityNomor(int $leadsId): string
     {
         $now = Carbon::now();
         $leads = Leads::find($leadsId);
+        $prefix = 'CAT/';
 
-        $prefix = "CAT/";
         if ($leads) {
-            switch ($leads->kebutuhan_id) {
-                case 2:
-                    $prefix .= "LS/";
-                    break;
-                case 1:
-                    $prefix .= "SG/";
-                    break;
-                case 3:
-                    $prefix .= "CS/";
-                    break;
-                case 4:
-                    $prefix .= "LL/";
-                    break;
-                default:
-                    $prefix .= "NN/";
-                    break;
-            }
-            $prefix .= $leads->nomor . "-";
+            $prefix .= match ($leads->kebutuhan_id) {
+                2 => 'LS/',
+                1 => 'SG/',
+                3 => 'CS/',
+                4 => 'LL/',
+                default => 'NN/',
+            };
+            $prefix .= $leads->nomor . '-';
         } else {
-            $prefix .= "NN/NNNNN-";
+            $prefix .= 'NN/NNNNN-';
         }
 
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
+        $month = $now->format('m');
         $year = $now->year;
-
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . '-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . $month . $year . "-" . $sequence;
+        return $prefix . $month . $year . '-' . $sequence;
     }
+
     /**
      * Validate multi site data consistency
      */
     public function validateMultiSiteData(Request $request): void
     {
         if ($request->jumlah_site == 'Multi Site') {
-            $siteCount = count($request->multisite ?? []);
-            $provinceCount = count($request->provinsi_multi ?? []);
-            $cityCount = count($request->kota_multi ?? []);
-            $placementCount = count($request->penempatan_multi ?? []);
+            $counts = [
+                count($request->multisite ?? []),
+                count($request->provinsi_multi ?? []),
+                count($request->kota_multi ?? []),
+                count($request->penempatan_multi ?? []),
+            ];
 
-            if ($siteCount !== $provinceCount || $siteCount !== $cityCount || $siteCount !== $placementCount) {
+            if (count(array_unique($counts)) > 1) {
                 throw new \Exception('Jumlah data multisite, provinsi, kota, dan penempatan harus sama');
             }
         }
     }
-    /**
-     * Get filtered quotations based on type
-     */
-    
-
-
 }

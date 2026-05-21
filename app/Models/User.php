@@ -64,6 +64,10 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Role::class, 'cais_role_id', 'id');
     }
+    public function tokens()
+    {
+        return $this->morphMany(HrisPersonalAccessToken::class, 'tokenable');
+    }
 
     // Relasi ke branch
     public function branch()
@@ -103,7 +107,7 @@ class User extends Authenticatable
         $this->tokens()->where('expires_at', '<', now())->delete();
 
         // Buat access token dengan Sanctum (2 jam expiry)
-        $accessToken = $this->createToken($name, $abilities, now()->addHours(2));
+        $accessToken = $this->createToken($name, $abilities, now()->addDay());
 
         // Buat refresh token
         $refreshToken = RefreshTokens::create([
@@ -111,7 +115,7 @@ class User extends Authenticatable
             'token' => hash('sha256', $plainRefreshToken = \Illuminate\Support\Str::random(40)),
             'tokenable_id' => $this->id,           // ✅ PENTING: Simpan user id
             'tokenable_type' => get_class($this),  // ✅ PENTING: Simpan user class (App\Models\U
-            // 'expires_at' => now()->addDays(7)
+            'expires_at' => now()->addDays(7)
         ]);
 
         return [

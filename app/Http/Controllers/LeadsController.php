@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreLeadRequest;
+use App\Http\Requests\UpdateLeadRequest;
 use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\City;
@@ -16,6 +18,7 @@ use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
 use App\Models\Pks;
 use App\Models\Province;
+use App\Models\Quotation;
 use App\Models\SalesActivity;
 use App\Models\Spk;
 use App\Models\StatusLeads;
@@ -510,35 +513,10 @@ class LeadsController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(StoreLeadRequest $request)
     {
         try {
             DB::beginTransaction();
-            $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['required', 'max:100', 'min:3', new UniqueCompanyStrict()],
-                'pic' => 'required',
-                'branch' => 'required',
-                'kebutuhan' => 'required|array|min:1',
-                'provinsi' => 'required',
-                'kota' => 'required'
-            ], [
-                'min' => 'Masukkan :attribute minimal :min',
-                'max' => 'Masukkan :attribute maksimal :max',
-                'required' => ':attribute harus di isi',
-                'kebutuhan.required' => 'Kebutuhan harus dipilih minimal 1',
-                'kebutuhan.array' => 'Kebutuhan harus berupa array',
-                'kebutuhan.min' => 'Kebutuhan harus dipilih minimal 1',
-            ]);
-            if ($validator->fails()) {
-                \Log::info('Validation failed', [
-                    'errors' => $validator->errors()->toArray()
-                ]);
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()->toArray()
-                ], 400);
-            }
-
             // \Log::info('Validation passed', [
             //     'nama_perusahaan' => $request->nama_perusahaan
             // ]);
@@ -793,7 +771,7 @@ class LeadsController extends Controller
      * 
      * )
      */
-    public function update(Request $request, $id)
+    public function update(UpdateLeadRequest $request, $id)
     {
         try {
             DB::beginTransaction();
@@ -805,23 +783,6 @@ class LeadsController extends Controller
                     'message' => 'Lead tidak ditemukan'
                 ], 404);
             }
-
-            $validator = Validator::make($request->all(), [
-                'nama_perusahaan' => ['sometimes', 'max:100', 'min:3', new UniqueCompanyStrict($id)],
-                'pic' => 'required',
-                'branch' => 'required',
-                'kebutuhan' => 'required|array|min:1',
-                'provinsi' => 'required',
-                'kota' => 'required'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()->toArray()
-                ], 400);
-            }
-
             $current_date_time = Carbon::now()->toDateTimeString();
 
             $provinsi = Province::find($request->provinsi);
@@ -2317,7 +2278,7 @@ class LeadsController extends Controller
         try {
             DB::beginTransaction();
 
-            // Cek lead
+            // 1. Cek lead
             $lead = Leads::find($id);
             if (!$lead) {
                 return response()->json([
@@ -2326,10 +2287,9 @@ class LeadsController extends Controller
                 ], 404);
             }
 
-            // Cek authorization - hanya user dengan cais_role_id tertentu yang bisa assign sales
+            // 2. Cek authorization
             $user = Auth::user();
             $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
-
             if (!in_array($user->cais_role_id, $allowedRoles)) {
                 return response()->json([
                     'success' => false,
@@ -2337,7 +2297,7 @@ class LeadsController extends Controller
                 ], 403);
             }
 
-            // Validasi input
+            // 3. Validasi input
             $validator = Validator::make($request->all(), [
                 'assignments' => 'required|array|min:1',
                 'assignments.*.tim_sales_d_id' => 'required|exists:m_tim_sales_d,id',
@@ -2353,7 +2313,7 @@ class LeadsController extends Controller
                 ], 400);
             }
 
-            // ✅ FIX #1: Pre-load semua kebutuhan untuk menghilangkan N+1 query
+            // 4. Pre-load Data untuk optimasi (Anti N+1)
             $kebutuhanIds = [];
             foreach ($request->assignments as $assignment) {
                 $kebutuhanIds = array_merge($kebutuhanIds, $assignment['kebutuhan_ids']);
@@ -2361,33 +2321,31 @@ class LeadsController extends Controller
             $kebutuhanIds = array_unique($kebutuhanIds);
             $kebutuhanMap = Kebutuhan::whereIn('id', $kebutuhanIds)->pluck('nama', 'id');
 
-            $assignmentResults = [];
-            $allAssignedKebutuhan = [];
-            $allAssignedKebutuhanNames = [];
-            $allAssignedSalesNames = []; // ✅ FIX #4: Kumpulkan semua sales untuk activity log
-
             $timSalesDIds = array_column($request->assignments, 'tim_sales_d_id');
             $timSalesDMap = TimSalesDetail::with('user', 'timSales')
                 ->whereIn('id', $timSalesDIds)
                 ->get()
                 ->keyBy('id');
 
-            // Ganti find() di dalam foreach:
+            $assignmentResults = [];
+            $allAssignedKebutuhanNames = [];
+            $allAssignedSalesNames = [];
+
+            // 5. Proses Assignment
             foreach ($request->assignments as $assignment) {
                 $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']);
 
-                if (!$timSalesD) {
-                    continue; // Skip jika sales tidak ditemukan
-                }
+                if (!$timSalesD)
+                    continue;
 
-                // ✅ FIX #4: Kumpulkan nama sales
-                $allAssignedSalesNames[] = $timSalesD->user->full_name ?? $timSalesD->nama;
+                $salesName = $timSalesD->user->full_name ?? $timSalesD->nama;
+                $allAssignedSalesNames[] = $salesName;
 
-                // Update atau buat record di leads_kebutuhan untuk setiap kebutuhan
-                $assignedKebutuhan = [];
+                $assignedKebutuhanForThisSales = [];
+
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
 
-                    $leadsKebutuhan = LeadsKebutuhan::updateOrCreate(
+                    LeadsKebutuhan::updateOrCreate(
                         [
                             'leads_id' => $lead->id,
                             'kebutuhan_id' => $kebutuhan_id,
@@ -2398,10 +2356,15 @@ class LeadsController extends Controller
                         ]
                     );
 
-                    $assignedKebutuhan[] = $kebutuhan_id;
-                    $allAssignedKebutuhan[] = $kebutuhan_id;
+                    // ✅ FIX UNTUK DATA DOUBLE (Hapus "no assigned"):
+                    // Menghapus record placeholder yang sales-nya masih kosong (NULL) untuk kebutuhan ini
+                    LeadsKebutuhan::where('leads_id', $lead->id)
+                        ->where('kebutuhan_id', $kebutuhan_id)
+                        ->whereNull('tim_sales_d_id')
+                        ->delete();
 
-                    // ✅ FIX #1: Ambil nama kebutuhan dari pre-loaded map (bukan query)
+                    $assignedKebutuhanForThisSales[] = $kebutuhan_id;
+
                     if (isset($kebutuhanMap[$kebutuhan_id])) {
                         $allAssignedKebutuhanNames[] = $kebutuhanMap[$kebutuhan_id];
                     }
@@ -2410,15 +2373,15 @@ class LeadsController extends Controller
                 $assignmentResults[] = [
                     'sales_assigned' => [
                         'tim_sales_d_id' => $timSalesD->id,
-                        'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
+                        'sales_name' => $salesName,
                         'tim_sales_id' => $timSalesD->tim_sales_id,
                         'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
                     ],
-                    'kebutuhan_assigned' => $assignedKebutuhan
+                    'kebutuhan_assigned' => $assignedKebutuhanForThisSales
                 ];
             }
 
-            // ✅ FIX #4: Buat activity untuk mencatat perubahan semua sales (bukan cuma yang terakhir)
+            // 6. Buat Activity Log
             $nomorActivity = $this->generateNomorActivity($lead->id);
             CustomerActivity::create([
                 'leads_id' => $lead->id,
@@ -2783,6 +2746,135 @@ class LeadsController extends Controller
             ], 500);
         }
     }
+    /**
+     * @OA\Get(
+     *     path="/api/leads/quotation/{id}",
+     *     summary="Mendapatkan daftar Quotation berdasarkan leads_id",
+     *     description="Endpoint ini digunakan untuk mengambil semua Quotation yang terkait dengan leads tertentu, termasuk summary (total, aktif, revisi).",
+     *     tags={"Leads"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         description="ID lead",
+     *         required=true,
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Berhasil mengambil data Quotation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Data Quotation berhasil diambil"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="nomor", type="string", example="Q/SG/AAAAB/01/2025"),
+     *                     @OA\Property(property="tgl_quotation", type="string", example="01-01-2025"),
+     *                     @OA\Property(property="revisi", type="integer", example=0),
+     *                     @OA\Property(property="is_aktif", type="integer", example=1),
+     *                     @OA\Property(property="status_quotation_id", type="integer", example=2),
+     *                     @OA\Property(property="nama_status", type="string", example="Disetujui"),
+     *                     @OA\Property(property="kebutuhan_id", type="integer", example=1),
+     *                     @OA\Property(property="layanan", type="string", example="Security"),
+     *                     @OA\Property(property="mulai_kontrak", type="string", example="01-02-2025"),
+     *                     @OA\Property(property="kontrak_selesai", type="string", example="01-02-2026"),
+     *                     @OA\Property(property="sisa_kontrak", type="string", example="8 bulan, 15 hari")
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="summary",
+     *                 type="object",
+     *                 @OA\Property(property="total", type="integer", example=5),
+     *                 @OA\Property(property="aktif", type="integer", example=3),
+     *                 @OA\Property(property="tidak_aktif", type="integer", example=2),
+     *                 @OA\Property(property="revisi_count", type="integer", example=2)
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Lead tidak ditemukan"
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Internal Server Error"
+     *     )
+     * )
+     */
+    public function getQuotationByLead($id, Request $request)
+    {
+        try {
+            $leadExists = Leads::whereKey($id)->exists();
+            if (!$leadExists) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lead tidak ditemukan'
+                ], 404);
+            }
+
+            // ✅ Tambahkan 'tipe_quotation' ke select
+            $quotations = Quotation::with('statusQuotation:id,nama')
+                ->where('leads_id', $id)
+                ->select([
+                    'id',
+                    'nomor',
+                    'leads_id',
+                    'tgl_quotation',
+                    'revisi',
+                    'is_aktif',
+                    'status_quotation_id',
+                    'kebutuhan_id',
+                    'layanan',
+                    'mulai_kontrak',
+                    'kontrak_selesai',
+                    'tipe_quotation',        // ← tambahan
+                    'created_by'
+                ])
+                ->orderBy('tgl_quotation', 'desc')
+                ->get();
+
+            $now = Carbon::now();
+
+            // ✅ Summary dari collection (tanpa query baru)
+            $summary = [
+                'total' => $quotations->count(),
+                'aktif' => $quotations->where('is_aktif', 1)->count(),
+                'tidak_aktif' => $quotations->where('is_aktif', 0)->count(),
+                'per_tipe' => $quotations->groupBy('tipe_quotation')->map->count(), // ← hitung per tipe
+            ];
+
+            $data = $quotations->map(function ($item) use ($now) {
+                return [
+                    'id' => $item->id,
+                    'nomor' => $item->nomor,
+                    'tgl_quotation' => $item->getRawOriginal('tgl_quotation')
+                        ? Carbon::parse($item->getRawOriginal('tgl_quotation'))->isoFormat('D MMMM Y')
+                        : null,
+                    'tipe_quotation' => $item->tipe_quotation,
+                    'is_aktif' => $item->is_aktif,
+                    'status_quotation_id' => $item->status_quotation_id,
+                    'nama_status' => $item->statusQuotation->nama ?? null,
+                    'created_by' => $item->created_by,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Quotation berhasil diambil',
+                'data' => $data,
+                'summary' => $summary,
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
     //==============================================================================//
     private function hitungBerakhirKontrak($tanggalBerakhir)
@@ -2957,15 +3049,9 @@ class LeadsController extends Controller
     // ✅ SESUDAH — pre-load semua TimSalesDetail sekaligus, response tetap sama
     private function manualAssignSalesToKebutuhan($lead, $assignments)
     {
-        $user = Auth::user();
         $assignmentResults = [];
-        $allowedRoles = [30, 31, 32, 33, 53, 96, 2];
 
-        if (!in_array($user->cais_role_id, $allowedRoles)) {
-            return $assignmentResults;
-        }
-
-        // Pre-load semua TimSalesDetail yang dibutuhkan dalam SATU query
+        // Pre-load data sales untuk efisiensi
         $timSalesDIds = array_column($assignments, 'tim_sales_d_id');
         $timSalesDMap = TimSalesDetail::with('user', 'timSales')
             ->whereIn('id', $timSalesDIds)
@@ -2973,37 +3059,43 @@ class LeadsController extends Controller
             ->keyBy('id');
 
         foreach ($assignments as $assignment) {
-            $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']); // ← dari collection, no query
+            $timSalesD = $timSalesDMap->get($assignment['tim_sales_d_id']);
 
             if ($timSalesD) {
+                $assignedKebutuhan = [];
                 foreach ($assignment['kebutuhan_ids'] as $kebutuhan_id) {
+
+                    // ✅ FIX: Gunakan tim_sales_d_id sebagai kunci pencarian agar mendukung multi-sales
                     LeadsKebutuhan::updateOrCreate(
-                        ['leads_id' => $lead->id, 'kebutuhan_id' => $kebutuhan_id],
-                        ['tim_sales_id' => $timSalesD->tim_sales_id, 'tim_sales_d_id' => $timSalesD->id]
+                        [
+                            'leads_id' => $lead->id,
+                            'kebutuhan_id' => $kebutuhan_id,
+                            'tim_sales_d_id' => $timSalesD->id
+                        ],
+                        [
+                            'tim_sales_id' => $timSalesD->tim_sales_id
+                        ]
                     );
+
+                    // ✅ FIX: Hapus record "no assigned" (yang tim_sales_d_id nya NULL) 
+                    // agar tidak muncul double di UI
+                    LeadsKebutuhan::where('leads_id', $lead->id)
+                        ->where('kebutuhan_id', $kebutuhan_id)
+                        ->whereNull('tim_sales_d_id')
+                        ->delete();
+
+                    $assignedKebutuhan[] = $kebutuhan_id;
                 }
 
                 $assignmentResults[] = [
-                    'type' => 'manual_assign',
                     'sales_assigned' => [
                         'tim_sales_d_id' => $timSalesD->id,
                         'sales_name' => $timSalesD->user->full_name ?? $timSalesD->nama,
                         'tim_sales_id' => $timSalesD->tim_sales_id,
                         'tim_sales_name' => $timSalesD->timSales->nama ?? 'N/A'
                     ],
-                    'kebutuhan_assigned' => $assignment['kebutuhan_ids']
+                    'kebutuhan_assigned' => $assignedKebutuhan
                 ];
-            }
-        }
-
-        // Ambil dari map yang sudah di-load, tidak perlu query lagi
-        if (!empty($assignments[0]['tim_sales_d_id'])) {
-            $firstTimSalesD = $timSalesDMap->get($assignments[0]['tim_sales_d_id']);
-            if ($firstTimSalesD) {
-                $lead->update([
-                    'tim_sales_id' => $firstTimSalesD->tim_sales_id,
-                    'tim_sales_d_id' => $firstTimSalesD->id
-                ]);
             }
         }
 
@@ -3015,16 +3107,15 @@ class LeadsController extends Controller
      */
     private function syncKebutuhanTanpaSales($lead, $kebutuhanIds)
     {
-        $user = Auth::user();
         $kebutuhanData = [];
         foreach ($kebutuhanIds as $kebutuhan_id) {
             $kebutuhanData[$kebutuhan_id] = [
-                'tim_sales_d_id' => $user->id,
-                'tim_sales_id' => 2
+                'tim_sales_d_id' => null, // Biarkan NULL agar muncul sebagai "no assigned" yang benar
+                'tim_sales_id' => null
             ];
         }
 
-        // Sync kebutuhan dengan data initialized
+        // Sync kebutuhan dengan status kosong (menunggu assignment)
         $lead->kebutuhan()->sync($kebutuhanData);
         return [];
     }

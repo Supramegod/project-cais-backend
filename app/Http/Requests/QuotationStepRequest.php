@@ -7,7 +7,8 @@ use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationSite;
 use App\Models\Umk;
-
+use SanderMuller\FluentValidation\FluentRule;
+use SanderMuller\FluentValidation\HasFluentRules;
 
 class QuotationStepRequest extends BaseRequest
 {
@@ -21,140 +22,166 @@ class QuotationStepRequest extends BaseRequest
         $step = $this->route('step');
 
         $rules = [
-            'edit' => 'sometimes|boolean',
+            'edit' => FluentRule::boolean()->sometimes(),
         ];
 
         switch ($step) {
             case 1:
-                $rules['jenis_kontrak'] = 'required|string|in:Reguler,Event Gaji Harian,PKHL,Borongan';
+                $rules['jenis_kontrak'] = FluentRule::string()->required()->in([
+                    'Reguler',
+                    'Event Gaji Harian',
+                    'PKHL',
+                    'Borongan',
+                    'General Cleaning'
+                ]);
                 break;
+
             case 2:
                 $excludedRoles = [53, 54, 55, 56, 2];
+                $userRole = auth()->user()?->cais_role_id;
 
-                // Ambil role dari user yang sedang login
-                $userRole = auth()->user()->cais_role_id ?? null;
+                // Aturan dasar selalu: date (jika ada input)
+                $rules['mulai_kontrak'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
+                $rules['kontrak_selesai'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
+                $rules['tgl_penempatan'] = FluentRule::date()
+                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
 
-                // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
-                if (!in_array($userRole, $excludedRoles)) {
-                    $rules['mulai_kontrak'] = 'required|date|after_or_equal:today';
-                    $rules['kontrak_selesai'] = 'required|date|after_or_equal:mulai_kontrak';
-
-                    $rules['tgl_penempatan'] = 'required|date';
-                }
-                $rules['top'] = 'required|in:Non TOP,Kurang Dari 7 Hari,Lebih Dari 7 Hari';
-                $rules['salary_rule'] = 'required|exists:m_salary_rule,id';
-                $rules['jumlah_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|integer|min:1';
-                $rules['tipe_hari_invoice'] = 'required_if:top,Lebih Dari 7 Hari|string|in:Kerja,Kalender';
-                $rules['evaluasi_kontrak'] = 'required|string';
-                $rules['durasi_kerjasama'] = 'required|string';
-                $rules['durasi_karyawan'] = 'required|string';
-                $rules['evaluasi_karyawan'] = 'required|string';
-                $rules['ada_cuti'] = 'required|string|in:Ada,Tidak Ada';
-                $rules['cuti'] = 'required_if:ada_cuti,Ada|array';
-                $rules['cuti.*'] = 'sometimes|string|in:Cuti Tahunan,Cuti Melahirkan,Cuti Kematian,Istri Melahirkan,Cuti Menikah,Cuti Roster,Tidak Ada';
-                $rules['gaji_saat_cuti'] = 'sometimes|string|in:No Work No Pay,Prorate';
-                $rules['prorate'] = 'required_if:gaji_saat_cuti,Prorate|integer|min:0';
-                $rules['shift_kerja'] = 'sometimes|string';
-                $rules['hari_kerja'] = 'required|string';
-                $rules['jam_kerja'] = 'required|string';
+                $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
+                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
+                $rules['jumlah_hari_invoice'] = FluentRule::integer()->requiredIf('top', 'Lebih Dari 7 Hari')->min(1);
+                $rules['tipe_hari_invoice'] = FluentRule::string()->requiredIf('top', 'Lebih Dari 7 Hari')->in(['Kerja', 'Kalender']);
+                $rules['evaluasi_kontrak'] = FluentRule::string()->required();
+                $rules['durasi_kerjasama'] = FluentRule::string()->required();
+                $rules['durasi_karyawan'] = FluentRule::string()->required();
+                $rules['evaluasi_karyawan'] = FluentRule::string()->required();
+                $rules['ada_cuti'] = FluentRule::string()->required()->in(['Ada', 'Tidak Ada']);
+                $rules['cuti'] = FluentRule::array()->requiredIf('ada_cuti', 'Ada')->children([
+                    '*' => FluentRule::string()->sometimes()->in([
+                        'Cuti Tahunan',
+                        'Cuti Melahirkan',
+                        'Cuti Kematian',
+                        'Istri Melahirkan',
+                        'Cuti Menikah',
+                        'Cuti Roster',
+                        'Tidak Ada'
+                    ]),
+                ]);
+                $rules['gaji_saat_cuti'] = FluentRule::string()->sometimes()->in(['No Work No Pay', 'Prorate']);
+                $rules['prorate'] = FluentRule::integer()->requiredIf('gaji_saat_cuti', 'Prorate')->min(0);
+                $rules['shift_kerja'] = FluentRule::string()->sometimes();
+                $rules['hari_kerja'] = FluentRule::string()->required();
+                $rules['jam_kerja'] = FluentRule::string()->required();
                 break;
+
             case 3:
-                $rules['headCountData'] = 'required|array';
-                $rules['headCountData.*.quotation_site_id'] = 'required|required|integer';
-                $rules['headCountData.*.position_id'] = 'required|required|integer';
-                $rules['headCountData.*.jumlah_hc'] = 'required|required|integer|min:1';
-                $rules['headCountData.*.jabatan_kebutuhan'] = 'required|required|string';
-                $rules['headCountData.*.nama_site'] = 'required|required|string';
+                $rules['headCountData'] = FluentRule::array()->required()->each([
+                    'quotation_site_id' => FluentRule::integer()->required(),
+                    'position_id' => FluentRule::integer()->required(),
+                    'jumlah_hc' => FluentRule::integer()->required()->min(1),
+                    'jabatan_kebutuhan' => FluentRule::string()->required(),
+                    'nama_site' => FluentRule::string()->required(),
+                ]);
                 break;
 
             case 4:
-                $rules['is_ppn'] = 'required|in:0,1';
-                $rules['ppn_pph_dipotong'] = 'required|in:Total Invoice,Management Fee';
-                $rules['management_fee_id'] = 'required|exists:m_management_fee,id';
-                $rules['persentase'] = 'required|numeric|min:0|max:100';
-                $rules['position_data'] = 'required|array|min:1';
-
-                $rules['position_data.*.quotation_detail_id'] = 'required|exists:sl_quotation_detail,id';
-                $rules['position_data.*.upah'] = 'required|string|in:UMP,UMK,Custom';
-                $rules['position_data.*.hitungan_upah'] = 'required_if:position_data.*.upah,Custom|string|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.nominal_upah'] = 'required_if:position_data.*.upah,Custom|numeric|min:0';
-
-                $rules['position_data.*.lembur'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
-                $rules['position_data.*.nominal_lembur'] = 'required_if:position_data.*.lembur,Flat|numeric|min:0';
-                $rules['position_data.*.jenis_bayar_lembur'] = 'required_if:position_data.*.lembur,Flat|in:Per Bulan,Per Hari,Per Jam';
-                $rules['position_data.*.jam_per_bulan_lembur'] = 'required_if:position_data.*.jenis_bayar_lembur,Per Jam|integer|min:0 ';
-                $rules['position_data.*.lembur_ditagihkan'] = 'required_if:position_data.*.lembur,Flat,Normatif|in:Ditagihkan,Ditagihkan Terpisah';
-                $rules['position_data.*.kompensasi'] = 'sometimes|in:Diprovisikan,Ditagihkan,Tidak Ada';
-                $rules['position_data.*.thr'] = 'sometimes|in:Diprovisikan,Ditagihkan,Diberikan Langsung,Tidak Ada';
-
-                $rules['position_data.*.tunjangan_holiday'] = 'sometimes|in:Flat,Tidak Ada,Normatif';
-                $rules['position_data.*.nominal_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|numeric|min:0';
-                $rules['position_data.*.jenis_bayar_tunjangan_holiday'] = 'required_if:position_data.*.tunjangan_holiday,Flat|in:Per Bulan,Per Hari,Per Jam';
+                $rules['is_ppn'] = FluentRule::integer()->required()->in([0, 1]);
+                $rules['ppn_pph_dipotong'] = FluentRule::string()->required()->in(['Total Invoice', 'Management Fee']);
+                $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee', 'id');
+                $rules['persentase'] = FluentRule::numeric()->required()->min(0)->max(100);
+                $rules['position_data'] = FluentRule::array()->required()->min(1)->each([
+                    'quotation_detail_id' => FluentRule::integer()->required()->exists('sl_quotation_detail', 'id'),
+                    'upah' => FluentRule::string()->required()->in(['UMP', 'UMK', 'Custom']),
+                    'hitungan_upah' => FluentRule::string()->requiredIf('upah', 'Custom')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
+                    'nominal_upah' => FluentRule::numeric()->requiredIf('upah', 'Custom')->min(0),
+                    'lembur' => FluentRule::string()->sometimes()->in(['Flat', 'Tidak Ada', 'Normatif']),
+                    'nominal_lembur' => FluentRule::numeric()->requiredIf('lembur', 'Flat')->min(0),
+                    'jenis_bayar_lembur' => FluentRule::string()->requiredIf('lembur', 'Flat')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
+                    'jam_per_bulan_lembur' => FluentRule::integer()->requiredIf('jenis_bayar_lembur', 'Per Jam')->min(0),
+                    'lembur_ditagihkan' => FluentRule::string()->rule('required_if:lembur,Flat,Normatif')->in(['Ditagihkan', 'Ditagihkan Terpisah']),
+                    'kompensasi' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Ditagihkan', 'Tidak Ada']),
+                    'thr' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Ditagihkan', 'Diberikan Langsung', 'Tidak Ada']),
+                    'tunjangan_holiday' => FluentRule::string()->sometimes()->in(['Flat', 'Tidak Ada', 'Normatif']),
+                    'nominal_tunjangan_holiday' => FluentRule::numeric()->requiredIf('tunjangan_holiday', 'Flat')->min(0),
+                    'jenis_bayar_tunjangan_holiday' => FluentRule::string()->requiredIf('tunjangan_holiday', 'Flat')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
+                ]);
                 break;
+
             case 5:
-                $rules['jenis-perusahaan'] = 'required|exists:m_jenis_perusahaan,id';
-                $rules['bidang-perusahaan'] = 'required|exists:m_bidang_perusahaan,id';
+                $rules['jenis-perusahaan'] = FluentRule::integer()->required()->exists('m_jenis_perusahaan', 'id');
+                $rules['bidang-perusahaan'] = FluentRule::integer()->required()->exists('m_bidang_perusahaan', 'id');
+                $rules['resiko'] = FluentRule::string()->required();
+                $rules['program-bpjs'] = FluentRule::string()->required();
+                $rules['penjamin'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::string()->sometimes(),
+                ]);
+                $rules['jkk'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::boolean()->sometimes(),
+                ]);
+                $rules['jkm'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::boolean()->sometimes(),
+                ]);
+                $rules['jht'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::boolean()->sometimes(),
+                ]);
+                $rules['jp'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::boolean()->sometimes(),
+                ]);
+                $rules['nominal_takaful'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::numeric()->sometimes()->min(0),
+                ]);
+                break;
 
-                $rules['resiko'] = 'required|string';
-                $rules['program-bpjs'] = 'required|string';
-                $rules['penjamin'] = 'sometimes|array';
-                $rules['penjamin.*'] = 'sometimes|string';
-                $rules['jkk'] = 'sometimes|array';
-                $rules['jkk.*'] = 'sometimes|boolean';
-                $rules['jkm'] = 'sometimes|array';
-                $rules['jkm.*'] = 'sometimes|boolean';
-                $rules['jht'] = 'sometimes|array';
-                $rules['jht.*'] = 'sometimes|boolean';
-                $rules['jp'] = 'sometimes|array';
-                $rules['jp.*'] = 'sometimes|boolean';
-                $rules['nominal_takaful'] = 'sometimes|array';
-                $rules['nominal_takaful.*'] = 'sometimes|numeric|min:0';
-                break;
             case 6:
-                $rules['aplikasi_pendukung'] = 'sometimes|array';
-                $rules['aplikasi_pendukung.*'] = 'exists:m_aplikasi_pendukung,id';
+                $rules['aplikasi_pendukung'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::integer()->exists('m_aplikasi_pendukung', 'id'),
+                ]);
                 break;
+
             case 9:
-                // Validasi untuk single chemical
-                $rules['barang_id'] = 'sometimes|required_without:chemicals|exists:m_barang,id';
-                $rules['jumlah'] = 'sometimes|required_without:chemicals|integer|min:0';
-                $rules['masa_pakai'] = 'sometimes|integer|min:1';
-                $rules['harga'] = 'sometimes|numeric|min:0';
-                // Validasi untuk multiple chemicals
-                $rules['chemicals'] = 'sometimes|array';
-                $rules['chemicals.*.barang_id'] = 'required_with:chemicals|exists:m_barang,id';
-                $rules['chemicals.*.jumlah'] = 'required_with:chemicals|integer|min:0';
-                $rules['chemicals.*.masa_pakai'] = 'sometimes|integer|min:1';
-                $rules['chemicals.*.harga'] = 'sometimes|numeric|min:0';
+                $rules['barang_id'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang', 'id');
+                $rules['jumlah'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->min(0);
+                $rules['masa_pakai'] = FluentRule::integer()->sometimes()->min(1);
+                $rules['harga'] = FluentRule::numeric()->sometimes()->min(0);
+
+                $rules['chemicals'] = FluentRule::array()->sometimes()->each([
+                    'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang', 'id'),
+                    'jumlah' => FluentRule::integer()->requiredWith('chemicals')->min(0),
+                    'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
+                    'harga' => FluentRule::numeric()->sometimes()->min(0),
+                ]);
                 break;
 
             case 10:
-                $rules['jumlah_kunjungan_operasional'] = 'required|integer|min:0';
-                $rules['bulan_tahun_kunjungan_operasional'] = 'required|string|in:Bulan,Tahun';
-                $rules['jumlah_kunjungan_tim_crm'] = 'required|integer|min:0';
-                $rules['bulan_tahun_kunjungan_tim_crm'] = 'required|string|in:Bulan,Tahun';
-                $rules['keterangan_kunjungan_operasional'] = 'sometimes|string';
-                $rules['keterangan_kunjungan_tim_crm'] = 'sometimes|string';
-                $rules['ada_training'] = 'sometimes|string|in:Ada,Tidak Ada';
-                $rules['training'] = 'sometimes|string';
-                $rules['persen_bunga_bank'] = 'sometimes|numeric|min:0';
+                $rules['jumlah_kunjungan_operasional'] = FluentRule::integer()->required()->min(0);
+                $rules['bulan_tahun_kunjungan_operasional'] = FluentRule::string()->required()->in(['Bulan', 'Tahun']);
+                $rules['jumlah_kunjungan_tim_crm'] = FluentRule::integer()->required()->min(0);
+                $rules['bulan_tahun_kunjungan_tim_crm'] = FluentRule::string()->required()->in(['Bulan', 'Tahun']);
+                $rules['keterangan_kunjungan_operasional'] = FluentRule::string()->sometimes();
+                $rules['keterangan_kunjungan_tim_crm'] = FluentRule::string()->sometimes();
+                $rules['ada_training'] = FluentRule::string()->sometimes()->in(['Ada', 'Tidak Ada']);
+                $rules['training'] = FluentRule::string()->sometimes();
+                $rules['persen_bunga_bank'] = FluentRule::numeric()->sometimes()->min(0);
                 break;
 
             case 11:
-                $rules['penagihan'] = 'required|string';
-                $rules['tunjangan_data'] = 'sometimes|array';
-                $rules['tunjangan_data.*'] = 'sometimes|array'; // Data per detail_id
-                $rules['tunjangan_data.*.*.nama_tunjangan'] = 'required_with:tunjangan_data.*|string|max:255';
-                $rules['tunjangan_data.*.*.nominal'] = 'required_with:tunjangan_data.*|numeric|min:0';
+                $rules['penagihan'] = FluentRule::string()->required();
+                $rules['tunjangan_data'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::array()->sometimes()->each([   // ← pakai each() karena array numerik
+                        'nama_tunjangan' => FluentRule::string()->required()->max(255),
+                        'nominal' => FluentRule::numeric()->required()->min(0),
+                    ]),
+                ]);
                 break;
 
             case 12:
-                // Tidak ada field khusus, hanya konfirmasi final
                 break;
         }
 
         return $rules;
     }
+
 
     public function messages(): array
     {
@@ -342,10 +369,10 @@ class QuotationStepRequest extends BaseRequest
             'penagihan.string' => 'Metode penagihan harus berupa teks',
             'tunjangan_data.array' => 'Data tunjangan harus berupa array',
             'tunjangan_data.*.array' => 'Data tunjangan per detail harus berupa array',
-            'tunjangan_data.*.*.nama_tunjangan.required_with' => 'Nama tunjangan harus diisi',
+            'tunjangan_data.*.*.nama_tunjangan.required' => 'Nama tunjangan harus diisi',
             'tunjangan_data.*.*.nama_tunjangan.string' => 'Nama tunjangan harus berupa teks',
             'tunjangan_data.*.*.nama_tunjangan.max' => 'Nama tunjangan maksimal 255 karakter',
-            'tunjangan_data.*.*.nominal.required_with' => 'Nominal tunjangan harus diisi',
+            'tunjangan_data.*.*.nominal.required' => 'Nominal tunjangan harus diisi',
             'tunjangan_data.*.*.nominal.numeric' => 'Nominal tunjangan harus berupa angka',
             'tunjangan_data.*.*.nominal.min' => 'Nominal tunjangan tidak boleh kurang dari 0',
         ];
@@ -379,7 +406,6 @@ class QuotationStepRequest extends BaseRequest
                     }
                 }
 
-
                 // Validasi khusus: gaji_saat_cuti hanya wajib jika ada Cuti Melahirkan
                 if (
                     $this->ada_cuti === 'Ada' &&
@@ -389,8 +415,8 @@ class QuotationStepRequest extends BaseRequest
                     $validator->errors()->add('gaji_saat_cuti', 'Gaji saat cuti harus diisi ketika memilih Cuti Melahirkan.');
                 }
             }
+
             // Validasi custom untuk step 3
-// Validasi custom untuk step 3
             if ($step == 3) {
                 \Log::info('=== STEP 3 VALIDATION START ===', [
                     'all_route_parameters' => $this->route()->parameters(),
@@ -596,12 +622,12 @@ class QuotationStepRequest extends BaseRequest
             //                 );
 
             //                 \Log::warning("Nominal upah custom kurang dari 85% UMK", [
-            //                     'detail_id' => $detailId,
-            //                     'nominal_upah' => $nominalUpah,
-            //                     'umk' => $umk->umk,
-            //                     'minimal_85_persen' => $minimalUpah,
-            //                     'site_id' => $site->id,
-            //                     'city_id' => $site->kota_id
+            //                     'detail_id'          => $detailId,
+            //                     'nominal_upah'       => $nominalUpah,
+            //                     'umk'                => $umk->umk,
+            //                     'minimal_85_persen'  => $minimalUpah,
+            //                     'site_id'            => $site->id,
+            //                     'city_id'            => $site->kota_id
             //                 ]);
             //             }
             //         }

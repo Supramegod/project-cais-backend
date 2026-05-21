@@ -43,6 +43,7 @@ return [
     */
 
     'path' => env('TELESCOPE_PATH', 'telescope'),
+    'show_docs' => env('SHOW_TELESCOPE_DOCS', false),
 
     /*
     |--------------------------------------------------------------------------

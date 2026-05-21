@@ -2,17 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Resources\QuotationResource;
 use App\Models\Client;
 use App\Models\Company;
 use App\Models\Customer;
+use App\Models\CustomerActivity;
 use App\Models\HrisSite;
 use App\Models\JabatanPic;
+use App\Models\KategoriSesuaiHc;
+use App\Models\Kebutuhan;
+use App\Models\Leads;
+use App\Models\LeadsKebutuhan;
 use App\Models\Loyalty;
 use App\Models\Pks;
-use App\Models\Leads;
-use App\Models\KategoriSesuaiHc;
+use App\Models\PksPerjanjian;
+use App\Models\PksPerjanjianHistory;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
@@ -24,20 +28,20 @@ use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Models\SalesActivity;
 use App\Models\Site;
-use App\Models\PksPerjanjian;
-use App\Models\CustomerActivity;
-use App\Models\Kebutuhan;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\PksPerjanjianTemplateService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Carbon\Carbon;
+use SebastianBergmann\Diff\Differ;
+use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;
+
 /**
  * @OA\Tag(
  *     name="PKS",
@@ -53,72 +57,103 @@ class PksController extends Controller
      *     description="Mengambil daftar PKS dengan filter tanggal, status, branch, dan pencarian",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="tgl_dari",
      *         in="query",
      *         description="Tanggal mulai filter (format: Y-m-d). Default: 6 bulan kebelakang",
      *         required=false,
+     *
      *         @OA\Schema(type="string", format="date", example="2025-01-01")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="tgl_sampai",
      *         in="query",
      *         description="Tanggal akhir filter (format: Y-m-d). Default: hari ini",
      *         required=false,
+     *
      *         @OA\Schema(type="string", format="date", example="2025-12-31")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
      *         description="Filter berdasarkan status PKS ID",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch",
      *         in="query",
      *         description="Filter berdasarkan branch ID dari leads",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="search",
      *         in="query",
      *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
      *         required=false,
+     *
      *         @OA\Schema(type="string", example="PT ABC")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="search_by",
      *         in="query",
      *         description="Kolom yang akan dicari (default: nama_perusahaan)",
      *         required=false,
+     *
      *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "created_by"}, example="nama_perusahaan")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Jumlah data per halaman (default: 15)",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=15)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
      *         description="Nomor halaman (default: 1)",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     * @OA\Parameter(
+     *     name="status_berlaku",
+     *     in="query",
+     *     description="Filter status berlaku kontrak",
+     *     required=false,
+     *     @OA\Schema(
+     *         type="string",
+     *         enum={"kontrak_habis", "berakhir_2_bulan", "berakhir_3_bulan", "lebih_3_bulan"}
+     *     )
+     * ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="PKS data retrieved successfully"),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="nomor", type="string", example="PKS/LEAD001-012024-00001"),
      *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
@@ -151,17 +186,23 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="message", type="string", example="Unauthenticated.")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Server Error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Failed to retrieve PKS list"),
      *             @OA\Property(property="error", type="string", example="Error details")
@@ -205,7 +246,7 @@ class PksController extends Controller
                     $searchTerm = str_contains($searchTerm, ' ')
                         ? '"' . $searchTerm . '"'
                         : $searchTerm . '*';
-                    $query->whereRaw("MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                    $query->whereRaw('MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
                 } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
                     $query->where("sl_pks.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
@@ -220,6 +261,30 @@ class PksController extends Controller
             // ✅ Pakai JOIN bukan whereHas — sudah JOIN di atas
             if ($request->filled('branch')) {
                 $query->where('sl_leads.branch_id', $request->branch);
+            }
+            // Setelah bagian search dan branch filter, tambahkan:
+
+            if ($request->filled('status_berlaku')) {
+                $now = Carbon::now()->toDateString();
+                $duaBulan = Carbon::now()->addDays(60)->toDateString();
+                $tigaBulan = Carbon::now()->addDays(90)->toDateString();
+
+                switch ($request->status_berlaku) {
+                    case 'kontrak_habis':
+                        $query->whereDate('sl_pks.kontrak_akhir', '<=', $now);
+                        break;
+                    case 'berakhir_2_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $now)
+                            ->whereDate('sl_pks.kontrak_akhir', '<=', $duaBulan);
+                        break;
+                    case 'berakhir_3_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $duaBulan)
+                            ->whereDate('sl_pks.kontrak_akhir', '<=', $tigaBulan);
+                        break;
+                    case 'lebih_3_bulan':
+                        $query->whereDate('sl_pks.kontrak_akhir', '>', $tigaBulan);
+                        break;
+                }
             }
 
             $pksList = $query->paginate($request->get('per_page', 15));
@@ -260,6 +325,7 @@ class PksController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('Error in PksController@index: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS list',
@@ -267,22 +333,28 @@ class PksController extends Controller
             ], 500);
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/pks/view/{id}",
      *     summary="Get PKS details with mapped data",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(
      *                 property="data",
@@ -295,7 +367,9 @@ class PksController extends Controller
      *                     @OA\Property(
      *                         property="activities",
      *                         type="array",
+     *
      *                         @OA\Items(
+     *
      *                             @OA\Property(property="id", type="integer"),
      *                             @OA\Property(property="tgl_activity", type="string", format="date"),
      *                             @OA\Property(property="notes", type="string"),
@@ -325,16 +399,20 @@ class PksController extends Controller
      *                 property="quotation_data",
      *                 type="array",
      *                 description="Array of Quotation details and calculations",
+     *
      *                 @OA\Items(type="object")
      *             ),
+     *
      *             @OA\Property(
      *                 property="spk_data",
      *                 type="array",
      *                 description="Array of SPK data",
+     *
      *                 @OA\Items(type="object")
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found"
@@ -387,7 +465,7 @@ class PksController extends Controller
                     'kelurahan' => $leads->kelurahan ?? null,
                     'alamat' => $leads->alamat ?? null,
                     'pic' => $leads->pic ?? null,
-                    'jabatan' => $leads->jabatan ?? null
+                    'jabatan' => $leads->jabatan ?? null,
 
                 ];
             }
@@ -404,7 +482,7 @@ class PksController extends Controller
                         'tgl_activity' => $activity->tgl_activity,
                         'notes' => $activity->notes,
                         'tipe' => $activity->tipe,
-                        'created_by' => $activity->created_by
+                        'created_by' => $activity->created_by,
                     ];
                 })->toArray(),
                 'perjanjian' => $pks->perjanjian->map(function ($perjanjian) {
@@ -413,7 +491,7 @@ class PksController extends Controller
                         'pasal' => $perjanjian->pasal,
                         'judul' => $perjanjian->judul,
                         'raw_text' => $perjanjian->raw_text,
-                        'created_by' => $perjanjian->created_by
+                        'created_by' => $perjanjian->created_by,
                     ];
                 })->toArray(),
                 // 'rule_thr' => $pks->ruleThr ? [
@@ -455,7 +533,7 @@ class PksController extends Controller
                         'quotationOhcs',
                         'quotationTrainings',
                         'quotationKerjasamas',
-                        'managementFee'
+                        'managementFee',
                     ])->find($dataid->quotation_id);
 
                     if ($quotation) {
@@ -482,7 +560,7 @@ class PksController extends Controller
                         'nama_site' => $site->nama_site,
                         'kota' => $site->kota,
                         'penempatan' => $site->penempatan,
-                        'quotation_id' => $site->quotation_id
+                        'quotation_id' => $site->quotation_id,
                     ];
                 })->toArray();
             } else {
@@ -500,7 +578,7 @@ class PksController extends Controller
                             'nama_site' => $site->nama_site,
                             'kota' => $site->kota,
                             'penempatan' => $site->penempatan,
-                            'quotation_id' => $site->quotation_id
+                            'quotation_id' => $site->quotation_id,
                         ];
                     })->toArray();
             }
@@ -513,7 +591,7 @@ class PksController extends Controller
                 ],
                 'quotation_data' => $quotationDataArray,
                 'spk_data' => $spkarray,
-                'sites_info' => $sitesInfo
+                'sites_info' => $sitesInfo,
             ];
 
             return response()->json($response);
@@ -525,7 +603,7 @@ class PksController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to retrieve PKS details',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -767,20 +845,25 @@ class PksController extends Controller
      *     summary="Create new PKS - Kontrak Baru, Rekontrak, atau Addendum",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="tipe",
      *         in="path",
      *         required=true,
      *         description="Tipe kontrak: baru, rekontrak, atau addendum",
+     *
      *         @OA\Schema(
      *             type="string",
      *             enum={"baru", "rekontrak", "addendum"}
      *         )
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"leads_id","tanggal_pks","tanggal_awal_kontrak","tanggal_akhir_kontrak","kategoriHC","loyalty","salary_rule","rule_thr","entitas"},
+     *
      *             @OA\Property(property="leads_id", type="integer", example=1, description="Required untuk semua tipe kecuali addendum (untuk addendum gunakan pks_id)"),
      *             @OA\Property(
      *                 property="pks_id",
@@ -792,16 +875,20 @@ class PksController extends Controller
      *                 property="site_ids",
      *                 type="array",
      *                 description="Required untuk tipe=baru. Array of SpkSite IDs",
+     *
      *                 @OA\Items(type="integer"),
      *                 example={1, 2, 3}
      *             ),
+     *
      *             @OA\Property(
      *                 property="quotation_site_ids",
      *                 type="array",
      *                 description="Required untuk tipe=rekontrak dan addendum. Array of QuotationSite IDs",
+     *
      *                 @OA\Items(type="integer"),
      *                 example={1, 2, 3}
      *             ),
+     *
      *             @OA\Property(property="tanggal_pks", type="string", format="date", example="2025-01-15"),
      *             @OA\Property(property="tanggal_awal_kontrak", type="string", format="date", example="2025-02-01"),
      *             @OA\Property(property="tanggal_akhir_kontrak", type="string", format="date", example="2026-01-31"),
@@ -812,15 +899,19 @@ class PksController extends Controller
      *             @OA\Property(property="entitas", type="integer", example=1, description="Untuk addendum, entitas akan diambil dari PKS induk")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="PKS created successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="PKS created successfully"),
      *             @OA\Property(property="data", type="object")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=400,
      *         description="Invalid tipe parameter"
@@ -875,43 +966,52 @@ class PksController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'PKS created successfully',
-                    'data' => $pks
+                    'data' => $pks,
                 ], 201);
             });
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
     /**
      * @OA\Put(
      *     path="/api/pks/update/{id}",
      *     summary="Update PKS",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="PKS ID",
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="tanggal_pks", type="string", format="date", example="2025-10-14"),
      *             @OA\Property(property="tanggal_awal_kontrak", type="string", format="date", example="2025-11-01"),
      *             @OA\Property(property="tanggal_akhir_kontrak", type="string", format="date", example="2026-10-31"),
      *             @OA\Property(property="status_pks_id", type="integer", example=2, description="Status PKS ID (1=Draft, 2=Active, 3=Expired, etc.)")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="PKS updated successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="PKS berhasil diupdate"),
      *             @OA\Property(
-     *                 property="data", 
+     *                 property="data",
      *                 type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="nomor", type="string", example="PKS/2025/001"),
@@ -922,22 +1022,28 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="PKS tidak ditemukan")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation failed"),
      *             @OA\Property(
-     *                 property="errors", 
+     *                 property="errors",
      *                 type="object",
      *                 example={
      *                     "tanggal_pks": {"The tanggal pks must be a valid date."}
@@ -955,7 +1061,7 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
@@ -964,13 +1070,13 @@ class PksController extends Controller
                 'tanggal_awal_kontrak' => 'sometimes|date',
                 'tanggal_akhir_kontrak' => 'sometimes|date|after:tanggal_awal_kontrak',
                 'status_pks_id' => 'sometimes|integer|exists:m_status_pks,id',
-                'is_aktif' => 'sometimes|boolean'
+                'is_aktif' => 'sometimes|boolean',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors()
+                    'message' => $validator->errors(),
                 ], 422);
             }
 
@@ -992,14 +1098,15 @@ class PksController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'PKS updated successfully',
-                'data' => $pks
+                'data' => $pks,
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1010,20 +1117,26 @@ class PksController extends Controller
      *     summary="Delete PKS",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="PKS deleted successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found"
@@ -1038,7 +1151,7 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
@@ -1046,13 +1159,13 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'PKS deleted successfully'
+                'message' => 'PKS deleted successfully',
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1063,27 +1176,36 @@ class PksController extends Controller
      *     summary="Approve PKS",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"ot"},
+     *
      *             @OA\Property(property="ot", type="integer", description="Approval level (1-4)")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="PKS approved successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found"
@@ -1098,7 +1220,7 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
@@ -1106,36 +1228,43 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'PKS approved successfully'
+                'message' => 'PKS approved successfully',
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
     /**
      * @OA\Post(
      *     path="/api/pks/{id}/activate",
      *     summary="Activate PKS sites with full synchronization",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="PKS sites activated successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found"
@@ -1154,12 +1283,12 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
             // Step 1: Update PKS and Leads Status
-            $leads = $this->updatePksAndLeadsStatus($pks, $current_date_time);
+            $leads = $this->updateStatus($pks, $current_date_time);
 
             // Step 2: Sync Customer to HRIS
             $clientId = $this->syncCustomerToHris($leads, $current_date_time);
@@ -1178,7 +1307,7 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'PKS sites activated successfully with HRIS synchronization'
+                'message' => 'PKS sites activated successfully with HRIS synchronization',
             ]);
 
         } catch (\Exception $e) {
@@ -1189,30 +1318,37 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/pks/{id}/perjanjian",
      *     summary="Get PKS perjanjian data for template",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object", description="Template data for frontend")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS not found"
@@ -1227,7 +1363,7 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
@@ -1235,26 +1371,30 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $templateData
+                'data' => $templateData,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/pks/available-leads",
      *     summary="Get available leads for PKS creation",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array", @OA\Items(
      *                 @OA\Property(property="id", type="integer"),
@@ -1265,6 +1405,7 @@ class PksController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Unauthenticated"
@@ -1278,13 +1419,13 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $leads
+                'data' => $leads,
             ]);
 
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1295,22 +1436,29 @@ class PksController extends Controller
      *     summary="Get available sites for leads",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="leadsId",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="tipe",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="string", enum={"baru", "rekontrak","addendum"})
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Successful operation",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array", @OA\Items(
      *                 @OA\Property(property="id", type="integer"),
@@ -1322,13 +1470,13 @@ class PksController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Leads not found"
      *     )
      * )
      */
-
     public function getAvailableSites($leadsId, $tipe): JsonResponse
     {
         try {
@@ -1337,12 +1485,12 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $sites
+                'data' => $sites,
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -1353,18 +1501,23 @@ class PksController extends Controller
      *     summary="Submit quotation checklist",
      *     description="Submits checklist data for quotation including NPWP, invoice, and other administrative details",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         description="Quotation ID",
      *         required=true,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Checklist data",
+     *
      *         @OA\JsonContent(
      *             required={"npwp", "alamat_npwp", "pic_invoice", "telp_pic_invoice", "email_pic_invoice", "materai", "joker_reliever", "syarat_invoice", "alamat_penagihan_invoice", "status_serikat"},
+     *
      *             @OA\Property(property="npwp", type="string", description="NPWP number", example="123456789012345"),
      *             @OA\Property(property="alamat_npwp", type="string", description="NPWP address", example="Jl. Sudirman No. 123, Jakarta"),
      *             @OA\Property(property="pic_invoice", type="string", description="PIC for invoice", example="John Doe"),
@@ -1384,9 +1537,11 @@ class PksController extends Controller
      *                 property="pics",
      *                 type="array",
      *                 description="Array of PIC data",
+     *
      *                 @OA\Items(
      *                     type="object",
      *                     required={"nama", "jabatan", "no_telp", "email"},
+     *
      *                     @OA\Property(property="nama", type="string", example="Jane Doe"),
      *                     @OA\Property(property="jabatan", type="integer", example=1),
      *                     @OA\Property(property="no_telp", type="string", example="081234567890"),
@@ -1395,10 +1550,13 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Checklist submitted successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Checklist submitted successfully"),
      *             @OA\Property(property="data", type="object",
@@ -1409,27 +1567,36 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Quotation not found",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Quotation not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error"),
      *             @OA\Property(property="errors", type="object")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Internal server error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Failed to submit checklist"),
      *             @OA\Property(property="error", type="string", example="Error details")
@@ -1534,18 +1701,24 @@ class PksController extends Controller
      *     description="Endpoint untuk mengupload file PKS yang sudah disetujui dan mengubah status PKS menjadi approved.",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID PKS",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\MediaType(
      *             mediaType="multipart/form-data",
+     *
      *             @OA\Schema(
+     *
      *                 @OA\Property(
      *                     property="file",
      *                     type="string",
@@ -1555,10 +1728,13 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="File berhasil diupload",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="PKS file uploaded successfully"),
      *             @OA\Property(property="data", type="object",
@@ -1569,26 +1745,35 @@ class PksController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=400,
      *         description="File tidak valid",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="PKS tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="PKS not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error uploading PKS file")
      *         )
@@ -1598,13 +1783,13 @@ class PksController extends Controller
     public function uploadPks(Request $request, $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240', // 10MB
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => $validator->errors()
+                'message' => $validator->errors(),
             ], 422);
         }
 
@@ -1616,7 +1801,7 @@ class PksController extends Controller
             if (!$pks) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'PKS not found'
+                    'message' => 'PKS not found',
                 ], 404);
             }
 
@@ -1643,7 +1828,7 @@ class PksController extends Controller
                 'status_pks_id' => 6, // Status Approved/Active
                 'link_pks_disetujui' => $fileUrl,
                 'updated_at' => now(),
-                'updated_by' => Auth::user()->full_name
+                'updated_by' => Auth::user()->full_name,
             ]);
 
             // Catat aktivitas
@@ -1661,8 +1846,8 @@ class PksController extends Controller
                     'nomor' => $pks->nomor,
                     'status_pks_id' => $pks->status_pks_id,
                     'status' => $pks->statusPks->nama ?? null,
-                    'link_pks_disetujui' => $pks->link_pks_disetujui
-                ]
+                    'link_pks_disetujui' => $pks->link_pks_disetujui,
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -1674,11 +1859,263 @@ class PksController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+    /**
+     * @OA\Put(
+     *     path="/api/pks/perjanjian/{id}",
+     *     summary="Update perjanjian PKS (menyimpan history versi lama)",
+     *     description="Memperbarui konten perjanjian PKS. Sebelum update, data lama akan disimpan ke tabel history untuk keperluan komparasi.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID perjanjian (sl_pks_perjanjian.id)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"raw_text"},
+     *             @OA\Property(property="judul", type="string", example="Ruang Lingkup Pekerjaan (Revisi)"),
+     *             @OA\Property(property="raw_text", type="string", example="<p>Isi kontrak yang sudah diperbarui...</p>")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Perjanjian berhasil diperbarui",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Perjanjian berhasil diperbarui"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=10),
+     *                 @OA\Property(property="pasal", type="string", example="Pasal 1"),
+     *                 @OA\Property(property="judul", type="string", example="Ruang Lingkup Pekerjaan (Revisi)"),
+     *                 @OA\Property(property="raw_text", type="string", example="<p>Isi kontrak yang sudah diperbarui...</p>"),
+     *                 @OA\Property(property="created_by", type="string", example="Admin"),
+     *                 @OA\Property(property="updated_by", type="string", example="John Doe")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Perjanjian tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi error")
+     * )
+     */
+    public function updatePerjanjian(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'judul' => 'nullable|string',
+                'raw_text' => 'required|string',
+            ]);
 
+            if ($validator->fails()) {
+                return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+            }
+
+            $perjanjian = PksPerjanjian::findOrFail($id);
+
+            $judulBaru = $request->judul ?? $perjanjian->judul;
+            $rawTextBaru = $request->raw_text;
+
+            // Cek apakah ada perubahan
+            if ($perjanjian->raw_text === $rawTextBaru && $perjanjian->judul === $judulBaru) {
+                return response()->json(['success' => true, 'message' => 'Tidak ada perubahan', 'data' => $perjanjian]);
+            }
+
+            DB::beginTransaction();
+
+            // Simpan data LAMA ke history
+            PksPerjanjianHistory::create([
+                'pks_perjanjian_id' => $perjanjian->id,
+                'pks_id' => $perjanjian->pks_id,
+                'pasal' => $perjanjian->pasal,
+                'judul' => $perjanjian->judul,
+                'raw_text' => $perjanjian->raw_text,
+                'snapshot' => json_encode($perjanjian->toArray(), JSON_PRETTY_PRINT),
+                'changed_by' => Auth::user()->full_name,
+            ]);
+
+            // Update data utama
+            $perjanjian->update([
+                'judul' => $judulBaru,
+                'raw_text' => $rawTextBaru,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
+            DB::commit();
+
+            // Catat aktivitas (opsional, gunakan method yang sudah ada atau buat helper)
+            $this->logPerjanjianChange($perjanjian);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Perjanjian berhasil diperbarui',
+                'data' => $perjanjian
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Update perjanjian error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+    /**
+     * @OA\Get(
+     *     path="/api/pks/perjanjian/{id}/history",
+     *     summary="Daftar riwayat perubahan perjanjian",
+     *     description="Mengembalikan daftar history perubahan untuk suatu perjanjian (berdasarkan ID perjanjian, bukan ID history).",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID perjanjian (sl_pks_perjanjian.id)",
+     *         @OA\Schema(type="integer", example=10)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="List riwayat perubahan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=101),
+     *                     @OA\Property(property="judul", type="string", example="RUANG LINGKUP PEKERJAAN"),
+     *                     @OA\Property(property="changed_by", type="string", example="John Doe"),
+     *                     @OA\Property(property="waktu", type="string", example="20-05-2026 14:30:00")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Perjanjian tidak ditemukan")
+     * )
+     */
+    public function getPerjanjianHistory($id)
+    {
+        $perjanjian = PksPerjanjian::find($id);
+        if (!$perjanjian) {
+            return response()->json(['success' => false, 'message' => 'Perjanjian not found'], 404);
+        }
+
+        $history = PksPerjanjianHistory::where('pks_perjanjian_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'judul', 'changed_by', 'created_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => $history->map(fn($h) => [
+                'id' => $h->id,
+                'judul' => $h->judul,
+                'changed_by' => $h->changed_by,
+                'waktu' => $h->created_at->format('d-m-Y H:i:s'),
+            ])
+        ]);
+    }
+    /**
+     * @OA\Post(
+     *     path="/api/pks/perjanjian/compare",
+     *     summary="Bandingkan dua versi perjanjian (highlight perubahan)",
+     *     description="Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"history_id_1"},
+     *             @OA\Property(property="history_id_1", type="integer", description="ID history (versi lama)", example=101),
+     *             @OA\Property(property="history_id_2", type="integer", description="ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama", example=100)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Hasil komparasi",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="version_label_old", type="string", example="Sebelum edit (20-05-2026 14:30:00)"),
+     *                 @OA\Property(property="version_label_new", type="string", example="Saat ini (terbaru)"),
+     *                 @OA\Property(property="diff_unified", type="string", example="--- Original\n+++ New\n@@ -1,3 +1,3 @@\n..."),
+     *                 @OA\Property(property="old_text", type="string", example="<p>teks lama</p>"),
+     *                 @OA\Property(property="new_text", type="string", example="<p>teks baru</p>")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validasi error, history_id_1 harus ada"),
+     *     @OA\Response(response=404, description="History tidak ditemukan")
+     * )
+     */
+    public function comparePerjanjian(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'history_id_1' => 'required|exists:sl_pks_perjanjian_history,id',
+            'history_id_2' => 'nullable|exists:sl_pks_perjanjian_history,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        $history1 = PksPerjanjianHistory::find($request->history_id_1);
+
+        // Bandingkan dengan versi lain atau versi terbaru
+        if ($request->filled('history_id_2')) {
+            $history2 = PksPerjanjianHistory::find($request->history_id_2);
+            $oldText = $history1->raw_text;
+            $newText = $history2->raw_text;
+            $oldJudul = $history1->judul;
+            $newJudul = $history2->judul;
+            $labelOld = "Versi " . $history1->created_at->format('d-m-Y H:i');
+            $labelNew = "Versi " . $history2->created_at->format('d-m-Y H:i');
+        } else {
+            $perjanjian = PksPerjanjian::find($history1->pks_perjanjian_id);
+            if (!$perjanjian) {
+                return response()->json(['success' => false, 'message' => 'Perjanjian tidak ditemukan'], 404);
+            }
+            $oldText = $history1->raw_text;
+            $newText = $perjanjian->raw_text;
+            $oldJudul = $history1->judul;
+            $newJudul = $perjanjian->judul;
+            $labelOld = "Sebelum edit (" . $history1->created_at->format('d-m-Y H:i') . ")";
+            $labelNew = "Saat ini (terbaru)";
+        }
+
+        // Deteksi perubahan judul
+        $judulChanged = ($oldJudul !== $newJudul);
+
+        // Generate diff untuk isi (raw_text) - opsional, bisa juga kirim null jika tidak perlu
+        $diff = null;
+        if ($oldText !== $newText) {
+            try {
+                $oldLines = preg_split('/\r\n|\r|\n/', $oldText);
+                $newLines = preg_split('/\r\n|\r|\n/', $newText);
+                $outputBuilder = new UnifiedDiffOutputBuilder("--- Original\n+++ New\n");
+                $differ = new Differ($outputBuilder);
+                $diff = $differ->diff($oldLines, $newLines);
+            } catch (\Exception $e) {
+                $diff = null; // Fallback, biar frontend yang handle diff
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'version_label_old' => $labelOld,
+                'version_label_new' => $labelNew,
+                'judul_old' => $oldJudul,
+                'judul_new' => $newJudul,
+                'judul_changed' => $judulChanged,
+                'diff_unified' => $diff,
+                'old_text' => $oldText,
+                'new_text' => $newText,
+            ]
+        ]);
+    }
 
     // ======================================================================
     // PRIVATE METHODS - Business Logic
@@ -1686,8 +2123,6 @@ class PksController extends Controller
     private function processPksLogic($request, $tipe)
     {
         $leads = Leads::findOrFail($request->leads_id);
-        $kebutuhan = Kebutuhan::find($leads->kebutuhan_id);
-
         // Tentukan nomor PKS berdasarkan tipe
         if ($tipe === 'addendum') {
             // Untuk addendum, gunakan nomor addendum
@@ -1711,6 +2146,9 @@ class PksController extends Controller
                 $quotationId = Quotation::where('leads_id', $leads->id)->first()->id ?? null;
             }
         }
+        $quotation = Quotation::find($quotationId);
+        $layananId = $quotation ? $quotation->kebutuhan_id : $leads->kebutuhan_id;
+        $kebutuhan = Kebutuhan::find($layananId);
 
         // 1. Create PKS (Unified)
         $pks = Pks::create([
@@ -1722,7 +2160,7 @@ class PksController extends Controller
             'kode_perusahaan' => $leads->nomor,
             'nama_perusahaan' => $leads->nama_perusahaan,
             'alamat_perusahaan' => $leads->alamat,
-            'layanan_id' => $leads->kebutuhan_id,
+            'layanan_id' => $layananId,
             'layanan' => $kebutuhan->nama ?? null,
             'bidang_usaha_id' => $leads->bidang_perusahaan_id,
             'bidang_usaha' => $leads->bidang_perusahaan,
@@ -1747,7 +2185,7 @@ class PksController extends Controller
             // Tambahkan field untuk addendum
             'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
             'tipe_pks' => $tipe, // tambahkan field tipe_pks jika ada di database
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
 
         // 2. Create Sites (Conditional)
@@ -1777,6 +2215,33 @@ class PksController extends Controller
             SalaryRule::find($request->salary_rule),
             $pksNomor
         );
+        // Update status SPK → "Generated PKS" (id: 3)
+        Spk::where('leads_id', $leads->id)
+            ->whereNotIn('status_spk_id', [100]) // skip Terminated
+            ->update([
+                'status_spk_id' => 3,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
+        // Update status Quotation → "Generated PKS" (id: 5)
+        if ($quotationId) {
+            Quotation::where('id', $quotationId)
+                ->where('status_quotation_id', '!=', 100) // skip Terminated
+                ->update([
+                    'status_quotation_id' => 5,
+                    'updated_by' => Auth::user()->full_name,
+                ]);
+        }
+
+        // Update status Leads → "Deal" (id: 99)
+        $statusTerminalLeads = [100, 101]; // Tidak Deal, Bukan Leads
+        if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
+            $leads->update([
+                'status_leads_id' => 99,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+        }
+
 
         return $pks;
     }
@@ -1788,10 +2253,11 @@ class PksController extends Controller
 
         foreach ($siteIds as $key => $id) {
             $sourceSite = $model::find($id);
-            if (!$sourceSite)
+            if (!$sourceSite) {
                 continue;
+            }
 
-            $nomorSite = $pksNomor . '-' . sprintf("%04d", ($key + 1));
+            $nomorSite = $pksNomor . '-' . sprintf('%04d', ($key + 1));
 
             $namaProyek = sprintf(
                 '%s-%s.%s.%s',
@@ -1830,7 +2296,6 @@ class PksController extends Controller
         }
     }
 
-
     /**
      * Create PKS Perjanjian using service
      */
@@ -1858,49 +2323,53 @@ class PksController extends Controller
         }
     }
 
-
     private function createInitialActivity($pks, $leads, $pksNomor)
     {
         $nomorActivity = $this->generateNomorActivity($leads->id);
         $user = Auth::user();
-        // if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-        //     // Untuk Sales, buat SalesActivity
-        //     $this->createSalesActivity($pks, $leads);
-        // } else {
+        if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
+            // Untuk Sales, buat SalesActivity
+            $this->createSalesActivity($pks, $user->full_name);
+        } else {
 
-        CustomerActivity::create([
-            'leads_id' => $leads->id,
-            'pks_id' => $pks->id,
-            'branch_id' => $leads->branch_id,
-            'tgl_activity' => now(),
-            'nomor' => $nomorActivity,
-            'tipe' => 'PKS',
-            'notes' => 'PKS dengan nomor :' . $pksNomor . ' terbentuk',
-            'is_activity' => 0,
-            'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name
-        ]);
-        // }
+            CustomerActivity::create([
+                'leads_id' => $leads->id,
+                'pks_id' => $pks->id,
+                'branch_id' => $leads->branch_id,
+                'tgl_activity' => now(),
+                'nomor' => $nomorActivity,
+                'tipe' => 'PKS',
+                'notes' => 'PKS dengan nomor :' . $pksNomor . ' terbentuk',
+                'is_activity' => 0,
+                'user_id' => Auth::id(),
+                'created_by' => Auth::user()->full_name,
+            ]);
+        }
     }
-    // private function createSalesActivity(Quotation $pks, string $createdBy): void
-    // {
-    //     $user = Auth::user();
+    private function createSalesActivity(Pks $pks, string $createdBy): void
+    {
+        $user = Auth::user();
 
-    //     // Cari leads_kebutuhan_id berdasarkan leads_id dan kebutuhan_id dari pks$pks
-    //     $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
-    //         ->where('kebutuhan_id', $pks->k)
-    //         ->where('tim_sales_d_id', $user->id) // Filter berdasarkan sales yang login
-    //         ->first();
+        // Ambil kebutuhan dari Quotation yang terhubung ke PKS ini
+        $quotation = $pks->quotations; // relasi belongsTo ke Quotation
 
-    //     SalesActivity::create([
-    //         'leads_id' => $pks->leads_id,
-    //         'leads_kebutuhan_id' => $leadsKebutuhan ? $leadsKebutuhan->id : null,
-    //         'tgl_activity' => Carbon::now(),
-    //         'jenis_activity' => 'PKS',
-    //         'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$pks->kebutuhan}",
-    //         'created_by' => $createdBy
-    //     ]);
-    // }
+        $kebutuhanId = $quotation?->kebutuhan_id ?? $pks->layanan_id;
+        $kebutuhanNama = $quotation?->kebutuhan ?? $pks->layanan;
+
+        $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $pks->leads_id)
+            ->where('kebutuhan_id', $kebutuhanId)
+            ->where('tim_sales_d_id', $user->id)
+            ->first();
+
+        SalesActivity::create([
+            'leads_id' => $pks->leads_id,
+            'leads_kebutuhan_id' => $leadsKebutuhan?->id,
+            'tgl_activity' => Carbon::now(),
+            'jenis_activity' => 'PKS',
+            'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$kebutuhanNama}",
+            'created_by' => $createdBy,
+        ]);
+    }
 
     private function approvePks($pks, $otLevel)
     {
@@ -1908,7 +2377,7 @@ class PksController extends Controller
             1 => 2,
             2 => 3,
             3 => 4,
-            4 => 5
+            4 => 5,
         ];
 
         $approveField = "ot{$otLevel}";
@@ -1916,7 +2385,7 @@ class PksController extends Controller
         $pks->update([
             $approveField => Auth::user()->full_name,
             'status_pks_id' => $statusMap[$otLevel] ?? $pks->status_pks_id,
-            'updated_by' => Auth::user()->full_name
+            'updated_by' => Auth::user()->full_name,
         ]);
     }
 
@@ -1930,7 +2399,7 @@ class PksController extends Controller
                 'ot5' => Auth::user()->full_name,
                 'status_pks_id' => 7,
                 'is_aktif' => 1,
-                'updated_by' => Auth::user()->full_name
+                'updated_by' => Auth::user()->full_name,
             ]);
 
             $leads = $pks->leads;
@@ -1947,7 +2416,7 @@ class PksController extends Controller
                     'tgl_customer' => now(),
                     'tim_sales_id' => $leads->tim_sales_id,
                     'tim_sales_d_id' => $leads->tim_sales_d_id,
-                    'created_by' => Auth::user()->full_name
+                    'created_by' => Auth::user()->full_name,
                 ]);
 
                 // Update leads dengan customer_id, status_leads_id, dan customer_active
@@ -1955,7 +2424,7 @@ class PksController extends Controller
                     'customer_id' => $customer->id,
                     'status_leads_id' => 102,
                     'customer_active' => 1, // Set ke 1 karena PKS aktif
-                    'updated_by' => Auth::user()->full_name
+                    'updated_by' => Auth::user()->full_name,
                 ]);
 
                 // Buat activity log untuk customer
@@ -1966,7 +2435,7 @@ class PksController extends Controller
                 $leads->update([
                     'status_leads_id' => 102,
                     'customer_active' => 1, // Set ke 1 karena PKS aktif
-                    'updated_by' => Auth::user()->full_name
+                    'updated_by' => Auth::user()->full_name,
                 ]);
             }
 
@@ -1979,6 +2448,7 @@ class PksController extends Controller
             throw $e;
         }
     }
+
     /**
      * SYNC OTOMATIS - Update customer_active berdasarkan status PKS
      * Dipanggil otomatis ketika ada perubahan PKS
@@ -1997,13 +2467,14 @@ class PksController extends Controller
 
             \Log::info('Auto sync customer_active status completed', [
                 'count' => $leadsWithCustomers->count(),
-                'timestamp' => now()
+                'timestamp' => now(),
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Auto sync customer_active status failed: ' . $e->getMessage());
         }
     }
+
     /**
      * Update customer_active untuk satu leads berdasarkan status PKS
      */
@@ -2030,14 +2501,14 @@ class PksController extends Controller
         // Only update if changed to avoid unnecessary database operations
         if ($lead->customer_active != $newStatus) {
             $lead->update([
-                'customer_active' => $newStatus
+                'customer_active' => $newStatus,
             ]);
 
             \Log::info('Customer active status updated', [
                 'leads_id' => $lead->id,
                 'customer_id' => $lead->customer_id,
                 'customer_active' => $newStatus,
-                'timestamp' => now()
+                'timestamp' => now(),
             ]);
         }
     }
@@ -2056,6 +2527,7 @@ class PksController extends Controller
 
         return $tanggalSekarang->lessThanOrEqualTo($tanggalKontrakAkhir);
     }
+
     /**
      * Generate nomor customer dengan format seperti PKS
      */
@@ -2071,23 +2543,23 @@ class PksController extends Controller
         $company = Company::where('id', $companyId)->first();
         $dataLeads = Leads::find($leadsId);
 
-        $nomor = "CUST/"; // Prefix CUST untuk Customer
+        $nomor = 'CUST/'; // Prefix CUST untuk Customer
 
         if ($company && $dataLeads) {
-            $nomor .= $company->code . "/";
-            $nomor .= $dataLeads->nomor . "-";
+            $nomor .= $company->code . '/';
+            $nomor .= $dataLeads->nomor . '-';
         } else {
-            $nomor .= "NN/NNNNN-";
+            $nomor .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
 
         // Hitung jumlah data customer dengan pattern yang sama
-        $pattern = $nomor . $month . $now->year . "-%";
+        $pattern = $nomor . $month . $now->year . '-%';
         $jumlahData = Customer::where('nomor', 'like', $pattern)->count();
-        $urutan = sprintf("%05d", $jumlahData + 1);
+        $urutan = sprintf('%05d', $jumlahData + 1);
 
-        return $nomor . $month . $now->year . "-" . $urutan;
+        return $nomor . $month . $now->year . '-' . $urutan;
     }
 
     /**
@@ -2106,7 +2578,7 @@ class PksController extends Controller
             'notes' => 'Customer dengan nomor :' . $customerNomor . ' terbentuk dari PKS',
             'is_activity' => 0,
             'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
     }
 
@@ -2139,17 +2611,17 @@ class PksController extends Controller
                     'nama' => 'MANDIRI',
                     'cabang' => 'KCP SURABAYA RUNGKUT MEGAH RAYA',
                     'rekening' => '1420001290823',
-                    'nama_rekening' => $company->name ?? ''
-                ]
+                    'nama_rekening' => $company->name ?? '',
+                ],
             ],
             'layanan' => [
                 'nama' => $kebutuhan->nama ?? '',
-                'kebutuhan_id' => $pks->layanan_id
+                'kebutuhan_id' => $pks->layanan_id,
             ],
             'rule_thr' => [
                 'hari_penagihan_invoice' => $ruleThr->hari_penagihan_invoice ?? 0,
                 'hari_pembayaran_invoice' => $ruleThr->hari_pembayaran_invoice ?? 0,
-                'hari_rilis_thr' => $ruleThr->hari_rilis_thr ?? 0
+                'hari_rilis_thr' => $ruleThr->hari_rilis_thr ?? 0,
             ],
             'salary_rule' => [
                 'cutoff' => $salaryRule->cutoff ?? '',
@@ -2157,15 +2629,15 @@ class PksController extends Controller
                 'pengiriman_invoice' => $salaryRule->pengiriman_invoice ?? '',
                 'perkiraan_invoice_diterima' => $salaryRule->perkiraan_invoice_diterima ?? '',
                 'pembayaran_invoice' => $salaryRule->pembayaran_invoice ?? '',
-                'rilis_payroll' => $salaryRule->rilis_payroll ?? ''
+                'rilis_payroll' => $salaryRule->rilis_payroll ?? '',
             ],
             'sites' => $pks->sites->map(function ($site) {
                 return [
                     'nama_site' => $site->nama_site,
                     'alamat' => $site->penempatan,
-                    'kota' => $site->kota
+                    'kota' => $site->kota,
                 ];
-            })
+            }),
         ];
     }
 
@@ -2176,25 +2648,28 @@ class PksController extends Controller
     private function hitungBerakhirKontrak($tanggalBerakhir)
     {
         if (is_null($tanggalBerakhir)) {
-            return "-";
+            return '-';
         }
 
         $tanggalSekarang = Carbon::now();
         $tanggalBerakhir = Carbon::createFromFormat('Y-m-d', $tanggalBerakhir);
 
         if ($tanggalSekarang->greaterThanOrEqualTo($tanggalBerakhir)) {
-            return "Kontrak habis";
+            return 'Kontrak habis';
         }
 
         $selisih = $tanggalSekarang->diff($tanggalBerakhir);
 
         $hasil = [];
-        if ($selisih->y > 0)
+        if ($selisih->y > 0) {
             $hasil[] = "{$selisih->y} tahun";
-        if ($selisih->m > 0)
+        }
+        if ($selisih->m > 0) {
             $hasil[] = "{$selisih->m} bulan";
-        if ($selisih->d > 0)
+        }
+        if ($selisih->d > 0) {
             $hasil[] = "{$selisih->d} hari";
+        }
 
         return implode(', ', $hasil);
     }
@@ -2203,19 +2678,24 @@ class PksController extends Controller
     {
         $selisih = $this->selisihKontrakBerakhir($tanggalBerakhir);
 
-        if ($selisih <= 0)
+        if ($selisih <= 0) {
             return 'Kontrak Habis';
-        if ($selisih <= 60)
+        }
+        if ($selisih <= 60) {
             return 'Berakhir dalam 2 bulan';
-        if ($selisih <= 90)
+        }
+        if ($selisih <= 90) {
             return 'Berakhir dalam 3 bulan';
+        }
+
         return 'Lebih dari 3 Bulan';
     }
 
     private function selisihKontrakBerakhir($tanggalBerakhir)
     {
-        if (is_null($tanggalBerakhir))
+        if (is_null($tanggalBerakhir)) {
             return 0;
+        }
 
         $tanggalSekarang = Carbon::now();
         $tanggalBerakhir = Carbon::createFromFormat('Y-m-d', $tanggalBerakhir);
@@ -2233,19 +2713,19 @@ class PksController extends Controller
         $dataLeads = Leads::find($leadsId);
         $company = Company::where('id', $companyId)->first();
 
-        $nomor = "PKS/";
+        $nomor = 'PKS/';
         if ($company) {
-            $nomor .= $company->code . "/";
-            $nomor .= $dataLeads->nomor . "-";
+            $nomor .= $company->code . '/';
+            $nomor .= $dataLeads->nomor . '-';
         } else {
-            $nomor .= "NN/NNNNN-";
+            $nomor .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $jumlahData = Pks::where('nomor', 'like', $nomor . $month . $now->year . "-%")->count();
-        $urutan = sprintf("%05d", $jumlahData + 1);
+        $jumlahData = Pks::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
+        $urutan = sprintf('%05d', $jumlahData + 1);
 
-        return $nomor . $month . $now->year . "-" . $urutan;
+        return $nomor . $month . $now->year . '-' . $urutan;
     }
 
     private function generateNomorActivity($leadsId)
@@ -2253,27 +2733,27 @@ class PksController extends Controller
         $now = Carbon::now();
         $leads = Leads::find($leadsId);
 
-        $prefix = "CAT/";
+        $prefix = 'CAT/';
         if ($leads) {
             $prefix .= match ($leads->kebutuhan_id) {
-                1 => "SG/",
-                2 => "LS/",
-                3 => "CS/",
-                4 => "LL/",
-                default => "NN/"
+                1 => 'SG/',
+                2 => 'LS/',
+                3 => 'CS/',
+                4 => 'LL/',
+                default => 'NN/'
             };
-            $prefix .= $leads->nomor . "-";
+            $prefix .= $leads->nomor . '-';
         } else {
-            $prefix .= "NN/NNNNN-";
+            $prefix .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $year = $now->year;
 
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . '-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . $month . $year . "-" . $sequence;
+        return $prefix . $month . $year . '-' . $sequence;
     }
 
     private function getAvailableLeadsData()
@@ -2284,13 +2764,17 @@ class PksController extends Controller
                     ->whereHas('spk', function ($subQuery) {
                         $subQuery->whereNull('sl_spk.deleted_at');
                     })
-                    ->whereDoesntHave('site');
+                    // Tambahkan closure di sini untuk memfilter soft deletes pada site
+                    ->whereDoesntHave('site', function ($siteQuery) {
+                        $siteQuery->whereNull('sl_site.deleted_at');
+                    });
             })
             ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
             ->distinct()
             ->orderBy('id', 'desc')
             ->get();
     }
+
     private function getAvailableSitesData($leadsId, $tipe = 'baru')
     {
         $isBaru = ($tipe === 'baru');
@@ -2304,7 +2788,7 @@ class PksController extends Controller
                     $q->where('leads_id', $leadsId)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
-                'leads'
+                'leads',
             ])
                 ->where('leads_id', $leadsId)
                 ->whereHas('spk', function ($q) {
@@ -2323,7 +2807,7 @@ class PksController extends Controller
                         ->where('tipe_quotation', $tipeQuotation)
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
-                'leads'
+                'leads',
             ])
                 ->where('leads_id', $leadsId)
                 ->whereHas('quotation', function ($q) use ($leadsId, $tipeQuotation) {
@@ -2335,10 +2819,14 @@ class PksController extends Controller
             $orderTable = 'sl_quotation';
             $orderColumn = 'quotation_id';
         }
+        $query->whereNull('deleted_at');
 
-        return $query->whereNull('deleted_at')
-            ->whereDoesntHave('site')
-            ->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
+
+        if ($isBaru) {
+            $query->whereDoesntHave('site');
+        }
+
+        return $query->select('id', 'nama_site', 'provinsi', 'kota', 'penempatan', 'quotation_id', ($isBaru ? 'spk_id' : 'leads_id'))
             ->orderBy(function ($q) use ($orderTable, $orderColumn) {
                 $q->select('nomor')
                     ->from($orderTable)
@@ -2379,7 +2867,7 @@ class PksController extends Controller
                         'nama' => $quotation->salaryRule->nama_salary_rule ?? null,
                         'cutoff' => $quotation->salaryRule->cutoff,
                         'pembayaran_invoice' => $quotation->salaryRule->pembayaran_invoice,
-                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll
+                        'rilis_payroll' => $quotation->salaryRule->rilis_payroll,
                     ] : null,
 
                     // Data Rule THR
@@ -2388,7 +2876,7 @@ class PksController extends Controller
                         'nama' => $quotation->ruleThr->nama ?? null,
                         'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice,
                         'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice,
-                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr
+                        'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr,
                     ] : null,
 
                     'quotation_id' => $quotation?->id,
@@ -2404,16 +2892,37 @@ class PksController extends Controller
     /**
      * Update PKS and Leads Status
      */
-    private function updatePksAndLeadsStatus($pks, $current_date_time)
+    private function updateStatus($pks, $current_date_time)
     {
-        // Update PKS status
+        // Update PKS status → Aktif (id: 7)
         $pks->update([
             'ot5' => Auth::user()->full_name,
             'status_pks_id' => 7,
             'is_aktif' => 1,
             'updated_at' => $current_date_time,
-            'updated_by' => Auth::user()->full_name
+            'updated_by' => Auth::user()->full_name,
         ]);
+
+        // Update Quotation status → "Site Telah Aktif" (id: 6)
+        if ($pks->quotation_id) {
+            $quotation = Quotation::find($pks->quotation_id);
+            if ($quotation) {
+                $quotation->update([
+                    'status_quotation_id' => 6,
+                    'updated_at' => $current_date_time,
+                    'updated_by' => Auth::user()->full_name,
+                ]);
+            }
+        }
+
+        // Update SPK status → "Site Telah Aktif" (id: 4)
+        Spk::where('leads_id', $pks->leads_id)
+            ->whereNotIn('status_spk_id', [100]) // skip Terminated
+            ->update([
+                'status_spk_id' => 4,
+                'updated_at' => $current_date_time,
+                'updated_by' => Auth::user()->full_name,
+            ]);
 
         // Get leads
         $leads = Leads::find($pks->leads_id);
@@ -2421,21 +2930,17 @@ class PksController extends Controller
             throw new \Exception('Leads not found');
         }
 
-        // Check RO and supervisor fields
-        if ($leads->ro_id_1 == null)
-            $leads->ro_id_1 = 0;
-        if ($leads->ro_id_2 == null)
-            $leads->ro_id_2 = 0;
-        if ($leads->ro_id_3 == null)
-            $leads->ro_id_3 = 0;
-        if ($leads->ro_id == null)
-            $leads->ro_id = 0;
+        // Pastikan field RO tidak null (diperlukan untuk sync HRIS)
+        $leads->ro_id_1 = $leads->ro_id_1 ?? 0;
+        $leads->ro_id_2 = $leads->ro_id_2 ?? 0;
+        $leads->ro_id_3 = $leads->ro_id_3 ?? 0;
+        $leads->ro_id = $leads->ro_id ?? 0;
 
-        // Update leads status
+        // Update Leads status → "Generated Customer" (id: 102)
         $leads->update([
             'status_leads_id' => 102,
             'updated_at' => $current_date_time,
-            'updated_by' => Auth::user()->full_name
+            'updated_by' => Auth::user()->full_name,
         ]);
 
         return $leads;
@@ -2464,7 +2969,7 @@ class PksController extends Controller
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
             'updated_at' => $current_date_time,
-            'updated_by' => Auth::user()->id
+            'updated_by' => Auth::user()->id,
         ]);
     }
 
@@ -2479,8 +2984,9 @@ class PksController extends Controller
 
         foreach ($siteList as $site) {
             $quotation = Quotation::find($site->quotation_id);
-            if (!$quotation)
+            if (!$quotation) {
                 continue;
+            }
 
             // Sync Site to HRIS
             $this->syncSiteToHris($site, $pks, $leads, $quotation, $clientId, $current_date_time);
@@ -2526,7 +3032,7 @@ class PksController extends Controller
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
             'updated_at' => $current_date_time,
-            'updated_by' => Auth::user()->id
+            'updated_by' => Auth::user()->id,
         ]);
     }
 
@@ -2581,7 +3087,7 @@ class PksController extends Controller
             'penagihan' => 'Tanpa Pembulatan',
             'pph' => 0,
             'pph_coss' => 0,
-            'quotation_detail' => []
+            'quotation_detail' => [],
         ];
     }
 
@@ -2610,7 +3116,7 @@ class PksController extends Controller
                     'gaji_pokok' => $calcQuotation->nominal_upah,
                     // Add other fields as needed
                     'updated_at' => $current_date_time,
-                    'updated_by' => Auth::user()->full_name
+                    'updated_by' => Auth::user()->full_name,
                 ]);
 
             // Update COSS calculation
@@ -2623,7 +3129,7 @@ class PksController extends Controller
                     'gaji_pokok' => $calcQuotation->nominal_upah,
                     // Add other fields as needed
                     'updated_at' => $current_date_time,
-                    'updated_by' => Auth::user()->full_name
+                    'updated_by' => Auth::user()->full_name,
                 ]);
 
             // Accumulate totals
@@ -2674,7 +3180,7 @@ class PksController extends Controller
             'gpm_hpp' => $totalData['gpm'],
             'gpm_harga_pokok' => $totalData['gpmCoss'],
             'created_at' => $current_date_time,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
     }
 
@@ -2696,7 +3202,7 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_at' => $current_date_time,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
     }
 
@@ -2715,14 +3221,14 @@ class PksController extends Controller
                 'tgl_customer' => $current_date_time,
                 'tim_sales_id' => $leads->tim_sales_id,
                 'tim_sales_d_id' => $leads->tim_sales_d_id,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
             ]);
 
             $leads->update([
                 'customer_id' => $customer->id,
                 'customer_active' => 1,
                 'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
+                'updated_by' => Auth::user()->full_name,
             ]);
 
             // Create customer activity log
@@ -2732,7 +3238,7 @@ class PksController extends Controller
             $leads->update([
                 'customer_active' => 1,
                 'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
+                'updated_by' => Auth::user()->full_name,
             ]);
         }
 
@@ -2757,16 +3263,14 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_at' => $current_date_time,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
     }
+
     /**
      * Add Detail PIC to Quotation
-     * 
-     * @param Quotation $quotation
-     * @param array $picData
-     * @param string $current_date_time
-     * @return void
+     *
+     * @param  Quotation  $quotation
      */
     private function addDetailPic($quotation, array $picData, string $current_date_time): void
     {
@@ -2784,7 +3288,7 @@ class PksController extends Controller
                 'no_telp' => $picData['no_telp'],
                 'email' => $picData['email'],
                 'created_at' => $current_date_time,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
             ]);
 
         } catch (\Exception $e) {
@@ -2792,17 +3296,17 @@ class PksController extends Controller
             throw $e;
         }
     }
+
     /**
      * Store PKS file to storage
-     * 
-     * @param \Illuminate\Http\UploadedFile $file
-     * @return string
+     *
+     * @param  \Illuminate\Http\UploadedFile  $file
      */
     private function storePksFile($file): string
     {
         $fileExtension = $file->getClientOriginalExtension();
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+        $fileName = $originalFileName . date('YmdHis') . rand(10000, 99999) . '.' . $fileExtension;
 
         // Simpan file ke disk 'pks' yang sudah dikonfigurasi
         Storage::disk('pks')->put($fileName, file_get_contents($file));
@@ -2812,9 +3316,8 @@ class PksController extends Controller
 
     /**
      * Create upload activity log for PKS
-     * 
-     * @param Pks $pks
-     * @return void
+     *
+     * @param  Pks  $pks
      */
     private function createUploadPksActivity($pks): void
     {
@@ -2831,15 +3334,15 @@ class PksController extends Controller
             'notes' => 'PKS dengan nomor : ' . $pks->nomor . ' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
         ]);
     }
+
     /**
      * Generate nomor untuk addendum PKS
      * Format: ADD/{nomor PKS induk}/{urutan 4 digit}
-     * 
-     * @param int $pksIndukId
-     * @return string
+     *
+     * @param  int  $pksIndukId
      */
     private function generateNomorAddendum($pksIndukId): string
     {
@@ -2851,10 +3354,27 @@ class PksController extends Controller
             ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
             ->count();
 
-        $urutan = sprintf("%04d", $jumlahAddendum + 1);
+        $urutan = sprintf('%04d', $jumlahAddendum + 1);
 
         return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
-
-
+    private function logPerjanjianChange($perjanjian)
+    {
+        $pks = Pks::find($perjanjian->pks_id);
+        if ($pks && $pks->leads_id) {
+            $leads = Leads::find($pks->leads_id);
+            if ($leads) {
+                $nomorActivity = $this->generateNomorActivity($leads->id);
+                CustomerActivity::create([
+                    'leads_id' => $leads->id,
+                    'pks_id' => $perjanjian->pks_id,
+                    'tgl_activity' => now(),
+                    'nomor' => $nomorActivity,
+                    'tipe' => 'PKS_PERJANJIAN',
+                    'notes' => "Perubahan pasal {$perjanjian->pasal} diedit oleh " . Auth::user()->full_name,
+                    'created_by' => Auth::user()->full_name,
+                ]);
+            }
+        }
+    }
 }

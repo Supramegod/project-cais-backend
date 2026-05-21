@@ -164,7 +164,7 @@ class DashboardApprovalController extends Controller
                         $q->where(function ($subQ) {
                             $subQ->whereNull('ot1');
                         })
-                            // Menunggu Dir Keu (THR belum diprovisikan)
+                            // Menunggu Dir Keu
                             ->orWhere(function ($subQ) {
                             $subQ->whereNotNull('ot1')
                                 ->whereNull('ot2')
@@ -465,7 +465,7 @@ class DashboardApprovalController extends Controller
     {
         $user = Auth::user();
         $unreadCount = LogNotification::getUnreadCount($user->id);
-
+        
         return response()->json([
             'success' => true,
             'data' => [
@@ -493,10 +493,14 @@ class DashboardApprovalController extends Controller
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
-        // Dir Sales — menunggu ot1
-        $countDirSales = (clone $baseConditions)->whereNull('ot1')->count();
-        // Dir Keu — menunggu ot2 dengan TOP Lebih Dari 7 Hari dan THR belum diprovisikan
+        // Dir Sales — semua quotation langsung antri
+        $countDirSales = (clone $baseConditions)
+            ->whereNull('ot1')
+            ->count();
+
+        // Dir Keu — tetap sama
         $countDirKeu = (clone $baseConditions)
+            ->whereNotNull('ot1')
             ->whereNull('ot2')
             ->where('top', 'Lebih Dari 7 Hari')
             ->whereHas('quotationDetails', function ($wageQ) {
@@ -505,7 +509,6 @@ class DashboardApprovalController extends Controller
                 });
             })
             ->count();
-
 
         $countMenungguApproval = $countDirSales + $countDirKeu;
 
@@ -530,29 +533,26 @@ class DashboardApprovalController extends Controller
             ->where('status_quotation_id', 2)
             ->where('step', 100);
 
-        $dirSalesCount = (clone $baseConditions())
-            ->whereNull('ot1')
-            ->count();
-
-        $dirKeuCount = (clone $baseConditions())
-            ->whereNull('ot2')
-            ->where('top', 'Lebih Dari 7 Hari')
-            ->whereHas('quotationDetails', function ($wageQ) {
-                $wageQ->whereHas('wage', function ($q) {
-                    $q->where('thr', '!=', 'diprovisikan');
-                });
-            })
-            ->count();
-
         return [
-            'dir_sales' => $dirSalesCount,
-            'dir_keu' => $dirKeuCount,
+            'dir_sales' => (clone $baseConditions())
+                ->whereNull('ot1')
+                ->count(),
+
+            'dir_keu' => (clone $baseConditions())
+                ->whereNotNull('ot1')
+                ->whereNull('ot2')
+                ->where('top', 'Lebih Dari 7 Hari')
+                ->whereHas('quotationDetails', function ($wageQ) {
+                    $wageQ->whereHas('wage', function ($q) {
+                        $q->where('thr', '!=', 'diprovisikan');
+                    });
+                })
+                ->count(),
         ];
     }
 
     /**
      * Apply filter untuk tipe "menunggu-anda" berdasarkan role user
-     * Hanya untuk Dir Sales (role 96) dan Dir Keuangan (role 97, 40)
      */
     private function applyMenungguAndaFilter($query, $user): void
     {
@@ -562,17 +562,18 @@ class DashboardApprovalController extends Controller
 
         $conditions = [];
 
-        // Dir Sales (role 96)
+        // Dir Sales (role 96) — semua quotation langsung antri
         if ($user->cais_role_id == 96) {
             $conditions[] = function ($q) {
                 $q->whereNull('ot1');
             };
         }
 
-        // Dir Keuangan (role 97 & 40)
+        // Dir Keuangan (role 97 & 40) — tetap sama
         if (in_array($user->cais_role_id, [97, 40])) {
             $conditions[] = function ($q) {
-                $q->whereNull('ot2')
+                $q->whereNotNull('ot1')
+                    ->whereNull('ot2')
                     ->where('top', 'Lebih Dari 7 Hari')
                     ->whereHas('quotationDetails', function ($wageQ) {
                         $wageQ->whereHas('wage', function ($q) {
@@ -608,6 +609,8 @@ class DashboardApprovalController extends Controller
         return [
             'step' => $quotation->step,
             'top' => $quotation->top,
+            'ot4' => $quotation->ot4,  // GM 2 (GM HRM)
+            'ot3' => $quotation->ot3,  // GM 1 (GM Operasional)
             'ot2' => $quotation->ot2,  // Direktur Keuangan
             'ot1' => $quotation->ot1,  // Direktur Sales
             'status' => $quotation->statusQuotation->nama ?? null,

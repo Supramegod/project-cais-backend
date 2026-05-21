@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "510c8fec2a9ea19ce5c4a4c88101cec5",
+    "content-hash": "3750a364edaaceae03fe4ff66f5ceb54",
     "packages": [
         {
             "name": "brick/math",
@@ -3740,6 +3740,157 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.9.1"
             },
             "time": "2025-09-04T20:59:21+00:00"
+        },
+        {
+            "name": "sandermuller/laravel-fluent-validation",
+            "version": "1.25.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/SanderMuller/laravel-fluent-validation.git",
+                "reference": "c84a0482d7d2e2c1087a9048165f51a203797793"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/SanderMuller/laravel-fluent-validation/zipball/c84a0482d7d2e2c1087a9048165f51a203797793",
+                "reference": "c84a0482d7d2e2c1087a9048165f51a203797793",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/contracts": "^11.0||^12.0||^13.0",
+                "illuminate/support": "^11.0||^12.0||^13.0",
+                "illuminate/validation": "^11.0||^12.0||^13.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "driftingly/rector-laravel": "^2.3",
+                "larastan/larastan": "^3.9.3",
+                "laravel/boost": "^2.4.2",
+                "laravel/pint": "^1.29",
+                "livewire/livewire": "^3.0||^4.0",
+                "mrpunyapal/rector-pest": "^0.2.7",
+                "nunomaduro/collision": "^8.0",
+                "orchestra/testbench": "^9.0||^10.11",
+                "pestphp/pest": "^3.0||^4.4.5",
+                "pestphp/pest-plugin-arch": "^3.0||^4.0",
+                "pestphp/pest-plugin-laravel": "^3.0||^4.1",
+                "phpstan/extension-installer": "^1.4.3",
+                "phpstan/phpstan-deprecation-rules": "^2.0.4",
+                "phpstan/phpstan-phpunit": "^2.0.16",
+                "phpstan/phpstan-strict-rules": "^2.0.10",
+                "rector/rector": "^2.4.1",
+                "rector/type-perfect": "^2.1.2",
+                "sandermuller/package-boost": "^0.9.0",
+                "spaze/phpstan-disallowed-calls": "^4.10",
+                "symplify/phpstan-extensions": "^12.0.2",
+                "tomasvotruba/cognitive-complexity": "^1.1",
+                "tomasvotruba/type-coverage": "^2.1"
+            },
+            "suggest": {
+                "nikic/php-parser": "^5.0 — required by SanderMuller\\FluentValidation\\Testing\\Arch\\BansFieldRuleTypeMethods, an opt-in Pest/PHPUnit arch helper that bans type-specific method calls on the untyped FluentRule::field() builder."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "SanderMuller\\FluentValidation\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sander Muller",
+                    "email": "github@scode.nl",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Fluent validation rule builders for Laravel",
+            "homepage": "https://github.com/sandermuller/laravel-fluent-validation",
+            "keywords": [
+                "fluent",
+                "laravel",
+                "rule-builder",
+                "validation"
+            ],
+            "support": {
+                "issues": "https://github.com/SanderMuller/laravel-fluent-validation/issues",
+                "source": "https://github.com/SanderMuller/laravel-fluent-validation/tree/1.25.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/SanderMuller",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-04-29T14:44:56+00:00"
+        },
+        {
+            "name": "sebastian/diff",
+            "version": "6.0.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sebastianbergmann/diff.git",
+                "reference": "b4ccd857127db5d41a5b676f24b51371d76d8544"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sebastianbergmann/diff/zipball/b4ccd857127db5d41a5b676f24b51371d76d8544",
+                "reference": "b4ccd857127db5d41a5b676f24b51371d76d8544",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^11.0",
+                "symfony/process": "^4.2 || ^5"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-main": "6.0-dev"
+                }
+            },
+            "autoload": {
+                "classmap": [
+                    "src/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastian Bergmann",
+                    "email": "sebastian@phpunit.de"
+                },
+                {
+                    "name": "Kore Nordmann",
+                    "email": "mail@kore-nordmann.de"
+                }
+            ],
+            "description": "Diff implementation",
+            "homepage": "https://github.com/sebastianbergmann/diff",
+            "keywords": [
+                "diff",
+                "udiff",
+                "unidiff",
+                "unified diff"
+            ],
+            "support": {
+                "issues": "https://github.com/sebastianbergmann/diff/issues",
+                "security": "https://github.com/sebastianbergmann/diff/security/policy",
+                "source": "https://github.com/sebastianbergmann/diff/tree/6.0.2"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/sebastianbergmann",
+                    "type": "github"
+                }
+            ],
+            "time": "2024-07-03T04:53:05+00:00"
         },
         {
             "name": "swagger-api/swagger-ui",
@@ -8361,73 +8512,6 @@
                 }
             ],
             "time": "2024-07-03T04:49:50+00:00"
-        },
-        {
-            "name": "sebastian/diff",
-            "version": "6.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/sebastianbergmann/diff.git",
-                "reference": "b4ccd857127db5d41a5b676f24b51371d76d8544"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/diff/zipball/b4ccd857127db5d41a5b676f24b51371d76d8544",
-                "reference": "b4ccd857127db5d41a5b676f24b51371d76d8544",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.2"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^11.0",
-                "symfony/process": "^4.2 || ^5"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-main": "6.0-dev"
-                }
-            },
-            "autoload": {
-                "classmap": [
-                    "src/"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "BSD-3-Clause"
-            ],
-            "authors": [
-                {
-                    "name": "Sebastian Bergmann",
-                    "email": "sebastian@phpunit.de"
-                },
-                {
-                    "name": "Kore Nordmann",
-                    "email": "mail@kore-nordmann.de"
-                }
-            ],
-            "description": "Diff implementation",
-            "homepage": "https://github.com/sebastianbergmann/diff",
-            "keywords": [
-                "diff",
-                "udiff",
-                "unidiff",
-                "unified diff"
-            ],
-            "support": {
-                "issues": "https://github.com/sebastianbergmann/diff/issues",
-                "security": "https://github.com/sebastianbergmann/diff/security/policy",
-                "source": "https://github.com/sebastianbergmann/diff/tree/6.0.2"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/sebastianbergmann",
-                    "type": "github"
-                }
-            ],
-            "time": "2024-07-03T04:53:05+00:00"
         },
         {
             "name": "sebastian/environment",

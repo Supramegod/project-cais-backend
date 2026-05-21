@@ -11,8 +11,10 @@ use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SalesActivityController;
+use App\Http\Controllers\SalesTargetController;
 use App\Http\Controllers\SpkController;
 use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
@@ -32,16 +34,21 @@ use App\Http\Controllers\SalaryRuleController;
 use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UmkController;
+use App\Http\Controllers\UpahController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
+use App\Http\Controllers\SystemAnnouncementController;
+use App\Http\Controllers\SystemAnnouncementV2Controller;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+Route::get('/admin-panel/consultations', [AdminPanelController::class, 'getConsultations']);
+Route::post('/admin-panel/consultations', [AdminPanelController::class, 'storeConsultation']);
 
-Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
+Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
@@ -184,6 +191,20 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/add', 'add');
     });
 
+    // Upah (Unified wage management: UMP, UMK & UMSK)
+    Route::prefix('upah')->controller(UpahController::class)->group(function () {
+        Route::get('/provinsi', 'listProvinsi');
+        Route::get('/provinsi/{provinceId}', 'getProvinceDetail');
+        Route::get('/kota/{cityId}', 'detailKota');
+        Route::get('/umsp/{id}', 'showUmsp');
+        Route::get('/umsk/{id}', 'showUmsk');
+        Route::post('/umsp', 'storeUmsp');
+        Route::post('/ump', 'storeUmp');
+        Route::post('/umk', 'storeUmk');
+        Route::post('/umsk', 'storeUmsk');
+
+    });
+
     // Supplier
     Route::prefix('supplier')->controller(SupplierController::class)->group(function () {
         Route::get('/list', 'list');
@@ -297,6 +318,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/spk/{id}', 'getSpkByLead');
         Route::get('/pks/{id}', 'getPksByLead');
         Route::get('/customeractivity/{id}', 'getCustomerActivityByLead');
+        Route::get('/quotation/{id}', 'getQuotationByLead');
     });
     Route::prefix('customer')->controller(CustomerController::class)->group(function () {
         Route::get('/list', 'list');
@@ -330,7 +352,7 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         // Site Management
         Route::get('/site-list/{id}', 'getSiteList');
         Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
-        
+
         // Submit Checklist
         Route::post('/{id}/submit-checklist', 'submitChecklist');
     });
@@ -362,7 +384,11 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/available-sites/{leadsId}/{tipe}', 'getAvailableSites');
         Route::post('/{id}/submit-checklist', 'submitChecklist');
         Route::post('/upload/{id}', 'uploadPks');
-        // });
+
+        // ==================== PERJANJIAN (edit, history, compare) ====================
+        Route::put('/perjanjian/{id}', 'updatePerjanjian');               // Update konten perjanjian
+        Route::get('/perjanjian/{id}/history', 'getPerjanjianHistory');   // Lihat daftar riwayat perubahan
+        Route::post('/perjanjian/compare', 'comparePerjanjian');          // Bandingkan dua versi
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
@@ -450,7 +476,16 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::get('/summary', 'getRevenueSummary');
         Route::get('/by-user', 'getRevenueByUser');
         Route::get('/by-month', 'getRevenueByMonth');
+        Route::get('/kpi', 'getkpi');
+
     });
+    Route::apiResource('sales-target', SalesTargetController::class)->only([
+        'index',
+        'store',
+        'show',
+        'update',
+        'destroy',
+    ]);
 
     // Target Management
     Route::prefix('targets')->controller(TargetController::class)->group(function () {
@@ -470,6 +505,35 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
         Route::post('/quotations/{quotation}/chemical', 'updateStep9');
         Route::post('/quotations/{quotation}/ohc', 'updateStep10');
         Route::post('/quotations/{quotation}/harga-jual', 'updateStep11');
+    });
+
+    // System Announcements
+    Route::prefix('system-announcements')->controller(SystemAnnouncementController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    // System Announcements V2 — rich content, image upload, file attachment
+    Route::prefix('v2/system-announcements')->controller(SystemAnnouncementV2Controller::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/add', 'add');
+        Route::post('/upload-image', 'uploadImage');
+        Route::post('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+        Route::delete('/delete-file/{fileId}', 'deleteFile');
+    });
+    // Sales Report Routes
+    Route::prefix('sales-report')->controller(ReportController::class)->group(function () {
+        Route::get('/monthly', 'monthly');
+        Route::get('/weekly', 'weekly');
+        Route::get('/activity-detail/{user_id}', 'activityDetail');
+        Route::get('/monthly/tele', 'monthlyRole30');
+        Route::get('/weekly/tele', 'weeklyRole30');
+
     });
 
 });

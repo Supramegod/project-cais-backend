@@ -1,9 +1,15 @@
 <?php
 
+// app/Models/City.php
+
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class City extends Model
 {
@@ -12,33 +18,54 @@ class City extends Model
     protected $connection = 'mysqlhris';
     protected $table = 'm_city';
     protected $primaryKey = 'id';
-    
-    protected $fillable = [
-        'province_id',
-        'name',
-        'kode',
-        'is_active'
-    ];
+    protected $fillable = ['province_id', 'name', 'kode', 'is_active'];
 
-    public function province()
+    // ── Relationships ─────────────────────────────────────────────────────────
+
+    public function province(): BelongsTo
     {
         return $this->belongsTo(Province::class, 'province_id');
     }
 
-    public function districts()
+    public function umks(): HasMany
     {
-        return $this->hasMany(District::class, 'city_id');
-    }
-
-    public function leads()
-    {
-        return $this->hasMany(Leads::class, 'kota_id');
+        return $this->hasMany(Umk::class, 'city_id');
     }
 
     /**
-     * Scope untuk filter berdasarkan province
+     * UMK aktif terbaru — latestOfMany menghindari N+1.
      */
-    public function scopeByProvince($query, $provinceId)
+    public function activeUmk(): HasOne
+    {
+        return $this->hasOne(Umk::class, 'city_id')
+            ->where('is_aktif', true)
+            ->latestOfMany('tgl_berlaku');
+    }
+
+    public function umsks(): HasMany
+    {
+        return $this->hasMany(Umsk::class, 'city_id');
+    }
+
+    /**
+     * Semua UMSK aktif (satu per sektor) — eager-loadable tanpa N+1.
+     * HasMany karena satu kota bisa punya banyak sektor aktif sekaligus.
+     */
+    public function activeUmsks(): HasMany
+    {
+        return $this->hasMany(Umsk::class, 'city_id')
+            ->where('is_aktif', true)
+            ->orderBy('sektor');
+    }
+
+    // ── Scopes ────────────────────────────────────────────────────────────────
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeByProvince(Builder $query, int $provinceId): Builder
     {
         return $query->where('province_id', $provinceId);
     }

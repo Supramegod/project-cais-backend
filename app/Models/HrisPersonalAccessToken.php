@@ -11,10 +11,11 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
     protected $table = 'personal_access_tokens';
     protected $connection = 'mysql';
 
+
     // Token expires dalam 2 jam
-    protected $expirationTime = 2;
+    protected $expirationTime = 24 * 60; // 24 jam dalam menit
 
-
+   
     /**
      * Boot method untuk set tokenable_type dan expires_at otomatis
      */
@@ -35,15 +36,14 @@ class HrisPersonalAccessToken extends SanctumPersonalAccessToken
         });
     }
 
-    public function isValid()
+
+    protected function isExpired(): Attribute
     {
-        return !$this->expires_at || Carbon::now()->lt($this->expires_at);
+        return Attribute::make(
+            get: fn() => $this->expires_at ? Carbon::now()->gt($this->expires_at) : false,
+        );
     }
 
-    public function isExpired()
-    {
-        return !$this->isValid();
-    }
     public function refreshToken()
     {
         return $this->hasOne(RefreshTokens::class, 'access_token_id');

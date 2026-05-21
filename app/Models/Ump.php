@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use App\Traits\HasWageHistory;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Ump extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasWageHistory;
 
+    protected $connection = 'mysql';
     protected $table = 'm_ump';
     protected $fillable = [
         'province_id',
@@ -39,11 +42,9 @@ class Ump extends Model
     /**
      * Format ump sebelum menyimpan
      */
-    public function setUmpAttribute($value)
+    public function setUmpAttribute(mixed $value): void
     {
-        // Format: Rp. 1.000.000,00 -> 1000000.00
-        $value = str_replace(["Rp.", ".", ","], "", $value);
-        $this->attributes['ump'] = (float) $value;
+        $this->attributes['ump'] = $this->parseCurrencyInput($value);
     }
 
     /**
@@ -63,7 +64,10 @@ class Ump extends Model
             ->whereNull('deleted_at')
             ->get();
     }
-
+    public function scopeByProvince(Builder $query, int $provinceId): Builder
+    {
+        return $query->where('province_id', $provinceId);
+    }
     /**
      * Scope untuk data aktif
      */
@@ -72,13 +76,6 @@ class Ump extends Model
         return $query->where('is_aktif', 1);
     }
 
-    /**
-     * Scope untuk province tertentu
-     */
-    public function scopeByProvince($query, $provinceId)
-    {
-        return $query->where('province_id', $provinceId);
-    }
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
@@ -97,12 +94,8 @@ class Ump extends Model
             ? Carbon::parse($value)->format('d-m-Y')
             : null;
     }
-    public function formatump()
+    public function formatump(): string
     {
-        if (!$this->ump) {
-            return 'Rp. 0';
-        }
-
-        return 'Rp. ' . number_format(floatval($this->ump), 0, ',', '.');
+        return $this->formatWage('ump');
     }
 }
