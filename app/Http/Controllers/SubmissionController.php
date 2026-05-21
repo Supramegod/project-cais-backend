@@ -60,13 +60,31 @@ class SubmissionController extends Controller
             }
             if ($request->filled('search')) {
                 $term = '%' . $request->search . '%';
-                $query->where(function ($q) use ($term) {
-                    $q->where('nama_perusahaan', 'LIKE', $term)
-                        ->orWhere('pic', 'LIKE', $term)
-                        ->orWhere('no_telp', 'LIKE', $term)
-                        ->orWhere('email', 'LIKE', $term)
-                        ->orWhere('nomor', 'LIKE', $term);
-                });
+                $searchBy = $request->get('search_by');
+
+                $directCols = [
+                    'nama_perusahaan', 'pic', 'jabatan', 'no_telp', 'email',
+                    'nomor', 'notes', 'created_by',
+                ];
+
+                if ($searchBy && in_array($searchBy, $directCols, true)) {
+                    $query->where($searchBy, 'LIKE', $term);
+                } elseif ($searchBy === 'wilayah') {
+                    $query->whereHas('branch', fn($q) => $q->where('name', 'LIKE', $term));
+                } elseif ($searchBy === 'sumber_submission') {
+                    $query->whereHas('platform', fn($q) => $q->where('nama', 'LIKE', $term));
+                } elseif ($searchBy === 'status') {
+                    $query->whereHas('statusLeads', fn($q) => $q->where('nama', 'LIKE', $term));
+                } else {
+                    $query->where(function ($q) use ($term, $directCols) {
+                        foreach ($directCols as $col) {
+                            $q->orWhere($col, 'LIKE', $term);
+                        }
+                        $q->orWhereHas('branch', fn($qq) => $qq->where('name', 'LIKE', $term))
+                          ->orWhereHas('platform', fn($qq) => $qq->where('nama', 'LIKE', $term))
+                          ->orWhereHas('statusLeads', fn($qq) => $qq->where('nama', 'LIKE', $term));
+                    });
+                }
             }
 
             $data = $query->orderBy('id', 'desc')
