@@ -13799,17 +13799,9 @@
                                                         "type": "string",
                                                         "example": "Q/SG/AAAAB/01/2025"
                                                     },
-                                                    "nama_perusahaan": {
-                                                        "type": "string",
-                                                        "example": "PT ABC Indonesia"
-                                                    },
                                                     "tgl_quotation": {
                                                         "type": "string",
                                                         "example": "01-01-2025"
-                                                    },
-                                                    "total_harga": {
-                                                        "type": "number",
-                                                        "example": 50000000
                                                     },
                                                     "revisi": {
                                                         "type": "integer",
@@ -18356,6 +18348,274 @@
                 ]
             }
         },
+        "/api/pks/perjanjian/{id}": {
+            "put": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Update perjanjian PKS (menyimpan history versi lama)",
+                "description": "Memperbarui konten perjanjian PKS. Sebelum update, data lama akan disimpan ke tabel history untuk keperluan komparasi.",
+                "operationId": "463e1791354053e9c49468c57f9c3282",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID perjanjian (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "judul": {
+                                        "type": "string",
+                                        "example": "Ruang Lingkup Pekerjaan (Revisi)"
+                                    },
+                                    "raw_text": {
+                                        "type": "string",
+                                        "example": "<p>Isi kontrak yang sudah diperbarui...</p>"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Perjanjian berhasil diperbarui",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Perjanjian berhasil diperbarui"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "pasal": {
+                                                    "type": "string",
+                                                    "example": "Pasal 1"
+                                                },
+                                                "judul": {
+                                                    "type": "string",
+                                                    "example": "Ruang Lingkup Pekerjaan (Revisi)"
+                                                },
+                                                "raw_text": {
+                                                    "type": "string",
+                                                    "example": "<p>Isi kontrak yang sudah diperbarui...</p>"
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "Admin"
+                                                },
+                                                "updated_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Perjanjian tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/perjanjian/{id}/history": {
+            "get": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Daftar riwayat perubahan perjanjian",
+                "description": "Mengembalikan daftar history perubahan untuk suatu perjanjian (berdasarkan ID perjanjian, bukan ID history).",
+                "operationId": "89d5f9cc96ec6c33720902fde119584f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID perjanjian (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List riwayat perubahan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "judul": {
+                                                        "type": "string",
+                                                        "example": "RUANG LINGKUP PEKERJAAN"
+                                                    },
+                                                    "changed_by": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "waktu": {
+                                                        "type": "string",
+                                                        "example": "20-05-2026 14:30:00"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Perjanjian tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/perjanjian/compare": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Bandingkan dua versi perjanjian (highlight perubahan)",
+                "description": "Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+                "operationId": "2f9e228be39de44abb36ced169747e41",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "history_id_1"
+                                ],
+                                "properties": {
+                                    "history_id_1": {
+                                        "description": "ID history (versi lama)",
+                                        "type": "integer",
+                                        "example": 101
+                                    },
+                                    "history_id_2": {
+                                        "description": "ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama",
+                                        "type": "integer",
+                                        "example": 100
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Hasil komparasi",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "version_label_old": {
+                                                    "type": "string",
+                                                    "example": "Sebelum edit (20-05-2026 14:30:00)"
+                                                },
+                                                "version_label_new": {
+                                                    "type": "string",
+                                                    "example": "Saat ini (terbaru)"
+                                                },
+                                                "diff_unified": {
+                                                    "type": "string",
+                                                    "example": "--- Original\\n+++ New\\n@@ -1,3 +1,3 @@\\n..."
+                                                },
+                                                "old_text": {
+                                                    "type": "string",
+                                                    "example": "<p>teks lama</p>"
+                                                },
+                                                "new_text": {
+                                                    "type": "string",
+                                                    "example": "<p>teks baru</p>"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi error, history_id_1 harus ada"
+                    },
+                    "404": {
+                        "description": "History tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/position/list": {
             "get": {
                 "tags": [
@@ -21786,6 +22046,495 @@
                                         "message": {
                                             "type": "string",
                                             "example": "The month field is required."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/monthly/tele": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan bulanan role-30 berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 1"
+                                                    },
+                                                    "aggregat": {
+                                                        "properties": {
+                                                            "jumlah_leads": {
+                                                                "description": "Jumlah leads yang sudah melalui proses assignment",
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "jumlah_assignment": {
+                                                                "description": "Jumlah assignment (1 per leads yang di-assign)",
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "jumlah_appointment": {
+                                                                "description": "Jumlah appointment yang terjadi setelah assignment",
+                                                                "type": "integer",
+                                                                "example": 6
+                                                            },
+                                                            "pct_leads_to_assignment": {
+                                                                "description": "Persentase leads yang berhasil di-assign",
+                                                                "type": "string",
+                                                                "example": "100.0%"
+                                                            },
+                                                            "pct_assignment_to_appointment": {
+                                                                "description": "Persentase assignment yang berhasil jadi appointment",
+                                                                "type": "string",
+                                                                "example": "60.0%"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/weekly/tele": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
+                "parameters": [
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1-12)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang (opsional)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data laporan mingguan role-30 berhasil diambil",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "no": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "user_id": {
+                                                        "type": "integer",
+                                                        "example": 101
+                                                    },
+                                                    "nama_sales": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "cabang": {
+                                                        "type": "string",
+                                                        "example": "Central 1"
+                                                    },
+                                                    "w1": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w2": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w3": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 3
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "w4": {
+                                                        "properties": {
+                                                            "leads": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "assignment": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "appt": {
+                                                                "type": "integer",
+                                                                "example": 0
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/activity-detail/{user_id}": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Detail Aktivitas Sales",
+                "description": "Menampilkan daftar aktivitas sales secara flat per bulan/tahun berdasarkan user_id sales. Field `aksi` berisi ID dokumen terkait jika jenis aktivitas adalah Leads/Quotation/SPK/PKS, null untuk jenis lainnya.",
+                "operationId": "40e807038c91c121cdf76163dfae5472",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "description": "ID user sales. Harus terdaftar sebagai sales aktif.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 101
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1–12). Default: bulan berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "example": 9
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit). Default: tahun berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2025
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data detail aktivitas berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "user_id": {
+                                            "type": "integer",
+                                            "example": 101
+                                        },
+                                        "sales_name": {
+                                            "type": "string",
+                                            "example": "S. Wulandari Ayuningdiah"
+                                        },
+                                        "cabang": {
+                                            "type": "string",
+                                            "example": "East"
+                                        },
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "SEPTEMBER - 2025"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "example": "2 September 2025"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string",
+                                                        "example": "CAT/CS/AAB8I-092025-00001"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "Universitas Katolik Widya Mandala Surabaya"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Leads",
+                                                            "Appointment",
+                                                            "Visit",
+                                                            "Quotation",
+                                                            "SPK",
+                                                            "PKS",
+                                                            "Follow Up",
+                                                            "Kirim Berkas",
+                                                            "Email"
+                                                        ],
+                                                        "example": "Visit"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Presentasi dan submit compro"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "S. Wulandari Ayuningdiah"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "02-09-2025 15:02:26"
+                                                    },
+                                                    "aksi": {
+                                                        "description": "ID dokumen terkait: Leads→leads_id, Quotation→quotation_id, SPK→spk_id, PKS→pks_id. null untuk jenis lain.",
+                                                        "type": "integer",
+                                                        "example": 47,
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "user_id tidak ditemukan dalam daftar sales aktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID tidak ditemukan dalam daftar sales aktif."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi input gagal.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month must be between 1 and 12."
                                         }
                                     },
                                     "type": "object"
@@ -27006,6 +27755,353 @@
                 ]
             }
         },
+        "/api/v2/system-announcements/list": {
+            "get": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "List announcements (paginated)",
+                "operationId": "50c6b6d4c14a88a45c304a125f6f2946",
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "is_active",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/view/{id}": {
+            "get": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Get announcement detail with files",
+                "operationId": "5dfa6d04b8b5286175a5ed46f710a757",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successful operation"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/upload-image": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Upload inline image untuk editor",
+                "description": "Upload gambar dan dapatkan URL untuk disisipkan ke konten HTML editor",
+                "operationId": "06ef6ff3746d3f38801ac380ec62362d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "image": {
+                                        "description": "File gambar (jpg,jpeg,png,gif,webp), max 5MB",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "URL gambar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "url": {
+                                            "type": "string",
+                                            "example": "http://example.com/document/announcement-images/image20260512123456.jpg"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/add": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Buat announcement baru dengan file attachment",
+                "operationId": "59b33f970fd8c0cc1eb5056ec7c3a32e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "details": {
+                                        "description": "HTML content dari rich editor",
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    },
+                                    "attachments[]": {
+                                        "description": "File attachment (pdf,doc,docx,jpg,jpeg,png), max 10MB each",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Announcement created successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/update/{id}": {
+            "post": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Update announcement dan tambah attachment baru",
+                "operationId": "75a2085b6f59de33c5878e34b2da9688",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "title"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "Fitur Baru",
+                                            "Bug Fix",
+                                            "Aturan",
+                                            "Update"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "version": {
+                                        "type": "string"
+                                    },
+                                    "release_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "description": {
+                                        "type": "string"
+                                    },
+                                    "details": {
+                                        "type": "string"
+                                    },
+                                    "is_active": {
+                                        "type": "boolean"
+                                    },
+                                    "attachments[]": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Announcement updated successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/delete/{id}": {
+            "delete": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Hapus announcement beserta semua file-nya",
+                "operationId": "76d0d0af5711a2740a3f563cbad55bb3",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v2/system-announcements/delete-file/{fileId}": {
+            "delete": {
+                "tags": [
+                    "System Announcements V2"
+                ],
+                "summary": "Hapus satu file attachment",
+                "operationId": "1905897d7474c3b4f146e61ebdea8a75",
+                "parameters": [
+                    {
+                        "name": "fileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File deleted successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/tim-sales/list": {
             "get": {
                 "tags": [
@@ -31531,6 +32627,12 @@
                 "type": "http",
                 "bearerFormat": "Token",
                 "scheme": "bearer"
+            },
+            "sanctum": {
+                "type": "apiKey",
+                "description": "Masukkan token: Bearer {token}",
+                "name": "Authorization",
+                "in": "header"
             }
         }
     },
@@ -31644,6 +32746,10 @@
             "description": "API Endpoints untuk Log Update Aplikasi dan Pengumuman Sistem"
         },
         {
+            "name": "System Announcements V2",
+            "description": "API v2 — Announcement dengan rich content, image upload, dan file attachment"
+        },
+        {
             "name": "Tim Sales",
             "description": "API Endpoints untuk mengelola Tim Sales"
         },
@@ -31674,6 +32780,11 @@
         {
             "name": "User Email Config",
             "description": "User Email Config"
+        }
+    ],
+    "security": [
+        {
+            "sanctum": []
         }
     ]
 }
