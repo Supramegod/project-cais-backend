@@ -40,6 +40,7 @@ use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\UserEmailConfigController;
 use App\Http\Controllers\SubmissionController;
+use App\Http\Controllers\SubmissionV2Controller;
 use App\Http\Controllers\SystemAnnouncementController;
 use App\Http\Controllers\SystemAnnouncementV2Controller;
 
@@ -296,6 +297,15 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/view/{id}', 'view');
         Route::post('/convert', 'convert');
         Route::post('/delete', 'delete');
+    });
+
+    // Submission V2 (Google Sheet)
+    Route::prefix('submission-v2')->controller(SubmissionV2Controller::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/convert', 'convert');
+        Route::post('/delete', 'delete');
+        Route::post('/sync', 'sync');
     });
 
     // Leads Routes
