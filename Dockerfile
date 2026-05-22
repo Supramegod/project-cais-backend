@@ -11,10 +11,6 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd pdo pdo_mysql
 
-# Install ekstensi mongodb via pecl
-RUN pecl install mongodb \
-    && docker-php-ext-enable mongodb
-
 # Set working directory
 WORKDIR /var/www/laravel
 
