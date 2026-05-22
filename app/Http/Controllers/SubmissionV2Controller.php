@@ -64,18 +64,32 @@ class SubmissionV2Controller extends Controller
                 ->whereNull('customer_id')
                 ->whereBetween('tgl_leads', [$tglDari . ' 00:00:00', $tglSampai . ' 23:59:59']);
 
-            if ($request->filled('branch')) $query->where('branch_id', $request->branch);
-            if ($request->filled('platform')) $query->where('platform_id', $request->platform);
-            if ($request->filled('status')) $query->where('status_leads_id', $request->status);
+            if ($request->filled('branch'))
+                $query->where('branch_id', $request->branch);
+            if ($request->filled('platform'))
+                $query->where('platform_id', $request->platform);
+            if ($request->filled('status'))
+                $query->where('status_leads_id', $request->status);
 
             if ($request->filled('search')) {
                 $term = '%' . $request->search . '%';
                 $searchBy = $request->get('search_by');
 
                 $directCols = [
-                    'nama_perusahaan', 'pic', 'jabatan', 'no_telp', 'email',
-                    'nomor', 'notes', 'created_by', 'hc', 'total_invoice',
-                    'wilayah_text', 'platform_text', 'kebutuhan_text', 'status_text',
+                    'nama_perusahaan',
+                    'pic',
+                    'jabatan',
+                    'no_telp',
+                    'email',
+                    'nomor',
+                    'notes',
+                    'created_by',
+                    'hc',
+                    'total_invoice',
+                    'wilayah_text',
+                    'platform_text',
+                    'kebutuhan_text',
+                    'status_text',
                 ];
 
                 if ($searchBy && in_array($searchBy, $directCols, true)) {
@@ -83,17 +97,17 @@ class SubmissionV2Controller extends Controller
                 } elseif ($searchBy === 'wilayah') {
                     $query->where(function ($q) use ($term) {
                         $q->whereHas('branch', fn($qq) => $qq->where('name', 'LIKE', $term))
-                          ->orWhere('wilayah_text', 'LIKE', $term);
+                            ->orWhere('wilayah_text', 'LIKE', $term);
                     });
                 } elseif ($searchBy === 'sumber_submission') {
                     $query->where(function ($q) use ($term) {
                         $q->whereHas('platform', fn($qq) => $qq->where('nama', 'LIKE', $term))
-                          ->orWhere('platform_text', 'LIKE', $term);
+                            ->orWhere('platform_text', 'LIKE', $term);
                     });
                 } elseif ($searchBy === 'status') {
                     $query->where(function ($q) use ($term) {
                         $q->whereHas('statusLeads', fn($qq) => $qq->where('nama', 'LIKE', $term))
-                          ->orWhere('status_text', 'LIKE', $term);
+                            ->orWhere('status_text', 'LIKE', $term);
                     });
                 } else {
                     $query->where(function ($q) use ($term, $directCols) {
@@ -101,8 +115,8 @@ class SubmissionV2Controller extends Controller
                             $q->orWhere($col, 'LIKE', $term);
                         }
                         $q->orWhereHas('branch', fn($qq) => $qq->where('name', 'LIKE', $term))
-                          ->orWhereHas('platform', fn($qq) => $qq->where('nama', 'LIKE', $term))
-                          ->orWhereHas('statusLeads', fn($qq) => $qq->where('nama', 'LIKE', $term));
+                            ->orWhereHas('platform', fn($qq) => $qq->where('nama', 'LIKE', $term))
+                            ->orWhereHas('statusLeads', fn($qq) => $qq->where('nama', 'LIKE', $term));
                     });
                 }
             }
@@ -175,14 +189,40 @@ class SubmissionV2Controller extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/submission-v2/convert",
-     *     summary="Konversi submission v2 terpilih menjadi leads",
-     *     tags={"Submission V2"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(required=true, @OA\JsonContent(required={"id"}, @OA\Property(property="id", type="array", @OA\Items(type="integer"))))
-     * )
-     */
+   * @OA\Post(
+   *     path="/api/submission-v2/convert",
+   *     summary="Konversi submission v2 terpilih menjadi leads",
+   *     tags={"Submission V2"},
+   *     security={{"bearerAuth":{}}},
+
+   *     @OA\RequestBody(
+   *         required=true,
+   *         @OA\JsonContent(
+   *             required={"id"},
+   *             @OA\Property(
+   *                 property="id",
+   *                 type="array",
+   *                 @OA\Items(type="integer")
+   *             )
+   *         )
+   *     ),
+
+   *     @OA\Response(
+   *         response=200,
+   *         description="Submission berhasil dikonversi"
+   *     ),
+
+   *     @OA\Response(
+   *         response=401,
+   *         description="Unauthorized"
+   *     ),
+
+   *     @OA\Response(
+   *         response=422,
+   *         description="Validation error"
+   *     )
+   * )
+   */
     public function convert(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -203,7 +243,8 @@ class SubmissionV2Controller extends Controller
 
             foreach ($request->id as $key => $submissionId) {
                 $submission = SubmissionV2::find($submissionId);
-                if (!$submission || $submission->deleted_at) continue;
+                if (!$submission || $submission->deleted_at)
+                    continue;
 
                 $nomor = $key === 0 ? $this->generateNomor() : $this->generateNomorLanjutan($nomor);
 
@@ -466,7 +507,8 @@ class SubmissionV2Controller extends Controller
     {
         $row = [];
         foreach ($header as $i => $key) {
-            if ($key === '' || $key === null) continue;
+            if ($key === '' || $key === null)
+                continue;
             $row[$key] = isset($cols[$i]) ? trim((string) $cols[$i]) : null;
         }
         return $row;
@@ -474,14 +516,17 @@ class SubmissionV2Controller extends Controller
 
     private function parseInt($v): ?int
     {
-        if ($v === null || $v === '') return null;
-        if (preg_match('/\d+/', (string) $v, $m)) return (int) $m[0];
+        if ($v === null || $v === '')
+            return null;
+        if (preg_match('/\d+/', (string) $v, $m))
+            return (int) $m[0];
         return null;
     }
 
     private function parseDate(?string $v): ?string
     {
-        if (!$v) return null;
+        if (!$v)
+            return null;
         $v = trim($v);
 
         // Sheet pakai format Indonesia: D/M/Y atau D/M/YY (e.g. "29/1/26", "5/1/26")
@@ -507,7 +552,8 @@ class SubmissionV2Controller extends Controller
 
     private function cleanPhone(?string $v): ?string
     {
-        if (!$v) return null;
+        if (!$v)
+            return null;
         $v = trim(preg_replace('/\s+/', ' ', $v));
         // Ambil baris pertama kalau multi-line
         $first = explode("\n", $v)[0] ?? $v;
@@ -516,11 +562,13 @@ class SubmissionV2Controller extends Controller
 
     private function matchBranch($branches, ?string $text): ?int
     {
-        if (!$text) return null;
+        if (!$text)
+            return null;
         $needle = strtolower(trim($text));
         foreach ($branches as $b) {
             $name = strtolower($b->name);
-            if ($needle === $name) return (int) $b->id;
+            if ($needle === $name)
+                return (int) $b->id;
         }
         foreach ($branches as $b) {
             $name = strtolower($b->name);
@@ -533,17 +581,20 @@ class SubmissionV2Controller extends Controller
 
     private function matchPlatform($platforms, ?string $text): ?int
     {
-        if (!$text) return null;
+        if (!$text)
+            return null;
         $needle = strtolower(trim($text));
         foreach ($platforms as $p) {
-            if ($needle === strtolower($p->nama)) return (int) $p->id;
+            if ($needle === strtolower($p->nama))
+                return (int) $p->id;
         }
         return null;
     }
 
     private function matchKebutuhan($kebutuhans, ?string $text): ?int
     {
-        if (!$text) return null;
+        if (!$text)
+            return null;
         $needle = strtolower(trim($text));
         $aliases = [
             'security guard' => 'security',
@@ -557,20 +608,24 @@ class SubmissionV2Controller extends Controller
         ];
         $target = $aliases[$needle] ?? $needle;
         foreach ($kebutuhans as $k) {
-            if (strtolower($k->nama) === $target) return (int) $k->id;
+            if (strtolower($k->nama) === $target)
+                return (int) $k->id;
         }
         foreach ($kebutuhans as $k) {
-            if (str_contains($target, strtolower($k->nama))) return (int) $k->id;
+            if (str_contains($target, strtolower($k->nama)))
+                return (int) $k->id;
         }
         return null;
     }
 
     private function matchStatus($statuses, ?string $text): ?int
     {
-        if (!$text) return null;
+        if (!$text)
+            return null;
         $needle = strtolower(trim($text));
         foreach ($statuses as $s) {
-            if ($needle === strtolower($s->nama)) return (int) $s->id;
+            if ($needle === strtolower($s->nama))
+                return (int) $s->id;
         }
         return null;
     }
@@ -580,19 +635,28 @@ class SubmissionV2Controller extends Controller
     private function generateNomor()
     {
         $lastLeads = Leads::latest('id')->first();
-        if (!$lastLeads?->nomor) return 'AAAAA';
+        if (!$lastLeads?->nomor)
+            return 'AAAAA';
 
         $nomor = $lastLeads->nomor;
         $chars = str_split($nomor);
         for ($i = count($chars) - 1; $i >= 0; $i--) {
             $current = $chars[$i];
             if (is_numeric($current)) {
-                if ($current < '9') { $chars[$i] = (string) ($current + 1); break; }
-                $chars[$i] = 'A'; break;
+                if ($current < '9') {
+                    $chars[$i] = (string) ($current + 1);
+                    break;
+                }
+                $chars[$i] = 'A';
+                break;
             }
             if (ctype_alpha($current)) {
-                if ($current < 'Z') { $chars[$i] = chr(ord($current) + 1); break; }
-                $chars[$i] = '0'; continue;
+                if ($current < 'Z') {
+                    $chars[$i] = chr(ord($current) + 1);
+                    break;
+                }
+                $chars[$i] = '0';
+                continue;
             }
         }
         return str_pad(implode('', $chars), 5, 'A', STR_PAD_RIGHT);
@@ -613,7 +677,8 @@ class SubmissionV2Controller extends Controller
             $nomor = substr_replace($nomor, chr($ascii), $i, 1);
             break;
         }
-        if (strlen($nomor) < 5) $nomor = str_pad($nomor, 5, 'A', STR_PAD_RIGHT);
+        if (strlen($nomor) < 5)
+            $nomor = str_pad($nomor, 5, 'A', STR_PAD_RIGHT);
         return $nomor;
     }
 }
