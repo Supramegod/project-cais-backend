@@ -67,7 +67,10 @@ return [
             'middleware' => [
                 'api' => [],
                 'asset' => [],
-                'docs' => ['web', 'auth'],
+                'docs' => explode(',', env(
+                    'L5_SWAGGER_MIDDLEWARE',
+                    'web'
+                )),
                 'oauth2_callback' => [],
             ],
 
