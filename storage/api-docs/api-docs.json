@@ -18530,10 +18530,9 @@
         "/api/pks/perjanjian/compare": {
             "post": {
                 "tags": [
-                    "PKS"
+                    "PKS - Perjanjian"
                 ],
-                "summary": "Bandingkan dua versi perjanjian (highlight perubahan)",
-                "description": "Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+                "summary": "Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
                 "operationId": "2f9e228be39de44abb36ced169747e41",
                 "requestBody": {
                     "required": true,
@@ -18541,18 +18540,16 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "history_id_1"
+                                    "pks_perjanjian_id"
                                 ],
                                 "properties": {
-                                    "history_id_1": {
-                                        "description": "ID history (versi lama)",
+                                    "pks_perjanjian_id": {
                                         "type": "integer",
-                                        "example": 101
+                                        "example": 10
                                     },
-                                    "history_id_2": {
-                                        "description": "ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama",
-                                        "type": "integer",
-                                        "example": 100
+                                    "history_id": {
+                                        "description": "Opsional, ID history yang akan dibandingkan dengan versi terbaru. Jika kosong, ambil history terbaru.",
+                                        "type": "integer"
                                     }
                                 },
                                 "type": "object"
@@ -18562,51 +18559,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Hasil komparasi",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "version_label_old": {
-                                                    "type": "string",
-                                                    "example": "Sebelum edit (20-05-2026 14:30:00)"
-                                                },
-                                                "version_label_new": {
-                                                    "type": "string",
-                                                    "example": "Saat ini (terbaru)"
-                                                },
-                                                "diff_unified": {
-                                                    "type": "string",
-                                                    "example": "--- Original\\n+++ New\\n@@ -1,3 +1,3 @@\\n..."
-                                                },
-                                                "old_text": {
-                                                    "type": "string",
-                                                    "example": "<p>teks lama</p>"
-                                                },
-                                                "new_text": {
-                                                    "type": "string",
-                                                    "example": "<p>teks baru</p>"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "description": "Validasi error, history_id_1 harus ada"
-                    },
-                    "404": {
-                        "description": "History tidak ditemukan"
+                        "description": "Hasil komparasi"
                     }
                 },
                 "security": [
@@ -27145,6 +27098,343 @@
                 ]
             }
         },
+        "/api/submission/list": {
+            "get": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Daftar submission dengan filter",
+                "operationId": "98016ac105582aea537f1908293fb41d",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/view/{id}": {
+            "get": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Detail satu submission",
+                "operationId": "c08715848c9e9a81ddb380224031b33c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/convert": {
+            "post": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Konversi submission terpilih menjadi leads",
+                "operationId": "cf783225ff8663b6758ed03c242592bd",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/delete": {
+            "delete": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Hapus (soft delete) submission terpilih",
+                "operationId": "939f40b8157cfb4d827f46500cb0d7f9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/list": {
+            "get": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Daftar submission v2 dengan filter",
+                "operationId": "b0e6b91b9f4c111d14c6cc1b3bcf23eb",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/convert": {
+            "post": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Konversi submission v2 terpilih menjadi leads",
+                "operationId": "6032ec6509301681cf2a784d69a8bf26",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Submission berhasil dikonversi"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/sync": {
+            "post": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Sync data submission v2 dari Google Sheet",
+                "description": "Tarik CSV dari Google Sheet publik, parse, dan upsert ke sl_submission_v2 berdasarkan source_row_no.",
+                "operationId": "9d88f3a0ca20e6892adfac575991dfe7",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/supplier/list": {
             "get": {
                 "tags": [
@@ -32738,6 +33028,14 @@
             "description": "API untuk manajemen Surat Perintah Kerja (SPK)"
         },
         {
+            "name": "Submission",
+            "description": "API untuk manajemen Submission (data form/webhook calon leads sebelum dikonversi menjadi leads)"
+        },
+        {
+            "name": "Submission V2",
+            "description": "Submission V2 — data berasal dari Google Sheet, disimpan di sl_submission_v2"
+        },
+        {
             "name": "Supplier",
             "description": "API Endpoints untuk Management Supplier"
         },
@@ -32776,6 +33074,10 @@
         {
             "name": "Upah",
             "description": "Modul terpadu Upah Minimum: UMP & UMSP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
+        },
+        {
+            "name": "PKS - Perjanjian",
+            "description": "PKS - Perjanjian"
         },
         {
             "name": "User Email Config",
