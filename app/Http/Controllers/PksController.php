@@ -2005,7 +2005,7 @@ class PksController extends Controller
 
         $history = PksPerjanjianHistory::where('pks_perjanjian_id', $id)
             ->orderBy('created_at', 'desc')
-            ->get(['id', 'judul', 'changed_by', 'created_at']);
+            ->get(['id', 'judul', 'raw_text', 'changed_by', 'created_at']);
 
         return response()->json([
             'success' => true,
@@ -2020,75 +2020,63 @@ class PksController extends Controller
     /**
      * @OA\Post(
      *     path="/api/pks/perjanjian/compare",
-     *     summary="Bandingkan dua versi perjanjian (highlight perubahan)",
-     *     description="Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
-     *     tags={"PKS"},
+     *     summary="Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
+     *     tags={"PKS - Perjanjian"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"history_id_1"},
-     *             @OA\Property(property="history_id_1", type="integer", description="ID history (versi lama)", example=101),
-     *             @OA\Property(property="history_id_2", type="integer", description="ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama", example=100)
+     *             required={"pks_perjanjian_id"},
+     *             @OA\Property(property="pks_perjanjian_id", type="integer", example=10),
+     *             @OA\Property(property="history_id", type="integer", description="Opsional, ID history yang akan dibandingkan dengan versi terbaru. Jika kosong, ambil history terbaru.")
      *         )
      *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Hasil komparasi",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", type="object",
-     *                 @OA\Property(property="version_label_old", type="string", example="Sebelum edit (20-05-2026 14:30:00)"),
-     *                 @OA\Property(property="version_label_new", type="string", example="Saat ini (terbaru)"),
-     *                 @OA\Property(property="diff_unified", type="string", example="--- Original\n+++ New\n@@ -1,3 +1,3 @@\n..."),
-     *                 @OA\Property(property="old_text", type="string", example="<p>teks lama</p>"),
-     *                 @OA\Property(property="new_text", type="string", example="<p>teks baru</p>")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(response=422, description="Validasi error, history_id_1 harus ada"),
-     *     @OA\Response(response=404, description="History tidak ditemukan")
+     *     @OA\Response(response=200, description="Hasil komparasi")
      * )
      */
     public function comparePerjanjian(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'history_id_1' => 'required|exists:sl_pks_perjanjian_history,id',
-            'history_id_2' => 'nullable|exists:sl_pks_perjanjian_history,id',
+            'pks_perjanjian_id' => 'required|exists:sl_pks_perjanjian,id',
+            'history_id' => 'nullable|exists:sl_pks_perjanjian_history,id',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
         }
 
-        $history1 = PksPerjanjianHistory::find($request->history_id_1);
+        $perjanjian = PksPerjanjian::find($request->pks_perjanjian_id);
+        $newText = $perjanjian->raw_text;
+        $newJudul = $perjanjian->judul;
+        $labelNew = "Saat ini (terbaru)";
 
-        // Bandingkan dengan versi lain atau versi terbaru
-        if ($request->filled('history_id_2')) {
-            $history2 = PksPerjanjianHistory::find($request->history_id_2);
-            $oldText = $history1->raw_text;
-            $newText = $history2->raw_text;
-            $oldJudul = $history1->judul;
-            $newJudul = $history2->judul;
-            $labelOld = "Versi " . $history1->created_at->format('d-m-Y H:i');
-            $labelNew = "Versi " . $history2->created_at->format('d-m-Y H:i');
-        } else {
-            $perjanjian = PksPerjanjian::find($history1->pks_perjanjian_id);
-            if (!$perjanjian) {
-                return response()->json(['success' => false, 'message' => 'Perjanjian tidak ditemukan'], 404);
+        if ($request->filled('history_id')) {
+            $history = PksPerjanjianHistory::find($request->history_id);
+            if (!$history) {
+                return response()->json(['success' => false, 'message' => 'History tidak ditemukan'], 404);
             }
-            $oldText = $history1->raw_text;
-            $newText = $perjanjian->raw_text;
-            $oldJudul = $history1->judul;
-            $newJudul = $perjanjian->judul;
-            $labelOld = "Sebelum edit (" . $history1->created_at->format('d-m-Y H:i') . ")";
-            $labelNew = "Saat ini (terbaru)";
+            $oldText = $history->raw_text;
+            $oldJudul = $history->judul;
+            $labelOld = "Versi " . $history->created_at->format('d-m-Y H:i');
+        } else {
+            $latestHistory = PksPerjanjianHistory::where('pks_perjanjian_id', $perjanjian->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (!$latestHistory) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada riwayat perubahan untuk perjanjian ini.'
+                ], 404);
+            }
+
+            $oldText = $latestHistory->raw_text;
+            $oldJudul = $latestHistory->judul;
+            $labelOld = "Sebelum edit (" . $latestHistory->created_at->format('d-m-Y H:i') . ")";
         }
 
-        // Deteksi perubahan judul
         $judulChanged = ($oldJudul !== $newJudul);
 
-        // Generate diff untuk isi (raw_text) - opsional, bisa juga kirim null jika tidak perlu
         $diff = null;
         if ($oldText !== $newText) {
             try {
@@ -2098,7 +2086,7 @@ class PksController extends Controller
                 $differ = new Differ($outputBuilder);
                 $diff = $differ->diff($oldLines, $newLines);
             } catch (\Exception $e) {
-                $diff = null; // Fallback, biar frontend yang handle diff
+                $diff = null;
             }
         }
 
@@ -2116,7 +2104,6 @@ class PksController extends Controller
             ]
         ]);
     }
-
     // ======================================================================
     // PRIVATE METHODS - Business Logic
     // ======================================================================
