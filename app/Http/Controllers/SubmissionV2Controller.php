@@ -322,7 +322,8 @@ class SubmissionV2Controller extends Controller
             $kebutuhans = DB::table('m_kebutuhan')->whereNull('deleted_at')->get(['id', 'nama']);
             $statuses = DB::table('m_status_leads')->get(['id', 'nama']);
 
-            $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'sync';
+            // Selalu pakai 'sync' biar konsisten — siapa yang trigger di-track via synced_at
+            $userName = 'sync';
             $now = Carbon::now()->toDateTimeString();
 
             $inserted = 0;
