@@ -1176,13 +1176,16 @@ class QuotationService
         }
 
         if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Management Fee") {
+            // PPH dari Management Fee
             $calculatedPph = round($managementFee * -0.02, 2);
             $maxPph = abs($baseAmount * 0.1);
             if (abs($calculatedPph) > $maxPph) {
                 $calculatedPph = -$maxPph;
             }
             $summary->{"pph{$suffix}"} = $calculatedPph;
-        } elseif ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong != "Total Invoice") {
+
+        } elseif ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Total Invoice") {
+            // ✅ FIX: PPH dari Total Invoice (sebelumnya tidak ada branch ini → PPH = 0)
             $calculatedPph = round($summary->{"grand_total_sebelum_pajak{$suffix}"} * -0.02, 2);
             $maxPph = abs($baseAmount * 0.1);
             if (abs($calculatedPph) > $maxPph) {
@@ -1190,6 +1193,7 @@ class QuotationService
             }
             $summary->{"pph{$suffix}"} = $calculatedPph;
         } else {
+            // PPH sudah ada nilainya, pastikan negatif
             if ($summary->{"pph{$suffix}"} > 0) {
                 $summary->{"pph{$suffix}"} = -abs($summary->{"pph{$suffix}"});
             }
