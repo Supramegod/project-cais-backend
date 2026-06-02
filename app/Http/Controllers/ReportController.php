@@ -1312,6 +1312,200 @@ class ReportController extends Controller
         ]);
     }
 
+    // ============================================================
+    //  ENDPOINT BARU: Activity Detail untuk cais_role_id = 30 (Telesales)
+    // ============================================================
+
+    /**
+     * @OA\Get(
+     *     path="/api/sales-report/activity-detail/tele/{user_id}",
+     *     summary="Detail Aktivitas Telesales",
+     *     description="Menampilkan daftar aktivitas telesales (cais_role_id=30) secara flat per bulan/tahun berdasarkan user_id. Hanya menampilkan aktivitas: Leads, Assignment, dan Appointment.",
+     *     tags={"Sales Report"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="user_id",
+     *         in="path",
+     *         required=true,
+     *         description="ID user telesales. Harus terdaftar sebagai telesales aktif (cais_role_id=30).",
+     *         @OA\Schema(type="integer", example=101)
+     *     ),
+     *     @OA\Parameter(
+     *         name="month",
+     *         in="query",
+     *         required=false,
+     *         description="Bulan laporan (1–12). Default: bulan berjalan.",
+     *         @OA\Schema(type="integer", minimum=1, maximum=12, example=5)
+     *     ),
+     *     @OA\Parameter(
+     *         name="year",
+     *         in="query",
+     *         required=false,
+     *         description="Tahun laporan (4 digit). Default: tahun berjalan.",
+     *         @OA\Schema(type="integer", example=2026)
+     *     ),
+     *     @OA\Parameter(
+     *         name="branch_id",
+     *         in="query",
+     *         required=false,
+     *         description="Filter berdasarkan ID cabang.",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Data detail aktivitas telesales berhasil diambil.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="user_id", type="integer", example=101),
+     *             @OA\Property(property="sales_name", type="string", example="Budi Santoso"),
+     *             @OA\Property(property="cabang", type="string", example="Central 1"),
+     *             @OA\Property(property="periode", type="string", example="MEI - 2026"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     @OA\Property(property="id", type="integer", example=123),
+     *                     @OA\Property(property="tgl_activity", type="string", example="5 Mei 2026"),
+     *                     @OA\Property(property="nomor", type="integer", example=1),
+     *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Maju Jaya"),
+     *                     @OA\Property(
+     *                         property="tipe",
+     *                         type="string",
+     *                         enum={"Leads", "Assignment", "Appointment"},
+     *                         example="Assignment"
+     *                     ),
+     *                     @OA\Property(property="notes", type="string", example="Leads dari referral"),
+     *                     @OA\Property(property="created_by", type="string", example="Budi Santoso"),
+     *                     @OA\Property(property="created_at", type="string", example="05-05-2026 09:30:00"),
+     *                     @OA\Property(
+     *                         property="aksi",
+     *                         type="integer",
+     *                         nullable=true,
+     *                         description="ID dokumen terkait: Leads→leads_id, Assignment→leads_id. null untuk Appointment.",
+     *                         example=47
+     *                     )
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="user_id tidak ditemukan dalam daftar telesales aktif.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="User ID tidak ditemukan dalam daftar telesales aktif.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validasi input gagal.",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="The month must be between 1 and 12.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=500, description="Server Error")
+     * )
+     */
+    public function activityDetailTele(Request $request, int $userId)
+    {
+        // ── 1. Validasi query params ──────────────────────────────────────────
+        $validator = Validator::make($request->all(), [
+            'month' => 'nullable|integer|between:1,12',
+            'year' => 'nullable|integer|digits:4',
+            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => $validator->errors()->first(),
+            ], 422);
+        }
+
+        // ── 2. Resolusi parameter ─────────────────────────────────────────────
+        $month = (int) ($request->month ?? now()->month);
+        $year = (int) ($request->year ?? now()->year);
+        $branchId = $request->branch_id;
+
+        $startDate = Carbon::createFromDate($year, $month, 1)->startOfDay();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
+
+        $periode = strtoupper(
+            Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
+        ) . ' - ' . $year;
+
+        // ── 3. Validasi user_id ada di daftar telesales aktif (role 30) ───────
+        $salesCollection = $this->getSalesNamesRole30($branchId);
+        $matched = $salesCollection->firstWhere('user_id', $userId);
+
+        if (!$matched) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User ID tidak ditemukan dalam daftar telesales aktif.',
+            ], 404);
+        }
+
+        $salesName = $matched->nama_sales;
+        $cabang = $matched->cabang;
+
+        // ── 4. Query aktivitas (hanya Leads, Assignment, Appointment) ─────────
+        $activities = DB::table('sl_activity_sales as sa')
+            ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+            ->select(
+                'sa.id',
+                'sa.leads_id',
+                'sa.tgl_activity',
+                'sa.jenis_activity',
+                DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                'sa.created_by',
+                'sa.created_at',
+                'l.nama_perusahaan'
+            )
+            ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+            ->where('sa.created_by', $salesName)
+            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
+            ->orderBy('sa.tgl_activity', 'asc')
+            ->orderBy('sa.created_at', 'asc')
+            ->get();
+
+        // ── 5. Map hasil ke response format ───────────────────────────────────
+        // aksi: Leads & Assignment → leads_id (untuk navigasi ke detail leads)
+        //       Appointment        → null (tidak ada dokumen terpisah)
+        $data = $activities->map(function ($row, $index) {
+            $aksi = match ($row->jenis_activity) {
+                'Leads', 'Assignment' => $row->leads_id,
+                default => null,
+            };
+
+            return [
+                'id' => $row->id,
+                'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
+                'nomor' => $index + 1,
+                'nama_perusahaan' => $row->nama_perusahaan,
+                'tipe' => $row->jenis_activity ?? '',
+                'notes' => $row->notulen,
+                'created_by' => $row->created_by,
+                'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
+                'aksi' => $aksi,
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'success' => true,
+            'user_id' => $userId,
+            'sales_name' => $salesName,
+            'cabang' => $cabang,
+            'periode' => $periode,
+            'data' => $data,
+        ]);
+    }
+
     // ──────────────────────────────────────────────
     //  Helper Methods
     // ──────────────────────────────────────────────
