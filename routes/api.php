@@ -20,6 +20,7 @@ use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
+use App\Http\Controllers\BentukUsahaController;
 use App\Http\Controllers\KebutuhanController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\KaporlapController;
@@ -64,6 +65,14 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     // Jenis Perusahaan
     Route::prefix('jenis-perusahaan')->controller(JenisPerusahaanController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::post('/save', 'save');
+        Route::get('/view/{id}', 'view');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    Route::prefix('bentuk-usaha')->controller(BentukUsahaController::class)->group(function () {
         Route::get('/list', 'list');
         Route::post('/save', 'save');
         Route::get('/view/{id}', 'view');
