@@ -423,40 +423,31 @@ class PksController extends Controller
     {
         try {
             $pks = Pks::with([
-                'leads',
-                'statusPks',
-                'sites',
-                'spk.spkSites',
-                'perjanjian',
-                'activities',
-                'ruleThr',
+                'leads.kebutuhan:id,nama',
+                'statusPks:id,nama',
+                'sites:id,pks_id,nama_site,kota,penempatan,quotation_id,created_at',
+                'spk.spkSites:id,spk_id,nama_site,kota,penempatan,quotation_id',
+                'perjanjian:id,pks_id,pasal,judul,raw_text,created_by',
+                'activities:id,pks_id,tgl_activity,notes,tipe,created_by',
+                'ruleThr:id,nama',
             ])->find($id);
 
             if (!$pks) {
                 return response()->json(['success' => false, 'message' => 'PKS not found'], 404);
             }
 
-            // Format dates
-            $pks->formatted_kontrak_awal = Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y');
-            $pks->formatted_kontrak_akhir = Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y');
-            $pks->berakhir_dalam = $this->hitungBerakhirKontrak($pks->kontrak_akhir);
-
-            // MAPPED DATA - LEADS
+            // ──────────────────────────────────────────────
+            // LEADS MAPPED
+            // ──────────────────────────────────────────────
             $leads_mapped = null;
             if ($pks->leads) {
                 $leads = $pks->leads;
-
-                // Ambil data kebutuhan dari leads
-                $kebutuhan_leads = null;
-                if ($leads->relationLoaded('kebutuhan') && $leads->kebutuhan) {
-                    $kebutuhan_leads = $leads->kebutuhan->nama;
-                }
 
                 $leads_mapped = [
                     'id' => $leads->id,
                     'nama_perusahaan' => $leads->nama_perusahaan ?? null,
                     'nomor_leads' => $leads->nomor ?? null,
-                    'kebutuhan_leads' => $kebutuhan_leads,
+                    'kebutuhan_leads' => $leads->kebutuhan->first()?->nama,
                     'negara' => $leads->negara ?? null,
                     'bidang_perusahaan' => $leads->bidang_perusahaan ?? null,
                     'pma_pmdn' => $leads->pma ?? null,
@@ -466,124 +457,128 @@ class PksController extends Controller
                     'alamat' => $leads->alamat ?? null,
                     'pic' => $leads->pic ?? null,
                     'jabatan' => $leads->jabatan ?? null,
-
                 ];
             }
 
-            // MAPPED DATA - PKS
+            // ──────────────────────────────────────────────
+            // PKS MAPPED
+            // ──────────────────────────────────────────────
             $pks_mapped = [
                 'id' => $pks->id,
                 'nomor' => $pks->nomor ?? null,
                 'link_pks_disetujui' => $pks->link_pks_disetujui ?? null,
-                'status' => $pks->statusPks ? $pks->statusPks->nama : null,
-                'activities' => $pks->activities->map(function ($activity) {
-                    return [
-                        'id' => $activity->id,
-                        'tgl_activity' => $activity->tgl_activity,
-                        'notes' => $activity->notes,
-                        'tipe' => $activity->tipe,
-                        'created_by' => $activity->created_by,
-                    ];
-                })->toArray(),
-                'perjanjian' => $pks->perjanjian->map(function ($perjanjian) {
-                    return [
-                        'id' => $perjanjian->id,
-                        'pasal' => $perjanjian->pasal,
-                        'judul' => $perjanjian->judul,
-                        'raw_text' => $perjanjian->raw_text,
-                        'created_by' => $perjanjian->created_by,
-                    ];
-                })->toArray(),
-                // 'rule_thr' => $pks->ruleThr ? [
-                //     'id' => $pks->ruleThr->id,
-                //     'nama' => $pks->ruleThr->nama,
-                //     'hari_rilis_thr' => $pks->ruleThr->hari_rilis_thr,
-                //     'hari_pembayaran_invoice' => $pks->ruleThr->hari_pembayaran_invoice,
-                //     'hari_penagihan_invoice' => $pks->ruleThr->hari_penagihan_invoice
-                // ] : null
+                'status' => $pks->statusPks?->nama,
+                'formatted_kontrak_awal' => Carbon::parse($pks->kontrak_awal)->isoFormat('D MMMM Y'),
+                'formatted_kontrak_akhir' => Carbon::parse($pks->kontrak_akhir)->isoFormat('D MMMM Y'),
+                'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->kontrak_akhir),
+                'activities' => $pks->activities->map(fn($a) => [
+                    'id' => $a->id,
+                    'tgl_activity' => $a->tgl_activity,
+                    'notes' => $a->notes,
+                    'tipe' => $a->tipe,
+                    'created_by' => $a->created_by,
+                ])->toArray(),
+                'perjanjian' => $pks->perjanjian->map(fn($p) => [
+                    'id' => $p->id,
+                    'pasal' => $p->pasal,
+                    'judul' => $p->judul,
+                    'raw_text' => $p->raw_text,
+                    'created_by' => $p->created_by,
+                ])->toArray(),
             ];
-
-            // QUOTATION DATA
             $quotationDataArray = [];
             $spkarray = [];
 
             if ($pks->sites->isNotEmpty()) {
-                $data = Site::where('pks_id', $pks->id)
+
+                // 1 query: ambil distinct quotation_id + spk_id dari sites
+                $siteData = Site::where('pks_id', $pks->id)
                     ->whereNotNull('quotation_id')
                     ->whereNull('deleted_at')
                     ->select('quotation_id', 'spk_id')
                     ->distinct()
                     ->get();
 
-                foreach ($data as $dataid) {
-                    $quotation = Quotation::with([
-                        'quotationDetails.quotationDetailHpps',
-                        'quotationDetails.quotationDetailCosses',
-                        'quotationDetails.wage',
-                        'quotationDetails.quotationDetailRequirements',
-                        'quotationDetails.quotationDetailTunjangans',
-                        'leads',
-                        'statusQuotation',
-                        'quotationSites',
-                        'quotationPics',
-                        'quotationAplikasis',
-                        'quotationKaporlaps',
-                        'quotationDevices',
-                        'quotationChemicals',
-                        'quotationOhcs',
-                        'quotationTrainings',
-                        'quotationKerjasamas',
-                        'managementFee',
-                    ])->find($dataid->quotation_id);
+                // Kumpulkan semua ID terlebih dahulu
+                $quotationIds = $siteData->pluck('quotation_id')->filter()->unique()->values();
+                $spkIds = $siteData->pluck('spk_id')->filter()->unique()->values();
 
+                // 1 query: load semua Quotation sekaligus
+                $quotations = Quotation::with([
+                    'quotationDetails.quotationDetailHpps',
+                    'quotationDetails.quotationDetailCosses',
+                    'quotationDetails.wage',
+                    'quotationDetails.quotationDetailRequirements',
+                    'quotationDetails.quotationDetailTunjangans',
+                    'leads',
+                    'statusQuotation',
+                    'quotationSites',
+                    'quotationPics',
+                    'quotationAplikasis',
+                    'quotationKaporlaps',
+                    'quotationDevices',
+                    'quotationChemicals',
+                    'quotationOhcs',
+                    'quotationTrainings',
+                    'quotationKerjasamas',
+                    'managementFee',
+                ])
+                    ->whereIn('id', $quotationIds)
+                    ->get()
+                    ->keyBy('id');  // akses O(1) di bawah
+
+                // 1 query: load semua Spk sekaligus
+                $spks = Spk::select('id', 'nomor', 'leads_id', 'tgl_spk')
+                    ->whereIn('id', $spkIds)
+                    ->get()
+                    ->keyBy('id');  // akses O(1) di bawah
+
+                // Loop ini tidak menembak query sama sekali
+                foreach ($siteData as $item) {
+                    $quotation = $quotations->get($item->quotation_id);
                     if ($quotation) {
                         $quotationDataArray[] = new QuotationResource($quotation);
                     }
 
-                    $spk = Spk::select('id', 'nomor', 'leads_id', 'tgl_spk')
-                        ->find($dataid->spk_id);
-
+                    $spk = $spks->get($item->spk_id);
                     if ($spk) {
                         $spkarray[] = $spk;
                     }
                 }
             }
 
-            // SITES INFO - PERBAIKAN DI SINI
+            // ──────────────────────────────────────────────
+            // SITES INFO
+            // ✅ FIX : branch else pakai $pks->sites (koleksi sudah eager-loaded)
+            //          bukan $pks->sites() yang menembak query baru
+            // ──────────────────────────────────────────────
             $sitesInfo = [];
 
-            // Cek apakah relasi spk ada dan tidak null
             if ($pks->spk && $pks->spk->spkSites) {
-                $sitesInfo = $pks->spk->spkSites->map(function ($site) {
-                    return [
+                $sitesInfo = $pks->spk->spkSites->map(fn($site) => [
+                    'id' => $site->id,
+                    'nama_site' => $site->nama_site,
+                    'kota' => $site->kota,
+                    'penempatan' => $site->penempatan,
+                    'quotation_id' => $site->quotation_id,
+                ])->toArray();
+            } else {
+                // ✅ $pks->sites = property (koleksi in-memory, 0 query)
+                //    $pks->sites() = method (query builder baru, +1 query) — jangan pakai ini
+                $sitesInfo = $pks->sites
+                    ->sortByDesc('created_at')
+                    ->unique('nama_site')
+                    ->values()
+                    ->map(fn($site) => [
                         'id' => $site->id,
                         'nama_site' => $site->nama_site,
                         'kota' => $site->kota,
                         'penempatan' => $site->penempatan,
                         'quotation_id' => $site->quotation_id,
-                    ];
-                })->toArray();
-            } else {
-                // Alternatif: Ambil sites info dari relasi sites yang sudah ada
-                // SITES INFO - ambil site terbaru untuk setiap nama_site
-                $sitesInfo = $pks->sites()
-                    ->select('id', 'nama_site', 'kota', 'penempatan', 'quotation_id', 'created_at')
-                    ->orderBy('created_at', 'desc') // urutkan dari terbaru
-                    ->get()
-                    ->unique('nama_site') // ambil unik berdasarkan nama_site (terbaru karena sudah diurutkan)
-                    ->values()
-                    ->map(function ($site) {
-                        return [
-                            'id' => $site->id,
-                            'nama_site' => $site->nama_site,
-                            'kota' => $site->kota,
-                            'penempatan' => $site->penempatan,
-                            'quotation_id' => $site->quotation_id,
-                        ];
-                    })->toArray();
+                    ])->toArray();
             }
 
-            $response = [
+            return response()->json([
                 'success' => true,
                 'data' => [
                     'pks_mapped' => $pks_mapped,
@@ -592,9 +587,8 @@ class PksController extends Controller
                 'quotation_data' => $quotationDataArray,
                 'spk_data' => $spkarray,
                 'sites_info' => $sitesInfo,
-            ];
+            ]);
 
-            return response()->json($response);
 
         } catch (\Exception $e) {
             \Log::error('Failed to retrieve PKS details: ' . $e->getMessage());
@@ -607,6 +601,7 @@ class PksController extends Controller
             ], 500);
         }
     }
+
     // /**
     //  * Format quotation data according to case 11 structure
     //  *//**
@@ -1358,7 +1353,14 @@ class PksController extends Controller
     public function getPerjanjianTemplateData($id): JsonResponse
     {
         try {
-            $pks = Pks::with(['leads', 'sites'])->find($id);
+            $pks = Pks::with([
+                'leads',
+                'sites:id,pks_id,nama_site,penempatan,kota',
+                'company:id,name,code,nama_direktur,address',
+                'kebutuhan:id,nama',
+                'ruleThr:id,hari_penagihan_invoice,hari_pembayaran_invoice,hari_rilis_thr',
+                'salaryRule:id,cutoff,crosscheck_absen,pengiriman_invoice,perkiraan_invoice_diterima,pembayaran_invoice,rilis_payroll',
+            ])->find($id);
 
             if (!$pks) {
                 return response()->json([
@@ -1830,9 +1832,13 @@ class PksController extends Controller
                 'updated_at' => now(),
                 'updated_by' => Auth::user()->full_name,
             ]);
+            $leads = $pks->leads; // pastikan relasi leads sudah di-load
+            if (!$leads) {
+                $leads = Leads::find($pks->leads_id);
+            }
 
             // Catat aktivitas
-            $this->createUploadPksActivity($pks);
+            $this->createUploadPksActivity($pks, $leads);
 
             DB::commit();
 
@@ -1949,8 +1955,10 @@ class PksController extends Controller
 
             DB::commit();
 
-            // Catat aktivitas (opsional, gunakan method yang sudah ada atau buat helper)
-            $this->logPerjanjianChange($perjanjian);
+            $pks = Pks::with('leads')->find($perjanjian->pks_id);
+            if ($pks && $pks->leads) {
+                $this->logPerjanjianChange($perjanjian, $pks->leads);
+            }
 
             return response()->json([
                 'success' => true,
@@ -2104,40 +2112,264 @@ class PksController extends Controller
             ]
         ]);
     }
+    /**
+     * @OA\Post(
+     *     path="/api/pks/{pks_id}/perjanjian",
+     *     summary="Tambah pasal baru ke perjanjian PKS",
+     *     description="Menambahkan pasal baru ke dalam perjanjian suatu PKS. Nomor pasal harus unik dalam satu PKS.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks_id",
+     *         in="path",
+     *         required=true,
+     *         description="ID PKS",
+     *         @OA\Schema(type="integer", example=5)
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"pasal","judul","raw_text"},
+     *             @OA\Property(property="pasal",    type="string", example="Pasal 12",           description="Nomor/label pasal, unik per PKS"),
+     *             @OA\Property(property="judul",    type="string", example="KETENTUAN LAIN-LAIN", description="Judul pasal"),
+     *             @OA\Property(property="raw_text", type="string", example="Hal-hal yang tidak diatur...", description="Isi lengkap pasal")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Pasal berhasil ditambahkan",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string",  example="Pasal berhasil ditambahkan"),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="id",         type="integer", example=42),
+     *                 @OA\Property(property="pks_id",     type="integer", example=5),
+     *                 @OA\Property(property="pasal",      type="string",  example="Pasal 12"),
+     *                 @OA\Property(property="judul",      type="string",  example="KETENTUAN LAIN-LAIN"),
+     *                 @OA\Property(property="raw_text",   type="string",  example="Hal-hal yang tidak diatur..."),
+     *                 @OA\Property(property="created_by", type="string",  example="John Doe")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="PKS tidak ditemukan"),
+     *     @OA\Response(response=422, description="Validasi gagal atau pasal sudah ada")
+     * )
+     */
+    public function storePasal(Request $request, $pks_id): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'pasal' => 'required|string|max:50',
+            'judul' => 'required|string|max:255',
+            'raw_text' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            // ✅ 2 query: PKS + leads sekaligus (eager load), tidak ada query susulan untuk leads
+            $pks = Pks::with('leads:id,nomor,kebutuhan_id,branch_id')
+                ->findOrFail($pks_id);
+
+            // ✅ 1 query: cek duplikasi pasal dalam PKS yang sama
+            if (
+                PksPerjanjian::where('pks_id', $pks_id)
+                    ->where('pasal', $request->pasal)
+                    ->exists()
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Pasal '{$request->pasal}' sudah ada dalam perjanjian PKS ini.",
+                ], 422);
+            }
+
+            DB::beginTransaction();
+
+            // ✅ 1 query: insert pasal baru
+            $perjanjian = PksPerjanjian::create([
+                'pks_id' => $pks->id,
+                'pasal' => $request->pasal,
+                'judul' => $request->judul,
+                'raw_text' => $request->raw_text,
+                'created_by' => Auth::user()->full_name,
+                'updated_by' => Auth::user()->full_name,
+            ]);
+
+            // ✅ Activity log — leads sudah ter-load di atas, tidak ada query tambahan untuk leads
+            if ($pks->leads) {
+                $nomorActivity = $this->generateNomorActivity($pks->leads);
+                CustomerActivity::create([
+                    'leads_id' => $pks->leads->id,
+                    'pks_id' => $pks->id,
+                    'branch_id' => $pks->leads->branch_id,
+                    'tgl_activity' => now(),
+                    'nomor' => $nomorActivity,
+                    'tipe' => 'PKS_PERJANJIAN',
+                    'notes' => "Pasal {$perjanjian->pasal} - {$perjanjian->judul} ditambahkan oleh " . Auth::user()->full_name,
+                    'is_activity' => 0,
+                    'user_id' => Auth::id(),
+                    'created_by' => Auth::user()->full_name,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pasal berhasil ditambahkan',
+                'data' => [
+                    'id' => $perjanjian->id,
+                    'pks_id' => $perjanjian->pks_id,
+                    'pasal' => $perjanjian->pasal,
+                    'judul' => $perjanjian->judul,
+                    'raw_text' => $perjanjian->raw_text,
+                    'created_by' => $perjanjian->created_by,
+                ],
+            ], 201);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'PKS tidak ditemukan'], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('storePasal error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/api/pks/perjanjian/{id}",
+     *     summary="Hapus pasal dari perjanjian PKS",
+     *     description="Menghapus (soft-delete) satu pasal dari perjanjian PKS berdasarkan ID pasal.",
+     *     tags={"PKS"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         description="ID pasal (sl_pks_perjanjian.id)",
+     *         @OA\Schema(type="integer", example=42)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Pasal berhasil dihapus",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string",  example="Pasal berhasil dihapus")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="Pasal tidak ditemukan")
+     * )
+     */
+    public function destroyPasal($id): JsonResponse
+    {
+        try {
+            // ✅ 1 query: ambil pasal — kolom minimal yang dibutuhkan
+            $perjanjian = PksPerjanjian::select('id', 'pks_id', 'pasal', 'judul')
+                ->findOrFail($id);
+
+            // ✅ 1 query: PKS + leads sekaligus, tidak ada query susulan untuk leads
+            $pks = Pks::with('leads:id,nomor,kebutuhan_id,branch_id')
+                ->find($perjanjian->pks_id);
+
+            DB::beginTransaction();
+
+            // ✅ 1 query: soft-delete (sets deleted_at, SoftDeletes trait)
+            $perjanjian->delete();
+
+            // ✅ Activity log — leads sudah ter-load di atas
+            if ($pks && $pks->leads) {
+                $nomorActivity = $this->generateNomorActivity($pks->leads);
+                CustomerActivity::create([
+                    'leads_id' => $pks->leads->id,
+                    'pks_id' => $pks->id,
+                    'branch_id' => $pks->leads->branch_id,
+                    'tgl_activity' => now(),
+                    'nomor' => $nomorActivity,
+                    'tipe' => 'PKS_PERJANJIAN',
+                    'notes' => "Pasal {$perjanjian->pasal} - {$perjanjian->judul} dihapus oleh " . Auth::user()->full_name,
+                    'is_activity' => 0,
+                    'user_id' => Auth::id(),
+                    'created_by' => Auth::user()->full_name,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pasal berhasil dihapus',
+            ]);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException) {
+            return response()->json(['success' => false, 'message' => 'Pasal tidak ditemukan'], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('destroyPasal error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     // ======================================================================
     // PRIVATE METHODS - Business Logic
     // ======================================================================
     private function processPksLogic($request, $tipe)
     {
+        // 1. Ambil data Leads utama
         $leads = Leads::findOrFail($request->leads_id);
-        // Tentukan nomor PKS berdasarkan tipe
+
+        $pksInduk = null;
+        $quotationId = null;
+
+        // 2. Tentukan nomor PKS & ID terkait berdasarkan tipe
         if ($tipe === 'addendum') {
-            // Untuk addendum, gunakan nomor addendum
             $pksNomor = $this->generateNomorAddendum($request->pks_id);
             $pksInduk = Pks::findOrFail($request->pks_id);
 
-            // Gunakan data dari PKS induk untuk beberapa field
             $quotationId = $pksInduk->quotation_id;
             $companyId = $pksInduk->company_id ?? $request->entitas;
         } else {
-            // Untuk baru dan rekontrak, gunakan generate nomor biasa
             $pksNomor = $this->generateNomor($leads->id, $request->entitas);
             $companyId = $request->entitas;
 
-            // Cari Quotation ID jika rekontrak
-            $quotationId = null;
             if ($tipe === 'rekontrak') {
-                $firstSite = QuotationSite::findOrFail($request->quotation_site_ids[0]);
+                // Gunakan select('quotation_id') agar query lebih ringan
+                $firstSite = QuotationSite::select('quotation_id')->findOrFail($request->quotation_site_ids[0]);
                 $quotationId = $firstSite->quotation_id;
             } else {
-                $quotationId = Quotation::where('leads_id', $leads->id)->first()->id ?? null;
+                // Gunakan select('id', 'kebutuhan_id') untuk optimasi memori
+                $quotation = Quotation::select('id', 'kebutuhan_id')->where('leads_id', $leads->id)->first();
+                $quotationId = $quotation->id ?? null;
             }
         }
-        $quotation = Quotation::find($quotationId);
-        $layananId = $quotation ? $quotation->kebutuhan_id : $leads->kebutuhan_id;
-        $kebutuhan = Kebutuhan::find($layananId);
 
-        // 1. Create PKS (Unified)
+        // 3. Tentukan Layanan/Kebutuhan ID secara presisi
+        if ($tipe !== 'addendum' && isset($quotation)) {
+            $layananId = $quotation->kebutuhan_id;
+        } else {
+            $quotation = $quotationId ? Quotation::select('id', 'kebutuhan_id')->find($quotationId) : null;
+            $layananId = $quotation ? $quotation->kebutuhan_id : $leads->kebutuhan_id;
+        }
+
+        // 4. BATCH FETCH DATA MASTER (Hanya tembak query jika ID-nya ada)
+        [$kebutuhan, $kategoriHC, $loyalty, $company, $ruleThr, $salaryRule] = [
+            $layananId ? Kebutuhan::find($layananId) : null,
+            $request->kategoriHC ? KategoriSesuaiHc::find($request->kategoriHC) : null,
+            $request->loyalty ? Loyalty::find($request->loyalty) : null,
+            $companyId ? Company::find($companyId) : null,
+            $request->rule_thr ? RuleThr::find($request->rule_thr) : null,
+            $request->salary_rule ? SalaryRule::find($request->salary_rule) : null,
+        ];
+
+        // 5. Create PKS (Unified)
         $pks = Pks::create([
             'leads_id' => $leads->id,
             'quotation_id' => $quotationId,
@@ -2161,48 +2393,40 @@ class PksController extends Controller
             'salary_rule_id' => $request->salary_rule,
             'rule_thr_id' => $request->rule_thr,
             'kategori_sesuai_hc_id' => $request->kategoriHC,
-            'kategori_sesuai_hc' => KategoriSesuaiHc::find($request->kategoriHC)->nama ?? null,
+            'kategori_sesuai_hc' => $kategoriHC->nama ?? null,
             'loyalty_id' => $request->loyalty,
-            'loyalty' => Loyalty::find($request->loyalty)->nama ?? null,
+            'loyalty' => $loyalty->nama ?? null,
             'provinsi_id' => $leads->provinsi_id,
             'provinsi' => $leads->provinsi,
             'kota_id' => $leads->kota_id,
             'kota' => $leads->kota,
             'pma' => $leads->pma,
-            // Tambahkan field untuk addendum
             'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
-            'tipe_pks' => $tipe, // tambahkan field tipe_pks jika ada di database
+            'tipe_pks' => $tipe,
             'created_by' => Auth::user()->full_name,
         ]);
 
-        // 2. Create Sites (Conditional)
+        // 6. Create Sites (Conditional)
         $siteIds = ($tipe === 'baru') ? $request->site_ids : $request->quotation_site_ids;
-
-        // Tentukan tipe untuk syncPksSites
         $syncType = ($tipe === 'baru') ? 'baru' : 'rekontrak';
 
         $this->syncPksSites($pks, $siteIds, $pksNomor, $kebutuhan, $leads, $syncType);
 
-        // 3. Side Effects
+        // 7. Side Effects
         $this->createInitialActivity($pks, $leads, $pksNomor);
 
-        // Untuk addendum, gunakan data company dari PKS induk
-        if ($tipe === 'addendum') {
-            $company = Company::find($companyId);
-        } else {
-            $company = Company::find($request->entitas);
-        }
-
+        // FIX OPTIMASI: Langsung gunakan variabel data master yang sudah di-fetch di awal (Langkah 4)
         $this->createPksPerjanjian(
             $pks,
             $leads,
-            $company,
-            $kebutuhan,
-            RuleThr::find($request->rule_thr),
-            SalaryRule::find($request->salary_rule),
+            $company,       // reuse variabel awal
+            $kebutuhan,     // reuse variabel awal
+            $ruleThr,       // reuse variabel awal
+            $salaryRule,    // reuse variabel awal
             $pksNomor
         );
-        // Update status SPK → "Generated PKS" (id: 3)
+
+        // 8. Bulk Update Status Model Lain
         Spk::where('leads_id', $leads->id)
             ->whereNotIn('status_spk_id', [100]) // skip Terminated
             ->update([
@@ -2210,25 +2434,22 @@ class PksController extends Controller
                 'updated_by' => Auth::user()->full_name,
             ]);
 
-        // Update status Quotation → "Generated PKS" (id: 5)
         if ($quotationId) {
             Quotation::where('id', $quotationId)
-                ->where('status_quotation_id', '!=', 100) // skip Terminated
+                ->where('status_quotation_id', '!=', 100)
                 ->update([
                     'status_quotation_id' => 5,
                     'updated_by' => Auth::user()->full_name,
                 ]);
         }
 
-        // Update status Leads → "Deal" (id: 99)
-        $statusTerminalLeads = [100, 101]; // Tidak Deal, Bukan Leads
+        $statusTerminalLeads = [100, 101];
         if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
             $leads->update([
                 'status_leads_id' => 99,
                 'updated_by' => Auth::user()->full_name,
             ]);
         }
-
 
         return $pks;
     }
@@ -2237,9 +2458,13 @@ class PksController extends Controller
     {
         $isBaru = ($type === 'baru');
         $model = $isBaru ? SpkSite::class : QuotationSite::class;
+        $sourceSites = $model::whereIn('id', $siteIds)
+            ->with('quotation:id,nomor')
+            ->get()
+            ->keyBy('id');
 
         foreach ($siteIds as $key => $id) {
-            $sourceSite = $model::find($id);
+            $sourceSite = $sourceSites->get($id);
             if (!$sourceSite) {
                 continue;
             }
@@ -2312,7 +2537,7 @@ class PksController extends Controller
 
     private function createInitialActivity($pks, $leads, $pksNomor)
     {
-        $nomorActivity = $this->generateNomorActivity($leads->id);
+        $nomorActivity = $this->generateNomorActivity($leads);
         $user = Auth::user();
         if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             // Untuk Sales, buat SalesActivity
@@ -2376,129 +2601,6 @@ class PksController extends Controller
         ]);
     }
 
-    private function activatePksSites($pks)
-    {
-        DB::beginTransaction();
-
-        try {
-            // Update PKS menjadi aktif
-            $pks->update([
-                'ot5' => Auth::user()->full_name,
-                'status_pks_id' => 7,
-                'is_aktif' => 1,
-                'updated_by' => Auth::user()->full_name,
-            ]);
-
-            $leads = $pks->leads;
-
-            // Cek apakah customer sudah ada
-            if (!$leads->customer_id) {
-                // Generate nomor customer
-                $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
-
-                // Buat record customer
-                $customer = Customer::create([
-                    'leads_id' => $leads->id,
-                    'nomor' => $customerNomor,
-                    'tgl_customer' => now(),
-                    'tim_sales_id' => $leads->tim_sales_id,
-                    'tim_sales_d_id' => $leads->tim_sales_d_id,
-                    'created_by' => Auth::user()->full_name,
-                ]);
-
-                // Update leads dengan customer_id, status_leads_id, dan customer_active
-                $leads->update([
-                    'customer_id' => $customer->id,
-                    'status_leads_id' => 102,
-                    'customer_active' => 1, // Set ke 1 karena PKS aktif
-                    'updated_by' => Auth::user()->full_name,
-                ]);
-
-                // Buat activity log untuk customer
-                $this->createCustomerActivity($leads, $customerNomor);
-
-            } else {
-                // Jika customer sudah ada, update status dan customer_active
-                $leads->update([
-                    'status_leads_id' => 102,
-                    'customer_active' => 1, // Set ke 1 karena PKS aktif
-                    'updated_by' => Auth::user()->full_name,
-                ]);
-            }
-
-            // Update customer_active untuk semua leads yang terkait (otomatis)
-            $this->autoSyncCustomerActiveStatus();
-
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
-    }
-
-    /**
-     * SYNC OTOMATIS - Update customer_active berdasarkan status PKS
-     * Dipanggil otomatis ketika ada perubahan PKS
-     */
-    private function autoSyncCustomerActiveStatus()
-    {
-        try {
-            // Ambil semua leads yang sudah menjadi customer
-            $leadsWithCustomers = Leads::whereNotNull('customer_id')
-                ->whereNull('deleted_at')
-                ->get();
-
-            foreach ($leadsWithCustomers as $lead) {
-                $this->updateCustomerActiveFromPks($lead);
-            }
-
-            \Log::info('Auto sync customer_active status completed', [
-                'count' => $leadsWithCustomers->count(),
-                'timestamp' => now(),
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Auto sync customer_active status failed: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Update customer_active untuk satu leads berdasarkan status PKS
-     */
-    private function updateCustomerActiveFromPks($lead)
-    {
-        // Cari semua PKS yang terkait dengan leads ini
-        $pksList = Pks::where('leads_id', $lead->id)
-            ->whereNull('deleted_at')
-            ->get();
-
-        $hasActivePks = false;
-
-        foreach ($pksList as $pks) {
-            // Cek apakah PKS aktif dan kontrak masih berlaku
-            if ($pks->is_aktif == 1 && $this->isKontrakBerlaku($pks->kontrak_akhir)) {
-                $hasActivePks = true;
-                break;
-            }
-        }
-
-        // Update customer_active berdasarkan status PKS
-        $newStatus = $hasActivePks ? 1 : 0;
-
-        // Only update if changed to avoid unnecessary database operations
-        if ($lead->customer_active != $newStatus) {
-            $lead->update([
-                'customer_active' => $newStatus,
-            ]);
-
-            \Log::info('Customer active status updated', [
-                'leads_id' => $lead->id,
-                'customer_id' => $lead->customer_id,
-                'customer_active' => $newStatus,
-                'timestamp' => now(),
-            ]);
-        }
-    }
 
     /**
      * Cek apakah kontrak masih berlaku
@@ -2515,46 +2617,13 @@ class PksController extends Controller
         return $tanggalSekarang->lessThanOrEqualTo($tanggalKontrakAkhir);
     }
 
-    /**
-     * Generate nomor customer dengan format seperti PKS
-     */
-    private function generateCustomerNumber($leadsId, $companyId = null)
-    {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-
-        if (!$companyId && $leads && $leads->company_id) {
-            $companyId = $leads->company_id;
-        }
-
-        $company = Company::where('id', $companyId)->first();
-        $dataLeads = Leads::find($leadsId);
-
-        $nomor = 'CUST/'; // Prefix CUST untuk Customer
-
-        if ($company && $dataLeads) {
-            $nomor .= $company->code . '/';
-            $nomor .= $dataLeads->nomor . '-';
-        } else {
-            $nomor .= 'NN/NNNNN-';
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-
-        // Hitung jumlah data customer dengan pattern yang sama
-        $pattern = $nomor . $month . $now->year . '-%';
-        $jumlahData = Customer::where('nomor', 'like', $pattern)->count();
-        $urutan = sprintf('%05d', $jumlahData + 1);
-
-        return $nomor . $month . $now->year . '-' . $urutan;
-    }
 
     /**
      * Create customer activity log
      */
     private function createCustomerActivity($leads, $customerNomor)
     {
-        $nomorActivity = $this->generateNomorActivity($leads->id);
+        $nomorActivity = $this->generateNomorActivity($leads);
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -2571,11 +2640,11 @@ class PksController extends Controller
 
     private function getTemplateData($pks)
     {
+        $company = $pks->company;
+        $kebutuhan = $pks->kebutuhan;
+        $ruleThr = $pks->ruleThr;
+        $salaryRule = $pks->salaryRule;
         $leads = $pks->leads;
-        $company = Company::find($pks->company_id);
-        $kebutuhan = Kebutuhan::find($pks->layanan_id);
-        $ruleThr = RuleThr::find($pks->rule_thr_id);
-        $salaryRule = SalaryRule::find($pks->salary_rule_id);
 
         return [
             'pks' => [
@@ -2715,10 +2784,10 @@ class PksController extends Controller
         return $nomor . $month . $now->year . '-' . $urutan;
     }
 
-    private function generateNomorActivity($leadsId)
+    private function generateNomorActivity(Leads $leads)
     {
         $now = Carbon::now();
-        $leads = Leads::find($leadsId);
+
 
         $prefix = 'CAT/';
         if ($leads) {
@@ -2890,16 +2959,14 @@ class PksController extends Controller
             'updated_by' => Auth::user()->full_name,
         ]);
 
-        // Update Quotation status → "Site Telah Aktif" (id: 6)
         if ($pks->quotation_id) {
-            $quotation = Quotation::find($pks->quotation_id);
-            if ($quotation) {
-                $quotation->update([
+            Quotation::where('id', $pks->quotation_id)
+                ->where('status_quotation_id', '!=', 100)
+                ->update([
                     'status_quotation_id' => 6,
                     'updated_at' => $current_date_time,
                     'updated_by' => Auth::user()->full_name,
                 ]);
-            }
         }
 
         // Update SPK status → "Site Telah Aktif" (id: 4)
@@ -2967,10 +3034,11 @@ class PksController extends Controller
     {
         $siteList = Site::where('pks_id', $pks->id)
             ->whereNull('deleted_at')
+            ->with('quotation')          // ← 1 query tambahan, bukan N
             ->get();
 
         foreach ($siteList as $site) {
-            $quotation = Quotation::find($site->quotation_id);
+            $quotation = $site->quotation;
             if (!$quotation) {
                 continue;
             }
@@ -3030,7 +3098,6 @@ class PksController extends Controller
     {
         // Get quotation details
         $detailQuotation = QuotationDetail::whereNull('deleted_at')
-            ->whereNull('deleted_at')
             ->where('quotation_site_id', $site->quotation_site_id)
             ->get();
 
@@ -3176,7 +3243,7 @@ class PksController extends Controller
      */
     private function createCustomerActivityLog($pks, $leads, $current_date_time)
     {
-        $nomorActivity = $this->generateNomorActivity($leads->id);
+        $nomorActivity = $this->generateNomorActivity($leads);
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -3196,49 +3263,13 @@ class PksController extends Controller
     /**
      * Handle Customer Status
      */
-    private function handleCustomerStatus($pks, $leads, $current_date_time)
-    {
-        // If customer doesn't exist, create one
-        if (!$leads->customer_id) {
-            $customerNomor = $this->generateCustomerNumber($leads->id, $pks->company_id);
-
-            $customer = Customer::create([
-                'leads_id' => $leads->id,
-                'nomor' => $customerNomor,
-                'tgl_customer' => $current_date_time,
-                'tim_sales_id' => $leads->tim_sales_id,
-                'tim_sales_d_id' => $leads->tim_sales_d_id,
-                'created_by' => Auth::user()->full_name,
-            ]);
-
-            $leads->update([
-                'customer_id' => $customer->id,
-                'customer_active' => 1,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name,
-            ]);
-
-            // Create customer activity log
-            $this->createCustomerCreationActivity($leads, $customerNomor, $current_date_time);
-        } else {
-            // Update existing customer status
-            $leads->update([
-                'customer_active' => 1,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name,
-            ]);
-        }
-
-        // Auto sync customer active status
-        $this->autoSyncCustomerActiveStatus();
-    }
 
     /**
      * Create Customer Creation Activity
      */
     private function createCustomerCreationActivity($leads, $customerNomor, $current_date_time)
     {
-        $nomorActivity = $this->generateNomorActivity($leads->id);
+        $nomorActivity = $this->generateNomorActivity($leads);
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -3306,10 +3337,9 @@ class PksController extends Controller
      *
      * @param  Pks  $pks
      */
-    private function createUploadPksActivity($pks): void
+    private function createUploadPksActivity($pks, Leads $leads): void
     {
-        $leads = Leads::find($pks->leads_id);
-        $nomorActivity = $this->generateNomorActivity($leads->id);
+        $nomorActivity = $this->generateNomorActivity($leads);
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -3345,13 +3375,12 @@ class PksController extends Controller
 
         return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
-    private function logPerjanjianChange($perjanjian)
+    private function logPerjanjianChange($perjanjian, Leads $leads)
     {
-        $pks = Pks::find($perjanjian->pks_id);
+        $pks = Pks::find($perjanjian->pks_id, );
         if ($pks && $pks->leads_id) {
-            $leads = Leads::find($pks->leads_id);
             if ($leads) {
-                $nomorActivity = $this->generateNomorActivity($leads->id);
+                $nomorActivity = $this->generateNomorActivity($leads);
                 CustomerActivity::create([
                     'leads_id' => $leads->id,
                     'pks_id' => $perjanjian->pks_id,
