@@ -2021,7 +2021,7 @@ class PksController extends Controller
      * @OA\Post(
      *     path="/api/pks/perjanjian/compare",
      *     summary="Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
-     *     tags={"PKS - Perjanjian"},
+     *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,

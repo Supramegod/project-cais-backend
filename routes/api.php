@@ -257,6 +257,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+        // Group routes
+        Route::get('/group/list', 'listGroup');
+        Route::post('/group/add', 'addGroup');
+        Route::post('/group/assign', 'assignMenuToGroup');
+
     });
 
     // OHC (hanya index)
@@ -562,6 +567,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/activity-detail/{user_id}', 'activityDetail');
         Route::get('/monthly/tele', 'monthlyRole30');
         Route::get('/weekly/tele', 'weeklyRole30');
+        Route::get('/activity-detail/tele/{user_id}', 'activityDetailTele');
 
     });
 
