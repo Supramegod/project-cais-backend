@@ -5,6 +5,7 @@ use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardApprovalController;
+use App\Http\Controllers\DashboardPksController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -483,6 +484,13 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::put('/notifications/{id}/read', 'markAsRead');
         Route::put('/notifications/read-all', 'markAllAsRead');
         Route::get('/notifications/unread-count', 'getUnreadCount');
+    });
+
+    // Dashboard PKS - monitoring kontrak
+    Route::prefix('dashboard-pks')->controller(DashboardPksController::class)->group(function () {
+        Route::get('/summary', 'summary');
+        Route::get('/expiring', 'expiring');
+        Route::get('/list', 'list');
     });
 
     // Sales Activity Routes
