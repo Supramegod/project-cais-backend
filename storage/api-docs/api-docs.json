@@ -18700,6 +18700,56 @@
                         "bearerAuth": []
                     }
                 ]
+            },
+            "delete": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Hapus pasal dari perjanjian PKS",
+                "description": "Menghapus (soft-delete) satu pasal dari perjanjian PKS berdasarkan ID pasal.",
+                "operationId": "b6879e9f29e73dac6e291564f119600b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID pasal (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 42
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pasal berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pasal tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/pks/perjanjian/{id}/history": {
@@ -18807,6 +18857,122 @@
                 "responses": {
                     "200": {
                         "description": "Hasil komparasi"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{pks_id}/perjanjian": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Tambah pasal baru ke perjanjian PKS",
+                "description": "Menambahkan pasal baru ke dalam perjanjian suatu PKS. Nomor pasal harus unik dalam satu PKS.",
+                "operationId": "b098bb3dc661a0bdee69d578ba2d9fd2",
+                "parameters": [
+                    {
+                        "name": "pks_id",
+                        "in": "path",
+                        "description": "ID PKS",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pasal",
+                                    "judul",
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "pasal": {
+                                        "description": "Nomor/label pasal, unik per PKS",
+                                        "type": "string",
+                                        "example": "Pasal 12"
+                                    },
+                                    "judul": {
+                                        "description": "Judul pasal",
+                                        "type": "string",
+                                        "example": "KETENTUAN LAIN-LAIN"
+                                    },
+                                    "raw_text": {
+                                        "description": "Isi lengkap pasal",
+                                        "type": "string",
+                                        "example": "Hal-hal yang tidak diatur..."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pasal berhasil ditambahkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 42
+                                                },
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "pasal": {
+                                                    "type": "string",
+                                                    "example": "Pasal 12"
+                                                },
+                                                "judul": {
+                                                    "type": "string",
+                                                    "example": "KETENTUAN LAIN-LAIN"
+                                                },
+                                                "raw_text": {
+                                                    "type": "string",
+                                                    "example": "Hal-hal yang tidak diatur..."
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal atau pasal sudah ada"
                     }
                 },
                 "security": [
