@@ -18777,7 +18777,7 @@
         "/api/pks/perjanjian/compare": {
             "post": {
                 "tags": [
-                    "PKS - Perjanjian"
+                    "PKS"
                 ],
                 "summary": "Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
                 "operationId": "2f9e228be39de44abb36ced169747e41",
@@ -33508,10 +33508,6 @@
         {
             "name": "Upah",
             "description": "Modul terpadu Upah Minimum: UMP & UMSP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
-        },
-        {
-            "name": "PKS - Perjanjian",
-            "description": "PKS - Perjanjian"
         },
         {
             "name": "User Email Config",
