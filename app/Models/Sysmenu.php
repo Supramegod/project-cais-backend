@@ -75,10 +75,11 @@ class Sysmenu extends Model
     {
         return $query->leftJoin('sysmenu_group', 'sysmenu_group.id', '=', 'sysmenu.group_id');
     }
+    // Di dalam Sysmenu.php
     public function scopeOrdered($query)
     {
-        return $query->orderBy('sysmenu_group.nama')
-            ->orderBy('id');
+        return $query->orderBy('sysmenu_group.sort_order')
+            ->orderBy('sysmenu.id');
     }
 
     // Tambahkan scope untuk filter view permission
@@ -106,4 +107,5 @@ class Sysmenu extends Model
             DB::raw('COALESCE(sysmenu_role.is_delete, 0) as is_delete')
         );
     }
+
 }

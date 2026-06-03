@@ -14584,7 +14584,7 @@
                                         "maxLength": 100,
                                         "example": "Dashboard"
                                     },
-                                    "menu_parent": {
+                                    "parent_id": {
                                         "type": "integer",
                                         "example": null,
                                         "nullable": true
@@ -14779,6 +14779,253 @@
                     },
                     "404": {
                         "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/list": {
+            "get": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Get all menu groups beserta daftar menu di dalamnya",
+                "operationId": "3906244e79539ecc2f16fc701be11412",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nama": {
+                                                        "type": "string"
+                                                    },
+                                                    "total_menu": {
+                                                        "type": "integer"
+                                                    },
+                                                    "menus": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "nama": {
+                                                                    "type": "string"
+                                                                },
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "icon": {
+                                                                    "type": "string",
+                                                                    "nullable": true
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/add": {
+            "post": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Tambah group menu baru",
+                "operationId": "0c7fd971500dcdfef5d3f320393e6b40",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "Master Data"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Grup Berhasil Dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Master Data"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/assign": {
+            "post": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Assign satu atau beberapa menu ke dalam sebuah group",
+                "description": "Kirim menu_ids berisi satu ID untuk single, atau lebih dari satu ID untuk multiple assign. Menu yang sudah ada di group lain akan dipindahkan ke group baru.",
+                "operationId": "4ee34ad2c740cdbe55d66feb3134d25e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "group_id",
+                                    "menu_ids"
+                                ],
+                                "properties": {
+                                    "group_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "menu_ids": {
+                                        "description": "Array ID menu, isi satu elemen untuk single assign",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "3 menu berhasil ditambahkan ke grup"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "group_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "group_nama": {
+                                                    "type": "string",
+                                                    "example": "Master Data"
+                                                },
+                                                "assigned_count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "not_found_ids": {
+                                                    "description": "ID menu yang tidak ditemukan / sudah terhapus",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Group tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -18530,7 +18777,7 @@
         "/api/pks/perjanjian/compare": {
             "post": {
                 "tags": [
-                    "PKS - Perjanjian"
+                    "PKS"
                 ],
                 "summary": "Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
                 "operationId": "2f9e228be39de44abb36ced169747e41",
@@ -22468,6 +22715,193 @@
                                         "message": {
                                             "type": "string",
                                             "example": "User ID tidak ditemukan dalam daftar sales aktif."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi input gagal.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month must be between 1 and 12."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/activity-detail/tele/{user_id}": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Detail Aktivitas Telesales",
+                "description": "Menampilkan daftar aktivitas telesales (cais_role_id=30) secara flat per bulan/tahun berdasarkan user_id. Hanya menampilkan aktivitas: Leads, Assignment, dan Appointment.",
+                "operationId": "67f84f10f57ec4802e74e60ccaee66ed",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "description": "ID user telesales. Harus terdaftar sebagai telesales aktif (cais_role_id=30).",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 101
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1–12). Default: bulan berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit). Default: tahun berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data detail aktivitas telesales berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "user_id": {
+                                            "type": "integer",
+                                            "example": 101
+                                        },
+                                        "sales_name": {
+                                            "type": "string",
+                                            "example": "Budi Santoso"
+                                        },
+                                        "cabang": {
+                                            "type": "string",
+                                            "example": "Central 1"
+                                        },
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "example": "5 Mei 2026"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Maju Jaya"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Leads",
+                                                            "Assignment",
+                                                            "Appointment"
+                                                        ],
+                                                        "example": "Assignment"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Leads dari referral"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "05-05-2026 09:30:00"
+                                                    },
+                                                    "aksi": {
+                                                        "description": "ID dokumen terkait: Leads→leads_id, Assignment→leads_id. null untuk Appointment.",
+                                                        "type": "integer",
+                                                        "example": 47,
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "user_id tidak ditemukan dalam daftar telesales aktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID tidak ditemukan dalam daftar telesales aktif."
                                         }
                                     },
                                     "type": "object"
@@ -33074,10 +33508,6 @@
         {
             "name": "Upah",
             "description": "Modul terpadu Upah Minimum: UMP & UMSP (Provinsi), UMK & UMSK (Kota/Kabupaten)."
-        },
-        {
-            "name": "PKS - Perjanjian",
-            "description": "PKS - Perjanjian"
         },
         {
             "name": "User Email Config",
