@@ -5,6 +5,7 @@ use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardApprovalController;
+use App\Http\Controllers\DashboardPksController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
+use App\Http\Controllers\BentukUsahaController;
 use App\Http\Controllers\KebutuhanController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\KaporlapController;
@@ -64,6 +66,14 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     // Jenis Perusahaan
     Route::prefix('jenis-perusahaan')->controller(JenisPerusahaanController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::post('/save', 'save');
+        Route::get('/view/{id}', 'view');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    Route::prefix('bentuk-usaha')->controller(BentukUsahaController::class)->group(function () {
         Route::get('/list', 'list');
         Route::post('/save', 'save');
         Route::get('/view/{id}', 'view');
@@ -481,6 +491,13 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::put('/notifications/{id}/read', 'markAsRead');
         Route::put('/notifications/read-all', 'markAllAsRead');
         Route::get('/notifications/unread-count', 'getUnreadCount');
+    });
+
+    // Dashboard PKS - monitoring kontrak
+    Route::prefix('dashboard-pks')->controller(DashboardPksController::class)->group(function () {
+        Route::get('/summary', 'summary');
+        Route::get('/expiring', 'expiring');
+        Route::get('/list', 'list');
     });
 
     // Sales Activity Routes
