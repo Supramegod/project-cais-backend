@@ -4571,8 +4571,10 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor",
-                                "kebutuhan"
+                                "tipe",
+                                "branch",
+                                "kebutuhan",
+                                "sales"
                             ],
                             "example": "nama_perusahaan"
                         }
@@ -22436,7 +22438,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
                 "parameters": [
                     {
@@ -22565,7 +22567,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
                 "parameters": [
                     {

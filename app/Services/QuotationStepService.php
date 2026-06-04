@@ -28,6 +28,7 @@ use App\Models\QuotationDetailWage;
 use App\Models\QuotationKaporlap;
 use App\Models\QuotationDevices;
 use App\Models\QuotationChemical;
+use App\Models\QuotationManagementFee;
 use App\Models\QuotationOhc;
 use App\Models\QuotationSite;
 use App\Models\QuotationTraining;
@@ -170,6 +171,22 @@ class QuotationStepService
                 break;
             case 4:
                 $data['additional_data']['manajemen_fee_list'] = ManagementFee::all();
+                $data['additional_data']['management_fee_config'] =
+                    QuotationManagementFee::resolveForQuotation($quotation->id);
+
+                // ▶ BARU: daftar flag yang tersedia beserta label human-readable
+                $data['additional_data']['management_fee_component_labels'] = [
+                    'is_thr' => 'THR (Tunjangan Hari Raya)',
+                    'is_kompensasi' => 'Kompensasi PKWT',
+                    'is_thl' => 'Tunjangan Hari Libur Nasional',
+                    'is_lembur' => 'Lembur (Flat)',
+                    'is_bpjs_kes' => 'BPJS Kesehatan',
+                    'is_bpjs_tk' => 'BPJS Ketenagakerjaan (JKK+JKM+JHT+JP)',
+                    'is_chemical' => 'Chemical',
+                    'is_kaporlap' => 'Kaporlap / Seragam',
+                    'is_device' => 'Device / Peralatan',
+                    'is_ohc' => 'OHC',
+                ];
                 // Data UMK per site
                 $data['additional_data']['umk_per_site'] = [];
                 foreach ($quotation->quotationSites as $site) {
@@ -571,6 +588,9 @@ class QuotationStepService
                     'quotation_id' => $quotation->id,
                     'position_count' => count($request->position_data)
                 ]);
+            }
+            if ($request->has('management_fee_components')) {
+                $this->saveManagementFeeConfig($quotation, $request->management_fee_components);
             }
 
             // Update quotation timestamp
@@ -1073,6 +1093,25 @@ class QuotationStepService
     // ============================
     // HELPER METHODS
     // ============================
+    private function saveManagementFeeConfig(Quotation $quotation, array $components): void
+    {
+        $allowedFlags = QuotationManagementFee::componentFlags();
+
+        // Sanitasi input: hanya flag yang dikenal, cast ke boolean
+        $sanitizedFlags = [];
+        foreach ($allowedFlags as $flag) {
+            // Checkbox yang tidak dicentang tidak muncul di request → default false
+            $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
+        }
+
+        QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
+
+        \Log::info('Saved management fee component config', [
+            'quotation_id' => $quotation->id,
+            'flags' => $sanitizedFlags,
+        ]);
+    }
+
     /**
      * Generate konten perjanjian kerjasama
      */
@@ -4220,6 +4259,7 @@ class QuotationStepService
             'quotation_detail',
             'quotation_site',
             'management_fee',
+            '_mf_config',
             'jumlah_hc',
             'provisi',
             'persen_bpjs_ketenagakerjaan',

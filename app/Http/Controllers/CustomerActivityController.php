@@ -112,7 +112,7 @@ class CustomerActivityController extends Controller
      *         in="query",
      *         description="Kolom yang akan dicari (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "kebutuhan"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "tipe", "branch", "kebutuhan", "sales"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -209,8 +209,20 @@ class CustomerActivityController extends Controller
 
             // 4. Logika Pencarian (Search) - sama seperti kode Anda
             if ($request->filled('search')) {
-                // ... (pertahankan kode search Anda)
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } elseif (in_array($searchBy, ['tipe', 'branch', 'kebutuhan', 'sales'])) {
+                    $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+                }
             } else {
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
@@ -228,6 +240,9 @@ class CustomerActivityController extends Controller
             });
             if ($request->filled('user')) {
                 $query->where('user_id', $request->user);
+            }
+            if ($request->filled('tipe')) {
+                $query->where('tipe', $request->tipe);
             }
 
             // 6. Pagination
@@ -406,12 +421,17 @@ class CustomerActivityController extends Controller
             // Get current activity data only
             $activityData = [
                 'id' => $activity->id,
+                'nomor' => $activity->nomor,
+                'nama_perusahaan' => $activity->leads?->nama_perusahaan ?? '-',
+                'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray() ?? [],
+                'branch' => $activity->leads?->branch?->name ?? '-',
+                'sales' => $activity->timSalesDetail?->nama ?? '-',
                 'tipe' => $activity->tipe,
                 'notes' => $activity->notes_tipe ?? $activity->notes,
                 'tgl_activity' => $activity->tgl_activity,
                 'created_at' => $activity->getRawOriginal('created_at'),
                 'created_by' => $activity->created_by,
-                'activity_files' => $activity->files->map(function ($file) {
+                'activity_files' => $activity->files->isEmpty() ? null : $activity->files->map(function ($file) {
                     return [
                         'id' => $file->id,
                         'nama_file' => $file->nama_file,

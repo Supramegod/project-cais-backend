@@ -77,7 +77,7 @@ class QuotationStepController extends Controller
         1 => ['kebutuhan'],
         2 => ['quotationSites'],
         3 => ['quotationDetails.quotationDetailRequirements', 'quotationDetails.quotationDetailTunjangans', 'quotationSites'],
-        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites'],
+        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites','managementFeeConfig'],
         5 => ['quotationDetails', 'jenisPerusahaan', 'leads.jenisperusahaan'],
         6 => ['quotationAplikasis'],
         7 => ['quotationDetails', 'quotationKaporlaps'],
