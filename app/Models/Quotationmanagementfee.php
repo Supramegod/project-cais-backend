@@ -121,16 +121,12 @@ class QuotationManagementFee extends Model
         );
     }
 
-    /**
-     * Ambil atau buat instance dengan default (tidak menyentuh DB).
-     * Berguna untuk operasi read-only di service layer.
-     */
-    public static function resolveForQuotation(int $quotationId): static
+
+    public static function resolveForQuotation(int $quotationId): self
     {
         return static::where('quotation_id', $quotationId)->first()
             ?? new static(static::defaultConfig());
     }
-
     // ── Relasi ────────────────────────────────────────────────────────────────
 
     public function quotation(): BelongsTo
