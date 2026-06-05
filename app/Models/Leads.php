@@ -40,6 +40,7 @@ class Leads extends Model
         'tgl_leads',
         'telp_perusahaan',
         'jenis_perusahaan',
+        'bentuk_usaha',
         'bidang_perusahaan_id',
         'bidang_perusahaan',
         'platform_id',

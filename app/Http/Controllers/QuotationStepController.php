@@ -15,6 +15,7 @@ use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDevices;
 use App\Models\QuotationKaporlap;
+use App\Models\QuotationManagementFee;
 use App\Models\SalaryRule;
 use App\Models\Top;
 use App\Models\Training;
@@ -77,7 +78,7 @@ class QuotationStepController extends Controller
         1 => ['kebutuhan'],
         2 => ['quotationSites'],
         3 => ['quotationDetails.quotationDetailRequirements', 'quotationDetails.quotationDetailTunjangans', 'quotationSites'],
-        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites'],
+        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites', 'managementFeeConfig'],
         5 => ['quotationDetails', 'jenisPerusahaan', 'leads.jenisperusahaan'],
         6 => ['quotationAplikasis'],
         7 => ['quotationDetails', 'quotationKaporlaps'],
@@ -408,12 +409,13 @@ class QuotationStepController extends Controller
         // 3. Return Struktur Akhir (Step Data & Global Data)
         return [
             'position_data' => $positionData,
+            // SESUDAH — tambah satu baris saja:
             'global_data' => [
                 'is_ppn' => $quotation->is_ppn ?? false,
-                'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
                 'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
                 'management_fee_id' => $quotation->management_fee_id ?? null,
                 'persentase' => $quotation->persentase ?? 0,
+                'management_fee_components' => $this->resolveMfConfig($quotation), // ← INI
             ],
         ];
     }
@@ -1261,5 +1263,22 @@ class QuotationStepController extends Controller
     private function isRo($detail): bool
     {
         return ($detail->position_id ?? null) === 224;
+    }
+    private function resolveMfConfig(Quotation $quotation): array
+    {
+        $config = $quotation->relationLoaded('managementFeeConfig')
+            ? $quotation->managementFeeConfig
+            : null;
+
+        $flags = QuotationManagementFee::componentFlags();
+
+        if (!$config) {
+            // Belum ada record (quotation lama) → default semua aktif
+            return array_fill_keys($flags, true);
+        }
+
+        return collect($flags)
+            ->mapWithKeys(fn($flag) => [$flag => (bool) ($config->{$flag} ?? true)])
+            ->all();
     }
 }

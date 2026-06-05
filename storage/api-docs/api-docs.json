@@ -4571,8 +4571,10 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor",
-                                "kebutuhan"
+                                "tipe",
+                                "branch",
+                                "kebutuhan",
+                                "sales"
                             ],
                             "example": "nama_perusahaan"
                         }
@@ -8335,6 +8337,109 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/summary": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "Ringkasan status & jumlah kontrak PKS",
+                "operationId": "271a9418705da68e0cf0066dbcd2ae90",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/expiring": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS teratas yang mendekati habis kontrak (pagination)",
+                "operationId": "0e1d0b5a07198851fcbf1f4264ea9dc0",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/list": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS by tipe (terbaru / belum-aktivasi / site-aktif)",
+                "operationId": "d0238cef11a6028811e0fe0b0abc1ffc",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "latest",
+                                "belum-aktivasi",
+                                "site-aktif"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
                     }
                 },
                 "security": [
@@ -22436,7 +22541,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
                 "parameters": [
                     {
@@ -22565,7 +22670,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
                 "parameters": [
                     {
@@ -33554,6 +33659,10 @@
         {
             "name": "Dashboard Approval",
             "description": "API untuk data dashboard approval quotation"
+        },
+        {
+            "name": "Dashboard PKS",
+            "description": "API untuk dashboard monitoring kontrak PKS"
         },
         {
             "name": "Jenis Barang",
