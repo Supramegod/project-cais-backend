@@ -121,7 +121,6 @@ class QuotationManagementFee extends Model
         );
     }
 
-
     public static function resolveForQuotation(int $quotationId): self
     {
         return static::where('quotation_id', $quotationId)->first()
