@@ -28,6 +28,7 @@ use App\Models\QuotationDetailWage;
 use App\Models\QuotationKaporlap;
 use App\Models\QuotationDevices;
 use App\Models\QuotationChemical;
+use App\Models\QuotationManagementFee;
 use App\Models\QuotationOhc;
 use App\Models\QuotationSite;
 use App\Models\QuotationTraining;
@@ -170,6 +171,22 @@ class QuotationStepService
                 break;
             case 4:
                 $data['additional_data']['manajemen_fee_list'] = ManagementFee::all();
+                $data['additional_data']['management_fee_config'] =
+                    QuotationManagementFee::resolveForQuotation($quotation->id);
+
+                // ▶ BARU: daftar flag yang tersedia beserta label human-readable
+                $data['additional_data']['management_fee_component_labels'] = [
+                    'is_thr' => 'THR (Tunjangan Hari Raya)',
+                    'is_kompensasi' => 'Kompensasi PKWT',
+                    'is_thl' => 'Tunjangan Hari Libur Nasional',
+                    'is_lembur' => 'Lembur (Flat)',
+                    'is_bpjs_kes' => 'BPJS Kesehatan',
+                    'is_bpjs_tk' => 'BPJS Ketenagakerjaan (JKK+JKM+JHT+JP)',
+                    'is_chemical' => 'Chemical',
+                    'is_kaporlap' => 'Kaporlap / Seragam',
+                    'is_device' => 'Device / Peralatan',
+                    'is_ohc' => 'OHC',
+                ];
                 // Data UMK per site
                 $data['additional_data']['umk_per_site'] = [];
                 foreach ($quotation->quotationSites as $site) {
@@ -571,6 +588,9 @@ class QuotationStepService
                     'quotation_id' => $quotation->id,
                     'position_count' => count($request->position_data)
                 ]);
+            }
+            if ($request->has('management_fee_components')) {
+                $this->saveManagementFeeConfig($quotation, $request->management_fee_components);
             }
 
             // Update quotation timestamp
@@ -1073,6 +1093,25 @@ class QuotationStepService
     // ============================
     // HELPER METHODS
     // ============================
+    private function saveManagementFeeConfig(Quotation $quotation, array $components): void
+    {
+        $allowedFlags = QuotationManagementFee::componentFlags();
+
+        // Sanitasi input: hanya flag yang dikenal, cast ke boolean
+        $sanitizedFlags = [];
+        foreach ($allowedFlags as $flag) {
+            // Checkbox yang tidak dicentang tidak muncul di request → default false
+            $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
+        }
+
+        QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
+
+        \Log::info('Saved management fee component config', [
+            'quotation_id' => $quotation->id,
+            'flags' => $sanitizedFlags,
+        ]);
+    }
+
     /**
      * Generate konten perjanjian kerjasama
      */
@@ -1811,59 +1850,62 @@ class QuotationStepService
     public function syncDetailHCFromArray(Quotation $quotation, array $details, string $timestamp, string $user): void
     {
         try {
+            // Ambil semua detail existing (aktif) untuk quotation ini, jadikan key by id
             $existingDetails = QuotationDetail::where('quotation_id', $quotation->id)
                 ->whereNull('deleted_at')
                 ->get()
-                ->keyBy(function ($detail) {
-                    return $detail->position_id . '_' . $detail->quotation_site_id;
-                });
+                ->keyBy('id');
 
-            $incomingKeys = collect($details)
-                ->filter(fn($d) => !empty($d['position_id']) && !empty($d['quotation_site_id']))
-                ->map(fn($d) => $d['position_id'] . '_' . $d['quotation_site_id'])
-                ->unique()
-                ->values()
+            // Kumpulkan id yang dikirim dari frontend (yang punya id)
+            $incomingIds = collect($details)
+                ->filter(fn($d) => !empty($d['id']))
+                ->pluck('id')
                 ->toArray();
 
-            $keysToDelete = $existingDetails->keys()->diff($incomingKeys);
-            foreach ($keysToDelete as $compositeKey) {
-                $detail = $existingDetails->get($compositeKey);
-                if ($detail) {
+            // Hapus (soft delete) detail yang id-nya tidak ada di request
+            foreach ($existingDetails as $id => $detail) {
+                if (!in_array($id, $incomingIds)) {
+                    \Log::info("Soft deleting quotation detail", [
+                        'id' => $id,
+                        'position_id' => $detail->position_id,
+                        'quotation_site_id' => $detail->quotation_site_id
+                    ]);
                     $this->softDeleteQuotationDetail($detail, $timestamp, $user);
                 }
             }
 
-            // Preload existing HPP & COSS for updates
-            $existingDetailIds = $existingDetails->pluck('id')->toArray();
-            $existingHpp = QuotationDetailHpp::whereIn('quotation_detail_id', $existingDetailIds)->get()->keyBy('quotation_detail_id');
-            $existingCoss = QuotationDetailCoss::whereIn('quotation_detail_id', $existingDetailIds)->get()->keyBy('quotation_detail_id');
+            // Preload existing HPP & COSS untuk update batch
+            $existingHpp = QuotationDetailHpp::whereIn('quotation_detail_id', $incomingIds)
+                ->get()
+                ->keyBy('quotation_detail_id');
+            $existingCoss = QuotationDetailCoss::whereIn('quotation_detail_id', $incomingIds)
+                ->get()
+                ->keyBy('quotation_detail_id');
 
-            $newDetails = [];
             $hppInsert = [];
             $cossInsert = [];
             $hppUpdate = [];
             $cossUpdate = [];
 
             foreach ($details as $detailData) {
-                if (empty($detailData['position_id']) || empty($detailData['quotation_site_id']))
-                    continue;
+                $detailId = $detailData['id'] ?? null;
 
-                $compositeKey = $detailData['position_id'] . '_' . $detailData['quotation_site_id'];
-                $existing = $existingDetails->get($compositeKey);
-
-                if ($existing) {
-                    // Update existing
-                    $existing->update([
+                if ($detailId && $existingDetails->has($detailId)) {
+                    // UPDATE EXISTING
+                    $detail = $existingDetails->get($detailId);
+                    $detail->update([
+                        'quotation_site_id' => $detailData['quotation_site_id'],
+                        'position_id' => $detailData['position_id'],
                         'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
-                        'jabatan_kebutuhan' => $detailData['jabatan_kebutuhan'] ?? $existing->jabatan_kebutuhan,
-                        'nama_site' => $detailData['nama_site'] ?? $existing->nama_site,
-                        'nominal_upah' => $detailData['nominal_upah'] ?? $existing->nominal_upah,
+                        'jabatan_kebutuhan' => $detailData['jabatan_kebutuhan'] ?? $detail->jabatan_kebutuhan,
+                        'nama_site' => $detailData['nama_site'] ?? $detail->nama_site,
+                        'nominal_upah' => $detailData['nominal_upah'] ?? $detail->nominal_upah,
                         'updated_at' => $timestamp,
                         'updated_by' => $user
                     ]);
 
-                    // Update HPP
-                    $hpp = $existingHpp->get($existing->id);
+                    // Siapkan update HPP & COSS (batch nanti)
+                    $hpp = $existingHpp->get($detailId);
                     if ($hpp) {
                         $hppUpdate[] = [
                             'id' => $hpp->id,
@@ -1872,10 +1914,9 @@ class QuotationStepService
                             'updated_by' => $user,
                         ];
                     } else {
-                        // create if missing
                         $hppInsert[] = [
                             'quotation_id' => $quotation->id,
-                            'quotation_detail_id' => $existing->id,
+                            'quotation_detail_id' => $detailId,
                             'leads_id' => $quotation->leads_id,
                             'position_id' => $detailData['position_id'],
                             'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
@@ -1884,8 +1925,7 @@ class QuotationStepService
                         ];
                     }
 
-                    // Update COSS
-                    $coss = $existingCoss->get($existing->id);
+                    $coss = $existingCoss->get($detailId);
                     if ($coss) {
                         $cossUpdate[] = [
                             'id' => $coss->id,
@@ -1896,7 +1936,7 @@ class QuotationStepService
                     } else {
                         $cossInsert[] = [
                             'quotation_id' => $quotation->id,
-                            'quotation_detail_id' => $existing->id,
+                            'quotation_detail_id' => $detailId,
                             'leads_id' => $quotation->leads_id,
                             'position_id' => $detailData['position_id'],
                             'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
@@ -1905,7 +1945,7 @@ class QuotationStepService
                         ];
                     }
                 } else {
-                    // Create new detail
+                    // CREATE NEW (tidak punya id)
                     $newDetail = QuotationDetail::create([
                         'quotation_id' => $quotation->id,
                         'quotation_site_id' => $detailData['quotation_site_id'],
@@ -1917,8 +1957,6 @@ class QuotationStepService
                         'created_at' => $timestamp,
                         'created_by' => $user
                     ]);
-
-                    $newDetails[] = $newDetail;
 
                     $hppInsert[] = [
                         'quotation_id' => $quotation->id,
@@ -1942,13 +1980,11 @@ class QuotationStepService
                 }
             }
 
-            // Batch insert HPP & COSS
+            // Batch insert & update HPP/COSS
             if (!empty($hppInsert))
                 QuotationDetailHpp::insert($hppInsert);
             if (!empty($cossInsert))
                 QuotationDetailCoss::insert($cossInsert);
-
-            // Batch update HPP & COSS
             foreach ($hppUpdate as $data) {
                 QuotationDetailHpp::where('id', $data['id'])->update($data);
             }
@@ -2919,7 +2955,7 @@ class QuotationStepService
                 }
             }
 
-           
+
             $toDelete = $existing->keys()->diff($processed);
 
             if ($toDelete->isNotEmpty()) {
@@ -4223,6 +4259,7 @@ class QuotationStepService
             'quotation_detail',
             'quotation_site',
             'management_fee',
+            '_mf_config',
             'jumlah_hc',
             'provisi',
             'persen_bpjs_ketenagakerjaan',

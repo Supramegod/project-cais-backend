@@ -74,7 +74,12 @@ class WebAuthController extends Controller
             'lax'
         );
 
-        return redirect('/api/documentation')->withCookie($cookie);
+        $redirectUrl = app()->environment('production')
+            ? '/'
+            : '/api/documentation';
+
+        return redirect($redirectUrl)
+            ->withCookie($cookie);
     }
 
     /**

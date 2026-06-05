@@ -5,6 +5,7 @@ use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardApprovalController;
+use App\Http\Controllers\DashboardPksController;
 use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
@@ -20,6 +21,7 @@ use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TimSalesController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\JenisPerusahaanController;
+use App\Http\Controllers\BentukUsahaController;
 use App\Http\Controllers\KebutuhanController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\KaporlapController;
@@ -38,8 +40,9 @@ use App\Http\Controllers\UpahController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\TargetController;
 use App\Http\Controllers\UserEmailConfigController;
+use App\Http\Controllers\SubmissionController;
+use App\Http\Controllers\SubmissionV2Controller;
 use App\Http\Controllers\SystemAnnouncementController;
 use App\Http\Controllers\SystemAnnouncementV2Controller;
 
@@ -63,6 +66,14 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     // Jenis Perusahaan
     Route::prefix('jenis-perusahaan')->controller(JenisPerusahaanController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::post('/save', 'save');
+        Route::get('/view/{id}', 'view');
+        Route::put('/update/{id}', 'update');
+        Route::delete('/delete/{id}', 'delete');
+    });
+
+    Route::prefix('bentuk-usaha')->controller(BentukUsahaController::class)->group(function () {
         Route::get('/list', 'list');
         Route::post('/save', 'save');
         Route::get('/view/{id}', 'view');
@@ -246,6 +257,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/view/{id}', 'view');
         Route::put('/update/{id}', 'update');
         Route::delete('/delete/{id}', 'delete');
+        // Group routes
+        Route::get('/group/list', 'listGroup');
+        Route::post('/group/add', 'addGroup');
+        Route::post('/group/assign', 'assignMenuToGroup');
+
     });
 
     // OHC (hanya index)
@@ -288,6 +304,23 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // Statistics & Recommendations
         Route::get('/statistics', 'getStatistics');
         Route::get('/recommendations', 'getRecommendations');
+    });
+
+    // Submission Routes (Sales > Submission)
+    Route::prefix('submission')->controller(SubmissionController::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/convert', 'convert');
+        Route::post('/delete', 'delete');
+    });
+
+    // Submission V2 (Google Sheet)
+    Route::prefix('submission-v2')->controller(SubmissionV2Controller::class)->group(function () {
+        Route::get('/list', 'list');
+        Route::get('/view/{id}', 'view');
+        Route::post('/convert', 'convert');
+        Route::post('/delete', 'delete');
+        Route::post('/sync', 'sync');
     });
 
     // Leads Routes
@@ -388,7 +421,9 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // ==================== PERJANJIAN (edit, history, compare) ====================
         Route::put('/perjanjian/{id}', 'updatePerjanjian');               // Update konten perjanjian
         Route::get('/perjanjian/{id}/history', 'getPerjanjianHistory');   // Lihat daftar riwayat perubahan
-        Route::post('/perjanjian/compare', 'comparePerjanjian');          // Bandingkan dua versi
+        Route::post('/perjanjian/compare', 'comparePerjanjian');
+        Route::post('/{pks_id}/perjanjian', 'storePasal');
+        Route::delete('/perjanjian/{id}', 'destroyPasal');         // Bandingkan dua versi
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {
@@ -458,6 +493,13 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/notifications/unread-count', 'getUnreadCount');
     });
 
+    // Dashboard PKS - monitoring kontrak
+    Route::prefix('dashboard-pks')->controller(DashboardPksController::class)->group(function () {
+        Route::get('/summary', 'summary');
+        Route::get('/expiring', 'expiring');
+        Route::get('/list', 'list');
+    });
+
     // Sales Activity Routes
     Route::prefix('sales-activity')->controller(SalesActivityController::class)->group(function () {
         Route::get('/available-leads', 'getAvailableLeads');
@@ -486,12 +528,6 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         'update',
         'destroy',
     ]);
-
-    // Target Management
-    Route::prefix('targets')->controller(TargetController::class)->group(function () {
-        Route::get('/list', 'index');
-        Route::post('/add', 'storeOrUpdate');
-    });
 
     // Admin Panel Routes - untuk update step quotation secara khusus
     Route::prefix('admin-panel')->controller(AdminPanelController::class)->group(function () {
@@ -533,6 +569,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/activity-detail/{user_id}', 'activityDetail');
         Route::get('/monthly/tele', 'monthlyRole30');
         Route::get('/weekly/tele', 'weeklyRole30');
+        Route::get('/activity-detail/tele/{user_id}', 'activityDetailTele');
 
     });
 

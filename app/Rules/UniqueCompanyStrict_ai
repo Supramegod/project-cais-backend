@@ -149,7 +149,7 @@ class UniqueCompanyStrict implements Rule
 
     private function askAI($input, $candidates)
     {
-        $apiKey = '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';
+        $apiKey = env(OPENROUTER_API_KEY);
         $endpoint = 'https://openrouter.ai/api/v1/chat/completions';
 
         // Ringkas data untuk menghemat token

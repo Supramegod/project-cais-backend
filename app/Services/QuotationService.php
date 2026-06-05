@@ -21,6 +21,7 @@ use App\Models\{
     SalaryRule,
     LeadsKebutuhan,
     CustomerActivity,
+    QuotationManagementFee,
     User
 };
 use App\DTO\QuotationCalculationResult;
@@ -121,7 +122,7 @@ class QuotationService
         $quotation->_daftar_tunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
             ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
 
-        // ── ManagementFee (gunakan instance cache) ─────────────────────────
+        // ── ManagementFee label (untuk display UI – tidak dipakai kalkulasi) ─
         $mfId = $quotation->management_fee_id;
         if (!isset($this->_management_fee_cache[$mfId])) {
             $mf = ManagementFee::find($mfId);
@@ -129,6 +130,9 @@ class QuotationService
         }
         $quotation->management_fee = $this->_management_fee_cache[$mfId];
 
+        // ── ▶ BARU: Management Fee dynamic config (SINGLE QUERY) ──────────
+        //    Jika record belum ada (quotation lama), default ke semua flag = true.
+        $quotation->_mf_config = QuotationManagementFee::resolveForQuotation($quotation->id);
 
         // Kaporlap: scope per quotation_detail_id
         $quotation->_kaporlap_items = QuotationKaporlap::whereNull('deleted_at')
@@ -1069,17 +1073,20 @@ class QuotationService
         $jumlahHcField = ($suffix === '_coss') ? 'jumlah_hc_original' : 'jumlah_hc_hpp';
 
         // ── Aturan Bisnis: Jabatan RO dikecualikan dari SELURUH agregasi COSS ──
-        // Menggunakan properti yang sudah di-preload → ZERO N+1 query.
         $details = ($suffix === '_coss')
             ? $quotation->quotation_detail->filter(fn($d) => !$this->isRo($d))
             : $quotation->quotation_detail;
+
+        // ── Aggregasi yang sudah ada (TIDAK BERUBAH) ──────────────────────────
 
         $summary->{"total_sebelum_management_fee{$suffix}"} =
             $details->sum('sub_total_personil' . $suffix);
 
         $summary->{"total_base_manpower{$suffix}"} = $details->sum(
             function ($detail) use ($suffix, $jumlahHcField) {
-                $total = ($suffix === '_coss') ? ($detail->total_base_manpower_coss ?? 0) : ($detail->total_base_manpower ?? 0);
+                $total = ($suffix === '_coss')
+                    ? ($detail->total_base_manpower_coss ?? 0)
+                    : ($detail->total_base_manpower ?? 0);
                 $jumlahHc = $detail->{$jumlahHcField} ?? $detail->jumlah_hc;
                 return $total * $jumlahHc;
             }
@@ -1098,7 +1105,9 @@ class QuotationService
         );
 
         $summary->total_potongan_bpu = $details->sum(
-            fn($d) => ($d->penjamin_kesehatan === 'BPU') ? 16800 * ($d->{$jumlahHcField} ?? $d->jumlah_hc) : 0
+            fn($d) => ($d->penjamin_kesehatan === 'BPU')
+            ? 16800 * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+            : 0
         );
         $summary->potongan_bpu_per_orang = 16800;
 
@@ -1112,32 +1121,121 @@ class QuotationService
                 'persen_bpjs_jkm',
                 'persen_bpjs_jht',
                 'persen_bpjs_jp',
-                'persen_bpjs_kes'
+                'persen_bpjs_kes',
             ];
             foreach ($fields as $f) {
                 $summaryField = $suffix === '' ? $f : "{$f}_coss";
                 $summary->{$summaryField} = $firstDetail->{$f} ?? 0;
             }
         }
+
+        // ── ▶ BARU: Agregasi per-komponen untuk management fee dinamis ────────
+        //    Semua operasi ini O(n) satu pass atas collection detail yang sudah
+        //    di-memory, zero tambahan query ke DB.
+
+        // Flag yang menentukan apakah kita di jalur HPP (suffix='') atau COSS
+        $isHpp = ($suffix !== '_coss');
+
+        // THR
+        $summary->{"total_thr{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->tunjangan_hari_raya_hpp ?? 0) : ($d->tunjangan_hari_raya_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Kompensasi PKWT
+        $summary->{"total_kompensasi{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->kompensasi_hpp ?? 0) : ($d->kompensasi_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Tunjangan Hari Libur Nasional
+        $summary->{"total_thl{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->tunjangan_holiday_hpp ?? 0) : ($d->tunjangan_holiday_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Lembur flat
+        $summary->{"total_lembur{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->lembur_hpp ?? 0) : ($d->lembur_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Kaporlap / Seragam
+        $summary->{"total_kaporlap{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->personil_kaporlap ?? 0) : ($d->personil_kaporlap_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Device / Peralatan
+        $summary->{"total_device{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->personil_devices ?? 0) : ($d->personil_devices_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // Chemical
+        $summary->{"total_chemical{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->personil_chemical ?? 0) : ($d->personil_chemical_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
+
+        // OHC
+        $summary->{"total_ohc{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->personil_ohc ?? 0) : ($d->personil_ohc_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
     }
 
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
+        $mfConfig = $quotation->_mf_config; // QuotationManagementFee | default stdClass
+        $persentase = (float) ($quotation->persentase ?? 0);
 
-        $managementFeeCalculations = [
-            1 => fn() => $summary->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
-            4 => fn() => $summary->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
-            5 => fn() => $summary->{"upah_pokok{$suffix}"} * $quotation->persentase / 100,
-            6 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"}) * $quotation->persentase / 100,
-            7 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
-            8 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
+        // ── BASIS: gaji pokok selalu masuk (tidak ada flag) ───────────────────
+        $base = (float) ($summary->{"upah_pokok{$suffix}"} ?? 0);
+
+        // ── Komponen opsional: flag → summary field ────────────────────────────
+        //    Menggunakan summary field yang sudah dihitung di calculateBaseTotals
+        //    → ZERO tambahan query, ZERO N+1
+        $componentMap = [
+            'is_thr' => "total_thr{$suffix}",
+            'is_kompensasi' => "total_kompensasi{$suffix}",
+            'is_thl' => "total_thl{$suffix}",
+            'is_lembur' => "total_lembur{$suffix}",
+            'is_bpjs_kes' => "total_bpjs_kesehatan{$suffix}",
+            'is_bpjs_tk' => "total_bpjs{$suffix}",
+            'is_chemical' => "total_chemical{$suffix}",
+            'is_kaporlap' => "total_kaporlap{$suffix}",
+            'is_device' => "total_device{$suffix}",
+            'is_ohc' => "total_ohc{$suffix}",
         ];
 
-        $calculation = $managementFeeCalculations[$quotation->management_fee_id] ?? $managementFeeCalculations[1];
-        $summary->{"nominal_management_fee{$suffix}"} = $calculation();
-        $summary->{"grand_total_sebelum_pajak{$suffix}"} = $summary->{"total_sebelum_management_fee{$suffix}"} + $summary->{"nominal_management_fee{$suffix}"};
+        foreach ($componentMap as $flag => $summaryField) {
+            // Jika config tidak punya property tersebut (fallback object), default true
+            $isActive = $mfConfig->{$flag} ?? true;
+            if ($isActive) {
+                $base += (float) ($summary->{$summaryField} ?? 0);
+            }
+        }
+
+        $nominalMf = $persentase > 0 ? round($base * $persentase / 100, 2) : 0.0;
+
+        $summary->{"nominal_management_fee{$suffix}"} = $nominalMf;
+        $summary->{"grand_total_sebelum_pajak{$suffix}"} =
+            ($summary->{"total_sebelum_management_fee{$suffix}"} ?? 0) + $nominalMf;
+
+        \Log::debug("calculateManagementFee [{$suffix}]", [
+            'quotation_id' => $quotation->id,
+            'base' => $base,
+            'persentase' => $persentase,
+            'nominal_mf' => $nominalMf,
+            'active_flags' => array_keys(array_filter(
+                array_map(fn($f) => $mfConfig->{$f} ?? true, array_flip(array_keys($componentMap))),
+            )),
+        ]);
     }
+
+
 
     private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
     {
@@ -1176,13 +1274,16 @@ class QuotationService
         }
 
         if ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Management Fee") {
+            // PPH dari Management Fee
             $calculatedPph = round($managementFee * -0.02, 2);
             $maxPph = abs($baseAmount * 0.1);
             if (abs($calculatedPph) > $maxPph) {
                 $calculatedPph = -$maxPph;
             }
             $summary->{"pph{$suffix}"} = $calculatedPph;
-        } elseif ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong != "Total Invoice") {
+
+        } elseif ($summary->{"pph{$suffix}"} == 0 && $ppnPphDipotong == "Total Invoice") {
+            // ✅ FIX: PPH dari Total Invoice (sebelumnya tidak ada branch ini → PPH = 0)
             $calculatedPph = round($summary->{"grand_total_sebelum_pajak{$suffix}"} * -0.02, 2);
             $maxPph = abs($baseAmount * 0.1);
             if (abs($calculatedPph) > $maxPph) {
@@ -1190,6 +1291,7 @@ class QuotationService
             }
             $summary->{"pph{$suffix}"} = $calculatedPph;
         } else {
+            // PPH sudah ada nilainya, pastikan negatif
             if ($summary->{"pph{$suffix}"} > 0) {
                 $summary->{"pph{$suffix}"} = -abs($summary->{"pph{$suffix}"});
             }

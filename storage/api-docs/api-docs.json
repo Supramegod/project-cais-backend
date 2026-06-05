@@ -4571,8 +4571,10 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor",
-                                "kebutuhan"
+                                "tipe",
+                                "branch",
+                                "kebutuhan",
+                                "sales"
                             ],
                             "example": "nama_perusahaan"
                         }
@@ -8335,6 +8337,109 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/summary": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "Ringkasan status & jumlah kontrak PKS",
+                "operationId": "271a9418705da68e0cf0066dbcd2ae90",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/expiring": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS teratas yang mendekati habis kontrak (pagination)",
+                "operationId": "0e1d0b5a07198851fcbf1f4264ea9dc0",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/list": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS by tipe (terbaru / belum-aktivasi / site-aktif)",
+                "operationId": "d0238cef11a6028811e0fe0b0abc1ffc",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "latest",
+                                "belum-aktivasi",
+                                "site-aktif"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
                     }
                 },
                 "security": [
@@ -14584,7 +14689,7 @@
                                         "maxLength": 100,
                                         "example": "Dashboard"
                                     },
-                                    "menu_parent": {
+                                    "parent_id": {
                                         "type": "integer",
                                         "example": null,
                                         "nullable": true
@@ -14779,6 +14884,253 @@
                     },
                     "404": {
                         "description": "Not Found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/list": {
+            "get": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Get all menu groups beserta daftar menu di dalamnya",
+                "operationId": "3906244e79539ecc2f16fc701be11412",
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nama": {
+                                                        "type": "string"
+                                                    },
+                                                    "total_menu": {
+                                                        "type": "integer"
+                                                    },
+                                                    "menus": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "properties": {
+                                                                "id": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "nama": {
+                                                                    "type": "string"
+                                                                },
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "icon": {
+                                                                    "type": "string",
+                                                                    "nullable": true
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/add": {
+            "post": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Tambah group menu baru",
+                "operationId": "0c7fd971500dcdfef5d3f320393e6b40",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nama"
+                                ],
+                                "properties": {
+                                    "nama": {
+                                        "type": "string",
+                                        "maxLength": 100,
+                                        "example": "Master Data"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Grup Berhasil Dibuat"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "nama": {
+                                                    "type": "string",
+                                                    "example": "Master Data"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/menu/group/assign": {
+            "post": {
+                "tags": [
+                    "Menu"
+                ],
+                "summary": "Assign satu atau beberapa menu ke dalam sebuah group",
+                "description": "Kirim menu_ids berisi satu ID untuk single, atau lebih dari satu ID untuk multiple assign. Menu yang sudah ada di group lain akan dipindahkan ke group baru.",
+                "operationId": "4ee34ad2c740cdbe55d66feb3134d25e",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "group_id",
+                                    "menu_ids"
+                                ],
+                                "properties": {
+                                    "group_id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "menu_ids": {
+                                        "description": "Array ID menu, isi satu elemen untuk single assign",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "example": 3
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "3 menu berhasil ditambahkan ke grup"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "group_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "group_nama": {
+                                                    "type": "string",
+                                                    "example": "Master Data"
+                                                },
+                                                "assigned_count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "not_found_ids": {
+                                                    "description": "ID menu yang tidak ditemukan / sudah terhapus",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Group tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validation Error"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
                     }
                 },
                 "security": [
@@ -18453,6 +18805,56 @@
                         "bearerAuth": []
                     }
                 ]
+            },
+            "delete": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Hapus pasal dari perjanjian PKS",
+                "description": "Menghapus (soft-delete) satu pasal dari perjanjian PKS berdasarkan ID pasal.",
+                "operationId": "b6879e9f29e73dac6e291564f119600b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID pasal (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 42
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pasal berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pasal tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/pks/perjanjian/{id}/history": {
@@ -18532,8 +18934,7 @@
                 "tags": [
                     "PKS"
                 ],
-                "summary": "Bandingkan dua versi perjanjian (highlight perubahan)",
-                "description": "Membandingkan teks antara dua history atau antara history dengan versi terbaru. Hasil berupa unified diff yang bisa dirender frontend.",
+                "summary": "Bandingkan perjanjian (versi terbaru vs history terbaru atau history tertentu)",
                 "operationId": "2f9e228be39de44abb36ced169747e41",
                 "requestBody": {
                     "required": true,
@@ -18541,18 +18942,16 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "history_id_1"
+                                    "pks_perjanjian_id"
                                 ],
                                 "properties": {
-                                    "history_id_1": {
-                                        "description": "ID history (versi lama)",
+                                    "pks_perjanjian_id": {
                                         "type": "integer",
-                                        "example": 101
+                                        "example": 10
                                     },
-                                    "history_id_2": {
-                                        "description": "ID history (versi baru) - jika kosong, akan dibandingkan dengan versi terbaru di tabel utama",
-                                        "type": "integer",
-                                        "example": 100
+                                    "history_id": {
+                                        "description": "Opsional, ID history yang akan dibandingkan dengan versi terbaru. Jika kosong, ambil history terbaru.",
+                                        "type": "integer"
                                     }
                                 },
                                 "type": "object"
@@ -18562,7 +18961,71 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Hasil komparasi",
+                        "description": "Hasil komparasi"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{pks_id}/perjanjian": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Tambah pasal baru ke perjanjian PKS",
+                "description": "Menambahkan pasal baru ke dalam perjanjian suatu PKS. Nomor pasal harus unik dalam satu PKS.",
+                "operationId": "b098bb3dc661a0bdee69d578ba2d9fd2",
+                "parameters": [
+                    {
+                        "name": "pks_id",
+                        "in": "path",
+                        "description": "ID PKS",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pasal",
+                                    "judul",
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "pasal": {
+                                        "description": "Nomor/label pasal, unik per PKS",
+                                        "type": "string",
+                                        "example": "Pasal 12"
+                                    },
+                                    "judul": {
+                                        "description": "Judul pasal",
+                                        "type": "string",
+                                        "example": "KETENTUAN LAIN-LAIN"
+                                    },
+                                    "raw_text": {
+                                        "description": "Isi lengkap pasal",
+                                        "type": "string",
+                                        "example": "Hal-hal yang tidak diatur..."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pasal berhasil ditambahkan",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -18571,27 +19034,35 @@
                                             "type": "boolean",
                                             "example": true
                                         },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil ditambahkan"
+                                        },
                                         "data": {
                                             "properties": {
-                                                "version_label_old": {
-                                                    "type": "string",
-                                                    "example": "Sebelum edit (20-05-2026 14:30:00)"
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 42
                                                 },
-                                                "version_label_new": {
-                                                    "type": "string",
-                                                    "example": "Saat ini (terbaru)"
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 5
                                                 },
-                                                "diff_unified": {
+                                                "pasal": {
                                                     "type": "string",
-                                                    "example": "--- Original\\n+++ New\\n@@ -1,3 +1,3 @@\\n..."
+                                                    "example": "Pasal 12"
                                                 },
-                                                "old_text": {
+                                                "judul": {
                                                     "type": "string",
-                                                    "example": "<p>teks lama</p>"
+                                                    "example": "KETENTUAN LAIN-LAIN"
                                                 },
-                                                "new_text": {
+                                                "raw_text": {
                                                     "type": "string",
-                                                    "example": "<p>teks baru</p>"
+                                                    "example": "Hal-hal yang tidak diatur..."
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
                                                 }
                                             },
                                             "type": "object"
@@ -18602,11 +19073,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Validasi error, history_id_1 harus ada"
-                    },
                     "404": {
-                        "description": "History tidak ditemukan"
+                        "description": "PKS tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal atau pasal sudah ada"
                     }
                 },
                 "security": [
@@ -22070,7 +22541,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
                 "parameters": [
                     {
@@ -22199,7 +22670,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
                 "parameters": [
                     {
@@ -22515,6 +22986,193 @@
                                         "message": {
                                             "type": "string",
                                             "example": "User ID tidak ditemukan dalam daftar sales aktif."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validasi input gagal.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The month must be between 1 and 12."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server Error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/sales-report/activity-detail/tele/{user_id}": {
+            "get": {
+                "tags": [
+                    "Sales Report"
+                ],
+                "summary": "Detail Aktivitas Telesales",
+                "description": "Menampilkan daftar aktivitas telesales (cais_role_id=30) secara flat per bulan/tahun berdasarkan user_id. Hanya menampilkan aktivitas: Leads, Assignment, dan Appointment.",
+                "operationId": "67f84f10f57ec4802e74e60ccaee66ed",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "description": "ID user telesales. Harus terdaftar sebagai telesales aktif (cais_role_id=30).",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 101
+                        }
+                    },
+                    {
+                        "name": "month",
+                        "in": "query",
+                        "description": "Bulan laporan (1–12). Default: bulan berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1,
+                            "example": 5
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "description": "Tahun laporan (4 digit). Default: tahun berjalan.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2026
+                        }
+                    },
+                    {
+                        "name": "branch_id",
+                        "in": "query",
+                        "description": "Filter berdasarkan ID cabang.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Data detail aktivitas telesales berhasil diambil.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "user_id": {
+                                            "type": "integer",
+                                            "example": 101
+                                        },
+                                        "sales_name": {
+                                            "type": "string",
+                                            "example": "Budi Santoso"
+                                        },
+                                        "cabang": {
+                                            "type": "string",
+                                            "example": "Central 1"
+                                        },
+                                        "periode": {
+                                            "type": "string",
+                                            "example": "MEI - 2026"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 123
+                                                    },
+                                                    "tgl_activity": {
+                                                        "type": "string",
+                                                        "example": "5 Mei 2026"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string",
+                                                        "example": "PT Maju Jaya"
+                                                    },
+                                                    "tipe": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Leads",
+                                                            "Assignment",
+                                                            "Appointment"
+                                                        ],
+                                                        "example": "Assignment"
+                                                    },
+                                                    "notes": {
+                                                        "type": "string",
+                                                        "example": "Leads dari referral"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string",
+                                                        "example": "Budi Santoso"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "example": "05-05-2026 09:30:00"
+                                                    },
+                                                    "aksi": {
+                                                        "description": "ID dokumen terkait: Leads→leads_id, Assignment→leads_id. null untuk Appointment.",
+                                                        "type": "integer",
+                                                        "example": 47,
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "user_id tidak ditemukan dalam daftar telesales aktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User ID tidak ditemukan dalam daftar telesales aktif."
                                         }
                                     },
                                     "type": "object"
@@ -27136,6 +27794,343 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/list": {
+            "get": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Daftar submission dengan filter",
+                "operationId": "98016ac105582aea537f1908293fb41d",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/view/{id}": {
+            "get": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Detail satu submission",
+                "operationId": "c08715848c9e9a81ddb380224031b33c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/convert": {
+            "post": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Konversi submission terpilih menjadi leads",
+                "operationId": "cf783225ff8663b6758ed03c242592bd",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission/delete": {
+            "delete": {
+                "tags": [
+                    "Submission"
+                ],
+                "summary": "Hapus (soft delete) submission terpilih",
+                "operationId": "939f40b8157cfb4d827f46500cb0d7f9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            2,
+                                            3
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/list": {
+            "get": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Daftar submission v2 dengan filter",
+                "operationId": "b0e6b91b9f4c111d14c6cc1b3bcf23eb",
+                "parameters": [
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "platform",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/convert": {
+            "post": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Konversi submission v2 terpilih menjadi leads",
+                "operationId": "6032ec6509301681cf2a784d69a8bf26",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "id"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Submission berhasil dikonversi"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/submission-v2/sync": {
+            "post": {
+                "tags": [
+                    "Submission V2"
+                ],
+                "summary": "Sync data submission v2 dari Google Sheet",
+                "description": "Tarik CSV dari Google Sheet publik, parse, dan upsert ke sl_submission_v2 berdasarkan source_row_no.",
+                "operationId": "9d88f3a0ca20e6892adfac575991dfe7",
+                "responses": {
+                    "200": {
+                        "description": "OK"
                     }
                 },
                 "security": [
@@ -32666,6 +33661,10 @@
             "description": "API untuk data dashboard approval quotation"
         },
         {
+            "name": "Dashboard PKS",
+            "description": "API untuk dashboard monitoring kontrak PKS"
+        },
+        {
             "name": "Jenis Barang",
             "description": "API Endpoints untuk Master Jenis Barang"
         },
@@ -32736,6 +33735,14 @@
         {
             "name": "SPK",
             "description": "API untuk manajemen Surat Perintah Kerja (SPK)"
+        },
+        {
+            "name": "Submission",
+            "description": "API untuk manajemen Submission (data form/webhook calon leads sebelum dikonversi menjadi leads)"
+        },
+        {
+            "name": "Submission V2",
+            "description": "Submission V2 — data berasal dari Google Sheet, disimpan di sl_submission_v2"
         },
         {
             "name": "Supplier",

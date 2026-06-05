@@ -917,10 +917,8 @@ class QuotationController extends Controller
                     // $query->whereNotIn('status_leads_id', [99, 100, 101, 102]);
                     break;
 
-                case 'revisi':
-                    // Leads yang sudah punya quotation aktif (status 3 = Quotation Aktif)
-                    $query->whereHas('quotations', function ($q) {
-                        $q->where('status_quotation_id', [2, 3, 4, 5, 6, 7, 8])
+                case 'revisi':                    $query->whereHas('quotations', function ($q) {
+                        $q->whereIn('status_quotation_id', [2, 3, 4, 5, 6, 7, 8])
                             ->whereNull('deleted_at');
                     });
                     break;
