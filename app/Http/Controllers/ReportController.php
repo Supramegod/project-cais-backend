@@ -276,287 +276,287 @@ class ReportController extends Controller
         $salesNames = $salesData->pluck('nama_sales')->toArray();
 
         //mentah
-        // $weeklyActivity = DB::table('sl_activity_sales')
-        //     ->select(
-        //         'created_by',
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_quot"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_spk"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_pks"),
+        $weeklyActivity = DB::table('sl_activity_sales')
+            ->select(
+                'created_by',
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_quot"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_spk"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_pks"),
 
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_visit"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_quot"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_spk"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_pks"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_visit"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_quot"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_spk"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_pks"),
 
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_visit"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_quot"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_spk"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_pks"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_visit"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_quot"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_spk"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_pks"),
 
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_visit"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_quot"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_spk"),
-        //         DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_pks")
-        //     )
-        //     ->whereBetween('tgl_activity', [$startMonth, $endMonth])
-        //     ->whereIn('created_by', $salesNames)
-        //     ->groupBy('created_by')
-        //     ->get();
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_visit"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_quot"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_spk"),
+                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_pks")
+            )
+            ->whereBetween('tgl_activity', [$startMonth, $endMonth])
+            ->whereIn('created_by', $salesNames)
+            ->groupBy('created_by')
+            ->get();
 
         // Alur: Kirim Proposal → Appointment → Visit → Quotation → SPK → PKS
         // Tiap step dicek EXISTS step sebelumnya pada leads_id yang sama
 
-        $weeklyActivity = DB::table('sl_activity_sales as sa')
-            ->leftJoin('sl_leads as l', 'sa.leads_id', '=', 'l.id')
-            ->select(
-                'sa.created_by',
+        // $weeklyActivity = DB::table('sl_activity_sales as sa')
+        //     ->leftJoin('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+        //     ->select(
+        //         'sa.created_by',
 
-                // ── WEEK 1 (1-7) ──────────────────────────────────────────
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity IN ('Kirim Berkas','Email')
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w1_appt"),
+        //         // ── WEEK 1 (1-7) ──────────────────────────────────────────
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity IN ('Kirim Berkas','Email')
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_appt"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w1_visit"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_visit"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Quotation'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND (
-                     EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
-                         WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                           AND sa2.tgl_activity <= sa.tgl_activity
-                     )
-                     OR l.status_leads_id = 102
-                 )
-                THEN 1 ELSE 0 END) as w1_quot"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Quotation'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND (
+        //              EXISTS (
+        //                  SELECT 1 FROM sl_activity_sales sa2
+        //                  WHERE sa2.leads_id = sa.leads_id
+        //                    AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //                    AND sa2.tgl_activity <= sa.tgl_activity
+        //              )
+        //              OR l.status_leads_id = 102
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_quot"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'SPK'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Quotation'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w1_spk"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'SPK'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Quotation'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_spk"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'PKS'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'SPK'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w1_pks"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'PKS'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'SPK'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_pks"),
 
-                // ── WEEK 2 (8-14) ──────────────────────────────────────────
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity IN ('Kirim Berkas','Email')
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w2_appt"),
+        //         // ── WEEK 2 (8-14) ──────────────────────────────────────────
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity IN ('Kirim Berkas','Email')
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_appt"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w2_visit"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_visit"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Quotation'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND (
-                     EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
-                         WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                           AND sa2.tgl_activity <= sa.tgl_activity
-                     )
-                     OR l.status_leads_id = 102
-                 )
-                THEN 1 ELSE 0 END) as w2_quot"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Quotation'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND (
+        //              EXISTS (
+        //                  SELECT 1 FROM sl_activity_sales sa2
+        //                  WHERE sa2.leads_id = sa.leads_id
+        //                    AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //                    AND sa2.tgl_activity <= sa.tgl_activity
+        //              )
+        //              OR l.status_leads_id = 102
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_quot"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'SPK'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Quotation'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w2_spk"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'SPK'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Quotation'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_spk"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'PKS'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'SPK'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w2_pks"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'PKS'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'SPK'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_pks"),
 
-                // ── WEEK 3 (15-21) ─────────────────────────────────────────
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity IN ('Kirim Berkas','Email')
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w3_appt"),
+        //         // ── WEEK 3 (15-21) ─────────────────────────────────────────
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity IN ('Kirim Berkas','Email')
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_appt"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w3_visit"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_visit"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Quotation'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND (
-                     EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
-                         WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                           AND sa2.tgl_activity <= sa.tgl_activity
-                     )
-                     OR l.status_leads_id = 102
-                 )
-                THEN 1 ELSE 0 END) as w3_quot"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Quotation'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND (
+        //              EXISTS (
+        //                  SELECT 1 FROM sl_activity_sales sa2
+        //                  WHERE sa2.leads_id = sa.leads_id
+        //                    AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //                    AND sa2.tgl_activity <= sa.tgl_activity
+        //              )
+        //              OR l.status_leads_id = 102
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_quot"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'SPK'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Quotation'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w3_spk"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'SPK'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Quotation'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_spk"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'PKS'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'SPK'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w3_pks"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'PKS'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'SPK'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_pks"),
 
-                // ── WEEK 4 (22-akhir bulan) ─────────────────────────────────
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity IN ('Kirim Berkas','Email')
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w4_appt"),
+        //         // ── WEEK 4 (22-akhir bulan) ─────────────────────────────────
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity IN ('Kirim Berkas','Email')
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_appt"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w4_visit"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_visit"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Quotation'
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND (
-                     EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
-                         WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                           AND sa2.tgl_activity <= sa.tgl_activity
-                     )
-                     OR l.status_leads_id = 102
-                 )
-                THEN 1 ELSE 0 END) as w4_quot"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Quotation'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND (
+        //              EXISTS (
+        //                  SELECT 1 FROM sl_activity_sales sa2
+        //                  WHERE sa2.leads_id = sa.leads_id
+        //                    AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+        //                    AND sa2.tgl_activity <= sa.tgl_activity
+        //              )
+        //              OR l.status_leads_id = 102
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_quot"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'SPK'
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Quotation'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w4_spk"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'SPK'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Quotation'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_spk"),
 
-                DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'PKS'
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'SPK'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w4_pks")
-            )
-            ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
-            ->whereIn('sa.created_by', $salesNames)
-            ->whereIn('sa.jenis_activity', ['Kirim Berkas', 'Email', 'Appointment', 'Visit', 'Quotation', 'SPK', 'PKS'])
-            ->groupBy('sa.created_by')
-            ->get();
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'PKS'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'SPK'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_pks")
+        //     )
+        //     ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+        //     ->whereIn('sa.created_by', $salesNames)
+        //     ->whereIn('sa.jenis_activity', ['Kirim Berkas', 'Email', 'Appointment', 'Visit', 'Quotation', 'SPK', 'PKS'])
+        //     ->groupBy('sa.created_by')
+        //     ->get();
 
         $data = [];
         $no = 1;
@@ -849,104 +849,104 @@ class ReportController extends Controller
 
         $salesNames = $salesData->pluck('nama_sales')->toArray();
 
-        // $weeklyActivity = DB::table('sl_activity_sales as sa')
-        //     ->select(
-        //         'sa.created_by',
+        $weeklyActivity = DB::table('sl_activity_sales as sa')
+            ->select(
+                'sa.created_by',
 
-        //         // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Leads'
-        //              AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-        //             THEN sa.leads_id END) as w1_leads"),
+                // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Leads'
+                     AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+                    THEN sa.leads_id END) as w1_leads"),
 
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Assignment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-        //             THEN sa.leads_id END) as w1_assignment"),
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Assignment'
+                     AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+                    THEN sa.leads_id END) as w1_assignment"),
 
-        //         DB::raw("SUM(CASE
-        //             WHEN sa.jenis_activity = 'Appointment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-        //              AND EXISTS (
-        //                  SELECT 1 FROM sl_activity_sales sa2
-        //                  WHERE sa2.leads_id = sa.leads_id
-        //                    AND sa2.jenis_activity = 'Assignment'
-        //                    AND sa2.tgl_activity <= sa.tgl_activity
-        //              )
-        //             THEN 1 ELSE 0 END) as w1_appt"),
+                DB::raw("SUM(CASE
+                    WHEN sa.jenis_activity = 'Appointment'
+                     AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+                     AND EXISTS (
+                         SELECT 1 FROM sl_activity_sales sa2
+                         WHERE sa2.leads_id = sa.leads_id
+                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tgl_activity <= sa.tgl_activity
+                     )
+                    THEN 1 ELSE 0 END) as w1_appt"),
 
-        //         // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Leads'
-        //              AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-        //             THEN sa.leads_id END) as w2_leads"),
+                // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Leads'
+                     AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+                    THEN sa.leads_id END) as w2_leads"),
 
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Assignment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-        //             THEN sa.leads_id END) as w2_assignment"),
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Assignment'
+                     AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+                    THEN sa.leads_id END) as w2_assignment"),
 
-        //         DB::raw("SUM(CASE
-        //             WHEN sa.jenis_activity = 'Appointment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-        //              AND EXISTS (
-        //                  SELECT 1 FROM sl_activity_sales sa2
-        //                  WHERE sa2.leads_id = sa.leads_id
-        //                    AND sa2.jenis_activity = 'Assignment'
-        //                    AND sa2.tgl_activity <= sa.tgl_activity
-        //              )
-        //             THEN 1 ELSE 0 END) as w2_appt"),
+                DB::raw("SUM(CASE
+                    WHEN sa.jenis_activity = 'Appointment'
+                     AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+                     AND EXISTS (
+                         SELECT 1 FROM sl_activity_sales sa2
+                         WHERE sa2.leads_id = sa.leads_id
+                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tgl_activity <= sa.tgl_activity
+                     )
+                    THEN 1 ELSE 0 END) as w2_appt"),
 
-        //         // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Leads'
-        //              AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-        //             THEN sa.leads_id END) as w3_leads"),
+                // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Leads'
+                     AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+                    THEN sa.leads_id END) as w3_leads"),
 
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Assignment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-        //             THEN sa.leads_id END) as w3_assignment"),
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Assignment'
+                     AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+                    THEN sa.leads_id END) as w3_assignment"),
 
-        //         DB::raw("SUM(CASE
-        //             WHEN sa.jenis_activity = 'Appointment'
-        //              AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-        //              AND EXISTS (
-        //                  SELECT 1 FROM sl_activity_sales sa2
-        //                  WHERE sa2.leads_id = sa.leads_id
-        //                    AND sa2.jenis_activity = 'Assignment'
-        //                    AND sa2.tgl_activity <= sa.tgl_activity
-        //              )
-        //             THEN 1 ELSE 0 END) as w3_appt"),
+                DB::raw("SUM(CASE
+                    WHEN sa.jenis_activity = 'Appointment'
+                     AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+                     AND EXISTS (
+                         SELECT 1 FROM sl_activity_sales sa2
+                         WHERE sa2.leads_id = sa.leads_id
+                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tgl_activity <= sa.tgl_activity
+                     )
+                    THEN 1 ELSE 0 END) as w3_appt"),
 
-        //         // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Leads'
-        //              AND DAY(sa.tgl_activity) >= 22
-        //             THEN sa.leads_id END) as w4_leads"),
+                // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Leads'
+                     AND DAY(sa.tgl_activity) >= 22
+                    THEN sa.leads_id END) as w4_leads"),
 
-        //         DB::raw("COUNT(DISTINCT CASE
-        //             WHEN sa.jenis_activity = 'Assignment'
-        //              AND DAY(sa.tgl_activity) >= 22
-        //             THEN sa.leads_id END) as w4_assignment"),
+                DB::raw("COUNT(DISTINCT CASE
+                    WHEN sa.jenis_activity = 'Assignment'
+                     AND DAY(sa.tgl_activity) >= 22
+                    THEN sa.leads_id END) as w4_assignment"),
 
-        //         DB::raw("SUM(CASE
-        //             WHEN sa.jenis_activity = 'Appointment'
-        //              AND DAY(sa.tgl_activity) >= 22
-        //              AND EXISTS (
-        //                  SELECT 1 FROM sl_activity_sales sa2
-        //                  WHERE sa2.leads_id = sa.leads_id
-        //                    AND sa2.jenis_activity = 'Assignment'
-        //                    AND sa2.tgl_activity <= sa.tgl_activity
-        //              )
-        //             THEN 1 ELSE 0 END) as w4_appt")
-        //     )
-        //     ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
-        //     ->whereIn('sa.created_by', $salesNames)
-        //     // Hanya ambil baris yang relevan dengan alur Leads→Assignment→Appointment
-        //     ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
-        //     ->groupBy('sa.created_by')
-        //     ->get();
+                DB::raw("SUM(CASE
+                    WHEN sa.jenis_activity = 'Appointment'
+                     AND DAY(sa.tgl_activity) >= 22
+                     AND EXISTS (
+                         SELECT 1 FROM sl_activity_sales sa2
+                         WHERE sa2.leads_id = sa.leads_id
+                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tgl_activity <= sa.tgl_activity
+                     )
+                    THEN 1 ELSE 0 END) as w4_appt")
+            )
+            ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+            ->whereIn('sa.created_by', $salesNames)
+            // Hanya ambil baris yang relevan dengan alur Leads→Assignment→Appointment
+            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
+            ->groupBy('sa.created_by')
+            ->get();
         // ── Query agregasi mingguan untuk 3 metrik (Leads, Assignment, Appointment) ──
         //
         // Strategi per metrik:
@@ -959,151 +959,151 @@ class ReportController extends Controller
         // assignment biasanya terjadi sebelum appointment pada leads yang sama.
         // ─────────────────────────────────────────────────────────────────────
 
-       $weeklyActivity = DB::table('sl_activity_sales as sa')
-        ->select(
-            'sa.created_by',
+        // $weeklyActivity = DB::table('sl_activity_sales as sa')
+        //     ->select(
+        //         'sa.created_by',
 
-            // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Leads'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                THEN sa.leads_id END) as w1_leads"),
+        //         // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
+        //         DB::raw("COUNT(DISTINCT CASE
+        //         WHEN sa.jenis_activity = 'Leads'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //         THEN sa.leads_id END) as w1_leads"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                THEN 1 ELSE 0 END) as w1_appt"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //         THEN 1 ELSE 0 END) as w1_appt"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Assignment'
-                 AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w1_assignment"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Assignment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w1_assignment"),
 
-            // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Leads'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                THEN sa.leads_id END) as w2_leads"),
+        //         // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
+        //         DB::raw("COUNT(DISTINCT CASE
+        //         WHEN sa.jenis_activity = 'Leads'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //         THEN sa.leads_id END) as w2_leads"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                THEN 1 ELSE 0 END) as w2_appt"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //         THEN 1 ELSE 0 END) as w2_appt"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Assignment'
-                 AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w2_assignment"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Assignment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w2_assignment"),
 
-            // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Leads'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                THEN sa.leads_id END) as w3_leads"),
+        //         // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
+        //         DB::raw("COUNT(DISTINCT CASE
+        //         WHEN sa.jenis_activity = 'Leads'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //         THEN sa.leads_id END) as w3_leads"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                THEN 1 ELSE 0 END) as w3_appt"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //         THEN 1 ELSE 0 END) as w3_appt"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Assignment'
-                 AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w3_assignment"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Assignment'
+        //          AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w3_assignment"),
 
-            // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Leads'
-                 AND DAY(sa.tgl_activity) >= 22
-                THEN sa.leads_id END) as w4_leads"),
+        //         // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
+        //         DB::raw("COUNT(DISTINCT CASE
+        //         WHEN sa.jenis_activity = 'Leads'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //         THEN sa.leads_id END) as w4_leads"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND DAY(sa.tgl_activity) >= 22
-                THEN 1 ELSE 0 END) as w4_appt"),
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Appointment'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //         THEN 1 ELSE 0 END) as w4_appt"),
 
-            DB::raw("SUM(CASE
-                WHEN sa.jenis_activity = 'Assignment'
-                 AND DAY(sa.tgl_activity) >= 22
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 ELSE 0 END) as w4_assignment")
-        )
-        ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
-        ->whereIn('sa.created_by', $salesNames)
-        ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
-        ->groupBy('sa.created_by')
-        ->get();
+        //         DB::raw("SUM(CASE
+        //         WHEN sa.jenis_activity = 'Assignment'
+        //          AND DAY(sa.tgl_activity) >= 22
+        //          AND EXISTS (
+        //              SELECT 1 FROM sl_activity_sales sa2
+        //              WHERE sa2.leads_id = sa.leads_id
+        //                AND sa2.jenis_activity = 'Appointment'
+        //                AND sa2.tgl_activity <= sa.tgl_activity
+        //          )
+        //         THEN 1 ELSE 0 END) as w4_assignment")
+        //     )
+        //     ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+        //     ->whereIn('sa.created_by', $salesNames)
+        //     ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
+        //     ->groupBy('sa.created_by')
+        //     ->get();
 
-    $emptyWeek = ['leads' => 0, 'appt' => 0, 'assignment' => 0];
+        $emptyWeek = ['leads' => 0, 'appt' => 0, 'assignment' => 0];
 
-    $data = [];
-    $no = 1;
-    foreach ($salesData as $sales) {
-        $nama = $sales->nama_sales;
-        $act = $weeklyActivity->firstWhere('created_by', $nama);
+        $data = [];
+        $no = 1;
+        foreach ($salesData as $sales) {
+            $nama = $sales->nama_sales;
+            $act = $weeklyActivity->firstWhere('created_by', $nama);
 
-        $w1 = $emptyWeek;
-        $w2 = $emptyWeek;
-        $w3 = $emptyWeek;
-        $w4 = $emptyWeek;
+            $w1 = $emptyWeek;
+            $w2 = $emptyWeek;
+            $w3 = $emptyWeek;
+            $w4 = $emptyWeek;
 
-        if ($act) {
-            $w1 = [
-                'leads' => (int) $act->w1_leads,
-                'appt' => (int) $act->w1_appt,
-                'assignment' => (int) $act->w1_assignment
-            ];
-            $w2 = [
-                'leads' => (int) $act->w2_leads,
-                'appt' => (int) $act->w2_appt,
-                'assignment' => (int) $act->w2_assignment
-            ];
-            $w3 = [
-                'leads' => (int) $act->w3_leads,
-                'appt' => (int) $act->w3_appt,
-                'assignment' => (int) $act->w3_assignment
-            ];
-            $w4 = [
-                'leads' => (int) $act->w4_leads,
-                'appt' => (int) $act->w4_appt,
-                'assignment' => (int) $act->w4_assignment
+            if ($act) {
+                $w1 = [
+                    'leads' => (int) $act->w1_leads,
+                    'appt' => (int) $act->w1_appt,
+                    'assignment' => (int) $act->w1_assignment
+                ];
+                $w2 = [
+                    'leads' => (int) $act->w2_leads,
+                    'appt' => (int) $act->w2_appt,
+                    'assignment' => (int) $act->w2_assignment
+                ];
+                $w3 = [
+                    'leads' => (int) $act->w3_leads,
+                    'appt' => (int) $act->w3_appt,
+                    'assignment' => (int) $act->w3_assignment
+                ];
+                $w4 = [
+                    'leads' => (int) $act->w4_leads,
+                    'appt' => (int) $act->w4_appt,
+                    'assignment' => (int) $act->w4_assignment
+                ];
+            }
+
+            $data[] = [
+                'no' => $no++,
+                'user_id' => $sales->user_id ?? null,
+                'nama_sales' => $nama,
+                'cabang' => $sales->cabang,
+                'w1' => $w1,
+                'w2' => $w2,
+                'w3' => $w3,
+                'w4' => $w4,
             ];
         }
-
-        $data[] = [
-            'no' => $no++,
-            'user_id' => $sales->user_id ?? null,
-            'nama_sales' => $nama,
-            'cabang' => $sales->cabang,
-            'w1' => $w1,
-            'w2' => $w2,
-            'w3' => $w3,
-            'w4' => $w4,
-        ];
-    }
 
         $periode = strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
@@ -1588,163 +1588,163 @@ class ReportController extends Controller
     /**
      * mentah
      */
-    // private function getMonthlyAggregation($start, $end, array $salesNames)
-    // {
-    //     return DB::table('sl_activity_sales')
-    //         ->select(
-    //             'created_by',
-    //             DB::raw("COUNT(CASE WHEN jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'Visit' THEN 1 END) as jumlah_visit"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'Quotation' THEN 1 END) as jumlah_quotation"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'SPK' THEN 1 END) as jumlah_spk"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'PKS' THEN 1 END) as jumlah_pks"),
-    //             DB::raw("COUNT(CASE WHEN jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
-    //         )
-    //         ->whereBetween('tgl_activity', [$start, $end])
-    //         ->whereIn('created_by', $salesNames)
-    //         ->groupBy('created_by')
-    //         ->get();
-    // }
     private function getMonthlyAggregation($start, $end, array $salesNames)
     {
-        return DB::table('sl_activity_sales as sa')
-            ->leftJoin('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+        return DB::table('sl_activity_sales')
             ->select(
-                'sa.created_by',
-
-                // Kirim Proposal
-                DB::raw("COUNT(CASE WHEN sa.jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
-
-                // Appointment
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'Appointment'
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity IN ('Kirim Berkas', 'Email')
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 END) as jumlah_appointment"),
-
-                // Visit – sekarang termasuk Online Meeting, Email, Telepon
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 END) as jumlah_visit"),
-
-                // Quotation – dengan pengecualian status 102, dan syarat Visit dalam arti luas
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'Quotation'
-                 AND (
-                     EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
-                         WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
-                           AND sa2.tgl_activity <= sa.tgl_activity
-                     )
-                     OR l.status_leads_id = 102
-                 )
-                THEN 1 END) as jumlah_quotation"),
-
-                // SPK
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'SPK'
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Quotation'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 END) as jumlah_spk"),
-
-                // PKS
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'PKS'
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'SPK'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 END) as jumlah_pks"),
-
-                // Follow Up
-                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
+                'created_by',
+                DB::raw("COUNT(CASE WHEN jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
+                DB::raw("COUNT(CASE WHEN jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
+                DB::raw("COUNT(CASE WHEN jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon') THEN 1 END) as jumlah_visit"),
+                DB::raw("COUNT(CASE WHEN jenis_activity = 'Quotation' THEN 1 END) as jumlah_quotation"),
+                DB::raw("COUNT(CASE WHEN jenis_activity = 'SPK' THEN 1 END) as jumlah_spk"),
+                DB::raw("COUNT(CASE WHEN jenis_activity = 'PKS' THEN 1 END) as jumlah_pks"),
+                DB::raw("COUNT(CASE WHEN jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
             )
-            ->whereBetween('sa.tgl_activity', [$start, $end])
-            ->whereIn('sa.created_by', $salesNames)
-            ->groupBy('sa.created_by')
+            ->whereBetween('tgl_activity', [$start, $end])
+            ->whereIn('created_by', $salesNames)
+            ->groupBy('created_by')
             ->get();
     }
-
-
-    //mentah
-    // private function getRole30MonthlyAggregation($start, $end, array $salesNames)
+    // private function getMonthlyAggregation($start, $end, array $salesNames)
     // {
     //     return DB::table('sl_activity_sales as sa')
+    //         ->leftJoin('sl_leads as l', 'sa.leads_id', '=', 'l.id')
     //         ->select(
     //             'sa.created_by',
 
-    //             // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
-    //             DB::raw("COUNT(DISTINCT CASE
-    //             WHEN sa.jenis_activity = 'Leads'
-    //             THEN sa.leads_id END) as jumlah_leads"),
+    //             // Kirim Proposal
+    //             DB::raw("COUNT(CASE WHEN sa.jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
 
-    //             // Assignment: semua activity 'Assignment' langsung dihitung (distinct per leads_id)
-    //             DB::raw("COUNT(DISTINCT CASE
-    //             WHEN sa.jenis_activity = 'Assignment'
-    //             THEN sa.leads_id END) as jumlah_assignment"),
-
-    //             // Appointment: semua activity 'Appointment' langsung dihitung
+    //             // Appointment
     //             DB::raw("COUNT(CASE
     //             WHEN sa.jenis_activity = 'Appointment'
-    //             THEN 1 END) as jumlah_appointment")
+    //              AND EXISTS (
+    //                  SELECT 1 FROM sl_activity_sales sa2
+    //                  WHERE sa2.leads_id = sa.leads_id
+    //                    AND sa2.jenis_activity IN ('Kirim Berkas', 'Email')
+    //                    AND sa2.tgl_activity <= sa.tgl_activity
+    //              )
+    //             THEN 1 END) as jumlah_appointment"),
+
+    //             // Visit – sekarang termasuk Online Meeting, Email, Telepon
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+    //              AND EXISTS (
+    //                  SELECT 1 FROM sl_activity_sales sa2
+    //                  WHERE sa2.leads_id = sa.leads_id
+    //                    AND sa2.jenis_activity = 'Appointment'
+    //                    AND sa2.tgl_activity <= sa.tgl_activity
+    //              )
+    //             THEN 1 END) as jumlah_visit"),
+
+    //             // Quotation – dengan pengecualian status 102, dan syarat Visit dalam arti luas
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity = 'Quotation'
+    //              AND (
+    //                  EXISTS (
+    //                      SELECT 1 FROM sl_activity_sales sa2
+    //                      WHERE sa2.leads_id = sa.leads_id
+    //                        AND sa2.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon')
+    //                        AND sa2.tgl_activity <= sa.tgl_activity
+    //                  )
+    //                  OR l.status_leads_id = 102
+    //              )
+    //             THEN 1 END) as jumlah_quotation"),
+
+    //             // SPK
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity = 'SPK'
+    //              AND EXISTS (
+    //                  SELECT 1 FROM sl_activity_sales sa2
+    //                  WHERE sa2.leads_id = sa.leads_id
+    //                    AND sa2.jenis_activity = 'Quotation'
+    //                    AND sa2.tgl_activity <= sa.tgl_activity
+    //              )
+    //             THEN 1 END) as jumlah_spk"),
+
+    //             // PKS
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity = 'PKS'
+    //              AND EXISTS (
+    //                  SELECT 1 FROM sl_activity_sales sa2
+    //                  WHERE sa2.leads_id = sa.leads_id
+    //                    AND sa2.jenis_activity = 'SPK'
+    //                    AND sa2.tgl_activity <= sa.tgl_activity
+    //              )
+    //             THEN 1 END) as jumlah_pks"),
+
+    //             // Follow Up
+    //             DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
     //         )
     //         ->whereBetween('sa.tgl_activity', [$start, $end])
     //         ->whereIn('sa.created_by', $salesNames)
-    //         ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
     //         ->groupBy('sa.created_by')
     //         ->get();
     // }
+
+
+    //mentah
     private function getRole30MonthlyAggregation($start, $end, array $salesNames)
     {
         return DB::table('sl_activity_sales as sa')
             ->select(
                 'sa.created_by',
 
-                // Leads: semua aktivitas 'Leads' (distinct per leads_id)
+                // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.jenis_activity = 'Leads'
                 THEN sa.leads_id END) as jumlah_leads"),
 
-                // Appointment: semua appointment (tanpa syarat, karena setelah Leads)
+                // Assignment: semua activity 'Assignment' langsung dihitung (distinct per leads_id)
+                DB::raw("COUNT(DISTINCT CASE
+                WHEN sa.jenis_activity = 'Assignment'
+                THEN sa.leads_id END) as jumlah_assignment"),
+
+                // Appointment: semua activity 'Appointment' langsung dihitung
                 DB::raw("COUNT(CASE
                 WHEN sa.jenis_activity = 'Appointment'
-                THEN 1 END) as jumlah_appointment"),
-
-                // Assignment: hanya jika sudah ada Appointment sebelumnya pada leads yang sama
-                DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'Assignment'
-                 AND EXISTS (
-                     SELECT 1 FROM sl_activity_sales sa2
-                     WHERE sa2.leads_id = sa.leads_id
-                       AND sa2.jenis_activity = 'Appointment'
-                       AND sa2.tgl_activity <= sa.tgl_activity
-                 )
-                THEN 1 END) as jumlah_assignment")
+                THEN 1 END) as jumlah_appointment")
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
             ->whereIn('sa.created_by', $salesNames)
-            ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
+            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
             ->groupBy('sa.created_by')
             ->get();
     }
+    // private function getRole30MonthlyAggregation($start, $end, array $salesNames)
+    // {
+    //     return DB::table('sl_activity_sales as sa')
+    //         ->select(
+    //             'sa.created_by',
+
+    //             // Leads: semua aktivitas 'Leads' (distinct per leads_id)
+    //             DB::raw("COUNT(DISTINCT CASE
+    //             WHEN sa.jenis_activity = 'Leads'
+    //             THEN sa.leads_id END) as jumlah_leads"),
+
+    //             // Appointment: semua appointment (tanpa syarat, karena setelah Leads)
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity = 'Appointment'
+    //             THEN 1 END) as jumlah_appointment"),
+
+    //             // Assignment: hanya jika sudah ada Appointment sebelumnya pada leads yang sama
+    //             DB::raw("COUNT(CASE
+    //             WHEN sa.jenis_activity = 'Assignment'
+    //              AND EXISTS (
+    //                  SELECT 1 FROM sl_activity_sales sa2
+    //                  WHERE sa2.leads_id = sa.leads_id
+    //                    AND sa2.jenis_activity = 'Appointment'
+    //                    AND sa2.tgl_activity <= sa.tgl_activity
+    //              )
+    //             THEN 1 END) as jumlah_assignment")
+    //         )
+    //         ->whereBetween('sa.tgl_activity', [$start, $end])
+    //         ->whereIn('sa.created_by', $salesNames)
+    //         ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
+    //         ->groupBy('sa.created_by')
+    //         ->get();
+    // }
 
     private function formatMonthlyCounts($record): array
     {
