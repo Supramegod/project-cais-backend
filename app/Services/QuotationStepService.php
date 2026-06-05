@@ -1100,13 +1100,12 @@ class QuotationStepService
         // Sanitasi input: hanya flag yang dikenal, cast ke boolean
         $sanitizedFlags = [];
         foreach ($allowedFlags as $flag) {
-            // Checkbox yang tidak dicentang tidak muncul di request → default false
             $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
         }
 
         QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
 
-        \Log::info('Saved management fee component config', [
+        \Log::info('Saved management fee component ', [
             'quotation_id' => $quotation->id,
             'flags' => $sanitizedFlags,
         ]);
