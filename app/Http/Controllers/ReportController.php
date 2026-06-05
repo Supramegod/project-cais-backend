@@ -959,22 +959,22 @@ class ReportController extends Controller
         // assignment biasanya terjadi sebelum appointment pada leads yang sama.
         // ─────────────────────────────────────────────────────────────────────
 
-       $weeklyActivity = DB::table('sl_activity_sales as sa')
-        ->select(
-            'sa.created_by',
+        $weeklyActivity = DB::table('sl_activity_sales as sa')
+            ->select(
+                'sa.created_by',
 
-            // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
+                // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.jenis_activity = 'Leads'
                  AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                 THEN sa.leads_id END) as w1_leads"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Appointment'
                  AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                 THEN 1 ELSE 0 END) as w1_appt"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Assignment'
                  AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                  AND EXISTS (
@@ -985,18 +985,18 @@ class ReportController extends Controller
                  )
                 THEN 1 ELSE 0 END) as w1_assignment"),
 
-            // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
+                // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.jenis_activity = 'Leads'
                  AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                 THEN sa.leads_id END) as w2_leads"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Appointment'
                  AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                 THEN 1 ELSE 0 END) as w2_appt"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Assignment'
                  AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                  AND EXISTS (
@@ -1007,18 +1007,18 @@ class ReportController extends Controller
                  )
                 THEN 1 ELSE 0 END) as w2_assignment"),
 
-            // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
+                // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.jenis_activity = 'Leads'
                  AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                 THEN sa.leads_id END) as w3_leads"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Appointment'
                  AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                 THEN 1 ELSE 0 END) as w3_appt"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Assignment'
                  AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                  AND EXISTS (
@@ -1029,18 +1029,18 @@ class ReportController extends Controller
                  )
                 THEN 1 ELSE 0 END) as w3_assignment"),
 
-            // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
-            DB::raw("COUNT(DISTINCT CASE
+                // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
+                DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.jenis_activity = 'Leads'
                  AND DAY(sa.tgl_activity) >= 22
                 THEN sa.leads_id END) as w4_leads"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Appointment'
                  AND DAY(sa.tgl_activity) >= 22
                 THEN 1 ELSE 0 END) as w4_appt"),
 
-            DB::raw("SUM(CASE
+                DB::raw("SUM(CASE
                 WHEN sa.jenis_activity = 'Assignment'
                  AND DAY(sa.tgl_activity) >= 22
                  AND EXISTS (
@@ -1050,60 +1050,60 @@ class ReportController extends Controller
                        AND sa2.tgl_activity <= sa.tgl_activity
                  )
                 THEN 1 ELSE 0 END) as w4_assignment")
-        )
-        ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
-        ->whereIn('sa.created_by', $salesNames)
-        ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
-        ->groupBy('sa.created_by')
-        ->get();
+            )
+            ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+            ->whereIn('sa.created_by', $salesNames)
+            ->whereIn('sa.jenis_activity', ['Leads', 'Appointment', 'Assignment'])
+            ->groupBy('sa.created_by')
+            ->get();
 
-    $emptyWeek = ['leads' => 0, 'appt' => 0, 'assignment' => 0];
+        $emptyWeek = ['leads' => 0, 'appt' => 0, 'assignment' => 0];
 
-    $data = [];
-    $no = 1;
-    foreach ($salesData as $sales) {
-        $nama = $sales->nama_sales;
-        $act = $weeklyActivity->firstWhere('created_by', $nama);
+        $data = [];
+        $no = 1;
+        foreach ($salesData as $sales) {
+            $nama = $sales->nama_sales;
+            $act = $weeklyActivity->firstWhere('created_by', $nama);
 
-        $w1 = $emptyWeek;
-        $w2 = $emptyWeek;
-        $w3 = $emptyWeek;
-        $w4 = $emptyWeek;
+            $w1 = $emptyWeek;
+            $w2 = $emptyWeek;
+            $w3 = $emptyWeek;
+            $w4 = $emptyWeek;
 
-        if ($act) {
-            $w1 = [
-                'leads' => (int) $act->w1_leads,
-                'appt' => (int) $act->w1_appt,
-                'assignment' => (int) $act->w1_assignment
-            ];
-            $w2 = [
-                'leads' => (int) $act->w2_leads,
-                'appt' => (int) $act->w2_appt,
-                'assignment' => (int) $act->w2_assignment
-            ];
-            $w3 = [
-                'leads' => (int) $act->w3_leads,
-                'appt' => (int) $act->w3_appt,
-                'assignment' => (int) $act->w3_assignment
-            ];
-            $w4 = [
-                'leads' => (int) $act->w4_leads,
-                'appt' => (int) $act->w4_appt,
-                'assignment' => (int) $act->w4_assignment
+            if ($act) {
+                $w1 = [
+                    'leads' => (int) $act->w1_leads,
+                    'appt' => (int) $act->w1_appt,
+                    'assignment' => (int) $act->w1_assignment
+                ];
+                $w2 = [
+                    'leads' => (int) $act->w2_leads,
+                    'appt' => (int) $act->w2_appt,
+                    'assignment' => (int) $act->w2_assignment
+                ];
+                $w3 = [
+                    'leads' => (int) $act->w3_leads,
+                    'appt' => (int) $act->w3_appt,
+                    'assignment' => (int) $act->w3_assignment
+                ];
+                $w4 = [
+                    'leads' => (int) $act->w4_leads,
+                    'appt' => (int) $act->w4_appt,
+                    'assignment' => (int) $act->w4_assignment
+                ];
+            }
+
+            $data[] = [
+                'no' => $no++,
+                'user_id' => $sales->user_id ?? null,
+                'nama_sales' => $nama,
+                'cabang' => $sales->cabang,
+                'w1' => $w1,
+                'w2' => $w2,
+                'w3' => $w3,
+                'w4' => $w4,
             ];
         }
-
-        $data[] = [
-            'no' => $no++,
-            'user_id' => $sales->user_id ?? null,
-            'nama_sales' => $nama,
-            'cabang' => $sales->cabang,
-            'w1' => $w1,
-            'w2' => $w2,
-            'w3' => $w3,
-            'w4' => $w4,
-        ];
-    }
 
         $periode = strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
