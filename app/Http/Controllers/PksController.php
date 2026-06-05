@@ -1081,7 +1081,7 @@ class PksController extends Controller
             $oldIsAktif = $pks->is_aktif;
             $oldKontrakAkhir = $pks->kontrak_akhir;
 
-            $pks->update($request->all());
+            $pks->update($validator->validated());
 
             // Jika ada perubahan pada is_aktif atau kontrak_akhir, sync customer_active
             if ($oldIsAktif != $pks->is_aktif || $oldKontrakAkhir != $pks->kontrak_akhir) {
@@ -1798,7 +1798,7 @@ class PksController extends Controller
         try {
             DB::beginTransaction();
 
-            $pks = Pks::find($id);
+            $pks = Pks::with('leads:id,nomor,kebutuhan_id,branch_id')->find($id);
 
             if (!$pks) {
                 return response()->json([
@@ -1953,12 +1953,12 @@ class PksController extends Controller
                 'updated_by' => Auth::user()->full_name,
             ]);
 
-            DB::commit();
-
             $pks = Pks::with('leads')->find($perjanjian->pks_id);
             if ($pks && $pks->leads) {
                 $this->logPerjanjianChange($perjanjian, $pks->leads);
             }
+            DB::commit();
+
 
             return response()->json([
                 'success' => true,
@@ -3369,6 +3369,7 @@ class PksController extends Controller
         // Hitung sudah berapa addendum untuk PKS induk ini
         $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
             ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
+            ->withTrashed()
             ->count();
 
         $urutan = sprintf('%04d', $jumlahAddendum + 1);
@@ -3392,5 +3393,26 @@ class PksController extends Controller
                 ]);
             }
         }
+    }
+    private function autoSyncCustomerActiveStatus(): void
+    {
+        $activeLeadsIds = Pks::select('leads_id')
+            ->where('is_aktif', 1)
+            ->whereNull('deleted_at')
+            ->where('kontrak_akhir', '>=', now()->toDateString())
+            ->pluck('leads_id')
+            ->unique();
+
+        DB::table('sl_leads')
+            ->whereNotNull('customer_id')
+            ->whereIn('id', $activeLeadsIds)
+            ->where('customer_active', '!=', 1)
+            ->update(['customer_active' => 1]);
+
+        DB::table('sl_leads')
+            ->whereNotNull('customer_id')
+            ->whereNotIn('id', $activeLeadsIds)
+            ->where('customer_active', '!=', 0)
+            ->update(['customer_active' => 0]);
     }
 }
