@@ -246,7 +246,7 @@ class CustomerActivityController extends Controller
             }
 
             // 6. Pagination
-            $activities = $query->orderBy('tgl_activity', 'desc')
+            $activities = $query->orderBy('created_at', 'desc')
                 ->orderBy('id', 'desc')
                 ->paginate($request->get('per_page', 15));
 
