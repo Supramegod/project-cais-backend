@@ -1183,6 +1183,10 @@ class QuotationService
             fn($d) => ($isHpp ? ($d->personil_ohc ?? 0) : ($d->personil_ohc_coss ?? 0))
             * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
         );
+        $summary->{"total_tunjangan_lain{$suffix}"} = $details->sum(
+            fn($d) => ($isHpp ? ($d->total_tunjangan ?? 0) : ($d->total_tunjangan_coss ?? 0))
+            * ($d->{$jumlahHcField} ?? $d->jumlah_hc)
+        );
     }
 
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
@@ -1208,6 +1212,7 @@ class QuotationService
             'is_kaporlap' => "total_kaporlap{$suffix}",
             'is_device' => "total_device{$suffix}",
             'is_ohc' => "total_ohc{$suffix}",
+            'is_tunjangan_lain' => "total_tunjangan_lain{$suffix}",
         ];
 
         foreach ($componentMap as $flag => $summaryField) {
