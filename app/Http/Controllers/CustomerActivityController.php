@@ -112,7 +112,7 @@ class CustomerActivityController extends Controller
      *         in="query",
      *         description="Kolom yang akan dicari (default: nama_perusahaan)",
      *         required=false,
-     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "kebutuhan"}, example="nama_perusahaan")
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "tipe", "branch", "kebutuhan", "sales"}, example="nama_perusahaan")
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -195,58 +195,40 @@ class CustomerActivityController extends Controller
                 return response()->json(['success' => false, 'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'], 422);
             }
 
-            // 2. Subquery untuk mengambil ID activity terbaru per leads_id
-            $latestActivityIds = CustomerActivity::select(DB::raw('MAX(id)'))
-                ->whereNull('deleted_at')
-                ->groupBy('leads_id');
-
-            // 3. Base Query dengan Eager Loading
+            // 2. Base Query dengan Eager Loading (tanpa grouping per leads_id)
             $query = CustomerActivity::with([
                 'leads:id,nama_perusahaan,branch_id',
                 'leads.branch:id,name',
                 'leads.kebutuhan:id,nama',
                 'timSalesDetail:id,nama'
-            ])
-                ->whereIn('id', $latestActivityIds);
+            ])->whereNull('deleted_at');
 
-            // 4. Logika Pencarian (Search)
+            // 3. Filter Tipe yang diizinkan
+            $allowedTypes = ['Telepon', 'Online Meeting', 'Email', 'Kirim Berkas', 'Visit'];
+            $query->whereIn('tipe', $allowedTypes);
+
+            // 4. Logika Pencarian (Search) - sama seperti kode Anda
             if ($request->filled('search')) {
                 $searchTerm = $request->search;
                 $searchBy = $request->get('search_by', 'nama_perusahaan');
 
                 if ($searchBy === 'nama_perusahaan') {
-                    // Formatting untuk Boolean Mode
-                    if (str_contains($searchTerm, ' ')) {
-                        $searchTerm = '"' . $searchTerm . '"';
-                    } else {
-                        $searchTerm = $searchTerm . '*';
-                    }
-
-                    // Search ke tabel Leads menggunakan MATCH AGAINST
-                    $query->whereHas('leads', function ($q) use ($searchTerm) {
-                        $q->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
-                    });
-                } else {
-                    $allowedColumns = ['nomor'];
-
-                    if ($searchBy === 'kebutuhan') {
-                        // Search ke relasi kebutuhan
-                        $query->whereHas('leads.kebutuhan', function ($q) use ($searchTerm) {
-                            $q->where('nama', 'LIKE', '%' . $searchTerm . '%');
-                        });
-                    } elseif (in_array($searchBy, $allowedColumns)) {
-                        // Search ke kolom di tabel activity sendiri (misal: nomor activity)
-                        $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
-                    }
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"' . $searchTerm . '"'
+                        : $searchTerm . '*';
+                    $query->whereRaw("MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                } elseif (in_array($searchBy, ['tipe', 'branch', 'kebutuhan', 'sales'])) {
+                    $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                // Jika tidak ada search, gunakan filter tanggal default
+                $tglDari = $request->get('tgl_dari', Carbon::today()->subMonths(6)->toDateString());
+                $tglSampai = $request->get('tgl_sampai', Carbon::today()->toDateString());
                 $query->whereBetween('tgl_activity', [$tglDari, $tglSampai]);
             }
 
-            // 5. Filter Tambahan (Branch, Tipe, User)
+            // 5. Filter Tambahan
             $query->whereHas('leads', function ($q) use ($request) {
-                $q->filterByUserRole(); // Gunakan scope dari model Leads
+                $q->filterByUserRole();
                 if ($request->filled('branch')) {
                     $q->where('branch_id', $request->branch);
                 }
@@ -256,23 +238,21 @@ class CustomerActivityController extends Controller
                     });
                 }
             });
-
+            if ($request->filled('user')) {
+                $query->where('user_id', $request->user);
+            }
             if ($request->filled('tipe')) {
                 $query->where('tipe', $request->tipe);
             }
 
-            if ($request->filled('user')) {
-                $query->where('user_id', $request->user);
-            }
-
-            // 6. Execution & Pagination
-            $activities = $query->orderBy('tgl_activity', 'desc')
+            // 6. Pagination
+            $activities = $query->orderBy('created_at', 'desc')
                 ->orderBy('id', 'desc')
                 ->paginate($request->get('per_page', 15));
 
-            // 7. Transformasi Data
+            // 7. Transformasi Data dengan conditional fields PER ITEM
             $activities->getCollection()->transform(function ($activity) {
-                return [
+                $base = [
                     'id' => $activity->id,
                     'nomor' => $activity->nomor,
                     'tgl_activity' => $activity->tgl_activity,
@@ -280,6 +260,7 @@ class CustomerActivityController extends Controller
                     'notes' => $activity->notes,
                     'status_leads_id' => $activity->status_leads_id,
                     'created_at' => $activity->getRawOriginal('created_at'),
+                    'created_by' => $activity->created_by,
                     'nama_perusahaan' => $activity->leads?->nama_perusahaan ?? '-',
                     'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray() ?? [],
                     'branch' => $activity->leads?->branch?->name ?? '-',
@@ -287,11 +268,26 @@ class CustomerActivityController extends Controller
                     'leads_id' => $activity->leads_id,
                     'quotation_id' => $activity->quotation_id,
                     'spk_id' => $activity->spk_id,
-                    'pks_id' => $activity->pks_id
+                    'pks_id' => $activity->pks_id,
                 ];
+
+                // Tambahkan field spesifik berdasarkan tipe
+                $tipeLower = strtolower($activity->tipe);
+                if (in_array($tipeLower, ['telepon', 'online meeting'])) {
+                    $base['start'] = $activity->start;
+                    $base['end'] = $activity->end;
+                    $base['durasi'] = $activity->durasi;
+                    $base['tgl_realisasi'] = $activity->tgl_realisasi;
+                } elseif ($tipeLower === 'visit') {
+                    $base['tgl_realisasi'] = $activity->tgl_realisasi;
+                    $base['jam_realisasi'] = $activity->jam_realisasi;
+                    $base['jenis_visit'] = $activity->jenis_visit;
+                }
+
+                return $base;
             });
 
-            // 8. Final Response
+            // 8. Response
             return response()->json([
                 'success' => true,
                 'message' => 'Data aktivitas berhasil diambil',
@@ -306,7 +302,8 @@ class CustomerActivityController extends Controller
                     'tgl_dari' => $tglDari,
                     'tgl_sampai' => $tglSampai,
                     'search_applied' => $request->search,
-                    'search_by' => $request->get('search_by', 'nama_perusahaan')
+                    'search_by' => $request->get('search_by', 'nama_perusahaan'),
+                    'filtered_types' => $allowedTypes
                 ]
             ]);
 
@@ -424,12 +421,17 @@ class CustomerActivityController extends Controller
             // Get current activity data only
             $activityData = [
                 'id' => $activity->id,
+                'nomor' => $activity->nomor,
+                'nama_perusahaan' => $activity->leads?->nama_perusahaan ?? '-',
+                'kebutuhan' => $activity->leads?->kebutuhan->pluck('nama')->toArray() ?? [],
+                'branch' => $activity->leads?->branch?->name ?? '-',
+                'sales' => $activity->timSalesDetail?->nama ?? '-',
                 'tipe' => $activity->tipe,
                 'notes' => $activity->notes_tipe ?? $activity->notes,
                 'tgl_activity' => $activity->tgl_activity,
                 'created_at' => $activity->getRawOriginal('created_at'),
                 'created_by' => $activity->created_by,
-                'activity_files' => $activity->files->map(function ($file) {
+                'activity_files' => $activity->files->isEmpty() ? null : $activity->files->map(function ($file) {
                     return [
                         'id' => $file->id,
                         'nama_file' => $file->nama_file,
