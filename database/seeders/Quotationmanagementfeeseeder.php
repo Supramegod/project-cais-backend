@@ -99,32 +99,24 @@ class QuotationManagementFeeSeeder extends Seeder
      *
      *   null/unknown → semua true (safe default agar data lama tidak kehilangan basis)
      */
-    private function getFlagsFromLegacyId(?int $managementFeeId): array
-    {
-        $allTrue  = array_fill_keys(QuotationManagementFee::componentFlags(), true);
-        $allFalse = array_fill_keys(QuotationManagementFee::componentFlags(), false);
+private function getFlagsFromLegacyId(?int $managementFeeId): array
+{
+    $allTrue  = array_fill_keys(QuotationManagementFee::componentFlags(), true);
+    $allFalse = array_fill_keys(QuotationManagementFee::componentFlags(), false);
 
-        return match ($managementFeeId) {
-            // id=1  Base Manpower: hanya gaji pokok (tunjangan bulanan tidak ada flag-nya)
-            1 => $allFalse,
+    $flags = match ($managementFeeId) {
+        1 => $allFalse,
+        4 => $allTrue,
+        5 => $allFalse,
+        6 => array_merge($allFalse, ['is_bpjs_tk'  => true]),
+        7 => array_merge($allFalse, ['is_bpjs_tk'  => true, 'is_bpjs_kes' => true]),
+        8 => array_merge($allFalse, ['is_bpjs_kes' => true]),
+        default => $allTrue,
+    };
 
-            // id=4  Total semua komponen HPP
-            4 => $allTrue,
+    // Kolom baru → selalu false untuk data lama (backward compat)
+    $flags['is_tunjangan_lain'] = false;
 
-            // id=5  Upah pokok saja
-            5 => $allFalse,
-
-            // id=6  Upah pokok + BPJS Ketenagakerjaan
-            6 => array_merge($allFalse, ['is_bpjs_tk' => true]),
-
-            // id=7  Upah pokok + BPJS TK + BPJS Kesehatan
-            7 => array_merge($allFalse, ['is_bpjs_tk' => true, 'is_bpjs_kes' => true]),
-
-            // id=8  Upah pokok + BPJS Kesehatan
-            8 => array_merge($allFalse, ['is_bpjs_kes' => true]),
-
-            // null/0/unknown → safe default: semua aktif
-            default => $allTrue,
-        };
-    }
+    return $flags;
+}
 }

@@ -187,6 +187,7 @@ class QuotationStepService
                     'is_kaporlap' => 'Kaporlap / Seragam',
                     'is_device' => 'Device / Peralatan',
                     'is_ohc' => 'OHC',
+                    'is_tunjangan_lain' => 'Tunjangan Lain',
                 ];
                 // Data UMK per site
                 $data['additional_data']['umk_per_site'] = [];
