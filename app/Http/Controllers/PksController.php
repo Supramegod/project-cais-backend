@@ -2557,6 +2557,10 @@ class PksController extends Controller
                 'created_by' => Auth::user()->full_name,
             ]);
         }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
     private function createSalesActivity(Pks $pks, string $createdBy): void
     {
@@ -3258,6 +3262,10 @@ class PksController extends Controller
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     /**
@@ -3353,6 +3361,10 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     /**
@@ -3392,6 +3404,10 @@ class PksController extends Controller
                     'created_by' => Auth::user()->full_name,
                 ]);
             }
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
     private function autoSyncCustomerActiveStatus(): void

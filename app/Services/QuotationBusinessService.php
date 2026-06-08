@@ -188,6 +188,10 @@ class QuotationBusinessService
                 'created_by' => $createdBy,
             ]);
         }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     /**
