@@ -2399,6 +2399,12 @@ class LeadsController extends Controller
                 'created_by' => $user->full_name
             ]);
 
+
+            if ($lead) {
+                $lead->tgl_leads = Carbon::now()->toDateString();
+                $lead->save();
+            }
+
             DB::commit();
 
             return response()->json([

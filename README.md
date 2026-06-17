@@ -1,61 +1,233 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CAIS Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+> **C**ustomer **A**cquisition & **I**ntegrated **S**ervices — Backend API  
+> Multi-tenant business management system for Sales, HR, Quotation, PKS, and SPK operations.
 
-## About Laravel
+## Tech Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+| Layer | Technology |
+|-------|-----------|
+| Framework | Laravel 12 |
+| Language | PHP ^8.2 |
+| Database | SQLite (dev) / MySQL (prod) |
+| Cache | Database / Redis |
+| Queue | Database / Redis |
+| Auth | Laravel Sanctum (token-based) |
+| API Docs | L5-Swagger (`@OA` attributes) |
+| Frontend | Vite + Tailwind CSS 4 |
+| Container | Docker + Docker Compose |
+| CI/CD | GitLab CI |
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Features / Modules
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- **Leads Management** — Track and manage sales leads, assign sales teams, import/export
+- **Quotation Engine** — Multi-step quotation creation, approval workflow, revision/duplication, PDF export, multi-site support, complex cost/margin calculations
+- **PKS (Perjanjian Kerja Sama)** — Contract management with version history, comparison, approval & activation
+- **SPK (Surat Perintah Kerja)** — Work order management with site assignments, file upload, checklist submission
+- **Sales Activity** — Daily sales activity logging with file attachments
+- **Sales Target & Revenue** — KPI tracking, revenue summaries, monthly/weekly reports
+- **Customer Management** — Company groups, customer activity tracking, email notifications
+- **HR Master Data** — Wages (UMP, UMK, UMSK, UMSP), salary rules, position tunjangan, THR rules
+- **Master Data** — Barang, jenis perusahaan, jenis barang, bentuk usaha, TOP, management fee, supplier, training, positions
+- **Role & Permissions** — Menu-based role management with granular permissions
+- **Dashboard** — Approval dashboard, PKS monitoring, notifications
+- **System Announcements** — Rich content announcements with image uploads and file attachments
+- **Admin Panel** — Direct step management for quotations
+- **Submission** — Sales submission management with Google Sheet sync (V2)
 
-## Learning Laravel
+## Prerequisites
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- PHP 8.2+
+- Composer 2.x
+- Node.js 20+ / npm
+- SQLite (development) or MySQL 8+ (production)
+- Redis (optional, for cache/queue)
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+## Setup
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+# 1. Clone & install dependencies
+git clone <repo-url> project-cais-backend
+cd project-cais-backend
+composer install
+npm install
 
-## Laravel Sponsors
+# 2. Environment
+cp .env.example .env
+php artisan key:generate
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+# 3. Database (SQLite — default for dev)
+# SQLite is already configured in .env.example; just run:
+php artisan migrate
 
-### Premium Partners
+# 4. Storage link
+php artisan storage:link
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+# 5. Start development
+composer dev
+```
 
-## Contributing
+## Available Commands
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Development (all-in-one)
+```bash
+composer dev
+# Runs 4 services concurrently:
+#   - php artisan serve       (:8000)
+#   - php artisan queue:listen --tries=1
+#   - php artisan pail --timeout=0  (real-time logs)
+#   - npm run dev             (Vite HMR)
+```
 
-## Code of Conduct
+### Individual Services
+```bash
+php artisan serve                     # API server on :8000
+php artisan queue:listen --tries=1    # Queue worker
+php artisan pail --timeout=0          # Real-time logs
+npm run dev                            # Vite HMR
+npm run build                          # Production build
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Testing
+```bash
+composer test                         # Full suite (config:clear + php artisan test)
+php artisan test --filter=TestName    # Single test
+php artisan test tests/Feature        # Feature tests only
+php artisan test tests/Unit           # Unit tests only
+```
 
-## Security Vulnerabilities
+## Architecture
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Routes      │────▶│  Controllers  │────▶│  Services     │
+│  (api.php)   │     │  (thin)       │     │  (logic)      │
+└──────────────┘     └──────────────┘     └──────┬───────┘
+       │                                         │
+       ▼                                         ▼
+┌──────────────────┐                  ┌──────────────────┐
+│  BaseRequest     │                  │  DTOs / Models   │
+│  (422 format)    │                  │  (data layer)    │
+└──────────────────┘                  └──────────────────┘
+```
+
+- **Controllers** — Thin, handle HTTP concerns only. Delegate to Services.
+- **Services** (`app/Services/`) — Business logic, DB transactions, return DTOs or arrays.
+- **DTOs** (`app/DTO/`) — Decouple calculation results from Eloquent models.
+- **Requests** (`app/Http/Requests/`) — Extend `BaseRequest` for consistent 422 format: `{ "message": { "field": ["error"] } }`.
+- **Resources** (`app/Http/Resources/`) — API transformers for consistent JSON: `{ "success": true, "data": {}, "message": "..." }`.
+- **Models** (`app/Models/`) — 80+ Eloquent models, all with `SoftDeletes` + audit columns.
+
+## API Documentation
+
+API is documented via L5-Swagger using `@OA` PHP attributes on controllers.
+
+```bash
+# Generate Swagger docs
+php artisan l5-swagger:generate
+
+# View docs (dev)
+# http://localhost:8000/api/documentation
+```
+
+## Authentication
+
+Uses **Laravel Sanctum** with token-based auth:
+- Login → `POST /api/auth/login` → returns token
+- All protected routes use `auth:sanctum,web` middleware
+- Custom `token.expiry` middleware checks `expires_at` on Sanctum tokens
+- Refresh tokens available via `POST /api/auth/refresh`
+- Custom token model: `HrisPersonalAccessToken`
+
+## Docker
+
+```bash
+# Development
+docker-compose -f docker-compose-dev.yml up
+
+# Services:
+#   - cais-v2-be-dev          (PHP-FPM :9000)
+#   - cais-v2-queue-worker-dev (queue worker)
+# Network: shelter-network (external, must exist)
+```
+
+## CI/CD
+
+GitLab CI with two environments:
+
+```
+test (php:8.2-cli) → deploy-dev (development branch) → deploy-prod (prod branch)
+```
+
+Deploy runs automatically:
+- `php artisan migrate --force`
+- `php artisan l5-swagger:generate`
+- `php artisan optimize:clear`
+
+## Testing
+
+- **Database**: SQLite `:memory:` (fast)
+- **Cache/Session**: `array` driver
+- **Queue**: `sync` driver (immediate execution)
+- **Mail**: `array` driver (no SMTP)
+
+```bash
+composer test   # runs config:clear first
+```
+
+## Directory Structure
+
+```
+├── app/
+│   ├── DTO/                      # Data transfer objects
+│   ├── Http/
+│   │   ├── Controllers/          # Thin controllers (46 files)
+│   │   ├── Middleware/           # CheckTokenExpiry, ApiResponseMiddleware
+│   │   ├── Requests/             # Validation (extend BaseRequest)
+│   │   └── Resources/            # API transformers (3 classes)
+│   ├── Models/                   # 80+ Eloquent models
+│   └── Services/                 # Business logic (13 services)
+├── bootstrap/
+│   └── app.php                   # Middleware, Sanctum config
+├── config/                       # Laravel config files
+├── database/
+│   └── migrations/               # Schema migrations
+├── routes/
+│   └── api.php                   # All API routes (576 lines)
+├── tests/
+│   ├── Feature/                  # HTTP endpoint tests
+│   └── Unit/                     # Business logic tests
+├── docker-compose-dev.yml        # Dev Docker setup
+├── docker-compose-prod.yml       # Prod Docker setup
+├── .gitlab-ci.yml                # CI/CD pipeline
+└── AGENTS.md                     # AI development instructions
+```
+
+## Environment Variables
+
+Key `.env` variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_NAME` | `Laravel` | Application name |
+| `APP_ENV` | `local` | Environment (`local`, `production`, `testing`) |
+| `APP_DEBUG` | `true` | Enable debug mode |
+| `APP_URL` | `http://localhost` | Application URL |
+| `DB_CONNECTION` | `sqlite` | Database driver (`sqlite`, `mysql`) |
+| `SESSION_DRIVER` | `database` | Session driver |
+| `QUEUE_CONNECTION` | `database` | Queue driver |
+| `CACHE_STORE` | `database` | Cache driver |
+| `MAIL_MAILER` | `log` | Mail driver |
+
+## Key Conventions
+
+- **SoftDeletes** on every model — never use `forceDelete()` unless archival cleanup
+- **Audit columns**: always populate `created_by`, `updated_by`, `deleted_by`
+- **Table prefix**: `sl_*` (e.g., `sl_leads`, `sl_quotation`)
+- **Scopes**: use local scopes (`.active()`, `.byBranch($id)`)
+- **LeadsKebutuhan pivot**: use `updateOrCreate`, NOT `firstOrCreate` (prevents duplicates)
+- **Multi-site**: `$request->jumlah_site == "Single Site"` is case-sensitive
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Proprietary — shelterapp2.co.id
