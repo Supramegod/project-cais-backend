@@ -849,94 +849,94 @@ class ReportController extends Controller
 
         $salesNames = $salesData->pluck('nama_sales')->toArray();
 
-        $weeklyActivity = DB::table('sl_activity_sales as sa')
+        $weeklyActivity = DB::table('sl_customer_activity as sa')
             ->select(
                 'sa.created_by',
 
                 // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Leads'
+                    WHEN sa.tipe = 'Leads'
                      AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                     THEN sa.leads_id END) as w1_leads"),
 
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Assignment'
+                    WHEN sa.tipe = 'Assignment'
                      AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                     THEN sa.leads_id END) as w1_assignment"),
 
                 DB::raw("SUM(CASE
-                    WHEN sa.jenis_activity = 'Appointment'
+                    WHEN sa.tipe = 'Appointment'
                      AND DAY(sa.tgl_activity) BETWEEN 1 AND 7
                      AND EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
+                         SELECT 1 FROM sl_customer_activity sa2
                          WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tipe = 'Assignment'
                            AND sa2.tgl_activity <= sa.tgl_activity
                      )
                     THEN 1 ELSE 0 END) as w1_appt"),
 
                 // ── WEEK 2 (tgl 8-14) ─────────────────────────────────────
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Leads'
+                    WHEN sa.tipe = 'Leads'
                      AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                     THEN sa.leads_id END) as w2_leads"),
 
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Assignment'
+                    WHEN sa.tipe = 'Assignment'
                      AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                     THEN sa.leads_id END) as w2_assignment"),
 
                 DB::raw("SUM(CASE
-                    WHEN sa.jenis_activity = 'Appointment'
+                    WHEN sa.tipe = 'Appointment'
                      AND DAY(sa.tgl_activity) BETWEEN 8 AND 14
                      AND EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
+                         SELECT 1 FROM sl_customer_activity sa2
                          WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tipe = 'Assignment'
                            AND sa2.tgl_activity <= sa.tgl_activity
                      )
                     THEN 1 ELSE 0 END) as w2_appt"),
 
                 // ── WEEK 3 (tgl 15-21) ────────────────────────────────────
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Leads'
+                    WHEN sa.tipe = 'Leads'
                      AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                     THEN sa.leads_id END) as w3_leads"),
 
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Assignment'
+                    WHEN sa.tipe = 'Assignment'
                      AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                     THEN sa.leads_id END) as w3_assignment"),
 
                 DB::raw("SUM(CASE
-                    WHEN sa.jenis_activity = 'Appointment'
+                    WHEN sa.tipe = 'Appointment'
                      AND DAY(sa.tgl_activity) BETWEEN 15 AND 21
                      AND EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
+                         SELECT 1 FROM sl_customer_activity sa2
                          WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tipe = 'Assignment'
                            AND sa2.tgl_activity <= sa.tgl_activity
                      )
                     THEN 1 ELSE 0 END) as w3_appt"),
 
                 // ── WEEK 4 (tgl 22-akhir bulan) ───────────────────────────
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Leads'
+                    WHEN sa.tipe = 'Leads'
                      AND DAY(sa.tgl_activity) >= 22
                     THEN sa.leads_id END) as w4_leads"),
 
                 DB::raw("COUNT(DISTINCT CASE
-                    WHEN sa.jenis_activity = 'Assignment'
+                    WHEN sa.tipe = 'Assignment'
                      AND DAY(sa.tgl_activity) >= 22
                     THEN sa.leads_id END) as w4_assignment"),
 
                 DB::raw("SUM(CASE
-                    WHEN sa.jenis_activity = 'Appointment'
+                    WHEN sa.tipe = 'Appointment'
                      AND DAY(sa.tgl_activity) >= 22
                      AND EXISTS (
-                         SELECT 1 FROM sl_activity_sales sa2
+                         SELECT 1 FROM sl_customer_activity sa2
                          WHERE sa2.leads_id = sa.leads_id
-                           AND sa2.jenis_activity = 'Assignment'
+                           AND sa2.tipe = 'Assignment'
                            AND sa2.tgl_activity <= sa.tgl_activity
                      )
                     THEN 1 ELSE 0 END) as w4_appt")
@@ -944,7 +944,7 @@ class ReportController extends Controller
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
             ->whereIn('sa.created_by', $salesNames)
             // Hanya ambil baris yang relevan dengan alur Leads→Assignment→Appointment
-            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
+            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
             ->groupBy('sa.created_by')
             ->get();
         // ── Query agregasi mingguan untuk 3 metrik (Leads, Assignment, Appointment) ──
@@ -1687,28 +1687,28 @@ class ReportController extends Controller
     //mentah
     private function getRole30MonthlyAggregation($start, $end, array $salesNames)
     {
-        return DB::table('sl_activity_sales as sa')
+        return DB::table('sl_customer_activity as sa')
             ->select(
                 'sa.created_by',
 
                 // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Leads'
+                WHEN sa.tipe = 'Leads'
                 THEN sa.leads_id END) as jumlah_leads"),
 
                 // Assignment: semua activity 'Assignment' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
-                WHEN sa.jenis_activity = 'Assignment'
+                WHEN sa.tipe = 'Assignment'
                 THEN sa.leads_id END) as jumlah_assignment"),
 
                 // Appointment: semua activity 'Appointment' langsung dihitung
                 DB::raw("COUNT(CASE
-                WHEN sa.jenis_activity = 'Appointment'
+                WHEN sa.tipe = 'Appointment'
                 THEN 1 END) as jumlah_appointment")
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
             ->whereIn('sa.created_by', $salesNames)
-            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
+            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
             ->groupBy('sa.created_by')
             ->get();
     }
