@@ -1479,13 +1479,13 @@ class ReportController extends Controller
         $cabang = $matched->cabang;
 
         // ── 4. Query aktivitas (hanya Leads, Assignment, Appointment) ─────────
-        $activities = DB::table('sl_activity_sales as sa')
+        $activities = DB::table('sl_customer_activity as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
             ->select(
                 'sa.id',
                 'sa.leads_id',
                 'sa.tgl_activity',
-                'sa.jenis_activity',
+                'sa.tipe',
                 DB::raw("COALESCE(sa.notulen, '') AS notulen"),
                 'sa.created_by',
                 'sa.created_at',
@@ -1493,7 +1493,7 @@ class ReportController extends Controller
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.created_by', $salesName)
-            ->whereIn('sa.jenis_activity', ['Leads', 'Assignment', 'Appointment'])
+            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
             ->orderBy('sa.tgl_activity', 'asc')
             ->orderBy('sa.created_at', 'asc')
             ->get();
@@ -1502,7 +1502,7 @@ class ReportController extends Controller
         // aksi: Leads & Assignment → leads_id (untuk navigasi ke detail leads)
         //       Appointment        → null (tidak ada dokumen terpisah)
         $data = $activities->map(function ($row, $index) {
-            $aksi = match ($row->jenis_activity) {
+            $aksi = match ($row->tipe) {
                 'Leads', 'Assignment' => $row->leads_id,
                 default => null,
             };
@@ -1512,7 +1512,7 @@ class ReportController extends Controller
                 'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
                 'nomor' => $index + 1,
                 'nama_perusahaan' => $row->nama_perusahaan,
-                'tipe' => $row->jenis_activity ?? '',
+                'tipe' => $row->tipe ?? '',
                 'notes' => $row->notulen,
                 'created_by' => $row->created_by,
                 'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
