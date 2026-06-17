@@ -1623,6 +1623,11 @@ class SpkController extends Controller
                     $this->createDeleteActivity($spk);
                 }
             }
+            $lead = Leads::find($spkSite->leads_id);
+            if ($lead) {
+                $lead->tgl_leads = Carbon::now();
+                $lead->save();
+            }
 
             DB::commit();
 
@@ -1880,6 +1885,10 @@ class SpkController extends Controller
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name
             ]);
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
 
@@ -2184,6 +2193,10 @@ class SpkController extends Controller
                 'created_by' => Auth::user()->full_name
             ]);
         }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
     /**
      * =============================================
@@ -2224,6 +2237,10 @@ class SpkController extends Controller
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
     /**
      * Helper method untuk membuat aktivitas upload SPK
@@ -2244,6 +2261,10 @@ class SpkController extends Controller
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     private function errorResponse(string $message, string $error = null, int $status = 500)

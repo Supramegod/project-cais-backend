@@ -43,19 +43,22 @@ class QuotationManagementFee extends Model
         'is_kaporlap',
         'is_device',
         'is_ohc',
+        'is_tunjangan_lain',
     ];
 
     protected $casts = [
-        'is_thr'        => 'boolean',
+        'is_thr' => 'boolean',
         'is_kompensasi' => 'boolean',
-        'is_thl'        => 'boolean',
-        'is_lembur'     => 'boolean',
-        'is_bpjs_kes'   => 'boolean',
-        'is_bpjs_tk'    => 'boolean',
-        'is_chemical'   => 'boolean',
-        'is_kaporlap'   => 'boolean',
-        'is_device'     => 'boolean',
-        'is_ohc'        => 'boolean',
+        'is_thl' => 'boolean',
+        'is_lembur' => 'boolean',
+        'is_bpjs_kes' => 'boolean',
+        'is_bpjs_tk' => 'boolean',
+        'is_chemical' => 'boolean',
+        'is_kaporlap' => 'boolean',
+        'is_device' => 'boolean',
+        'is_ohc' => 'boolean',
+        'is_tunjangan_lain' => 'boolean',
+
     ];
 
     // ── Static helpers ────────────────────────────────────────────────────────
@@ -76,6 +79,7 @@ class QuotationManagementFee extends Model
             'is_kaporlap',
             'is_device',
             'is_ohc',
+            'is_tunjangan_lain',
         ];
     }
 
@@ -99,7 +103,7 @@ class QuotationManagementFee extends Model
     {
         // Sanitasi: hanya proses flag yang dikenal, casting ke boolean
         $allowedFlags = static::componentFlags();
-        $sanitized    = [];
+        $sanitized = [];
         foreach ($allowedFlags as $flag) {
             $sanitized[$flag] = isset($flags[$flag]) ? (bool) $flags[$flag] : true;
         }
@@ -107,30 +111,27 @@ class QuotationManagementFee extends Model
         // Gunakan DB::table agar bisa mengabaikan soft-delete pada lookup
         // dan tidak terkena duplikat unique constraint
         DB::table('sl_quotation_management_fee')->upsert(
-            [array_merge(
-                ['quotation_id' => $quotationId],
-                $sanitized,
-                [
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                    'deleted_at' => null,   // restore jika sebelumnya ter-soft-delete
-                ]
-            )],
+            [
+                array_merge(
+                    ['quotation_id' => $quotationId],
+                    $sanitized,
+                    [
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'deleted_at' => null,   // restore jika sebelumnya ter-soft-delete
+                    ]
+                )
+            ],
             uniqueBy: ['quotation_id'],
             update: array_merge($allowedFlags, ['updated_at', 'deleted_at'])
         );
     }
 
-    /**
-     * Ambil atau buat instance dengan default (tidak menyentuh DB).
-     * Berguna untuk operasi read-only di service layer.
-     */
-    public static function resolveForQuotation(int $quotationId): static
+    public static function resolveForQuotation(int $quotationId): self
     {
         return static::where('quotation_id', $quotationId)->first()
             ?? new static(static::defaultConfig());
     }
-
     // ── Relasi ────────────────────────────────────────────────────────────────
 
     public function quotation(): BelongsTo

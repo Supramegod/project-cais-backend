@@ -28,6 +28,7 @@ use App\Models\QuotationDetailWage;
 use App\Models\QuotationKaporlap;
 use App\Models\QuotationDevices;
 use App\Models\QuotationChemical;
+
 use App\Models\QuotationManagementFee;
 use App\Models\QuotationOhc;
 use App\Models\QuotationSite;
@@ -186,6 +187,7 @@ class QuotationStepService
                     'is_kaporlap' => 'Kaporlap / Seragam',
                     'is_device' => 'Device / Peralatan',
                     'is_ohc' => 'OHC',
+                    'is_tunjangan_lain' => 'Tunjangan Lain',
                 ];
                 // Data UMK per site
                 $data['additional_data']['umk_per_site'] = [];
@@ -1100,13 +1102,12 @@ class QuotationStepService
         // Sanitasi input: hanya flag yang dikenal, cast ke boolean
         $sanitizedFlags = [];
         foreach ($allowedFlags as $flag) {
-            // Checkbox yang tidak dicentang tidak muncul di request → default false
             $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
         }
 
         QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
 
-        \Log::info('Saved management fee component config', [
+        \Log::info('Saved management fee component ', [
             'quotation_id' => $quotation->id,
             'flags' => $sanitizedFlags,
         ]);

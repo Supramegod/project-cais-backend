@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\JabatanPic;
+use App\Models\QuotationManagementFee;
 use App\Models\SalaryRule;
 use App\Models\Umk;
 use App\Services\QuotationService;
@@ -46,6 +47,23 @@ class QuotationResource extends JsonResource
     /**
      * Calculate approval highlights berdasarkan standar
      */
+
+    protected function resolveMfConfig(): array
+    {
+        $config = $this->resource->relationLoaded('managementFeeConfig')
+            ? $this->resource->managementFeeConfig
+            : null;
+
+        $flags = QuotationManagementFee::componentFlags();
+
+        if (!$config) {
+            return array_fill_keys($flags, true);
+        }
+
+        return collect($flags)
+            ->mapWithKeys(fn($flag) => [$flag => (bool) ($config->{$flag} ?? true)])
+            ->all();
+    }
 
     protected function calculateApprovalHighlights()
     {
@@ -277,7 +295,9 @@ class QuotationResource extends JsonResource
             'nominal_upah' => $this->nominal_upah,
             'hitungan_upah' => $this->hitungan_upah,
             'management_fee_id' => $this->management_fee_id,
+            'management_fee_nama' => $this->managementFee?->nama,
             'persentase' => $this->persentase,
+            'management_fee_components' => $this->resolveMfConfig(),
             'is_ppn' => $this->is_ppn,
             'ppn_pph_dipotong' => $this->ppn_pph_dipotong,
             'jumlah_hari_invoice' => $this->jumlah_hari_invoice,

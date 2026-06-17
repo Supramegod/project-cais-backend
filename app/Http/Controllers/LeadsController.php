@@ -824,6 +824,7 @@ class LeadsController extends Controller
                 'benua' => $benua ? $benua->nama_benua : null,
                 'negara_id' => $request->negara,
                 'negara' => $negara ? $negara->nama_negara : null,
+                'tgl_leads' => Carbon::now()->toDateString(), // hasil: 2026-06-08
                 'updated_by' => Auth::user()->full_name
             ]);
 
@@ -2397,6 +2398,12 @@ class LeadsController extends Controller
                 'user_id' => $user->id,
                 'created_by' => $user->full_name
             ]);
+
+
+            if ($lead) {
+                $lead->tgl_leads = Carbon::now()->toDateString();
+                $lead->save();
+            }
 
             DB::commit();
 
