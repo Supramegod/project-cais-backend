@@ -118,9 +118,14 @@ class QuotationService
                 ->where('quotation_site_id', $site->id)->count();
         });
 
-        // ── Daftar tunjangan unik ──────────────────────────────────────────
-        $quotation->_daftar_tunjangan = QuotationDetailTunjangan::where('quotation_id', $quotation->id)
-            ->distinct('nama_tunjangan')->get(['nama_tunjangan as nama']);
+        // ── Daftar tunjangan unik (dari collection, zero query) ────────────
+        $quotation->_daftar_tunjangan = $quotationDetails
+            ->pluck('quotationDetailTunjangans')
+            ->flatten()
+            ->pluck('nama_tunjangan')
+            ->unique()
+            ->values()
+            ->map(fn($nama) => (object) ['nama' => $nama]);
 
         // ── ManagementFee label (untuk display UI – tidak dipakai kalkulasi) ─
         $mfId = $quotation->management_fee_id;
@@ -800,7 +805,6 @@ class QuotationService
             }
         }
 
-        $this->applyBpjsOptOut($detail);
         $this->updateQuotationBpjs($detail, $quotation);
     }
 
@@ -1392,38 +1396,6 @@ class QuotationService
         ][$resiko] ?? 0.24;
     }
 
-    private function applyBpjsOptOut($detail): void
-    {
-        $optOuts = [
-            'is_bpjs_jkk' => ['bpjs_jkk', 'persen_bpjs_jkk'],
-            'is_bpjs_jkm' => ['bpjs_jkm', 'persen_bpjs_jkm'],
-            'is_bpjs_jht' => ['bpjs_jht', 'persen_bpjs_jht'],
-            'is_bpjs_jp' => ['bpjs_jp', 'persen_bpjs_jp'],
-            'is_bpjs_kes' => ['bpjs_kes', 'persen_bpjs_kes'],
-        ];
-
-        foreach ($optOuts as $optField => $targetFields) {
-            if (!isset($detail->{$optField}))
-                continue;
-
-            $optValue = $detail->{$optField};
-            $isOptOut = (
-                ($optValue === "0" || $optValue === 0 || $optValue === false || $optValue === "false" ||
-                    (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
-                && !($optField === 'is_bpjs_kes' && $detail->penjamin_kesehatan === 'BPJS')
-            );
-
-            if (!$isOptOut && is_string($optValue) && strtolower(trim($optValue)) === 'ya') {
-                $isOptOut = false;
-            }
-
-            if ($isOptOut) {
-                $detail->{$targetFields[0]} = 0;
-                $detail->{$targetFields[1]} = 0;
-            }
-        }
-    }
-
     private function updateQuotationBpjs($detail, $quotation): void
     {
         $detail->persen_bpjs_ketenagakerjaan =
@@ -1444,11 +1416,6 @@ class QuotationService
             $detail->bpjs_kesehatan = 0;
             $detail->persen_bpjs_kesehatan = 0;
         }
-    }
-
-    private function calculateBpu($detail, $quotation): int
-    {
-        return $detail->penjamin_kesehatan === 'BPU' ? 16800 : 0;
     }
 
     private function calculateTunjanganHolidayFromWage($wage): float

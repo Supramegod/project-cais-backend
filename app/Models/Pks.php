@@ -100,6 +100,8 @@ class Pks extends Model
         'ot3',
         'ot4',
         'ot5',
+        'pks_induk_id',
+        'tipe_pks',
         'created_by',
         'updated_by'
     ];
