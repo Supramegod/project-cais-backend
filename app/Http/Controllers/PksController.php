@@ -3431,4 +3431,25 @@ class PksController extends Controller
             ->where('customer_active', '!=', 0)
             ->update(['customer_active' => 0]);
     }
+    private function autoSyncCustomerActiveStatus(): void
+    {
+        $activeLeadsIds = Pks::select('leads_id')
+            ->where('is_aktif', 1)
+            ->whereNull('deleted_at')
+            ->where('kontrak_akhir', '>=', now()->toDateString())
+            ->pluck('leads_id')
+            ->unique();
+
+        DB::table('sl_leads')
+            ->whereNotNull('customer_id')
+            ->whereIn('id', $activeLeadsIds)
+            ->where('customer_active', '!=', 1)
+            ->update(['customer_active' => 1]);
+
+        DB::table('sl_leads')
+            ->whereNotNull('customer_id')
+            ->whereNotIn('id', $activeLeadsIds)
+            ->where('customer_active', '!=', 0)
+            ->update(['customer_active' => 0]);
+    }
 }
