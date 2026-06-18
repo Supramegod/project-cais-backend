@@ -572,6 +572,8 @@ class QuotationResource extends JsonResource
                                 'id' => $tunjangan->id,
                                 'nama_tunjangan' => $tunjangan->nama_tunjangan,
                                 'nominal' => $tunjangan->nominal,
+                                'nominal_coss' => $tunjangan->nominal_coss,
+                                'jenis' => $tunjangan->jenis,
                             ];
                         }) : [],
 
@@ -719,6 +721,7 @@ class QuotationResource extends JsonResource
                             'nama_tunjangan' => $t->nama_tunjangan,
                             'nominal' => $t->nominal,
                             'nominal_coss' => $t->nominal_coss,
+                            'jenis' => $t->jenis,
                         ])->values()->toArray(),
                         'hpp' => [
                             'nominal_upah' => $hppData['gaji_pokok'] ?? 0,

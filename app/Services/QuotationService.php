@@ -673,6 +673,11 @@ class QuotationService
             $dtTunjangan = $detail->quotationDetailTunjangans
                 ->where('nama_tunjangan', $tunjangan->nama)->first();
 
+            if ($dtTunjangan && in_array($dtTunjangan->jenis, ['Normatif', 'Ditagihkan'])) {
+                $detail->{$tunjangan->nama} = 0;
+                continue;
+            }
+
             $value = $dtTunjangan && is_numeric($dtTunjangan->nominal) ? (float) $dtTunjangan->nominal : 0.0;
             $valuecoss = $dtTunjangan && is_numeric($dtTunjangan->nominal_coss) ? (float) $dtTunjangan->nominal_coss : 0.0;
 

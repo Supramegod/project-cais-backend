@@ -151,6 +151,8 @@ class QuotationStepResource extends JsonResource
                                 return [
                                     'nama_tunjangan' => $tunjangan->nama_tunjangan,
                                     'nominal' => $tunjangan->nominal,
+                                    'nominal_coss' => $tunjangan->nominal_coss,
+                                    'jenis' => $tunjangan->jenis,
                                 ];
                             })->toArray();
                         } else {
@@ -160,6 +162,8 @@ class QuotationStepResource extends JsonResource
                                     return [
                                         'nama_tunjangan' => $tunjangan->nama_tunjangan,
                                         'nominal' => $tunjangan->nominal,
+                                        'nominal_coss' => $tunjangan->nominal_coss,
+                                        'jenis' => $tunjangan->jenis,
                                     ];
                                 })->toArray();
                             } catch (\Exception $e) {
