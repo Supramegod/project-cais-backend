@@ -1583,7 +1583,15 @@ class QuotationStepService
     {
         $currentDateTime = Carbon::now();
 
-        // Hapus kerjasama existing
+        $existing = QuotationKerjasama::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->count();
+
+        if ($existing > 0) {
+            return;
+        }
+
+        // Hapus kerjasama existing (soft delete yg sudah terlanjur dihapus)
         QuotationKerjasama::where('quotation_id', $quotation->id)->update([
             'deleted_at' => $currentDateTime,
             'deleted_by' => Auth::user()->full_name
