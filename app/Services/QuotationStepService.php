@@ -2931,8 +2931,16 @@ class QuotationStepService
                 if (empty($nama))
                     continue;
 
-                $nominal = $this->parseNominal($item['nominal'] ?? 0);
-                $nominalCoss = $this->parseNominal($item['nominal_coss'] ?? 0);
+                $jenis = $item['jenis'] ?? 'Nominal';
+
+                if (in_array($jenis, ['Normatif', 'Ditagihkan'])) {
+                    $nominal = 0;
+                    $nominalCoss = 0;
+                } else {
+                    $nominal = $this->parseNominal($item['nominal'] ?? 0);
+                    $nominalCoss = $this->parseNominal($item['nominal_coss'] ?? 0);
+                }
+
                 $processed[] = $nama;
 
                 if ($existing->has($nama)) {
@@ -2940,6 +2948,7 @@ class QuotationStepService
                         'id' => $existing[$nama]->id,
                         'nominal' => $nominal,
                         'nominal_coss' => $nominalCoss,
+                        'jenis' => $jenis,
                         'updated_at' => $currentDateTime,
                         'updated_by' => $user,
                     ];
@@ -2950,6 +2959,7 @@ class QuotationStepService
                         'nama_tunjangan' => $nama,
                         'nominal' => $nominal,
                         'nominal_coss' => $nominalCoss,
+                        'jenis' => $jenis,
                         'created_at' => $currentDateTime,
                         'created_by' => $user,
                     ];

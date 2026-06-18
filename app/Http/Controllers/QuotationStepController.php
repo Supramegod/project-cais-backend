@@ -618,6 +618,7 @@ class QuotationStepController extends Controller
                     'nama_tunjangan' => $t->nama_tunjangan,
                     'nominal' => $t->nominal,
                     'nominal_coss' => $t->nominal_coss,
+                    'jenis' => $t->jenis,
                 ])->values()->toArray();
 
                 $thrDisplay = $resolveDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
