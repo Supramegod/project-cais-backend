@@ -25,7 +25,7 @@ class PksTemplateFactory
         RuleThr $ruleThr,
         SalaryRule $salaryRule,
         string $pksNomor
-    ): PksPerjanjianTemplateService {
+    ): PksTemplateInterface {
         $class = self::MAP[$company->id] ?? PksPerjanjianTemplateService::class;
 
         return new $class($leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor);

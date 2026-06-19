@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
  * Auto-generated dari dokumen draft PKS, mengikuti struktur
  * dan arsitektur yang sama dengan PksPerjanjianTemplateService.
  */
-class PksGsuTemplateService
+class PksGsuTemplateService implements PksTemplateInterface
 {
     private $leads;
     private $company;
@@ -44,7 +44,7 @@ class PksGsuTemplateService
     /**
      * Generate all agreement sections
      */
-    public function generateAllSections()
+    public function generateAllSections(): array
     {
         return [
             [
@@ -198,7 +198,7 @@ class PksGsuTemplateService
     /**
      * Insert all agreement sections into database
      */
-    public function insertAgreementSections($pksId, $createdBy)
+    public function insertAgreementSections($pksId, $createdBy): void
     {
         $sections = $this->generateAllSections();
         $insertData = [];
