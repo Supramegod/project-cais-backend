@@ -31,6 +31,7 @@ use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\PksPerjanjianTemplateService;
+use App\Services\PksTemplate\PksTemplateFactory;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -2514,8 +2515,8 @@ class PksController extends Controller
     private function createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor)
     {
         try {
-            // Inisialisasi service
-            $templateService = new PksPerjanjianTemplateService(
+            // Pilih template sesuai company, fallback ke PksPerjanjianTemplateService
+            $templateService = (new PksTemplateFactory)->make(
                 $leads,
                 $company,
                 $kebutuhan,
@@ -2527,7 +2528,7 @@ class PksController extends Controller
             // Insert agreement sections
             $templateService->insertAgreementSections($pks->id, Auth::user()->full_name);
 
-            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id);
+            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id . ' using ' . get_class($templateService));
 
         } catch (\Exception $e) {
             \Log::error('Failed to create PKS Perjanjian: ' . $e->getMessage());
