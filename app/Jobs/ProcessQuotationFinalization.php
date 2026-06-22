@@ -1,0 +1,271 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\LeadsKebutuhan;
+use App\Models\LogNotification;
+use App\Models\Pks;
+use App\Models\Quotation;
+use App\Models\QuotationDetailRequirement;
+use App\Models\QuotationKerjasama;
+use App\Models\QuotationSite;
+use App\Models\Site;
+use App\Models\SpkSite;
+use App\Services\QuotationBusinessService;
+use App\Services\QuotationNotificationService;
+use Carbon\Carbon;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
+
+class ProcessQuotationFinalization implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(
+        public int $quotationId,
+        public ?array $kerjasamaData,
+        public string $user,
+        public int $statusQuotationId,
+        public string $tipeQuotation,
+        public ?int $oldQuotationId,
+    ) {}
+
+    public function handle(
+        QuotationBusinessService $businessService,
+        QuotationNotificationService $notificationService,
+    ): void {
+        $quotation = Quotation::with([
+            'quotationDetails.quotationDetailRequirements',
+        ])->find($this->quotationId);
+
+        if (!$quotation) {
+            Log::warning('ProcessQuotationFinalization: Quotation not found', [
+                'id' => $this->quotationId,
+            ]);
+            return;
+        }
+
+        $now = Carbon::now();
+
+        $this->updateKerjasamaData($quotation, $this->kerjasamaData, $now);
+        $this->insertRequirements($quotation, $now);
+
+        if ($this->statusQuotationId == 2) {
+            $this->notifyDirSales($quotation, $notificationService, $now);
+        }
+
+        if (in_array($this->statusQuotationId, [2, 3]) && $this->tipeQuotation === 'revisi' && $this->oldQuotationId) {
+            $oldQuotation = Quotation::withTrashed()->find($this->oldQuotationId);
+            if ($oldQuotation) {
+                $this->updateDownstreamReferences($oldQuotation, $quotation, $businessService);
+            }
+        }
+
+        Log::info("ProcessQuotationFinalization: completed", [
+            'quotation_id' => $quotation->id,
+            'status_quotation_id' => $this->statusQuotationId,
+        ]);
+    }
+
+    private function updateKerjasamaData(Quotation $quotation, ?array $kerjasamaData, Carbon $now): void
+    {
+        if ($kerjasamaData !== null) {
+            $this->syncKerjasamaData($quotation, $kerjasamaData, $now, $this->user);
+        } else {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $now,
+                    'deleted_by' => $this->user,
+                ]);
+        }
+    }
+
+    private function syncKerjasamaData(Quotation $quotation, array $kerjasamas, Carbon $now, string $user): void
+    {
+        if (empty($kerjasamas)) {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $now,
+                    'deleted_by' => $user,
+                ]);
+            return;
+        }
+
+        $upsertData = [];
+        $incomingIds = [];
+
+        foreach ($kerjasamas as $kerjasamaData) {
+            $perjanjian = trim($kerjasamaData['perjanjian'] ?? '');
+            if ($perjanjian === '') continue;
+
+            $item = [
+                'quotation_id' => $quotation->id,
+                'perjanjian' => $perjanjian,
+                'is_delete' => $kerjasamaData['is_delete'] ?? 1,
+                'updated_at' => $now,
+                'updated_by' => $user,
+            ];
+
+            if (!empty($kerjasamaData['id'])) {
+                $item['id'] = $kerjasamaData['id'];
+                $incomingIds[] = $kerjasamaData['id'];
+            } else {
+                $item['created_at'] = $now;
+                $item['created_by'] = $user;
+            }
+            $upsertData[] = $item;
+        }
+
+        if (!empty($upsertData)) {
+            QuotationKerjasama::upsert(
+                $upsertData,
+                ['id'],
+                ['perjanjian', 'is_delete', 'updated_at', 'updated_by'],
+            );
+        }
+
+        if (!empty($incomingIds)) {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNotIn('id', $incomingIds)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $now,
+                    'deleted_by' => $user,
+                ]);
+        } else {
+            QuotationKerjasama::where('quotation_id', $quotation->id)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => $now,
+                    'deleted_by' => $user,
+                ]);
+        }
+    }
+
+    private function insertRequirements(Quotation $quotation, Carbon $now): void
+    {
+        $detailsWithoutReqs = $quotation->quotationDetails->filter(function ($detail) {
+            return $detail->quotationDetailRequirements->count() == 0;
+        });
+
+        if ($detailsWithoutReqs->isEmpty()) return;
+
+        $positionIds = $detailsWithoutReqs->pluck('id')->unique()->toArray();
+
+        $allRequirements = QuotationDetailRequirement::whereNull('deleted_at')
+            ->whereIn('quotation_detail_id', $positionIds)
+            ->get()
+            ->groupBy('quotation_detail_id');
+
+        $batchInsert = [];
+        foreach ($detailsWithoutReqs as $detail) {
+            $requirements = $allRequirements[$detail->id] ?? collect();
+            foreach ($requirements as $req) {
+                $batchInsert[] = [
+                    'quotation_id' => $quotation->id,
+                    'quotation_detail_id' => $detail->id,
+                    'requirement' => $req->requirement,
+                    'created_at' => $now,
+                    'created_by' => $this->user,
+                ];
+            }
+        }
+
+        if (!empty($batchInsert)) {
+            QuotationDetailRequirement::insert($batchInsert);
+        }
+    }
+
+    private function notifyDirSales(Quotation $quotation, QuotationNotificationService $notificationService, Carbon $now): void
+    {
+        $dirSales = [27927, 127822];
+
+        $leadsKebutuhan = LeadsKebutuhan::with('timSalesD')
+            ->where('leads_id', $quotation->leads_id)
+            ->where('kebutuhan_id', $quotation->kebutuhan_id)
+            ->first();
+
+        $creatorName = $leadsKebutuhan?->timSalesD?->nama ?? $this->user;
+        $msg = "Quotation dengan nomor: {$quotation->nomor} telah selesai dibuat oleh {$creatorName} dan membutuhkan persetujuan Direktur sales.";
+
+        foreach ($dirSales as $userId) {
+            LogNotification::create([
+                'user_id' => $userId,
+                'doc_id' => $quotation->id,
+                'transaksi' => 'Quotation',
+                'tabel' => 'sl_quotation',
+                'pesan' => $msg,
+                'is_read' => 0,
+                'created_at' => $now,
+                'created_by' => $creatorName,
+            ]);
+        }
+
+        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
+        $notificationService->sendApprovalNotification(
+            quotation: $quotation,
+            creatorName: $creatorName,
+            approvalUrl: $approvalUrl,
+            overrideRecipients: QuotationNotificationService::DIR_SALES,
+        );
+
+        dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $now))
+            ->delay(now()->addDay());
+    }
+
+    private function updateDownstreamReferences(Quotation $oldQuotation, Quotation $newQuotation, QuotationBusinessService $businessService): void
+    {
+        $oldSites = QuotationSite::withTrashed()
+            ->where('quotation_id', $oldQuotation->id)
+            ->get()
+            ->keyBy('id');
+
+        $newSitesByNama = QuotationSite::where('quotation_id', $newQuotation->id)
+            ->get()
+            ->keyBy('nama_site');
+
+        SpkSite::where('quotation_id', $oldQuotation->id)
+            ->each(function (SpkSite $spkSite) use ($oldSites, $newSitesByNama, $newQuotation) {
+                $oldSite = $oldSites->get($spkSite->quotation_site_id);
+                if (!$oldSite) return;
+
+                $newSite = $newSitesByNama->get($oldSite->nama_site);
+                if (!$newSite) return;
+
+                $spkSite->update([
+                    'quotation_id' => $newQuotation->id,
+                    'quotation_site_id' => $newSite->id,
+                    'updated_by' => $this->user,
+                ]);
+            });
+
+        Site::where('quotation_id', $oldQuotation->id)
+            ->each(function (Site $site) use ($oldSites, $newSitesByNama, $newQuotation) {
+                $oldSite = $oldSites->get($site->quotation_site_id);
+                if (!$oldSite) return;
+
+                $newSite = $newSitesByNama->get($oldSite->nama_site);
+                if (!$newSite) return;
+
+                $site->update([
+                    'quotation_id' => $newQuotation->id,
+                    'quotation_site_id' => $newSite->id,
+                    'updated_by' => $this->user,
+                ]);
+            });
+
+        Pks::where('quotation_id', $oldQuotation->id)
+            ->update([
+                'quotation_id' => $newQuotation->id,
+                'updated_by' => $this->user,
+            ]);
+
+        $businessService->softDeleteQuotationRelations($oldQuotation, $this->user);
+    }
+}
