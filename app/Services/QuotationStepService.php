@@ -1069,7 +1069,7 @@ class QuotationStepService
                 $request->has('quotation_kerjasamas') ? $request->quotation_kerjasamas : null,
                 $user,
                 $statusData['status_quotation_id'],
-                $quotation->tipe_quotation,
+                $quotation->tipe_quotation ?? '',
                 $oldQuotationId,
             );
 
