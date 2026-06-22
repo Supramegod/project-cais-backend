@@ -1071,7 +1071,7 @@ class QuotationStepService
                 $statusData['status_quotation_id'],
                 $quotation->tipe_quotation,
                 $oldQuotationId,
-            )->onQueue('high');
+            );
 
             DB::commit();
 
