@@ -6,6 +6,7 @@ use App\DTO\CalculationSummary;
 use App\DTO\DetailCalculation;
 use App\DTO\QuotationCalculationResult;
 use App\Jobs\EscalateQuotationJob;
+use App\Jobs\ProcessQuotationFinalization;
 use App\Models\AplikasiPendukung;
 use App\Models\BarangDefaultQty;
 use App\Models\BidangPerusahaan;
@@ -1042,9 +1043,7 @@ class QuotationStepService
                     'updated_at' => $currentDateTime,
                 ], $dbUpdateData));
 
-            $this->updateKerjasamaData($quotation, $request, $currentDateTime);
-            $this->insertRequirements($quotation);
-
+            // ⚡ SYNC: audit trail — harus seatomik dengan perubahan status
             if ($statusData['status_quotation_id'] === 8) {
                 LogApproval::create([
                     'tabel' => 'quotation',
@@ -1058,21 +1057,21 @@ class QuotationStepService
                 ]);
             }
 
-            if ($statusData['status_quotation_id'] == 2) {
-                $this->notifyDirSales($quotation, $currentDateTime);
-            }
-
+            // ⏳ BACKGROUND: kerjasama, requirements, notifikasi, downstream, soft-delete
+            $oldQuotationId = null;
             if (in_array($statusData['status_quotation_id'], [2, 3]) && $quotation->tipe_quotation == 'revisi') {
                 $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
-
-                if ($oldQuotation) {
-                    $this->quotationBusinessService->softDeleteQuotationRelations($oldQuotation, $user);
-                    \Log::info("Soft deleted old quotation and its relations", [
-                        'old_quotation_id' => $oldQuotation->id,
-                        'new_quotation_id' => $quotation->id,
-                    ]);
-                }
+                $oldQuotationId = $oldQuotation?->id;
             }
+
+            ProcessQuotationFinalization::dispatch(
+                $quotation->id,
+                $request->has('quotation_kerjasamas') ? $request->quotation_kerjasamas : null,
+                $user,
+                $statusData['status_quotation_id'],
+                $quotation->tipe_quotation,
+                $oldQuotationId,
+            )->onQueue('high');
 
             DB::commit();
 
