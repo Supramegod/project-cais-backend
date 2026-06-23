@@ -212,7 +212,7 @@ class ProcessQuotationFinalization implements ShouldQueue
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES,
+            overrideRecipients: QuotationNotificationService::dirSales(),
         );
 
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $now))

@@ -10,27 +10,38 @@ use Illuminate\Support\Facades\Mail;
 
 class QuotationNotificationService
 {
-    const DIR_SALES = [
-        //  ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'nino@shelterindonesia.id', 'role' => 'Direktur Sales'],
-        ['name' => 'Muhammad Nino Mayvi Dian', 'email' => 'jalupradipta22@gmail.com', 'role' => 'Direktur Sales'],
-    ];
-
-    const DIR_KEU = [
-        // ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'alivian.shelter@gmail.com', 'role' => 'Direktur Keuangan'],
-        ['name' => 'Alivian Pranatyas Hening Lazuardi', 'email' => 'zamakbar12@gmail.com', 'role' => 'Direktur Keuangan'],
-    ];
-    // const GM_OPERASIONAL = [
-    //     // ['name' => 'Marien Ristanti', 'email' => 'marin.shelter@gmail.com', 'role' => 'General Manager Operasional'],
-    //     ['name' => 'Marien Ristanti', 'email' => 'jluppradipta728@gmail.com', 'role' => 'General Manager Operasional'],
-    // ];
-
-    // const GM_HRM = [
-    //     // ['name' => 'Miftakhul Arif', 'email' => 'miftahularifshelter@gmail.com', 'role' => 'General Manager HRM'],
-    //     ['name' => 'Miftakhul Arif', 'email' => 'zamakbar01@gmail.com', 'role' => 'General Manager HRD'],
-    // ];
+    // ✅ Sekarang pakai config/notification-contacts.php (bisa di-override via .env per environment)
+    // Email lama (referensi):
+    // DIR_SALES: nino@shelterindonesia.id / jalupradipta22@gmail.com
+    // DIR_KEU:   alivian.shelter@gmail.com / zamakbar12@gmail.com
+    // DIRUT:     jluppradipta@gmail.com
+    // GM_OPERASIONAL: marin.shelter@gmail.com / jluppradipta728@gmail.com
+    // GM_HRM:         miftahularifshelter@gmail.com / zamakbar01@gmail.com
     // ✅ Constructor tidak perlu DynamicMailerService lagi
     public function __construct()
     {
+    }
+
+    public static function dirSales(): array
+    {
+        return [
+            [
+                'name' => config('notification-contacts.dir_sales.name'),
+                'email' => config('notification-contacts.dir_sales.email'),
+                'role' => 'Direktur Sales',
+            ],
+        ];
+    }
+
+    public static function dirKeu(): array
+    {
+        return [
+            [
+                'name' => config('notification-contacts.dir_keu.name'),
+                'email' => config('notification-contacts.dir_keu.email'),
+                'role' => 'Direktur Keuangan',
+            ],
+        ];
     }
 
     public function sendApprovalNotification(
@@ -88,9 +99,8 @@ class QuotationNotificationService
 
     private function resolveRecipients(Quotation $quotation): array
     {
-        // tidak ada perubahan di sini
         if (empty($quotation->ot1)) {
-            return self::DIR_SALES;
+            return self::dirSales();
         }
 
         if (empty($quotation->ot2)) {
@@ -100,7 +110,7 @@ class QuotationNotificationService
             });
 
             if ($quotation->top === 'Lebih Dari 7 Hari' || $hasNonProvisionalThr) {
-                return self::DIR_KEU;
+                return self::dirKeu();
             }
         }
 
@@ -108,12 +118,15 @@ class QuotationNotificationService
     }
 
     private function resolveStageLabel(?array $recipients): string
-{
-    // if ($recipients === self::GM_OPERASIONAL) return 'Persetujuan General Manager Operasional';
-    // if ($recipients === self::GM_HRM)         return 'Persetujuan General Manager HCM';
-    if ($recipients === self::DIR_SALES)      return 'Persetujuan Direktur Sales';
-    if ($recipients === self::DIR_KEU)        return 'Persetujuan Direktur Keuangan';
-
-    return 'Selesai';
-}
+    {
+        if (empty($recipients)) {
+            return 'Selesai';
+        }
+        $role = $recipients[0]['role'] ?? '';
+        return match ($role) {
+            'Direktur Sales' => 'Persetujuan Direktur Sales',
+            'Direktur Keuangan' => 'Persetujuan Direktur Keuangan',
+            default => 'Selesai',
+        };
+    }
 }
