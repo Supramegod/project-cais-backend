@@ -1245,7 +1245,7 @@ class QuotationStepService
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirSales()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
             ->delay(now()->addDay());

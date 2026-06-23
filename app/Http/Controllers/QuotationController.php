@@ -1504,7 +1504,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirKeu()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
             ->delay(now()->addDay());
@@ -1539,7 +1539,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirSales()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
             ->delay(now()->addDay());
@@ -1608,7 +1608,7 @@ class QuotationController extends Controller
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 6, 7, 8]);
+                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 7, 8]);
 
                 break;
             case 'addendum':
