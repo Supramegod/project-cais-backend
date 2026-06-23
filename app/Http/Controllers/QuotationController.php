@@ -737,27 +737,31 @@ class QuotationController extends Controller
     public function submitForApproval(QuotationApproveRequest $request): JsonResponse
     {
         try {
-            $id = $request->validated('id');                // sudah pasti valid
-
+            $id = $request->validated('id');
             $quotation = Quotation::notDeleted()
                 ->with(['quotationDetails.wage'])
                 ->findOrFail($id);
 
-            $data = $request->validated();                  // ['id', 'is_approved', 'alasan']
+            $data = $request->validated();
+            $user = Auth::user();
 
-            // Service masih menerima 'is_approved' & 'notes', jadi mapping 'alasan' → 'notes'
+            DB::beginTransaction();
+
             $result = $this->submitApproval(
                 $quotation,
                 [
                     'is_approved' => $data['is_approved'],
                     'notes' => $data['alasan'] ?? null,
                 ],
-                Auth::user()
+                $user
             );
 
             if (!$result['success']) {
+                DB::rollBack();
                 return response()->json($result, 400);
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -768,6 +772,7 @@ class QuotationController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan sistem',
@@ -1387,8 +1392,8 @@ class QuotationController extends Controller
         bool $isApproved,
         ?string $notes
     ): array {
-        // Panggil fresh() SEKALI saja
-        $freshQuotation = $quotation->fresh();
+        // Panggil fresh() + eager load spk/pks untuk cek revisi
+        $freshQuotation = $quotation->fresh()->load('spk', 'pks');
 
         $this->sendNotificationToSales($freshQuotation, $user, $isApproved, $notes);
 
@@ -1398,6 +1403,19 @@ class QuotationController extends Controller
             && $freshQuotation->tipe_quotation === 'addendum'
         ) {
             app(AddendumService::class)->process($freshQuotation);
+        }
+
+        if (
+            $isApproved
+            && $freshQuotation->status_quotation_id === 3
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            if ($freshQuotation->spk) {
+                $freshQuotation->spk->update(['status_spk_id' => 1]);
+            }
+            if ($freshQuotation->pks) {
+                $freshQuotation->pks->update(['status_pks_id' => 5]);
+            }
         }
 
         return ['success' => true, 'data' => $freshQuotation];

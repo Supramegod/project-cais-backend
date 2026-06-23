@@ -10,6 +10,7 @@ use App\Models\QuotationDetailRequirement;
 use App\Models\QuotationKerjasama;
 use App\Models\QuotationSite;
 use App\Models\Site;
+use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\QuotationBusinessService;
 use App\Services\QuotationNotificationService;
@@ -63,6 +64,10 @@ class ProcessQuotationFinalization implements ShouldQueue
             if ($oldQuotation) {
                 $this->updateDownstreamReferences($oldQuotation, $quotation, $businessService);
             }
+        }
+
+        if ($this->statusQuotationId == 3 && $this->tipeQuotation === 'revisi') {
+            $this->updateRevisionStatuses($quotation);
         }
 
         Log::info("ProcessQuotationFinalization: completed", [
@@ -266,6 +271,23 @@ class ProcessQuotationFinalization implements ShouldQueue
                 'updated_by' => $this->user,
             ]);
 
+        Spk::where('quotation_id', $oldQuotation->id)
+            ->update([
+                'quotation_id' => $newQuotation->id,
+                'updated_by' => $this->user,
+            ]);
+
         $businessService->softDeleteQuotationRelations($oldQuotation, $this->user);
+    }
+
+    private function updateRevisionStatuses(Quotation $quotation): void
+    {
+        Spk::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->update(['status_spk_id' => 1]);
+
+        Pks::where('quotation_id', $quotation->id)
+            ->whereNull('deleted_at')
+            ->update(['status_pks_id' => 5]);
     }
 }
