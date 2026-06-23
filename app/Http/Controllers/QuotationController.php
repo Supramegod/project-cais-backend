@@ -471,7 +471,9 @@ class QuotationController extends Controller
                     'quotationChemicals',
                     'quotationOhcs',
                     'quotationTrainings',
-                    'quotationKerjasamas'
+                    'quotationKerjasamas',
+                    'spk',
+                    'pks'
                 ])->findOrFail($request->quotation_referensi_id);
 
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
@@ -510,6 +512,10 @@ class QuotationController extends Controller
             }
 
             QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
+
+            if ($tipe_quotation === 'revisi' && $quotationReferensi) {
+                $this->updateRevisionStatuses($quotationReferensi);
+            }
 
             DB::commit();
 
@@ -731,27 +737,31 @@ class QuotationController extends Controller
     public function submitForApproval(QuotationApproveRequest $request): JsonResponse
     {
         try {
-            $id = $request->validated('id');                // sudah pasti valid
-
+            $id = $request->validated('id');
             $quotation = Quotation::notDeleted()
                 ->with(['quotationDetails.wage'])
                 ->findOrFail($id);
 
-            $data = $request->validated();                  // ['id', 'is_approved', 'alasan']
+            $data = $request->validated();
+            $user = Auth::user();
 
-            // Service masih menerima 'is_approved' & 'notes', jadi mapping 'alasan' → 'notes'
+            DB::beginTransaction();
+
             $result = $this->submitApproval(
                 $quotation,
                 [
                     'is_approved' => $data['is_approved'],
                     'notes' => $data['alasan'] ?? null,
                 ],
-                Auth::user()
+                $user
             );
 
             if (!$result['success']) {
+                DB::rollBack();
                 return response()->json($result, 400);
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -762,6 +772,7 @@ class QuotationController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan sistem',
@@ -1381,8 +1392,8 @@ class QuotationController extends Controller
         bool $isApproved,
         ?string $notes
     ): array {
-        // Panggil fresh() SEKALI saja
-        $freshQuotation = $quotation->fresh();
+        // Panggil fresh() + eager load spk/pks untuk cek revisi
+        $freshQuotation = $quotation->fresh()->load('spk', 'pks');
 
         $this->sendNotificationToSales($freshQuotation, $user, $isApproved, $notes);
 
@@ -1392,6 +1403,19 @@ class QuotationController extends Controller
             && $freshQuotation->tipe_quotation === 'addendum'
         ) {
             app(AddendumService::class)->process($freshQuotation);
+        }
+
+        if (
+            $isApproved
+            && $freshQuotation->status_quotation_id === 3
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            if ($freshQuotation->spk) {
+                $freshQuotation->spk->update(['status_spk_id' => 1]);
+            }
+            if ($freshQuotation->pks) {
+                $freshQuotation->pks->update(['status_pks_id' => 5]);
+            }
         }
 
         return ['success' => true, 'data' => $freshQuotation];
@@ -1569,6 +1593,38 @@ class QuotationController extends Controller
         return ['success' => true, 'data' => $quotation->fresh()];
     }
 
+    private function updateRevisionStatuses(Quotation $quotationReferensi): void
+    {
+        $spk = $quotationReferensi->spk;
+        if ($spk) {
+            Log::info('Revision: updating SPK status', [
+                'quotation_id' => $quotationReferensi->id,
+                'spk_id' => $spk->id,
+                'old_status_spk_id' => $spk->status_spk_id,
+                'new_status_spk_id' => 5,
+            ]);
+            $spk->update(['status_spk_id' => 5]);
+        } else {
+            Log::info('Revision: no SPK found for quotation', [
+                'quotation_id' => $quotationReferensi->id,
+            ]);
+        }
+
+        $pks = $quotationReferensi->pks;
+        if ($pks) {
+            Log::info('Revision: updating PKS status', [
+                'quotation_id' => $quotationReferensi->id,
+                'pks_id' => $pks->id,
+                'old_status_pks_id' => $pks->status_pks_id,
+                'new_status_pks_id' => 8,
+            ]);
+            $pks->update(['status_pks_id' => 8]);
+        } else {
+            Log::info('Revision: no PKS found for quotation', [
+                'quotation_id' => $quotationReferensi->id,
+            ]);
+        }
+    }
 
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
