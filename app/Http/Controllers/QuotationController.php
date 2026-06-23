@@ -471,7 +471,9 @@ class QuotationController extends Controller
                     'quotationChemicals',
                     'quotationOhcs',
                     'quotationTrainings',
-                    'quotationKerjasamas'
+                    'quotationKerjasamas',
+                    'spk',
+                    'pks'
                 ])->findOrFail($request->quotation_referensi_id);
 
                 $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
@@ -510,6 +512,10 @@ class QuotationController extends Controller
             }
 
             QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
+
+            if ($tipe_quotation === 'revisi' && $quotationReferensi) {
+                $this->updateRevisionStatuses($quotationReferensi);
+            }
 
             DB::commit();
 
@@ -1569,6 +1575,38 @@ class QuotationController extends Controller
         return ['success' => true, 'data' => $quotation->fresh()];
     }
 
+    private function updateRevisionStatuses(Quotation $quotationReferensi): void
+    {
+        $spk = $quotationReferensi->spk;
+        if ($spk) {
+            Log::info('Revision: updating SPK status', [
+                'quotation_id' => $quotationReferensi->id,
+                'spk_id' => $spk->id,
+                'old_status_spk_id' => $spk->status_spk_id,
+                'new_status_spk_id' => 5,
+            ]);
+            $spk->update(['status_spk_id' => 5]);
+        } else {
+            Log::info('Revision: no SPK found for quotation', [
+                'quotation_id' => $quotationReferensi->id,
+            ]);
+        }
+
+        $pks = $quotationReferensi->pks;
+        if ($pks) {
+            Log::info('Revision: updating PKS status', [
+                'quotation_id' => $quotationReferensi->id,
+                'pks_id' => $pks->id,
+                'old_status_pks_id' => $pks->status_pks_id,
+                'new_status_pks_id' => 8,
+            ]);
+            $pks->update(['status_pks_id' => 8]);
+        } else {
+            Log::info('Revision: no PKS found for quotation', [
+                'quotation_id' => $quotationReferensi->id,
+            ]);
+        }
+    }
 
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
