@@ -2865,7 +2865,7 @@ class PksController extends Controller
             $query = QuotationSite::with([
                 'quotation' => function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', $tipeQuotation)
+                        ->whereIn('tipe_quotation', [$tipeQuotation, 'revisi'])
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads',
@@ -2873,7 +2873,7 @@ class PksController extends Controller
                 ->where('leads_id', $leadsId)
                 ->whereHas('quotation', function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', $tipeQuotation)
+                        ->whereIn('tipe_quotation', [$tipeQuotation, 'revisi'])
                         ->whereNull('deleted_at');
                 });
 
@@ -2894,6 +2894,7 @@ class PksController extends Controller
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
             }, 'asc')
+            ->whereNotIn('status_quotation_id', [1, 2]) // skip Terminated
             ->get()
             ->filter(function ($site) {
                 return $site->quotation !== null;
