@@ -70,6 +70,10 @@ class ProcessQuotationFinalization implements ShouldQueue
             $this->updateRevisionStatuses($quotation);
         }
 
+        if ($this->statusQuotationId == 8 && $this->tipeQuotation === 'revisi') {
+            $this->revertRevisionStatuses($quotation);
+        }
+
         Log::info("ProcessQuotationFinalization: completed", [
             'quotation_id' => $quotation->id,
             'status_quotation_id' => $this->statusQuotationId,
@@ -277,5 +281,18 @@ class ProcessQuotationFinalization implements ShouldQueue
         Pks::whereHas('sites', fn($q) =>
             $q->where('quotation_id', $quotation->id)
         )->update(['status_pks_id' => 5]);
+    }
+
+    private function revertRevisionStatuses(Quotation $quotation): void
+    {
+        $quotationIds = array_filter([$quotation->id, $quotation->quotation_referensi_id]);
+
+        Spk::whereHas('spkSites', fn($q) =>
+            $q->whereIn('quotation_id', $quotationIds)
+        )->update(['status_spk_id' => 6]);
+
+        Pks::whereHas('sites', fn($q) =>
+            $q->whereIn('quotation_id', $quotationIds)
+        )->update(['status_pks_id' => 10]);
     }
 }

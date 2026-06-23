@@ -1421,6 +1421,22 @@ class QuotationController extends Controller
             )->update(['status_pks_id' => 5]);
         }
 
+        if (
+            !$isApproved
+            && $freshQuotation->status_quotation_id === 8
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            $quotationIds = array_filter([$freshQuotation->id, $freshQuotation->quotation_referensi_id]);
+
+            Spk::whereHas('spkSites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_spk_id' => 6]);
+
+            Pks::whereHas('sites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_pks_id' => 10]);
+        }
+
         return ['success' => true, 'data' => $freshQuotation];
     }
 
