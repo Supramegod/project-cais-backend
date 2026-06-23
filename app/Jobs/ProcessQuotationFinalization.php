@@ -265,29 +265,17 @@ class ProcessQuotationFinalization implements ShouldQueue
                 ]);
             });
 
-        Pks::where('quotation_id', $oldQuotation->id)
-            ->update([
-                'quotation_id' => $newQuotation->id,
-                'updated_by' => $this->user,
-            ]);
-
-        Spk::where('quotation_id', $oldQuotation->id)
-            ->update([
-                'quotation_id' => $newQuotation->id,
-                'updated_by' => $this->user,
-            ]);
-
         $businessService->softDeleteQuotationRelations($oldQuotation, $this->user);
     }
 
     private function updateRevisionStatuses(Quotation $quotation): void
     {
-        Spk::where('quotation_id', $quotation->id)
-            ->whereNull('deleted_at')
-            ->update(['status_spk_id' => 1]);
+        Spk::whereHas('spkSites', fn($q) =>
+            $q->where('quotation_id', $quotation->id)
+        )->update(['status_spk_id' => 1]);
 
-        Pks::where('quotation_id', $quotation->id)
-            ->whereNull('deleted_at')
-            ->update(['status_pks_id' => 5]);
+        Pks::whereHas('sites', fn($q) =>
+            $q->where('quotation_id', $quotation->id)
+        )->update(['status_pks_id' => 5]);
     }
 }
