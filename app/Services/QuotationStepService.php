@@ -1745,19 +1745,17 @@ class QuotationStepService
 
     private function makeRejectResult(string $notes): array
     {
-        return $this->makeStatusResult(0, 8, 'baru', $notes);
+        return $this->makeStatusResult(0, 8, $notes);
     }
 
     private function makeStatusResult(
         int $isAktif,
         int $statusQuotationId,
-        ?string $tipeQuotation = null,
         ?string $notes = null
     ): array {
         return [
             'is_aktif' => $isAktif,
             'status_quotation_id' => $statusQuotationId,
-            'tipe_quotation' => $tipeQuotation,
             'notes' => $notes,
         ];
     }
