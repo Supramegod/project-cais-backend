@@ -2902,7 +2902,9 @@ class PksController extends Controller
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
             }, 'asc')
-            ->whereNotIn('status_quotation_id', [1, 2]) // skip Terminated
+            ->whereHas('quotation', function ($q) {
+                $q->whereNotIn('status_quotation_id', [1, 2]); // skip Terminated
+            })
             ->get()
             ->filter(function ($site) {
                 return $site->quotation !== null;
