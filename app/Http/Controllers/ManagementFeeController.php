@@ -145,7 +145,8 @@ class ManagementFeeController extends Controller
 
             $managementFee = ManagementFee::create([
                 'nama' => $request->nama,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

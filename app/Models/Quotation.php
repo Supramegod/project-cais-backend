@@ -22,6 +22,7 @@ class Quotation extends Model
         'status_quotation_id',
         'total_harga',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by',
         'npwp',

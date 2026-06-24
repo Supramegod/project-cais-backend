@@ -390,7 +390,8 @@ class KebutuhanController extends Controller
                 'position_id' => $request->position_id ?? 0,
                 'nama' => $request->nama,
                 'nominal' => $nominal,
-                'created_by' => Auth::user()->full_name ?? 'system'
+                'created_by' => Auth::user()->full_name ?? 'system',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([
@@ -706,7 +707,8 @@ class KebutuhanController extends Controller
                 'kebutuhan_id' => $request->kebutuhan_id,
                 'position_id' => $request->position_id ?? 0,
                 'requirement' => $request->requirement,
-                'created_by' => Auth::user()->full_name ?? 'system'
+                'created_by' => Auth::user()->full_name ?? 'system',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

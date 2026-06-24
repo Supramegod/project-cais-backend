@@ -222,6 +222,7 @@ class QuotationService
             'nominal_tunjangan_holiday' => 0,
             'jenis_bayar_tunjangan_holiday' => null,
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
             'created_at' => $now,
             'updated_at' => $now,
         ])->values()->all();

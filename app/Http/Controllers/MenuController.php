@@ -213,6 +213,7 @@ class MenuController extends Controller
                 'icon'       => $request->icon,
                 'created_at' => Carbon::now()->toDateTimeString(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
 
             return response()->json([

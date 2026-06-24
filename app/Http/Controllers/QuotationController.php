@@ -1459,6 +1459,7 @@ class QuotationController extends Controller
             'approval_date' => $now,
             'created_at' => $now,
             'created_by' => $user->full_name,
+            'created_by_user_id' => $user->id,
         ]);
     }
 
@@ -1494,7 +1495,8 @@ class QuotationController extends Controller
             'pesan' => $msg,
             'is_read' => 0,
             'created_at' => Carbon::now(),
-            'created_by' => $approver->full_name
+            'created_by' => $approver->full_name,
+            'created_by_user_id' => $approver->id
         ]);
 
         // $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
@@ -1537,7 +1539,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 
@@ -1573,7 +1576,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 

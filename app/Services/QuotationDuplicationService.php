@@ -186,6 +186,7 @@ class QuotationDuplicationService
                 'nominal_upah' => $siteRef->nominal_upah,
                 'penempatan' => $siteRef->penempatan,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
 
             $this->siteIdMapping[$siteRef->id] = $newSite->id;
@@ -400,6 +401,7 @@ class QuotationDuplicationService
             'nominal_takaful' => $detailRef->nominal_takaful,
             'biaya_monitoring_kontrol' => $detailRef->biaya_monitoring_kontrol,
             'created_by' => $newQuotation->created_by,
+            'created_by_user_id' => $newQuotation->created_by_user_id,
         ];
     }
 
@@ -426,6 +428,7 @@ class QuotationDuplicationService
                 'nominal_tunjangan_holiday' => $detailRef->wage->nominal_tunjangan_holiday,
                 'jenis_bayar_tunjangan_holiday' => $detailRef->wage->jenis_bayar_tunjangan_holiday,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -437,6 +440,7 @@ class QuotationDuplicationService
                 'nominal' => $tunjangan->nominal,
                 'nominal_coss' => $tunjangan->nominal_coss,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -465,6 +469,7 @@ class QuotationDuplicationService
                 'insentif' => $hpp->insentif,
                 'total_hpp' => $hpp->total_hpp,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -496,6 +501,7 @@ class QuotationDuplicationService
                 'pph' => $coss->pph,
                 'total_coss' => $coss->total_coss,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -505,6 +511,7 @@ class QuotationDuplicationService
                 'quotation_id' => $newQuotation->id,
                 'requirement' => $req->requirement,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
     }
@@ -543,6 +550,7 @@ class QuotationDuplicationService
                 'jumlah' => $kaporlap->jumlah,
                 'harga' => $kaporlap->harga,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -594,6 +602,7 @@ class QuotationDuplicationService
                 'jumlah' => $kaporlap->jumlah,
                 'harga' => $kaporlap->harga,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
 
@@ -642,6 +651,7 @@ class QuotationDuplicationService
             'jumlah' => $device->jumlah,
             'harga' => $device->harga,
             'created_by' => $newQuotation->created_by,
+            'created_by_user_id' => $newQuotation->created_by_user_id,
         ];
     }
 
@@ -656,6 +666,7 @@ class QuotationDuplicationService
             'harga' => $chemical->harga,
             'masa_pakai' => $chemical->masa_pakai,
             'created_by' => $newQuotation->created_by,
+            'created_by_user_id' => $newQuotation->created_by_user_id,
         ];
     }
 
@@ -669,6 +680,7 @@ class QuotationDuplicationService
             'jumlah' => $ohc->jumlah,
             'harga' => $ohc->harga,
             'created_by' => $newQuotation->created_by,
+            'created_by_user_id' => $newQuotation->created_by_user_id,
         ];
     }
 
@@ -711,6 +723,7 @@ class QuotationDuplicationService
                 'aplikasi_pendukung' => $app->aplikasi_pendukung,
                 'harga' => $app->harga,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
     }
@@ -722,6 +735,7 @@ class QuotationDuplicationService
                 'training_id' => $training->training_id,
                 'nama' => $training->nama,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
     }
@@ -732,6 +746,7 @@ class QuotationDuplicationService
             $newQuotation->quotationKerjasamas()->create([
                 'perjanjian' => $kerjasama->perjanjian,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
     }
@@ -748,6 +763,7 @@ class QuotationDuplicationService
                 'email' => $pic->email,
                 'is_kuasa' => $pic->is_kuasa,
                 'created_by' => $newQuotation->created_by,
+                'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
         }
     }

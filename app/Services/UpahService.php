@@ -12,6 +12,7 @@ use App\Models\Ump;
 use App\Models\Umsp;
 use Illuminate\Database\QueryException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -113,6 +114,7 @@ class UpahService
                 ...$this->formatUmp($ump),
                 'is_aktif' => $ump->is_aktif,
                 'created_by' => $ump->created_by,
+                'created_by_user_id' => $ump->created_by_user_id,
                 'deleted_at' => $ump->deleted_at?->format('Y-m-d'),
             ]);
 
@@ -155,6 +157,7 @@ class UpahService
                 ...$this->formatUmsp($umsp),
                 'is_aktif' => $umsp->is_aktif,
                 'created_by' => $umsp->created_by,
+                'created_by_user_id' => $umsp->created_by_user_id,
             ]);
 
             return $paginated;
@@ -257,6 +260,7 @@ class UpahService
                     ...$this->formatUmk($umk),
                     'is_aktif' => $umk->is_aktif,
                     'created_by' => $umk->created_by,
+                    'created_by_user_id' => $umk->created_by_user_id,
                     'deleted_at' => $umk->deleted_at?->format('Y-m-d'),
                 ])
                 ->values(),
@@ -289,6 +293,7 @@ class UpahService
                         ...$validated,
                         'is_aktif' => true,
                         'created_by' => $actor,
+                        'created_by_user_id' => Auth::id(),
                         'updated_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
@@ -341,6 +346,7 @@ class UpahService
                         ...$validated,
                         'is_aktif' => true,
                         'created_by' => $actor,
+                        'created_by_user_id' => Auth::id(),
                         'updated_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
@@ -390,6 +396,7 @@ class UpahService
                         ...$validated,
                         'is_aktif' => true,
                         'created_by' => $actor,
+                        'created_by_user_id' => Auth::id(),
                         'updated_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
@@ -442,6 +449,7 @@ class UpahService
                         ...$validated,
                         'is_aktif' => true,
                         'created_by' => $actor,
+                        'created_by_user_id' => Auth::id(),
                         'updated_by' => $actor,
                     ]);
                 } catch (QueryException $e) {
@@ -496,6 +504,7 @@ class UpahService
             'province_name' => $umsp->province_name,
             'is_aktif' => $umsp->is_aktif,
             'created_by' => $umsp->created_by,
+            'created_by_user_id' => $umsp->created_by_user_id,
             'updated_by' => $umsp->updated_by,
             'created_at' => $umsp->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $umsp->updated_at?->format('Y-m-d H:i:s'),
@@ -533,6 +542,7 @@ class UpahService
             'city_name' => $umsk->city_name,
             'is_aktif' => $umsk->is_aktif,
             'created_by' => $umsk->created_by,
+            'created_by_user_id' => $umsk->created_by_user_id,
             'updated_by' => $umsk->updated_by,
             'created_at' => $umsk->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $umsk->updated_at?->format('Y-m-d H:i:s'),
