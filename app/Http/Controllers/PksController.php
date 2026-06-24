@@ -2199,6 +2199,7 @@ class PksController extends Controller
                 'judul' => $request->judul,
                 'raw_text' => $request->raw_text,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'updated_by' => Auth::user()->full_name,
             ]);
 
@@ -2216,6 +2217,7 @@ class PksController extends Controller
                     'is_activity' => 0,
                     'user_id' => Auth::id(),
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -2300,6 +2302,7 @@ class PksController extends Controller
                     'is_activity' => 0,
                     'user_id' => Auth::id(),
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -2405,6 +2408,7 @@ class PksController extends Controller
             'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
             'tipe_pks' => $tipe,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
 
         // 6. Create Sites (Conditional)
@@ -2497,6 +2501,7 @@ class PksController extends Controller
                 'kebutuhan_id' => $leads->kebutuhan_id,
                 'kebutuhan' => $kebutuhan->nama ?? null,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
 
                 'spk_id' => $isBaru ? $sourceSite->spk_id : null,
                 'spk_site_id' => $isBaru ? $sourceSite->id : null,
@@ -2556,6 +2561,7 @@ class PksController extends Controller
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
         }
         if ($leads) {
@@ -2585,6 +2591,7 @@ class PksController extends Controller
             'jenis_activity' => 'PKS',
             'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$kebutuhanNama}",
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -2640,6 +2647,7 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -3028,6 +3036,7 @@ class PksController extends Controller
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
+            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);
@@ -3092,6 +3101,7 @@ class PksController extends Controller
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
+            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);
@@ -3241,6 +3251,7 @@ class PksController extends Controller
             'gpm_harga_pokok' => $totalData['gpmCoss'],
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -3263,6 +3274,7 @@ class PksController extends Controller
             'user_id' => Auth::user()->id,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
         if ($leads) {
             $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
@@ -3292,6 +3304,7 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -3317,6 +3330,7 @@ class PksController extends Controller
                 'email' => $picData['email'],
                 'created_at' => $current_date_time,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
 
         } catch (\Exception $e) {
@@ -3362,6 +3376,7 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
         if ($leads) {
             $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
@@ -3404,6 +3419,7 @@ class PksController extends Controller
                     'tipe' => 'PKS_PERJANJIAN',
                     'notes' => "Perubahan pasal {$perjanjian->pasal} diedit oleh " . Auth::user()->full_name,
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
         }

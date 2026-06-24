@@ -139,7 +139,8 @@ class AddendumService
                     'kebutuhan_id' => $addendumSite->kebutuhan_id,
                     'kebutuhan' => $addendumSite->kebutuhan,
                     'nomor_quotation' => $newQuot->nomor,
-                    'created_by' => Auth::user()->full_name ?? 'System'
+                    'created_by' => Auth::user()->full_name ?? 'System',
+                    'created_by_user_id' => Auth::id()
                 ]);
 
                 $results['added_sites']++;
@@ -178,7 +179,8 @@ class AddendumService
             'notes' => 'Quotation addendum ' . $newQuot->nomor . ' menambahkan site ke PKS ' . $pks->nomor,
             'is_activity' => 0,
             'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name ?? 'System'
+            'created_by' => Auth::user()->full_name ?? 'System',
+            'created_by_user_id' => Auth::id()
         ]);
     }
 

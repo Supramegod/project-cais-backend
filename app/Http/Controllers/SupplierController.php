@@ -197,7 +197,8 @@ class SupplierController extends Controller
                 'kontak' => $request->kontak,
                 'npwp' => $request->npwp ?? null,
                 'kategori_barang' => $request->kategori_barang ?? null,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

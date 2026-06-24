@@ -310,6 +310,7 @@ class CompanyGroupController extends Controller
                 'jumlah_perusahaan' => 0,
                 'created_at' => $userInfo['time'],
                 'created_by' => $userInfo['name'],
+                'created_by_user_id' => $userInfo['id'],
                 'update_at' => $userInfo['time'],
                 'update_by' => $userInfo['name']
             ]);
@@ -419,6 +420,7 @@ class CompanyGroupController extends Controller
                 'nama_perusahaan' => $company->nama_perusahaan,
                 'created_at' => $userInfo['time'],
                 'created_by' => $userInfo['name'],
+                'created_by_user_id' => $userInfo['id'],
                 'update_at' => $userInfo['time'],
                 'update_by' => $userInfo['name']
             ];
@@ -1007,6 +1009,7 @@ class CompanyGroupController extends Controller
                         'nama_perusahaan' => $company->nama_perusahaan,
                         'created_at' => $userInfo['time'],
                         'created_by' => $userInfo['name'],
+                        'created_by_user_id' => $userInfo['id'],
                         'update_at' => $userInfo['time'],
                         'update_by' => $userInfo['name']
                     ];

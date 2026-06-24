@@ -282,7 +282,8 @@ class TrainingController extends Controller
                 'jp' => $request->jp,
                 'menit' => $request->menit,
                 'total' => $request->jp * $request->menit,
-                'created_by' => Auth::user()->full_name ?? Auth::user()->name
+                'created_by' => Auth::user()->full_name ?? Auth::user()->name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

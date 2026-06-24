@@ -95,6 +95,7 @@ class QuotationBusinessService
             'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -123,6 +124,7 @@ class QuotationBusinessService
             'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $refSite->penempatan,
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -146,6 +148,7 @@ class QuotationBusinessService
                 'email' => $leads->email ?? '',
                 'no_hp' => $leads->telp_perusahaan ?? '',
                 'created_by' => $createdBy,
+                'created_by_user_id' => Auth::id(),
             ]);
         }
     }
@@ -186,6 +189,7 @@ class QuotationBusinessService
                 'is_activity' => 0,
                 'user_id' => $userId,
                 'created_by' => $createdBy,
+                'created_by_user_id' => Auth::id(),
             ]);
         }
         if ($leads) {
@@ -211,6 +215,7 @@ class QuotationBusinessService
             'jenis_activity' => 'Quotation',
             'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 

@@ -283,7 +283,8 @@ class TimSalesController extends Controller
                 'nama' => $request->nama,
                 'branch_id' => $request->branch_id,
                 'branch' => $branch->name,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             // Load relationship for response
@@ -697,7 +698,8 @@ class TimSalesController extends Controller
                 'nama' => $user->full_name,
                 'user_id' => $request->user_id,
                 'username' => $user->username,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             DB::commit();

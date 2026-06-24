@@ -334,6 +334,7 @@ class QuotationStepService
                                 'is_delete' => $kerjasama->is_delete ?? 1,
                                 'created_at' => $kerjasama->created_at,
                                 'created_by' => $kerjasama->created_by,
+                                'created_by_user_id' => $kerjasama->created_by_user_id,
                             ];
                         })->toArray()
                         : [],
@@ -789,6 +790,7 @@ class QuotationStepService
                             'jenis_barang_id' => 8,
                             'created_at' => $currentDateTime,
                             'created_by' => $user,
+                            'created_by_user_id' => Auth::id(),
                             'updated_at' => $currentDateTime,
                             'updated_by' => $user,
                         ];
@@ -1054,6 +1056,7 @@ class QuotationStepService
                     'approval_date' => $currentDateTime,
                     'note' => $statusData['notes'],
                     'created_by' => $user,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -1236,7 +1239,8 @@ class QuotationStepService
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id(),
             ]);
         }
 
@@ -1548,7 +1552,8 @@ class QuotationStepService
                     'quotation_id' => $quotation->id,
                     'nama' => $training->nama,
                     'harga' => $training->harga,
-                    'created_by' => $user
+                    'created_by' => $user,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
         }
@@ -1603,7 +1608,8 @@ class QuotationStepService
             QuotationKerjasama::create([
                 'quotation_id' => $quotation->id,
                 'perjanjian' => $perjanjian,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
         }
     }
@@ -1841,6 +1847,7 @@ class QuotationStepService
                     'requirement' => $req->requirement,
                     'created_at' => $currentDateTime,
                     'created_by' => $user,
+                    'created_by_user_id' => Auth::id(),
                 ];
             }
         }
@@ -1928,6 +1935,7 @@ class QuotationStepService
                             'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
                             'created_at' => $timestamp,
                             'created_by' => $user,
+                            'created_by_user_id' => Auth::id(),
                         ];
                     }
 
@@ -1948,6 +1956,7 @@ class QuotationStepService
                             'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
                             'created_at' => $timestamp,
                             'created_by' => $user,
+                            'created_by_user_id' => Auth::id(),
                         ];
                     }
                 } else {
@@ -1961,7 +1970,8 @@ class QuotationStepService
                         'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
                         'nominal_upah' => $detailData['nominal_upah'] ?? 0,
                         'created_at' => $timestamp,
-                        'created_by' => $user
+                        'created_by' => $user,
+                        'created_by_user_id' => Auth::id(),
                     ]);
 
                     $hppInsert[] = [
@@ -1972,6 +1982,7 @@ class QuotationStepService
                         'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
                         'created_at' => $timestamp,
                         'created_by' => $user,
+                        'created_by_user_id' => Auth::id(),
                     ];
 
                     $cossInsert[] = [
@@ -1982,6 +1993,7 @@ class QuotationStepService
                         'jumlah_hc' => $detailData['jumlah_hc'] ?? 0,
                         'created_at' => $timestamp,
                         'created_by' => $user,
+                        'created_by_user_id' => Auth::id(),
                     ];
                 }
             }
@@ -2069,7 +2081,8 @@ class QuotationStepService
                 'jumlah_hc' => $data['jumlah_hc'] ?? 0,
                 'nominal_upah' => $data['nominal_upah'] ?? 0,
                 'created_at' => $timestamp,
-                'created_by' => $user
+                'created_by' => $user,
+                'created_by_user_id' => Auth::id(),
             ]);
 
             // Create HPP
@@ -2080,7 +2093,8 @@ class QuotationStepService
                 'position_id' => $positionId,
                 'jumlah_hc' => $data['jumlah_hc'] ?? 0,
                 'created_at' => $timestamp,
-                'created_by' => $user
+                'created_by' => $user,
+                'created_by_user_id' => Auth::id(),
             ]);
 
             // Create COSS
@@ -2091,7 +2105,8 @@ class QuotationStepService
                 'position_id' => $positionId,
                 'jumlah_hc' => $data['jumlah_hc'] ?? 0,
                 'created_at' => $timestamp,
-                'created_by' => $user
+                'created_by' => $user,
+                'created_by_user_id' => Auth::id(),
             ]);
 
             // Create Requirements if provided
@@ -2103,7 +2118,8 @@ class QuotationStepService
                             'quotation_detail_id' => $newDetail->id,
                             'requirement' => trim($requirement),
                             'created_at' => $timestamp,
-                            'created_by' => $user
+                            'created_by' => $user,
+                            'created_by_user_id' => Auth::id(),
                         ]);
                     }
                 }
@@ -2231,7 +2247,8 @@ class QuotationStepService
             $wage = QuotationDetailWage::updateOrCreate(
                 ['quotation_detail_id' => $detail->id],
                 array_merge($wageData, [
-                    'created_by' => Auth::user()->full_name
+                    'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ])
             );
 
@@ -2967,6 +2984,7 @@ class QuotationStepService
                         'jenis' => $jenis,
                         'created_at' => $currentDateTime,
                         'created_by' => $user,
+                        'created_by_user_id' => Auth::id(),
                     ];
                 }
             }
@@ -3651,6 +3669,7 @@ class QuotationStepService
                 'position_id' => $detail->position_id,
                 'jumlah_hc' => $detail->jumlah_hc,
                 'created_by' => $user,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => $currentDateTime
             ]);
         }
@@ -4430,6 +4449,7 @@ class QuotationStepService
                 'position_id' => $detail->position_id,
                 'jumlah_hc' => $detail->jumlah_hc,
                 'created_by' => $user,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => $currentDateTime,
             ]);
         }

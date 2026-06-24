@@ -35,6 +35,7 @@ class Leads extends Model
         'jenis_perusahaan_id',
         'nomor',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by',
         'tgl_leads',

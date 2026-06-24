@@ -8,6 +8,7 @@ use App\Models\Kebutuhan;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Template Perjanjian Kerja Sama (PKS) untuk PT GLOBAL SECURINDO UTAMA (Satpam)
@@ -211,6 +212,7 @@ class PksGsuTemplateService implements PksTemplateInterface
                 'raw_text' => $section['raw_text'],
                 'created_at' => $this->currentDateTime,
                 'created_by' => $createdBy,
+                'created_by_user_id' => Auth::id(),
                 'updated_at' => $this->currentDateTime,
             ];
         }

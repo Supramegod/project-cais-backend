@@ -9,6 +9,7 @@ use App\Models\RuleThr;
 use App\Models\SalaryRule;
 use App\Services\PksTemplate\PksTemplateInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class PksPerjanjianTemplateService implements PksTemplateInterface
 {
@@ -969,6 +970,7 @@ font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN"><o:p></o:p></span
                 'raw_text' => $section['raw_text'],
                 'created_at' => $this->currentDateTime,
                 'created_by' => $createdBy,
+                'created_by_user_id' => Auth::id(),
                 'updated_at' => $this->currentDateTime,
             ];
         }

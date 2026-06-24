@@ -191,7 +191,8 @@ class SalaryRuleController extends Controller
                 'tgl_pembayaran_invoice' => $request->pembayaran_invoice,
                 'rilis_payroll' => $rilisPayroll,
                 'tgl_rilis_payroll' => $request->rilis_payroll,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

@@ -1424,6 +1424,7 @@ class CustomerActivityController extends Controller
                 'branch_id' => $leads->branch_id,
                 'user_id' => $user->id,
                 'created_by' => $user->full_name,
+                'created_by_user_id' => $user->id,
                 'created_at' => $current_date_time
             ];
             if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
@@ -1927,6 +1928,7 @@ class CustomerActivityController extends Controller
                 'is_activity' => 1,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => $current_date_time
             ];
 
@@ -2040,6 +2042,7 @@ class CustomerActivityController extends Controller
                 'is_activity' => 1,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => $current_date_time
             ];
 
@@ -2142,6 +2145,7 @@ class CustomerActivityController extends Controller
                 'is_activity' => 1,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => $current_date_time
             ]);
 
@@ -2561,6 +2565,7 @@ class CustomerActivityController extends Controller
                 'nama_file' => $file->getClientOriginalName(),
                 'url_file' => $fileUrl,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => Carbon::now()
             ]);
 
@@ -2587,7 +2592,8 @@ class CustomerActivityController extends Controller
                 'tgl_activity' => Carbon::now(),
                 'jenis_activity' => 'Email',
                 'notulen' => $notulen,
-                'created_by' => $user->full_name
+                'created_by' => $user->full_name,
+                'created_by_user_id' => $user->id
             ]);
 
             // Simpan activity pertama sebagai referensi lampiran

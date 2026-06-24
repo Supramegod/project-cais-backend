@@ -336,7 +336,8 @@ class JenisBarangController extends Controller
             $jenisBarang = JenisBarang::create([
                 'nama' => $request->nama,
                 'created_at' => Carbon::now(),
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             DB::commit();
