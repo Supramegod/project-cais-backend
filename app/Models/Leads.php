@@ -158,6 +158,14 @@ class Leads extends Model
         return $this->belongsTo(JabatanPic::class, 'jabatan');
     }
     /**
+     * Relasi ke daftar PIC (multi PIC) leads
+     */
+    public function pics()
+    {
+        return $this->hasMany(LeadsPic::class, 'leads_id')
+            ->whereNull('deleted_at');
+    }
+    /**
      * Relasi ke LeadsKebutuhan untuk akses tim sales
      */
     public function leadsKebutuhan()

@@ -36,6 +36,16 @@ class StoreLeadRequest extends BaseRequest
             'benua'           => FluentRule::numeric('Benua')->nullable(),
             'negara'          => FluentRule::numeric('Negara')->nullable(),
 
+            // Multi PIC (opsional). Kolom datar pic/jabatan_pic/no_telp/email
+            // tetap diisi dari PIC pertama untuk kompatibilitas mundur.
+            'pics'            => FluentRule::array(label: 'PIC')->nullable()
+                ->each([
+                    'pic'         => FluentRule::string('Nama PIC')->required(),
+                    'jabatan_pic' => FluentRule::field('Jabatan PIC')->nullable(),
+                    'no_telp'     => FluentRule::string('No Telp')->nullable(),
+                    'email'       => FluentRule::email('Email')->nullable(),
+                ]),
+
             // ✅ perbaikan
             'assignments'     => FluentRule::array(label: 'Assignments')->nullable()
                 ->each([
