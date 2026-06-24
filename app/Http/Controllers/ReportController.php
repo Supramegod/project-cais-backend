@@ -279,7 +279,7 @@ class ReportController extends Controller
         //mentah
         $weeklyActivity = DB::table('sl_activity_sales')
             ->select(
-                'created_by',
+                DB::raw('ANY_VALUE(created_by) as created_by'),
                 'created_by_user_id',
                 DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
                 DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
@@ -853,7 +853,7 @@ class ReportController extends Controller
 
         $weeklyActivity = DB::table('sl_customer_activity as sa')
             ->select(
-                'sa.created_by',
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
                 'sa.user_id',
 
                 // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
@@ -1595,7 +1595,7 @@ class ReportController extends Controller
     {
         return DB::table('sl_activity_sales')
             ->select(
-                'created_by',
+                DB::raw('ANY_VALUE(created_by) as created_by'),
                 'created_by_user_id',
                 DB::raw("COUNT(CASE WHEN jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
                 DB::raw("COUNT(CASE WHEN jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
@@ -1693,7 +1693,7 @@ class ReportController extends Controller
     {
         return DB::table('sl_customer_activity as sa')
             ->select(
-                'sa.created_by',
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
                 'sa.user_id',
 
                 // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
