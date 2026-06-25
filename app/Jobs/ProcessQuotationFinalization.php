@@ -12,6 +12,7 @@ use App\Models\QuotationSite;
 use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
+use App\Services\AddendumService;
 use App\Services\QuotationBusinessService;
 use App\Services\QuotationNotificationService;
 use Carbon\Carbon;
@@ -34,6 +35,7 @@ class ProcessQuotationFinalization implements ShouldQueue
         public int $statusQuotationId,
         public string $tipeQuotation,
         public ?int $oldQuotationId,
+        public ?int $userId = null,
     ) {}
 
     public function handle(
@@ -73,6 +75,15 @@ class ProcessQuotationFinalization implements ShouldQueue
 
         if ($this->statusQuotationId == 8 && $this->tipeQuotation === 'revisi') {
             $this->revertRevisionStatuses($quotation);
+        }
+
+        if ($this->statusQuotationId == 3 && $this->tipeQuotation === 'addendum') {
+            $this->updateDownstreamReferencesForAddendum($quotation, $businessService);
+            app(AddendumService::class)->process(
+                $quotation,
+                $this->user,
+                $this->userId,
+            );
         }
 
         Log::info("ProcessQuotationFinalization: completed", [
@@ -297,5 +308,17 @@ class ProcessQuotationFinalization implements ShouldQueue
         Pks::whereHas('sites', fn($q) =>
             $q->whereIn('quotation_id', $quotationIds)
         )->update(['status_pks_id' => 10]);
+    }
+
+    private function updateDownstreamReferencesForAddendum(Quotation $quotation, QuotationBusinessService $businessService): void
+    {
+        $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
+        if (!$oldQuotation) return;
+
+        SpkSite::where('quotation_id', $oldQuotation->id)
+            ->update(['quotation_id' => $quotation->id, 'updated_by' => $this->user]);
+
+        Site::where('quotation_id', $oldQuotation->id)
+            ->update(['quotation_id' => $quotation->id, 'updated_by' => $this->user]);
     }
 }

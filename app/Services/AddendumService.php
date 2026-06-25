@@ -6,24 +6,25 @@ use App\Models\Site;
 use App\Models\Quotation;
 use App\Models\Leads;
 use App\Models\CustomerActivity;
-use Illuminate\Support\Facades\Auth;
+use App\Models\QuotationSite;
+use App\Models\SpkSite;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class AddendumService
 {
-    public function process(Quotation $newQuot): array
+    public function process(Quotation $newQuot, string $userName = 'System', ?int $userId = null): array
     {
         $results = [
             'new_quot_id' => $newQuot->id,
             'new_quot_no' => $newQuot->nomor,
+            'matched_sites' => 0,
             'added_sites' => 0,
             'errors' => [],
             'warnings' => []
         ];
 
-        // Validasi tipe addendum
         if ($newQuot->tipe_quotation !== 'addendum') {
             $results['errors'][] = 'Quotation bukan tipe addendum';
             return $results;
@@ -43,7 +44,6 @@ class AddendumService
         DB::beginTransaction();
 
         try {
-            // Cari PKS melalui site yang terkait dengan parent quotation
             $siteParent = Site::where('quotation_id', $parentQuot->id)->first();
             $pks = null;
 
@@ -51,7 +51,6 @@ class AddendumService
                 $pks = Pks::find($siteParent->pks_id);
             }
 
-            // Fallback: cari PKS langsung berdasarkan quotation_id (jika ada relasi langsung)
             if (!$pks) {
                 $pks = Pks::where('quotation_id', $parentQuot->id)->first();
             }
@@ -61,14 +60,11 @@ class AddendumService
                 DB::rollBack();
                 return $results;
             }
-            $originalPksNumber = $pks->nomor;
-            $newPksNumber = null;
-         
+
             $originalPksNumber = $pks->nomor;
             $newPksNumber = null;
 
             if (preg_match('/^ADD\/(.+)\/(\d+)$/', $originalPksNumber, $matches)) {
-                // Sudah dalam format ADD, ambil nomor asli dan urutan terakhir
                 $nomorAsli = $matches[1];
                 $urutanTerakhir = (int) $matches[2];
                 $urutan = $urutanTerakhir + 1;
@@ -81,19 +77,6 @@ class AddendumService
             $pks->nomor = $newPksNumber;
             $pks->save();
 
-            // Catat di hasil (opsional)
-            // $results['pks_number_updated'] = $newPksNumber;
-
-            // Ambil SPK ID dari site yang sudah ada di PKS ini
-            $sampleSite = Site::where('pks_id', $pks->id)->first();
-            // $spkId = $sampleSite ? $sampleSite->spk_id : null;
-
-            // if (!$spkId) {
-            //     $results['errors'][] = 'Tidak ditemukan SPK untuk PKS ini';
-            //     DB::rollBack();
-            //     return $results;
-            // }
-
             $addendumSites = $newQuot->quotationSites;
 
             if ($addendumSites->isEmpty()) {
@@ -102,52 +85,87 @@ class AddendumService
                 return $results;
             }
 
+            // Load parent QuotationSites by nama_site untuk mapping
+            $parentQuotationSites = QuotationSite::where('quotation_id', $parentQuot->id)
+                ->get()
+                ->keyBy('nama_site');
+
+            // Load existing SpkSite (dengan QuotationSite-nya) by quotation_id parent
+            $existingSpkSites = SpkSite::with('quotationSite')
+                ->where('quotation_id', $parentQuot->id)
+                ->get()
+                ->filter(fn($s) => $s->quotationSite)
+                ->keyBy(fn($s) => $s->quotationSite->nama_site);
+
+            // Load existing Site by quotation_id parent
+            $existingSites = Site::where('quotation_id', $parentQuot->id)
+                ->where('pks_id', $pks->id)
+                ->get()
+                ->keyBy('nama_site');
+
+            // Hitung jumlah site existing di PKS untuk generate nomor site baru
+            $nextSiteUrutan = Site::where('pks_id', $pks->id)->count() + 1;
+
             foreach ($addendumSites as $addendumSite) {
-                // Generate nomor site berdasarkan urutan terbaru di PKS
-                $siteCount = Site::where('pks_id', $pks->id)->count();
-                $nomorSite = $pks->nomor . '-' . sprintf("%04d", $siteCount + 1);
+                $existingSpkSite = $existingSpkSites->get($addendumSite->nama_site);
+                $existingSite = $existingSites->get($addendumSite->nama_site);
 
-                // Generate nama proyek
-                $namaProyek = sprintf(
-                    '%s-%s.%s.%s',
-                    Carbon::parse($pks->kontrak_awal)->format('my'),
-                    Carbon::parse($pks->kontrak_akhir)->format('my'),
-                    strtoupper(substr($pks->layanan ?? 'NN', 0, 2)),
-                    strtoupper($pks->nama_perusahaan)
-                );
+                if ($existingSpkSite && $existingSite) {
+                    // MATCH → UPDATE
+                    $existingSpkSite->update([
+                        'quotation_id' => $newQuot->id,
+                        'quotation_site_id' => $addendumSite->id,
+                        'updated_by' => $userName,
+                    ]);
+                    $existingSite->update([
+                        'quotation_id' => $newQuot->id,
+                        'quotation_site_id' => $addendumSite->id,
+                        'updated_by' => $userName,
+                    ]);
 
-                // Buat Site baru (tanpa spk_site_id)
-                Site::create([
-                    'quotation_id' => $newQuot->id,
-                    // 'spk_id' => $spkId,
-                    'pks_id' => $pks->id,
-                    'quotation_site_id' => $addendumSite->id,
-                    'spk_site_id' => null, // tidak buat SpkSite
-                    'leads_id' => $parentQuot->leads_id,
-                    'nomor' => $nomorSite,
-                    'nomor_proyek' => $namaProyek,
-                    'nama_proyek' => $namaProyek,
-                    'nama_site' => $addendumSite->nama_site,
-                    'provinsi_id' => $addendumSite->provinsi_id,
-                    'provinsi' => $addendumSite->provinsi,
-                    'kota_id' => $addendumSite->kota_id,
-                    'kota' => $addendumSite->kota,
-                    'ump' => $addendumSite->ump,
-                    'umk' => $addendumSite->umk,
-                    'nominal_upah' => $addendumSite->nominal_upah,
-                    'penempatan' => $addendumSite->penempatan,
-                    'kebutuhan_id' => $addendumSite->kebutuhan_id,
-                    'kebutuhan' => $addendumSite->kebutuhan,
-                    'nomor_quotation' => $newQuot->nomor,
-                    'created_by' => Auth::user()->full_name ?? 'System',
-                    'created_by_user_id' => Auth::id()
-                ]);
+                    $results['matched_sites']++;
+                } else {
+                    // NO MATCH → CREATE Site baru
+                    $nomorSite = $pks->nomor . '-' . sprintf("%04d", $nextSiteUrutan++);
 
-                $results['added_sites']++;
+                    $namaProyek = sprintf(
+                        '%s-%s.%s.%s',
+                        Carbon::parse($pks->kontrak_awal)->format('my'),
+                        Carbon::parse($pks->kontrak_akhir)->format('my'),
+                        strtoupper(substr($pks->layanan ?? 'NN', 0, 2)),
+                        strtoupper($pks->nama_perusahaan)
+                    );
+
+                    Site::create([
+                        'quotation_id' => $newQuot->id,
+                        'pks_id' => $pks->id,
+                        'quotation_site_id' => $addendumSite->id,
+                        'spk_site_id' => null,
+                        'leads_id' => $parentQuot->leads_id,
+                        'nomor' => $nomorSite,
+                        'nomor_proyek' => $namaProyek,
+                        'nama_proyek' => $namaProyek,
+                        'nama_site' => $addendumSite->nama_site,
+                        'provinsi_id' => $addendumSite->provinsi_id,
+                        'provinsi' => $addendumSite->provinsi,
+                        'kota_id' => $addendumSite->kota_id,
+                        'kota' => $addendumSite->kota,
+                        'ump' => $addendumSite->ump,
+                        'umk' => $addendumSite->umk,
+                        'nominal_upah' => $addendumSite->nominal_upah,
+                        'penempatan' => $addendumSite->penempatan,
+                        'kebutuhan_id' => $addendumSite->kebutuhan_id,
+                        'kebutuhan' => $addendumSite->kebutuhan,
+                        'nomor_quotation' => $newQuot->nomor,
+                        'created_by' => $userName,
+                        'created_by_user_id' => $userId,
+                    ]);
+
+                    $results['added_sites']++;
+                }
             }
 
-            // Catat aktivitas
-            $this->createAddendumActivity($newQuot, $parentQuot, $pks);
+            $this->createAddendumActivity($newQuot, $parentQuot, $pks, $userName, $userId);
 
             DB::commit();
 
@@ -162,11 +180,10 @@ class AddendumService
         }
     }
 
-    private function createAddendumActivity(Quotation $newQuot, Quotation $parentQuot, Pks $pks): void
+    private function createAddendumActivity(Quotation $newQuot, Quotation $parentQuot, Pks $pks, string $userName, ?int $userId): void
     {
         $leads = $newQuot->leads;
-        if (!$leads)
-            return;
+        if (!$leads) return;
 
         CustomerActivity::create([
             'leads_id' => $leads->id,
@@ -178,9 +195,9 @@ class AddendumService
             'tipe' => 'Addendum',
             'notes' => 'Quotation addendum ' . $newQuot->nomor . ' menambahkan site ke PKS ' . $pks->nomor,
             'is_activity' => 0,
-            'user_id' => Auth::id(),
-            'created_by' => Auth::user()->full_name ?? 'System',
-            'created_by_user_id' => Auth::id()
+            'user_id' => $userId,
+            'created_by' => $userName,
+            'created_by_user_id' => $userId,
         ]);
     }
 

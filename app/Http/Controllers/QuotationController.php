@@ -1404,7 +1404,7 @@ class QuotationController extends Controller
             && $freshQuotation->status_quotation_id === 3
             && $freshQuotation->tipe_quotation === 'addendum'
         ) {
-            app(AddendumService::class)->process($freshQuotation);
+            app(AddendumService::class)->process($freshQuotation, $user->full_name, $user->id);
         }
 
         if (

@@ -1031,6 +1031,7 @@ class QuotationStepService
         try {
             $currentDateTime = Carbon::now();
             $user = Auth::user()->full_name;
+            $userId = Auth::id();
 
             $calculationResult = $this->getQuotationService()->calculateQuotation($quotation);
             $summary = $calculationResult->calculation_summary;
@@ -1052,11 +1053,11 @@ class QuotationStepService
                     'doc_id' => $quotation->id,
                     'tingkat' => 0,
                     'is_approve' => false,
-                    'user_id' => Auth::id(),
+                    'user_id' => $userId,
                     'approval_date' => $currentDateTime,
                     'note' => $statusData['notes'],
                     'created_by' => $user,
-                    'created_by_user_id' => Auth::id(),
+                    'created_by_user_id' => $userId,
                 ]);
             }
 
@@ -1074,6 +1075,7 @@ class QuotationStepService
                 $statusData['status_quotation_id'],
                 $quotation->tipe_quotation ?? '',
                 $oldQuotationId,
+                $userId
             );
 
             DB::commit();
