@@ -49,3 +49,6 @@ _ide_helper_models.php
 .php-cs-fixer.cache
 Homestead.json
 Homestead.yaml
+prd_cais.md
+plan_analitytic.md
+AGENTS.md
