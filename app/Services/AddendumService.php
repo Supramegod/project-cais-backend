@@ -64,7 +64,7 @@ class AddendumService
             $originalPksNumber = $pks->nomor;
             $newPksNumber = null;
 
-            if (preg_match('/^ADD\/(.+)\/(\d+)$/', $originalPksNumber, $matches)) {
+            if  (preg_match('/^ADD\/(.+)\/(\d+)$/', $originalPksNumber, $matches)) {
                 $nomorAsli = $matches[1];
                 $urutanTerakhir = (int) $matches[2];
                 $urutan = $urutanTerakhir + 1;

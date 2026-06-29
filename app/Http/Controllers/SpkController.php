@@ -694,6 +694,7 @@ class SpkController extends Controller
                     'id' => $quotation->id,
                     'nomor_quotation' => $quotation->nomor ?? null,
                     'nama_perusahaan' => $quotation->nama_perusahaan ?? null,
+                    'status_quotation' => $quotation->status_quotation_id ?? null,
                     'kebutuhan' => $quotation->kebutuhan ?? null,
                     'jenis_kontrak' => $quotation->jenis_kontrak ?? null,
                     'tanggal_penempatan' => $quotation->tgl_penempatan ?? null,
