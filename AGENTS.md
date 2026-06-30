@@ -1,12 +1,11 @@
 # AGENTS.md
 
-> CAIS Backend: Laravel 12 / PHP ^8.2 API for Sales, HR master data, Leads, Quotations, PKS, SPK.
+> CAIS Backend: Laravel 12 / PHP 8.2 API for sales, HR master data, leads, quotations, PKS, and SPK.
 
 ## Source Of Truth
 
-- Trust executable config over prose: `composer.json`, `package.json`, `phpunit.xml`, `.gitlab-ci.yml`, `bootstrap/app.php`, `routes/api.php`.
-- `.github/copilot-instructions.md` exists but contains stale route names and response-shape examples; verify before copying from it.
-- `.opencode/PRD.md` and `docs/*fulfillment*` are draft product docs for fulfillment/visit work, not current runtime wiring.
+- Trust executable config first: `composer.json`, `package.json`, `phpunit.xml`, `.gitlab-ci.yml`, `bootstrap/app.php`, `routes/api.php`, `config/database.php`.
+- `README.md` is useful for setup, but some architecture/response-shape statements are too broad. Match the nearby controller/model behavior before copying patterns.
 
 ## Commands
 
@@ -18,63 +17,56 @@ php artisan key:generate
 php artisan migrate
 php artisan storage:link
 
-composer dev                         # serve :8000 + queue:listen --tries=1 + pail + Vite
-composer test                        # php artisan config:clear, then php artisan test
+composer dev                         # serve + queue:listen --tries=1 + pail + Vite
+composer test                        # clears config, then runs php artisan test
 php artisan test --filter=TestName   # focused test
-php artisan test tests/Feature       # feature tests
-php artisan test tests/Unit          # unit tests
-npm run build                        # Vite production build
-php artisan l5-swagger:generate      # regenerate API docs from @OA annotations
-vendor/bin/pint                      # PHP formatting; no composer lint script exists
+php artisan test tests/Feature
+php artisan test tests/Unit
+npm run build
+php artisan l5-swagger:generate
+vendor/bin/pint
 ```
 
-- There is no `npm test`, typecheck, or lint script in `package.json`; do not invent one for verification.
-- `.editorconfig` requires LF, 4-space indentation, and 2-space YAML indentation.
+- `package.json` has only `dev` and `build`; there is no JS test, lint, or typecheck script.
+- `.editorconfig` enforces LF, 4-space indentation, and 2-space YAML indentation.
 
 ## App Wiring
 
-- All API routes are in `routes/api.php`; protected routes use `auth:sanctum,web` plus `token.expiry`.
-- Public API routes are only `POST /api/auth/login`, `POST /api/auth/refresh`, and two admin-panel consultation routes before the auth group.
-- `bootstrap/app.php` replaces the API middleware group with session middleware plus `ApiResponseMiddleware`; that middleware only forces `Accept: application/json`.
-- Route prefixes are plural where defined, for example `quotations` and `quotations-step`, not `/quotation`.
-- Controllers/resources build JSON responses directly. Keep the existing endpoint shape; do not assume a global wrapper.
+- All API routes live in `routes/api.php`.
+- Only public API routes are `POST /auth/login`, `POST /auth/refresh`, and the two `/admin-panel/consultations` routes before the auth group.
+- Protected routes use `auth:sanctum,web` plus `token.expiry`.
+- `bootstrap/app.php` replaces the API middleware group with session middleware plus `ApiResponseMiddleware`; that middleware only sets `Accept: application/json`.
+- Keep endpoint response shapes consistent with the touched controller/resource. There is no single global JSON wrapper.
 
-## Validation And Responses
+## Validation And Data
 
-- New request classes should extend `app/Http/Requests/BaseRequest`, which wraps Laravel `FormRequest` and returns 422 as `{ "message": { "field": ["error"] } }`.
-- Requests use `sandermuller/laravel-fluent-validation` (`FluentRule`) in current quotation/auth/lead/upah requests.
-- Some legacy controller-level validators return `{ "success": false, "message": "...", "errors": ... }`; match local controller behavior when editing nearby code.
-
-## Database And Models
-
-- Default `.env.example` uses SQLite, but many real models/validators reference MySQL connections: `mysql` and `mysqlhris` in `config/database.php`.
-- HRIS models such as `User`, `Branch`, `Company`, city/province tables use `mysqlhris`; Sanctum access tokens and refresh tokens use `mysql`.
-- PHPUnit forces SQLite `:memory:`, cache/session `array`, queue `sync`, mail `array`; tests touching `mysql`/`mysqlhris` models need explicit connection handling or fakes.
-- Domain tables are mostly `sl_*`; master tables are often `m_*`; audit columns are common (`created_by`, `updated_by`, `deleted_by`, and newer `created_by_user_id`) but not universal.
-- Many domain models use SoftDeletes, but not every model does. Check the model/migration before assuming `deleted_at` exists; avoid `forceDelete()` for domain records unless explicitly needed.
+- New request classes should extend `app/Http/Requests/BaseRequest`; failed validation returns `422` as `{ "message": { "field": ["error"] } }`.
+- The repo uses `sandermuller/laravel-fluent-validation` (`FluentRule`) in current request classes; follow the local request style.
+- Default local config is SQLite, but the app also uses `mysql` and `mysqlhris` connections. HRIS models like `User`, `Branch`, `Company`, `Province`, and `City` use `mysqlhris`; Sanctum and refresh tokens use `mysql`.
+- PHPUnit forces `sqlite :memory:` plus `array` cache/session, `sync` queue, and `array` mail. Tests that hit `mysql` or `mysqlhris` models need fakes, alternate setup, or connection-aware assertions.
+- Do not assume every model has `SoftDeletes`; verify the model or migration first.
 
 ## Auth
 
-- `User` is `mysqlhris.m_user`, uses Sanctum tokens, and checks passwords with `md5('SHELTER-' . $password . '-SHELTER')` in `scopeCheckLogin()`.
-- `User::createTokenPair()` creates a 1-day access token and 7-day refresh token; trust this over stale comments in token models.
-- `HrisPersonalAccessToken` is registered in `bootstrap/app.php` via `Sanctum::usePersonalAccessTokenModel()` and hard-codes `$connection = 'mysql'`.
+- `App\Models\User` uses `mysqlhris.m_user`.
+- Login checks `md5('SHELTER-' . $password . '-SHELTER')` in `User::scopeCheckLogin()`.
+- `User::createTokenPair()` creates a 1-day access token and a 7-day refresh token.
+- `Sanctum::usePersonalAccessTokenModel()` points to `HrisPersonalAccessToken`, which hard-codes `$connection = 'mysql'`.
 
-## Quotation Notes
+## Quotation And Leads Gotchas
 
-- Start quotation changes in `app/Services/QuotationService.php`, `QuotationBusinessService.php`, `QuotationStepService.php`, and DTOs in `app/DTO/`; controllers still contain some legacy flow glue.
-- `QuotationService::calculateQuotation()` returns `QuotationCalculationResult` and preloads HPP/COSS/sites/items into dynamic `_...` properties; see `docs/architecture-overview.md` before changing calculation order.
-- `jumlah_site` is an exact string enum: `Single Site` or `Multi Site`. `QuotationStoreRequest` nulls multi-site arrays for single-site requests and defaults them to `[]` for multi-site requests.
-- Multi-site arrays `multisite`, `provinsi_multi`, `kota_multi`, and `penempatan_multi` must have matching counts; `QuotationBusinessService::validateMultiSiteData()` enforces this.
-- Management-fee component flags live in `sl_quotation_management_fee`; use `QuotationManagementFee::upsertForQuotation()` so soft-deleted rows are restored and unique `quotation_id` conflicts are avoided.
+- For quotation work, start from `app/Services/QuotationService.php`, `QuotationBusinessService.php`, `QuotationStepService.php`, and the DTOs. Controllers still contain some legacy flow glue.
+- `QuotationService::calculateQuotation()` returns `QuotationCalculationResult` and preloads calculation state into dynamic `_...` properties on the quotation model; be careful changing calculation order or load assumptions.
+- `jumlah_site` is an exact enum string: `Single Site` or `Multi Site`.
+- `QuotationStoreRequest` nulls multi-site arrays for single-site requests and defaults them to `[]` for multi-site requests. `QuotationBusinessService::validateMultiSiteData()` requires `multisite`, `provinsi_multi`, `kota_multi`, and `penempatan_multi` counts to match.
+- For quotation management-fee flags, use `QuotationManagementFee::upsertForQuotation()` so soft-deleted rows are restored instead of colliding on the unique `quotation_id`.
+- `Leads::kebutuhan()` and `Leads::leadsKebutuhan()` already exclude soft-deleted pivot rows.
+- In `LeadsController::assignSales()`, keep the `LeadsKebutuhan::updateOrCreate(...)` plus placeholder-row cleanup. Replacing it with `firstOrCreate()` risks duplicate soft-deleted pivot rows.
+- Lead, quotation, customer, PKS, and SPK list searches use MySQL fulltext `MATCH ... AGAINST`; SQLite tests will not exercise that behavior faithfully.
 
-## Leads Notes
+## CI And Docker
 
-- `Leads::kebutuhan()` filters the `sl_leads_kebutuhan` pivot with `wherePivot('deleted_at', null)`; `Leads::leadsKebutuhan()` also filters soft-deleted rows.
-- In `LeadsController::assignSales()`, keep the current `updateOrCreate()` pattern and placeholder cleanup; changing to `firstOrCreate()` can recreate duplicate soft-deleted pivot rows.
-- Lead and quotation list searches use MySQL fulltext `MATCH ... AGAINST` for `nama_perusahaan`; this will not behave on SQLite without adjustment.
-
-## Docker And CI
-
-- `docker-compose-dev.yml` is deployment-host-specific: absolute `/home/data/development/project-cais-backend` paths, PHP-FPM on port 9000, and external `shelter-network`.
-- GitLab CI tests only on `development` and `prod` branch rules, using `php:8.2-cli`, installing `gd`, `pdo_mysql`, `zip`, and `mongodb`, then `cp .env.example .env`, `composer install`, `key:generate`, `config:clear`, `php artisan test`.
-- Deploy jobs reset the remote branch, rebuild the backend and queue-worker services, then run `storage:link`, `migrate --force`, `l5-swagger:generate`, and `optimize:clear` inside the container.
+- GitLab CI only runs tests on `development` and `prod` branches.
+- CI uses `php:8.2-cli`, installs `gd`, `pdo_mysql`, `zip`, and `mongodb`, then runs `cp .env.example .env`, `composer install`, `php artisan key:generate`, `php artisan config:clear`, and `php artisan test`.
+- Deployment rebuilds the backend and queue-worker containers, then runs `storage:link`, `migrate --force`, `l5-swagger:generate`, and `optimize:clear` inside the container.
+- `docker-compose-dev.yml` is deployment-host-specific, with absolute `/home/data/development/project-cais-backend` paths and external network `shelter-network`; do not assume it is a portable local dev setup.

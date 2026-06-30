@@ -10,6 +10,7 @@ use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
+use App\Http\Controllers\PksWizardController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\ReportController;
@@ -424,6 +425,15 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::post('/perjanjian/compare', 'comparePerjanjian');
         Route::post('/{pks_id}/perjanjian', 'storePasal');
         Route::delete('/perjanjian/{id}', 'destroyPasal');         // Bandingkan dua versi
+    });
+    Route::prefix('pks-wizard')->controller(PksWizardController::class)->group(function () {
+        Route::post('/initialize/{tipe}', 'initialize');
+        Route::get('/{pksId}/step/{step}', 'getStep');
+        Route::post('/{pksId}/step/{step}', 'updateStep');
+        Route::post('/{pksId}/preview-pasal', 'generatePasalPreview');
+        Route::put('/{pksId}/preview-pasal/{pasalKey}', 'updatePasalPreview');
+        Route::post('/{pksId}/finalize', 'finalize');
+        Route::delete('/{pksId}', 'cancel');
     });
     // Quotation Management
     Route::prefix('quotations')->controller(QuotationController::class)->group(function () {

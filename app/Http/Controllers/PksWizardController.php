@@ -1,0 +1,593 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\PksWizardInitializeRequest;
+use App\Http\Requests\PksWizardFinalizeRequest;
+use App\Http\Requests\PksWizardPasalPreviewRequest;
+use App\Http\Requests\PksWizardPasalPreviewUpdateRequest;
+use App\Http\Requests\PksWizardStepRequest;
+use App\Models\Pks;
+use App\Services\PksPasalPreviewService;
+use App\Services\PksWizardFinalizeService;
+use App\Services\PksWizardService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * @OA\Tag(
+ *     name="PKS Wizard",
+ *     description="API untuk inisialisasi, step, dan preview pasal PKS Wizard"
+ * )
+ */
+class PksWizardController extends Controller
+{
+    public function __construct(
+        private readonly PksWizardService $pksWizardService,
+        private readonly PksPasalPreviewService $pksPasalPreviewService,
+        private readonly PksWizardFinalizeService $pksWizardFinalizeService
+    )
+    {
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-wizard/initialize/{tipe}",
+     *     summary="Initialize PKS wizard",
+     *     description="Membuat draft PKS wizard awal dengan nomor draft dan menyimpan snapshot source awal ke sl_pks.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="tipe",
+     *         in="path",
+     *         required=true,
+     *         description="Tipe PKS wizard",
+     *         @OA\Schema(type="string", enum={"baru", "rekontrak", "addendum"}, example="baru")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             oneOf={
+     *                 @OA\Schema(
+     *                     required={"leads_id", "company_id", "spk_id"},
+     *                     @OA\Property(property="leads_id", type="integer", example=123),
+     *                     @OA\Property(property="company_id", type="integer", example=13),
+     *                     @OA\Property(property="quotation_id", type="integer", nullable=true, example=456),
+     *                     @OA\Property(property="spk_id", type="integer", nullable=true, example=789)
+     *                 ),
+     *                 @OA\Schema(
+     *                     required={"leads_id", "company_id", "quotation_id"},
+     *                     @OA\Property(property="leads_id", type="integer", example=123),
+     *                     @OA\Property(property="company_id", type="integer", example=13),
+     *                     @OA\Property(property="quotation_id", type="integer", example=456),
+     *                     @OA\Property(property="spk_id", type="integer", nullable=true, example=null)
+     *                 ),
+     *                 @OA\Schema(
+     *                     required={"leads_id", "pks_induk_id"},
+     *                     @OA\Property(property="leads_id", type="integer", example=123),
+     *                     @OA\Property(property="pks_induk_id", type="integer", example=22),
+     *                     @OA\Property(property="quotation_id", type="integer", nullable=true, example=456),
+     *                     @OA\Property(property="company_id", type="integer", nullable=true, example=13)
+     *                 )
+     *             }
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="PKS wizard initialized successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="pks_id", type="integer", example=99),
+     *                 @OA\Property(property="nomor", type="string", example="draft/PKS/SIG/LDS001-062026-00001"),
+     *                 @OA\Property(property="wizard_status_id", type="integer", example=1),
+     *                 @OA\Property(property="wizard_current_step", type="integer", example=1)
+     *             ),
+     *             @OA\Property(property="message", type="string", example="PKS wizard initialized successfully")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="object", example={"leads_id": {"The leads id field is required."}})
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to initialize PKS wizard"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+    public function initialize(PksWizardInitializeRequest $request, string $tipe): JsonResponse
+    {
+        try {
+            $pks = $this->pksWizardService->initialize($tipe, $request->validated(), Auth::user());
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'pks_id' => $pks->id,
+                    'nomor' => $pks->nomor,
+                    'wizard_status_id' => $pks->wizard_status_id,
+                    'wizard_current_step' => $pks->wizard_current_step,
+                ],
+                'message' => 'PKS wizard initialized successfully',
+            ], 201);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@initialize: ' . $e->getMessage(), [
+                'tipe' => $tipe,
+                'payload' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initialize PKS wizard',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-wizard/{pksId}/step/{step}",
+     *     summary="Get PKS wizard step data",
+     *     description="Mengambil payload step PKS wizard yang tersimpan di sl_pks.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\Parameter(name="step", in="path", required=true, @OA\Schema(type="integer", minimum=1, maximum=7, example=1)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Step data retrieved successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(property="pks_id", type="integer", example=99),
+     *                 @OA\Property(property="step", type="integer", example=1),
+     *                 @OA\Property(property="wizard_status_id", type="integer", example=1),
+     *                 @OA\Property(property="wizard_status", type="string", example="Initialized"),
+     *                 @OA\Property(property="wizard_current_step", type="integer", example=1),
+     *                 @OA\Property(property="wizard_completed_steps", type="array", @OA\Items(type="integer", example=1)),
+     *                 @OA\Property(property="nomor", type="string", example="draft/PKS/SIG/LDS001-062026-00001"),
+     *                 @OA\Property(property="tipe_pks", type="string", example="baru"),
+     *                 @OA\Property(property="step_data", type="object")
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Step data retrieved successfully")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="PKS not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="PKS not found")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Invalid step",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Step wizard tidak valid")
+     *         )
+     *     )
+     * )
+     */
+    public function getStep(int $pksId, int $step): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId);
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->pksWizardService->getStep($pks, $step),
+                'message' => 'Step data retrieved successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@getStep: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'step' => $step,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get step data',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-wizard/{pksId}/step/{step}",
+     *     summary="Update PKS wizard step data",
+     *     description="Menyimpan payload per step ke wizard_payload pada sl_pks dan mengupdate progress wizard.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\Parameter(name="step", in="path", required=true, @OA\Schema(type="integer", minimum=1, maximum=7, example=2)),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="mark_as_complete", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="step_data",
+     *                 type="object",
+     *                 example={
+     *                     "tanggal_pks": "2026-07-01",
+     *                     "tanggal_awal_kontrak": "2026-07-01",
+     *                     "tanggal_akhir_kontrak": "2027-06-30",
+     *                     "company_id": 13,
+     *                     "salary_rule_id": 1,
+     *                     "rule_thr_id": 2,
+     *                     "kategori_sesuai_hc_id": 1,
+     *                     "loyalty_id": 1
+     *                 }
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Step updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="message", type="string", example="Step 2 updated successfully")
+     *         )
+     *     ),
+     *     @OA\Response(response=404, description="PKS not found",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="PKS not found")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="object", example={"step_data": {"The step data must be an array."}})
+     *         )
+     *     ),
+     *     @OA\Response(response=500, description="Server error",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Failed to update step data"),
+     *             @OA\Property(property="error", type="string", example="Error details")
+     *         )
+     *     )
+     * )
+     */
+    public function updateStep(PksWizardStepRequest $request, int $pksId, int $step): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId);
+
+            $updated = $this->pksWizardService->updateStep(
+                $pks,
+                $step,
+                $request->input('step_data', []),
+                (bool) $request->boolean('mark_as_complete', true),
+                Auth::user()
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->pksWizardService->getStep($updated, $step),
+                'message' => "Step {$step} updated successfully",
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@updateStep: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'step' => $step,
+                'payload' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update step data',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-wizard/{pksId}/preview-pasal",
+     *     summary="Generate PKS wizard pasal preview",
+     *     description="Generate atau regenerate preview pasal wizard dari template PKS existing. Untuk addendum dapat menerima pasal tambahan manual.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\RequestBody(
+     *         required=false,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="regenerate", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="additional_articles",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="pasal", type="string", example="Addendum 1"),
+     *                     @OA\Property(property="judul", type="string", example="PASAL TAMBAHAN"),
+     *                     @OA\Property(property="raw_text", type="string", example="<p>Isi pasal tambahan</p>")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Pasal preview generated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="message", type="string", example="Pasal preview generated successfully")
+     *         )
+     *     )
+     * )
+     */
+    public function generatePasalPreview(PksWizardPasalPreviewRequest $request, int $pksId): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId)->loadMissing(['leads', 'pksInduk']);
+
+            $preview = $this->pksPasalPreviewService->generatePreview($pks, $request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $preview,
+                'message' => 'Pasal preview generated successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@generatePasalPreview: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'payload' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate pasal preview',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Put(
+     *     path="/api/pks-wizard/{pksId}/preview-pasal/{pasalKey}",
+     *     summary="Update PKS wizard pasal preview",
+     *     description="Update raw text pasal preview sebelum finalize.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\Parameter(name="pasalKey", in="path", required=true, @OA\Schema(type="string", example="section_0")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"raw_text"},
+     *             @OA\Property(property="pasal", type="string", example="Pasal 1"),
+     *             @OA\Property(property="judul", type="string", example="RUANG LINGKUP PERJANJIAN"),
+     *             @OA\Property(property="raw_text", type="string", example="<p>Raw text hasil edit</p>")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Pasal preview updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="message", type="string", example="Pasal preview updated successfully")
+     *         )
+     *     )
+     * )
+     */
+    public function updatePasalPreview(PksWizardPasalPreviewUpdateRequest $request, int $pksId, string $pasalKey): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId);
+
+            $preview = $this->pksPasalPreviewService->updatePreview($pks, $pasalKey, $request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $preview,
+                'message' => 'Pasal preview updated successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@updatePasalPreview: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'pasal_key' => $pasalKey,
+                'payload' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update pasal preview',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-wizard/{pksId}/finalize",
+     *     summary="Finalize PKS wizard",
+     *     description="Mengubah draft PKS wizard menjadi finalized, menyimpan site final, insert pasal final, dan menjalankan side effect status/activity.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"confirm_finalize"},
+     *             @OA\Property(property="confirm_finalize", type="boolean", example=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="PKS wizard finalized successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="message", type="string", example="PKS wizard finalized successfully")
+     *         )
+     *     )
+     * )
+     */
+    public function finalize(PksWizardFinalizeRequest $request, int $pksId): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId);
+
+            $finalized = $this->pksWizardFinalizeService->finalize($pks, Auth::user());
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $finalized->id,
+                    'nomor' => $finalized->nomor,
+                    'wizard_status_id' => $finalized->wizard_status_id,
+                    'finalized_at' => $finalized->finalized_at,
+                    'sites_count' => $finalized->sites->count(),
+                    'perjanjian_count' => $finalized->perjanjian->count(),
+                ],
+                'message' => 'PKS wizard finalized successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@finalize: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'payload' => $request->all(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to finalize PKS wizard',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/api/pks-wizard/{pksId}",
+     *     summary="Cancel PKS wizard",
+     *     description="Membatalkan PKS wizard draft dengan mengubah wizard status menjadi cancelled. Tidak berlaku untuk PKS yang sudah finalized.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="pksId", in="path", required=true, @OA\Schema(type="integer", example=99)),
+     *     @OA\Response(
+     *         response=200,
+     *         description="PKS wizard cancelled successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object"),
+     *             @OA\Property(property="message", type="string", example="PKS wizard cancelled successfully")
+     *         )
+     *     )
+     * )
+     */
+    public function cancel(int $pksId): JsonResponse
+    {
+        try {
+            $pks = $this->resolveAccessiblePks($pksId);
+
+            $cancelled = $this->pksWizardService->cancel($pks, Auth::user());
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'id' => $cancelled->id,
+                    'wizard_status_id' => $cancelled->wizard_status_id,
+                    'wizard_status' => $cancelled->wizardStatus?->nama,
+                ],
+                'message' => 'PKS wizard cancelled successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS not found',
+            ], 404);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@cancel: ' . $e->getMessage(), [
+                'pks_id' => $pksId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to cancel PKS wizard',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function resolveAccessiblePks(int $pksId): Pks
+    {
+        return Pks::with(['wizardStatus', 'leads'])
+            ->whereHas('leads', function ($query) {
+                $query->filterByUserRole(Auth::user());
+            })
+            ->findOrFail($pksId);
+    }
+}

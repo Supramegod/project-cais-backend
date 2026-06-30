@@ -17,6 +17,7 @@ use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\PksPerjanjian;
 use App\Models\PksPerjanjianHistory;
+use App\Models\PksWizardStatus;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
@@ -226,12 +227,17 @@ class PksController extends Controller
                 'sl_pks.kontrak_awal',
                 'sl_pks.kontrak_akhir',
                 'sl_pks.status_pks_id', // ✅ WAJIB untuk eager load statusPks
+                'sl_pks.wizard_status_id',
+                'sl_pks.wizard_current_step',
+                'sl_pks.wizard_completed_steps',
+                'sl_pks.initialized_at',
                 'sl_pks.created_at',
                 'sl_pks.created_by',
             ])
                 ->with([
                     // ✅ Batasi kolom — jangan load semua
                     'statusPks:id,nama',
+                    'wizardStatus:id,kode,nama',
                     'sites:id,pks_id,nama_site',
                 ])
                 // ✅ JOIN leads sekali — dipakai untuk filter branch
@@ -252,7 +258,10 @@ class PksController extends Controller
                     $query->where("sl_pks.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                $query->whereBetween('sl_pks.tgl_pks', [$tglDari, $tglSampai]);
+                $query->whereBetween(
+                    DB::raw('DATE(COALESCE(sl_pks.tgl_pks, sl_pks.initialized_at, sl_pks.created_at))'),
+                    [$tglDari, $tglSampai]
+                );
             }
 
             if ($request->filled('status')) {
@@ -291,21 +300,45 @@ class PksController extends Controller
             $pksList = $query->paginate($request->get('per_page', 15));
 
             $pksList->getCollection()->transform(function ($pks) {
+                $tglPks = $pks->getRawOriginal('tgl_pks');
+                $initializedAt = $pks->getRawOriginal('initialized_at') ?: $pks->getRawOriginal('created_at');
+
                 return [
                     'id' => $pks->id,
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
-                    // ✅ getRawOriginal karena ada accessor getTglPksAttribute di model
-                    'tgl_pks' => Carbon::parse($pks->getRawOriginal('tgl_pks'))
-                        ->locale('id')->isoFormat('D MMMM Y'),
+                    'tgl_pks' => $tglPks
+                        ? Carbon::parse($tglPks)->locale('id')->isoFormat('D MMMM Y')
+                        : null,
+                    'initialized_at' => $initializedAt,
                     'nama_site' => $pks->sites->pluck('nama_site')->toArray(),
                     'kontrak_awal' => $pks->getRawOriginal('kontrak_awal'),
                     'kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir'),
-                    'formatted_kontrak_awal' => Carbon::parse($pks->getRawOriginal('kontrak_awal'))->locale('id')->isoFormat('D MMMM Y'),
-                    'formatted_kontrak_akhir' => Carbon::parse($pks->getRawOriginal('kontrak_akhir'))->locale('id')->isoFormat('D MMMM Y'),
+                    'formatted_kontrak_awal' => $pks->getRawOriginal('kontrak_awal')
+                        ? Carbon::parse($pks->getRawOriginal('kontrak_awal'))->locale('id')->isoFormat('D MMMM Y')
+                        : null,
+                    'formatted_kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir')
+                        ? Carbon::parse($pks->getRawOriginal('kontrak_akhir'))->locale('id')->isoFormat('D MMMM Y')
+                        : null,
                     'status' => $pks->statusPks->nama ?? '-',
-                    'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->getRawOriginal('kontrak_akhir')),
-                    'status_berlaku' => $this->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir')),
+                    'wizard_status' => $pks->wizardStatus ? [
+                        'id' => $pks->wizardStatus->id,
+                        'kode' => $pks->wizardStatus->kode,
+                        'nama' => $pks->wizardStatus->nama,
+                    ] : null,
+                    'wizard_current_step' => $pks->wizard_current_step,
+                    'wizard_completed_steps' => $pks->wizard_completed_steps ?? [],
+                    'is_wizard_in_progress' => in_array($pks->wizard_status_id, [
+                        PksWizardStatus::INITIALIZED,
+                        PksWizardStatus::IN_PROGRESS,
+                        PksWizardStatus::READY_TO_FINALIZE,
+                    ], true),
+                    'berakhir_dalam' => $pks->getRawOriginal('kontrak_akhir')
+                        ? $this->hitungBerakhirKontrak($pks->getRawOriginal('kontrak_akhir'))
+                        : null,
+                    'status_berlaku' => $pks->getRawOriginal('kontrak_akhir')
+                        ? $this->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir'))
+                        : null,
                     'created_at' => $pks->getRawOriginal('created_at'),
                     'created_by' => $pks->created_by,
                 ];
@@ -1220,6 +1253,10 @@ class PksController extends Controller
                 ], 404);
             }
 
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                return $response;
+            }
+
             $this->approvePks($pks, $request->ot);
 
             return response()->json([
@@ -1281,6 +1318,12 @@ class PksController extends Controller
                     'success' => false,
                     'message' => 'PKS not found',
                 ], 404);
+            }
+
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                DB::rollBack();
+                DB::connection('mysqlhris')->rollBack();
+                return $response;
             }
 
             // Step 1: Update PKS and Leads Status
@@ -1806,6 +1849,11 @@ class PksController extends Controller
                     'success' => false,
                     'message' => 'PKS not found',
                 ], 404);
+            }
+
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                DB::rollBack();
+                return $response;
             }
 
             // Hapus file lama jika ada
@@ -3450,5 +3498,21 @@ class PksController extends Controller
             ->whereNotIn('id', $activeLeadsIds)
             ->where('customer_active', '!=', 0)
             ->update(['customer_active' => 0]);
+    }
+
+    private function ensureWizardFinalizedOrLegacy(Pks $pks): ?JsonResponse
+    {
+        if ($pks->wizard_status_id === null) {
+            return null;
+        }
+
+        if ((int) $pks->wizard_status_id !== PksWizardStatus::FINALIZED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS wizard belum finalized',
+            ], 422);
+        }
+
+        return null;
     }
 }
