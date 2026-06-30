@@ -11224,369 +11224,6 @@
                 ]
             }
         },
-        "/api/leads/add": {
-            "post": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Membuat lead baru dengan assign sales ke kebutuhan",
-                "description": "Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi, generate nomor lead otomatis, membuat aktivitas pertama, dan assign sales ke kebutuhan berdasarkan role user:\n     *                 - User role 29 (Sales): Auto assign ke semua kebutuhan\n     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan\n     *                 - User lainnya: Hanya sync kebutuhan tanpa sales",
-                "operationId": "4214eac4602ababdf9addbc28de2d8c4",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_perusahaan",
-                                    "pic",
-                                    "branch",
-                                    "kebutuhan",
-                                    "provinsi",
-                                    "kota"
-                                ],
-                                "properties": {
-                                    "nama_perusahaan": {
-                                        "description": "Nama perusahaan leads",
-                                        "type": "string",
-                                        "maxLength": 100,
-                                        "minLength": 3,
-                                        "example": "PT ABC Indonesia"
-                                    },
-                                    "telp_perusahaan": {
-                                        "description": "Nomor telepon perusahaan",
-                                        "type": "string",
-                                        "example": "021-1234567"
-                                    },
-                                    "jenis_perusahaan": {
-                                        "description": "ID jenis perusahaan (PT, CV, UD, dll)",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "bidang_perusahaan": {
-                                        "description": "ID bidang usaha perusahaan",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "branch": {
-                                        "description": "ID cabang yang menangani lead ini",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "platform": {
-                                        "description": "ID platform sumber lead (website, referral, social media)",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "kebutuhan": {
-                                        "description": "Array ID kebutuhan produk/layanan yang diinginkan (minimal 1)",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "example": [
-                                            1,
-                                            2,
-                                            3
-                                        ]
-                                    },
-                                    "alamat_perusahaan": {
-                                        "description": "Alamat lengkap perusahaan",
-                                        "type": "string",
-                                        "example": "Jl. Sudirman No. 123, Jakarta"
-                                    },
-                                    "pic": {
-                                        "description": "Nama Person In Charge / contact person",
-                                        "type": "string",
-                                        "example": "John Doe"
-                                    },
-                                    "jabatan_pic": {
-                                        "description": "Jabatan PIC di perusahaan",
-                                        "type": "string",
-                                        "example": "Manager Purchasing"
-                                    },
-                                    "no_telp": {
-                                        "description": "Nomor telepon/HP PIC",
-                                        "type": "string",
-                                        "example": "08123456789"
-                                    },
-                                    "email": {
-                                        "description": "Email PIC",
-                                        "type": "string",
-                                        "format": "email",
-                                        "example": "john@abc.com"
-                                    },
-                                    "pma": {
-                                        "description": "Apakah perusahaan PMA (Penanaman Modal Asing)",
-                                        "type": "string",
-                                        "example": "PMDN"
-                                    },
-                                    "detail_leads": {
-                                        "description": "Catatan/detail tambahan tentang lead",
-                                        "type": "string",
-                                        "example": "Tertarik dengan produk A untuk kebutuhan X"
-                                    },
-                                    "provinsi": {
-                                        "description": "ID provinsi lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 10
-                                    },
-                                    "kota": {
-                                        "description": "ID kota/kabupaten lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 259
-                                    },
-                                    "kecamatan": {
-                                        "description": "ID kecamatan lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 3515170
-                                    },
-                                    "kelurahan": {
-                                        "description": "ID kelurahan/desa lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 9471083530
-                                    },
-                                    "benua": {
-                                        "description": "ID benua (untuk perusahaan luar negeri)",
-                                        "type": "integer",
-                                        "example": 2
-                                    },
-                                    "negara": {
-                                        "description": "ID negara (untuk perusahaan luar negeri)",
-                                        "type": "integer",
-                                        "example": 79
-                                    },
-                                    "assignments": {
-                                        "description": "Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
-                                        "type": "array",
-                                        "items": {
-                                            "properties": {
-                                                "tim_sales_d_id": {
-                                                    "description": "ID Tim Sales Detail",
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "kebutuhan_ids": {
-                                                    "description": "Array ID kebutuhan yang diassign ke sales ini",
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "integer"
-                                                    },
-                                                    "example": [
-                                                        1,
-                                                        2
-                                                    ]
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "example": [
-                                            {
-                                                "tim_sales_d_id": 1,
-                                                "kebutuhan_ids": [
-                                                    1,
-                                                    2
-                                                ]
-                                            },
-                                            {
-                                                "tim_sales_d_id": 2,
-                                                "kebutuhan_ids": [
-                                                    3,
-                                                    4
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Lead berhasil dibuat",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Leads PT ABC Indonesia berhasil disimpan dengan nomor: AAAAB"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "lead": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "nomor": {
-                                                            "type": "string",
-                                                            "example": "AAAAB"
-                                                        },
-                                                        "nama_perusahaan": {
-                                                            "type": "string",
-                                                            "example": "PT ABC Indonesia"
-                                                        },
-                                                        "tgl_leads": {
-                                                            "type": "string",
-                                                            "example": "2024-01-15 10:30:00"
-                                                        },
-                                                        "tim_sales_id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "tim_sales_d_id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                },
-                                                "assignments": {
-                                                    "description": "Detail assignment sales yang berhasil dilakukan",
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "type": {
-                                                                "description": "auto_assign atau manual_assign",
-                                                                "type": "string",
-                                                                "example": "auto_assign"
-                                                            },
-                                                            "sales_assigned": {
-                                                                "properties": {
-                                                                    "tim_sales_d_id": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    },
-                                                                    "sales_name": {
-                                                                        "type": "string",
-                                                                        "example": "John Sales"
-                                                                    },
-                                                                    "tim_sales_id": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    },
-                                                                    "tim_sales_name": {
-                                                                        "type": "string",
-                                                                        "example": "Tim Sales Jakarta"
-                                                                    }
-                                                                },
-                                                                "type": "object"
-                                                            },
-                                                            "kebutuhan_assigned": {
-                                                                "type": "array",
-                                                                "items": {
-                                                                    "type": "integer"
-                                                                },
-                                                                "example": [
-                                                                    1,
-                                                                    2,
-                                                                    3
-                                                                ]
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validation Error atau nama perusahaan terlalu mirip",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "nama_perusahaan": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Masukkan nama_perusahaan minimal 3"
-                                                    }
-                                                },
-                                                "kebutuhan": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Kebutuhan harus dipilih minimal 1"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/api/leads/update/{id}": {
             "put": {
                 "tags": [
@@ -19886,6 +19523,68 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/source/quotations/{leadsId}": {
+            "get": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Get available quotations for PKS wizard source selection",
+                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard.",
+                "operationId": "a6e391f2337fe5e61120fc1f621e7179",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available quotations retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/source/spk/{leadsId}": {
+            "get": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Get available SPK for PKS wizard source selection",
+                "description": "Mengambil daftar SPK berdasarkan leads yang bisa dipakai frontend untuk memilih spk_id saat initialize wizard tipe baru.",
+                "operationId": "b9e2a2271ad3ba926bb7084081b891ec",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available SPK retrieved successfully"
                     }
                 },
                 "security": [

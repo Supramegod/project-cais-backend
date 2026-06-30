@@ -582,6 +582,82 @@ class PksWizardController extends Controller
         }
     }
 
+    /**
+     * @OA\Get(
+     *     path="/api/pks-wizard/source/quotations/{leadsId}",
+     *     summary="Get available quotations for PKS wizard source selection",
+     *     description="Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
+     *     @OA\Response(response=200, description="Available quotations retrieved successfully")
+     * )
+     */
+    public function getAvailableQuotations(int $leadsId): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->pksWizardService->getAvailableQuotationsByLeads($leadsId),
+                'message' => 'Available quotations retrieved successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leads not found',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@getAvailableQuotations: ' . $e->getMessage(), [
+                'leads_id' => $leadsId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get available quotations',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-wizard/source/spk/{leadsId}",
+     *     summary="Get available SPK for PKS wizard source selection",
+     *     description="Mengambil daftar SPK berdasarkan leads yang bisa dipakai frontend untuk memilih spk_id saat initialize wizard tipe baru.",
+     *     tags={"PKS Wizard"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
+     *     @OA\Response(response=200, description="Available SPK retrieved successfully")
+     * )
+     */
+    public function getAvailableSpk(int $leadsId): JsonResponse
+    {
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->pksWizardService->getAvailableSpkByLeads($leadsId),
+                'message' => 'Available SPK retrieved successfully',
+            ]);
+        } catch (ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Leads not found',
+            ], 404);
+        } catch (\Throwable $e) {
+            Log::error('PksWizardController@getAvailableSpk: ' . $e->getMessage(), [
+                'leads_id' => $leadsId,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get available SPK',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function resolveAccessiblePks(int $pksId): Pks
     {
         return Pks::with(['wizardStatus', 'leads'])

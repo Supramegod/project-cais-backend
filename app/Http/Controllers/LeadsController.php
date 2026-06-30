@@ -13,6 +13,7 @@ use App\Models\JabatanPic;
 use App\Models\JenisPerusahaan;
 use App\Models\Kebutuhan;
 use App\Models\Leads;
+use App\Models\LeadsPic;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\Negara;
@@ -358,7 +359,8 @@ class LeadsController extends Controller
                 'statusLeads',
                 'jenisPerusahaan',
                 'company',
-                'groupDetails'
+                'groupDetails',
+                'pics.jabatan'
             ])->whereNull('customer_id')->find($id);
 
             if (!$lead) {
@@ -513,6 +515,38 @@ class LeadsController extends Controller
      *     )
      * )
      */
+    /**
+     * Simpan daftar PIC (multi PIC) ke tabel sl_leads_pic.
+     * Jika $replace = true, PIC lama akan di-soft delete dulu (dipakai saat update).
+     */
+    private function syncLeadsPics(Leads $lead, ?array $pics, bool $replace = false): void
+    {
+        if (empty($pics)) {
+            return;
+        }
+
+        if ($replace) {
+            LeadsPic::where('leads_id', $lead->id)
+                ->update(['deleted_by' => Auth::user()->full_name]);
+            LeadsPic::where('leads_id', $lead->id)->delete();
+        }
+
+        foreach ($pics as $pic) {
+            if (empty($pic['pic'])) {
+                continue;
+            }
+            LeadsPic::create([
+                'leads_id'   => $lead->id,
+                'nama'       => $pic['pic'],
+                'jabatan_id' => $pic['jabatan_pic'] ?? null,
+                'no_telp'    => $pic['no_telp'] ?? null,
+                'email'      => $pic['email'] ?? null,
+                'is_kuasa'   => $pic['is_kuasa'] ?? false,
+                'created_by' => Auth::user()->full_name,
+            ]);
+        }
+    }
+
     public function add(StoreLeadRequest $request)
     {
         try {
@@ -534,6 +568,10 @@ class LeadsController extends Controller
 
             $nomor = $this->generateNomor();
 
+            // Multi PIC: kolom datar diisi dari PIC pertama (kompatibilitas mundur)
+            $pics = $request->input('pics', []);
+            $firstPic = !empty($pics) ? $pics[0] : null;
+
             // Create lead using model
             $lead = Leads::create([
                 'nomor' => $nomor,
@@ -548,10 +586,10 @@ class LeadsController extends Controller
                 'branch_id' => $request->branch,
                 'platform_id' => $request->platform,
                 'alamat' => $request->alamat_perusahaan,
-                'pic' => $request->pic,
-                'jabatan' => $request->jabatan_pic,
-                'no_telp' => $request->no_telp,
-                'email' => $request->email,
+                'pic' => $request->pic ?: ($firstPic['pic'] ?? null),
+                'jabatan' => $request->jabatan_pic ?: ($firstPic['jabatan_pic'] ?? null),
+                'no_telp' => $request->no_telp ?: ($firstPic['no_telp'] ?? null),
+                'email' => $request->email ?: ($firstPic['email'] ?? null),
                 'pma' => $request->pma,
                 'status_leads_id' => 1,
                 'notes' => $request->detail_leads,
@@ -570,6 +608,17 @@ class LeadsController extends Controller
                 'created_by' => Auth::user()->full_name,
                 'created_by_user_id' => Auth::id()
             ]);
+
+            // Simpan daftar PIC (multi PIC). Fallback ke PIC tunggal lama bila pics kosong.
+            $this->syncLeadsPics(
+                $lead,
+                !empty($pics) ? $pics : [[
+                    'pic'         => $request->pic,
+                    'jabatan_pic' => $request->jabatan_pic,
+                    'no_telp'     => $request->no_telp,
+                    'email'       => $request->email,
+                ]]
+            );
 
             $assignmentResults = [];
 
@@ -797,6 +846,10 @@ class LeadsController extends Controller
             $jenisPerusahaan = JenisPerusahaan::find($request->jenis_perusahaan);
             $bidangPerusahaan = BidangPerusahaan::find($request->bidang_perusahaan);
 
+            // Multi PIC: kolom datar diisi dari PIC pertama (kompatibilitas mundur)
+            $pics = $request->input('pics', []);
+            $firstPic = !empty($pics) ? $pics[0] : null;
+
             $lead->update([
                 'nama_perusahaan' => $request->nama_perusahaan ?? $lead->nama_perusahaan,
                 'telp_perusahaan' => $request->telp_perusahaan,
@@ -808,10 +861,10 @@ class LeadsController extends Controller
                 'branch_id' => $request->branch,
                 'platform_id' => $request->platform,
                 'alamat' => $request->alamat_perusahaan,
-                'pic' => $request->pic,
-                'jabatan' => $request->jabatan_pic,
-                'no_telp' => $request->no_telp,
-                'email' => $request->email,
+                'pic' => $request->pic ?: ($firstPic['pic'] ?? null),
+                'jabatan' => $request->jabatan_pic ?: ($firstPic['jabatan_pic'] ?? null),
+                'no_telp' => $request->no_telp ?: ($firstPic['no_telp'] ?? null),
+                'email' => $request->email ?: ($firstPic['email'] ?? null),
                 'pma' => $request->pma,
                 'notes' => $request->detail_leads,
                 'provinsi_id' => $request->provinsi,
@@ -829,6 +882,11 @@ class LeadsController extends Controller
                 'tgl_leads' => Carbon::now()->toDateString(), // hasil: 2026-06-08
                 'updated_by' => Auth::user()->full_name
             ]);
+
+            // Sync daftar PIC (multi PIC). Hanya diproses bila pics dikirim.
+            if (!empty($pics)) {
+                $this->syncLeadsPics($lead, $pics, true);
+            }
 
             $assignmentResults = [];
 
