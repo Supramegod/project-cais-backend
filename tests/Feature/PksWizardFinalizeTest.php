@@ -422,6 +422,44 @@ class PksWizardFinalizeTest extends TestCase
         ]);
     }
 
+    public function test_source_quotation_endpoint_returns_quotation_candidates(): void
+    {
+        $user = $this->seedUser(8, 54, 'CRM Source');
+        $this->seedCommonMasterData();
+        $this->seedLead(10);
+        $this->seedQuotation(20, 10);
+
+        $this->actingAs($user, 'web');
+        $this->withoutMiddleware(CheckTokenExpiry::class);
+
+        $response = $this->getJson('/api/pks-wizard/source/quotations/10');
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.id', 20)
+            ->assertJsonPath('data.0.nomor', 'Q-001')
+            ->assertJsonPath('data.0.company.id', 13);
+    }
+
+    public function test_source_spk_endpoint_returns_spk_candidates(): void
+    {
+        $user = $this->seedUser(9, 54, 'CRM SPK');
+        $this->seedCommonMasterData();
+        $this->seedLead(10);
+        $this->seedQuotation(20, 10);
+        $this->seedSpk(30, 10, 20);
+
+        $this->actingAs($user, 'web');
+        $this->withoutMiddleware(CheckTokenExpiry::class);
+
+        $response = $this->getJson('/api/pks-wizard/source/spk/10');
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.id', 30)
+            ->assertJsonPath('data.0.nomor', 'SPK-001')
+            ->assertJsonPath('data.0.quotation.id', 20)
+            ->assertJsonPath('data.0.quotation.company.id', 13);
+    }
+
     private function seedUser(int $id, int $roleId, string $fullName): User
     {
         DB::table('m_user')->insert([

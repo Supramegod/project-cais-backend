@@ -1,12 +1,22 @@
 {
   "notes": {
     "usage": "Ganti semua ID contoh sebelum dipakai manual atau di test.",
+    "source_quotation_endpoint": "/api/pks-wizard/source/quotations/{leadsId}",
+    "source_spk_endpoint": "/api/pks-wizard/source/spk/{leadsId}",
     "initialize_endpoint": "/api/pks-wizard/initialize/{tipe}",
     "step_endpoint": "/api/pks-wizard/{pksId}/step/{step}",
     "preview_endpoint": "/api/pks-wizard/{pksId}/preview-pasal",
     "preview_update_endpoint": "/api/pks-wizard/{pksId}/preview-pasal/{pasalKey}",
     "finalize_endpoint": "/api/pks-wizard/{pksId}/finalize",
     "cancel_endpoint": "/api/pks-wizard/{pksId}"
+  },
+  "source_picker_usage": {
+    "quotation": {
+      "description": "Pakai endpoint source quotations untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Gunakan field id sebagai quotation_id."
+    },
+    "spk": {
+      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Gunakan field id sebagai spk_id."
+    }
   },
   "initialize": {
     "baru": {

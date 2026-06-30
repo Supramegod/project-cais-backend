@@ -242,6 +242,72 @@ class PksWizardService
         return $pks->fresh(['wizardStatus', 'leads']);
     }
 
+    public function getAvailableQuotationsByLeads(int $leadsId): array
+    {
+        $lead = Leads::filterByUserRole()->findOrFail($leadsId);
+
+        return Quotation::with(['company:id,name,code', 'salaryRule:id,nama_salary_rule', 'ruleThr:id,nama'])
+            ->where('leads_id', $lead->id)
+            ->whereNull('deleted_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Quotation $quotation) {
+                return [
+                    'id' => $quotation->id,
+                    'nomor' => $quotation->nomor,
+                    'status_quotation_id' => $quotation->status_quotation_id,
+                    'tipe_quotation' => $quotation->tipe_quotation,
+                    'company_id' => $quotation->company_id,
+                    'company' => $quotation->company ? [
+                        'id' => $quotation->company->id,
+                        'name' => $quotation->company->name,
+                        'code' => $quotation->company->code,
+                    ] : null,
+                    'salary_rule' => $quotation->salaryRule ? [
+                        'id' => $quotation->salaryRule->id,
+                        'nama' => $quotation->salaryRule->nama_salary_rule,
+                    ] : null,
+                    'rule_thr' => $quotation->ruleThr ? [
+                        'id' => $quotation->ruleThr->id,
+                        'nama' => $quotation->ruleThr->nama,
+                    ] : null,
+                ];
+            })
+            ->all();
+    }
+
+    public function getAvailableSpkByLeads(int $leadsId): array
+    {
+        $lead = Leads::filterByUserRole()->findOrFail($leadsId);
+
+        return Spk::with(['quotation:id,nomor,company_id,salary_rule_id,rule_thr_id', 'quotation.company:id,name,code'])
+            ->where('leads_id', $lead->id)
+            ->whereNull('deleted_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function (Spk $spk) {
+                return [
+                    'id' => $spk->id,
+                    'nomor' => $spk->nomor,
+                    'status_spk_id' => $spk->status_spk_id,
+                    'quotation_id' => $spk->quotation_id,
+                    'quotation' => $spk->quotation ? [
+                        'id' => $spk->quotation->id,
+                        'nomor' => $spk->quotation->nomor,
+                        'company_id' => $spk->quotation->company_id,
+                        'salary_rule_id' => $spk->quotation->salary_rule_id,
+                        'rule_thr_id' => $spk->quotation->rule_thr_id,
+                        'company' => $spk->quotation->company ? [
+                            'id' => $spk->quotation->company->id,
+                            'name' => $spk->quotation->company->name,
+                            'code' => $spk->quotation->company->code,
+                        ] : null,
+                    ] : null,
+                ];
+            })
+            ->all();
+    }
+
     private function mergeTemplatePayload(Pks $pks, array $payload): array
     {
         $templatePayload = $pks->template_payload ?? [];

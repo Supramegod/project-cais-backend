@@ -8,12 +8,13 @@ Dokumen ini dibuat berdasarkan implementasi backend saat ini, bukan sekadar plan
 
 Flow umum frontend:
 
-1. Panggil `initialize` untuk membuat draft PKS wizard dan mendapatkan `pksId`.
-2. Ambil data step dengan `GET /step/{step}`.
-3. Simpan data per step dengan `POST /step/{step}`.
-4. Pada step pasal, generate preview pasal dengan `POST /preview-pasal`.
-5. Jika user mengedit isi pasal, simpan dengan `PUT /preview-pasal/{pasalKey}`.
-6. Setelah semua step selesai, panggil `POST /finalize`.
+1. Panggil endpoint source untuk mengambil kandidat `quotation_id` atau `spk_id` jika dibutuhkan.
+2. Panggil `initialize` untuk membuat draft PKS wizard dan mendapatkan `pksId`.
+3. Ambil data step dengan `GET /step/{step}`.
+4. Simpan data per step dengan `POST /step/{step}`.
+5. Pada step pasal, generate preview pasal dengan `POST /preview-pasal`.
+6. Jika user mengedit isi pasal, simpan dengan `PUT /preview-pasal/{pasalKey}`.
+7. Setelah semua step selesai, panggil `POST /finalize`.
 
 ## Base Info
 
@@ -72,6 +73,146 @@ Catatan untuk frontend:
 
 - PKS dengan status `1`, `2`, `3` masih dianggap draft wizard.
 - Endpoint approval, upload, dan activate pada modul PKS lama akan ditolak jika `wizard_status_id != 4`.
+
+## Endpoint 1: Initialize PKS Wizard
+
+## Endpoint Source A: Get Available Quotations by Leads
+
+**Endpoint**
+
+```text
+GET /api/pks-wizard/source/quotations/{leadsId}
+```
+
+### Tujuan
+
+- Mengambil daftar quotation kandidat berdasarkan leads
+- Dipakai frontend untuk mendapatkan `quotation_id` sebelum `initialize`
+- Sangat berguna untuk flow `rekontrak` dan `addendum`
+
+### Path Param
+
+- `leadsId`
+: ID leads yang dipilih user.
+
+### Response Contoh
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 456,
+      "nomor": "Q-001",
+      "status_quotation_id": 3,
+      "tipe_quotation": "rekontrak",
+      "company_id": 13,
+      "company": {
+        "id": 13,
+        "name": "PT SIG",
+        "code": "SIG"
+      },
+      "salary_rule": {
+        "id": 1,
+        "nama": "SR 1"
+      },
+      "rule_thr": {
+        "id": 2,
+        "nama": "Rule THR"
+      }
+    }
+  ],
+  "message": "Available quotations retrieved successfully"
+}
+```
+
+### Field Penting untuk Frontend
+
+- `id`
+: pakai ini sebagai `quotation_id` saat initialize
+
+- `nomor`
+: tampilkan ke user sebagai nomor quotation
+
+- `status_quotation_id`
+: status quotation saat ini
+
+- `tipe_quotation`
+: tipe quotation dari backend
+
+- `company_id`
+: bisa dipakai untuk autofill `company_id` saat initialize jika dibutuhkan UI
+
+- `salary_rule`
+: referensi tambahan untuk frontend
+
+- `rule_thr`
+: referensi tambahan untuk frontend
+
+## Endpoint Source B: Get Available SPK by Leads
+
+**Endpoint**
+
+```text
+GET /api/pks-wizard/source/spk/{leadsId}
+```
+
+### Tujuan
+
+- Mengambil daftar SPK kandidat berdasarkan leads
+- Dipakai frontend untuk mendapatkan `spk_id` sebelum `initialize`
+- Paling relevan untuk flow `baru`
+
+### Path Param
+
+- `leadsId`
+: ID leads yang dipilih user.
+
+### Response Contoh
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 789,
+      "nomor": "SPK-001",
+      "status_spk_id": 1,
+      "quotation_id": 456,
+      "quotation": {
+        "id": 456,
+        "nomor": "Q-001",
+        "company_id": 13,
+        "salary_rule_id": 1,
+        "rule_thr_id": 2,
+        "company": {
+          "id": 13,
+          "name": "PT SIG",
+          "code": "SIG"
+        }
+      }
+    }
+  ],
+  "message": "Available SPK retrieved successfully"
+}
+```
+
+### Field Penting untuk Frontend
+
+- `id`
+: pakai ini sebagai `spk_id` saat initialize tipe `baru`
+
+- `nomor`
+: tampilkan sebagai nomor SPK
+
+- `status_spk_id`
+: status SPK saat ini
+
+- `quotation_id`
+: relasi quotation yang melekat pada SPK, bisa dipakai frontend untuk autofill jika dibutuhkan
+
+- `quotation.company_id`
+: referensi tambahan untuk mempermudah prefill company
 
 ## Endpoint 1: Initialize PKS Wizard
 
@@ -184,6 +325,8 @@ POST /api/pks-wizard/initialize/{tipe}
 
 - Simpan `pks_id` hasil initialize.
 - Semua endpoint step, preview, dan finalize berikutnya memakai `pks_id` ini.
+- Untuk `baru`, ambil `spk_id` dari endpoint source SPK jika UI membutuhkan source picker.
+- Untuk `rekontrak` dan `addendum`, ambil `quotation_id` dari endpoint source quotation jika UI membutuhkan source picker.
 
 ## Endpoint 2: Get Step Data
 
