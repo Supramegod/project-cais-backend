@@ -252,24 +252,28 @@ class PksWizardService
             ->orderByDesc('id')
             ->get()
             ->map(function (Quotation $quotation) {
+                $company = $quotation->getRelation('company');
+                $salaryRule = $quotation->getRelation('salaryRule');
+                $ruleThr = $quotation->getRelation('ruleThr');
+
                 return [
                     'id' => $quotation->id,
                     'nomor' => $quotation->nomor,
                     'status_quotation_id' => $quotation->status_quotation_id,
                     'tipe_quotation' => $quotation->tipe_quotation,
                     'company_id' => $quotation->company_id,
-                    'company' => $quotation->company ? [
-                        'id' => $quotation->company->id,
-                        'name' => $quotation->company->name,
-                        'code' => $quotation->company->code,
+                    'company' => $company ? [
+                        'id' => $company->id,
+                        'name' => $company->name,
+                        'code' => $company->code,
                     ] : null,
-                    'salary_rule' => $quotation->salaryRule ? [
-                        'id' => $quotation->salaryRule->id,
-                        'nama' => $quotation->salaryRule->nama_salary_rule,
+                    'salary_rule' => $salaryRule ? [
+                        'id' => $salaryRule->id,
+                        'nama' => $salaryRule->nama_salary_rule,
                     ] : null,
-                    'rule_thr' => $quotation->ruleThr ? [
-                        'id' => $quotation->ruleThr->id,
-                        'nama' => $quotation->ruleThr->nama,
+                    'rule_thr' => $ruleThr ? [
+                        'id' => $ruleThr->id,
+                        'nama' => $ruleThr->nama,
                     ] : null,
                 ];
             })
@@ -286,21 +290,24 @@ class PksWizardService
             ->orderByDesc('id')
             ->get()
             ->map(function (Spk $spk) {
+                $quotation = $spk->getRelation('quotation');
+                $company = $quotation?->getRelation('company');
+
                 return [
                     'id' => $spk->id,
                     'nomor' => $spk->nomor,
                     'status_spk_id' => $spk->status_spk_id,
                     'quotation_id' => $spk->quotation_id,
-                    'quotation' => $spk->quotation ? [
-                        'id' => $spk->quotation->id,
-                        'nomor' => $spk->quotation->nomor,
-                        'company_id' => $spk->quotation->company_id,
-                        'salary_rule_id' => $spk->quotation->salary_rule_id,
-                        'rule_thr_id' => $spk->quotation->rule_thr_id,
-                        'company' => $spk->quotation->company ? [
-                            'id' => $spk->quotation->company->id,
-                            'name' => $spk->quotation->company->name,
-                            'code' => $spk->quotation->company->code,
+                    'quotation' => $quotation ? [
+                        'id' => $quotation->id,
+                        'nomor' => $quotation->nomor,
+                        'company_id' => $quotation->company_id,
+                        'salary_rule_id' => $quotation->salary_rule_id,
+                        'rule_thr_id' => $quotation->rule_thr_id,
+                        'company' => $company ? [
+                            'id' => $company->id,
+                            'name' => $company->name,
+                            'code' => $company->code,
                         ] : null,
                     ] : null,
                 ];
