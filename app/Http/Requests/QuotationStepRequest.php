@@ -100,7 +100,7 @@ class QuotationStepRequest extends BaseRequest
                     'jenis_bayar_lembur' => FluentRule::string()->requiredIf('lembur', 'Flat')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
                     'jam_per_bulan_lembur' => FluentRule::integer()->requiredIf('jenis_bayar_lembur', 'Per Jam')->min(0),
                     'lembur_ditagihkan' => FluentRule::string()->rule('required_if:lembur,Flat,Normatif')->in(['Ditagihkan', 'Ditagihkan Terpisah']),
-                    'kompensasi' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Ditagihkan', 'Tidak Ada']),
+                    'kompensasi' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Diberikan Langsung','Ditagihkan', 'Tidak Ada']),
                     'thr' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Ditagihkan', 'Diberikan Langsung', 'Tidak Ada']),
                     'tunjangan_holiday' => FluentRule::string()->sometimes()->in(['Flat', 'Tidak Ada', 'Normatif']),
                     'nominal_tunjangan_holiday' => FluentRule::numeric()->requiredIf('tunjangan_holiday', 'Flat')->min(0),
