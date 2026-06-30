@@ -102,11 +102,29 @@ class Pks extends Model
         'ot5',
         'pks_induk_id',
         'tipe_pks',
+        'wizard_status_id',
+        'wizard_current_step',
+        'wizard_completed_steps',
+        'wizard_payload',
+        'template_payload',
+        'pasal_preview_payload',
+        'initialized_at',
+        'finalized_at',
         'created_by',
-        'updated_by'
+        'updated_by',
+        'created_by_user_id'
     ];
 
     protected $dates = ['tgl_pks', 'kontrak_awal', 'kontrak_akhir', 'deleted_at'];
+
+    protected $casts = [
+        'wizard_completed_steps' => 'array',
+        'wizard_payload' => 'array',
+        'template_payload' => 'array',
+        'pasal_preview_payload' => 'array',
+        'initialized_at' => 'datetime',
+        'finalized_at' => 'datetime',
+    ];
 
     // Relationships
     public function leads(): BelongsTo
@@ -117,6 +135,11 @@ class Pks extends Model
     public function statusPks(): BelongsTo
     {
         return $this->belongsTo(StatusPks::class, 'status_pks_id');
+    }
+
+    public function wizardStatus(): BelongsTo
+    {
+        return $this->belongsTo(PksWizardStatus::class, 'wizard_status_id');
     }
 
     public function sites(): HasMany
@@ -174,6 +197,10 @@ class Pks extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'company_id');
+    }
+    public function pksInduk(): BelongsTo
+    {
+        return $this->belongsTo(Pks::class, 'pks_induk_id');
     }
     public function getCreatedAtAttribute($value)
     {
