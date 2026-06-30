@@ -1482,12 +1482,14 @@ class ReportController extends Controller
         $cabang = $matched->cabang;
 
         // ── 4. Query aktivitas (hanya Leads, Assignment, Appointment) ─────────
+
         $activities = DB::table('sl_customer_activity as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
             ->select(
                 'sa.id',
                 'sa.leads_id',
                 'sa.tgl_activity',
+                'sa.tipe',
                 'sa.tipe',
                 DB::raw("COALESCE(sa.notulen, '') AS notulen"),
                 'sa.created_by',
