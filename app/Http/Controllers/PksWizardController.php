@@ -13,6 +13,7 @@ use App\Services\PksWizardFinalizeService;
 use App\Services\PksWizardService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -586,19 +587,38 @@ class PksWizardController extends Controller
      * @OA\Get(
      *     path="/api/pks-wizard/source/quotations/{leadsId}",
      *     summary="Get available quotations for PKS wizard source selection",
-     *     description="Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard.",
+     *     description="Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard. Jika query param spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
      *     tags={"PKS Wizard"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
+     *     @OA\Parameter(name="spk_id", in="query", required=false, @OA\Schema(type="integer", example=789)),
+     *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string", example="SIG")),
+     *     @OA\Parameter(name="search_by", in="query", required=false, @OA\Schema(type="string", enum={"nomor", "tipe_quotation", "company_name", "company_code", "salary_rule", "rule_thr"}, example="company_name")),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", example=10)),
+     *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer", example=1)),
      *     @OA\Response(response=200, description="Available quotations retrieved successfully")
      * )
      */
-    public function getAvailableQuotations(int $leadsId): JsonResponse
+    public function getAvailableQuotations(Request $request, int $leadsId): JsonResponse
     {
         try {
+            $quotations = $this->pksWizardService->getAvailableQuotationsByLeads(
+                $leadsId,
+                $request->integer('spk_id') ?: null,
+                $request->query('search'),
+                $request->query('search_by', 'nomor'),
+                max(1, $request->integer('per_page', 10))
+            );
+
             return response()->json([
                 'success' => true,
-                'data' => $this->pksWizardService->getAvailableQuotationsByLeads($leadsId),
+                'data' => $quotations->items(),
+                'pagination' => [
+                    'current_page' => $quotations->currentPage(),
+                    'last_page' => $quotations->lastPage(),
+                    'total' => $quotations->total(),
+                    'per_page' => $quotations->perPage(),
+                ],
                 'message' => 'Available quotations retrieved successfully',
             ]);
         } catch (ModelNotFoundException $e) {
@@ -628,15 +648,32 @@ class PksWizardController extends Controller
      *     tags={"PKS Wizard"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
+     *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string", example="SPK-001")),
+     *     @OA\Parameter(name="search_by", in="query", required=false, @OA\Schema(type="string", enum={"nomor", "quotation_nomor", "company_name", "company_code"}, example="quotation_nomor")),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", example=10)),
+     *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer", example=1)),
      *     @OA\Response(response=200, description="Available SPK retrieved successfully")
      * )
      */
-    public function getAvailableSpk(int $leadsId): JsonResponse
+    public function getAvailableSpk(Request $request, int $leadsId): JsonResponse
     {
         try {
+            $spk = $this->pksWizardService->getAvailableSpkByLeads(
+                $leadsId,
+                $request->query('search'),
+                $request->query('search_by', 'nomor'),
+                max(1, $request->integer('per_page', 10))
+            );
+
             return response()->json([
                 'success' => true,
-                'data' => $this->pksWizardService->getAvailableSpkByLeads($leadsId),
+                'data' => $spk->items(),
+                'pagination' => [
+                    'current_page' => $spk->currentPage(),
+                    'last_page' => $spk->lastPage(),
+                    'total' => $spk->total(),
+                    'per_page' => $spk->perPage(),
+                ],
                 'message' => 'Available SPK retrieved successfully',
             ]);
         } catch (ModelNotFoundException $e) {

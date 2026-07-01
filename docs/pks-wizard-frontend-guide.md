@@ -90,6 +90,23 @@ GET /api/pks-wizard/source/quotations/{leadsId}
 - Dipakai frontend untuk mendapatkan `quotation_id` sebelum `initialize`
 - Sangat berguna untuk flow `rekontrak` dan `addendum`
 
+### Optional Query Param
+
+- `spk_id`
+: optional. Jika dikirim, backend hanya mengembalikan quotation yang memang terhubung dengan SPK tersebut. Ini dipakai jika frontend ingin memastikan pilihan quotation selalu sinkron dengan SPK yang sudah dipilih user.
+
+- `search`
+: optional. Search keyword multi-kolom. Saat ini bisa mencocokkan `nomor`, `tipe_quotation`, nama/code company, nama salary rule, dan nama rule THR.
+
+- `search_by`
+: optional. Menentukan kolom pencarian secara eksplisit. Nilai yang didukung: `nomor`, `tipe_quotation`, `company_name`, `company_code`, `salary_rule`, `rule_thr`.
+
+- `per_page`
+: optional. Jumlah item per halaman.
+
+- `page`
+: optional. Nomor halaman.
+
 ### Path Param
 
 - `leadsId`
@@ -122,6 +139,12 @@ GET /api/pks-wizard/source/quotations/{leadsId}
       }
     }
   ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 1,
+    "total": 1,
+    "per_page": 10
+  },
   "message": "Available quotations retrieved successfully"
 }
 ```
@@ -163,6 +186,27 @@ GET /api/pks-wizard/source/spk/{leadsId}
 - Dipakai frontend untuk mendapatkan `spk_id` sebelum `initialize`
 - Paling relevan untuk flow `baru`
 
+Catatan:
+
+- Endpoint source SPK tidak menerima filter `quotation_id`.
+- Frontend cukup ambil daftar SPK berdasarkan leads.
+- Jika frontend perlu memastikan quotation yang cocok dengan SPK, gunakan endpoint source quotation dengan query `spk_id`.
+- Endpoint ini mendukung pagination dan search.
+
+### Optional Query Param
+
+- `search`
+: optional. Search keyword multi-kolom. Saat ini bisa mencocokkan `nomor` SPK, `nomor` quotation terkait, dan nama/code company dari quotation terkait.
+
+- `search_by`
+: optional. Menentukan kolom pencarian secara eksplisit. Nilai yang didukung: `nomor`, `quotation_nomor`, `company_name`, `company_code`.
+
+- `per_page`
+: optional. Jumlah item per halaman.
+
+- `page`
+: optional. Nomor halaman.
+
 ### Path Param
 
 - `leadsId`
@@ -193,6 +237,12 @@ GET /api/pks-wizard/source/spk/{leadsId}
       }
     }
   ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 1,
+    "total": 1,
+    "per_page": 10
+  },
   "message": "Available SPK retrieved successfully"
 }
 ```

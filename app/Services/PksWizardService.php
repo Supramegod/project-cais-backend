@@ -17,6 +17,7 @@ use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -242,16 +243,70 @@ class PksWizardService
         return $pks->fresh(['wizardStatus', 'leads']);
     }
 
-    public function getAvailableQuotationsByLeads(int $leadsId): array
+    public function getAvailableQuotationsByLeads(
+        int $leadsId,
+        ?int $spkId = null,
+        ?string $search = null,
+        string $searchBy = 'nomor',
+        int $perPage = 10
+    ): LengthAwarePaginator
     {
         $lead = Leads::filterByUserRole()->findOrFail($leadsId);
 
-        return Quotation::with(['company:id,name,code', 'salaryRule:id,nama_salary_rule', 'ruleThr:id,nama'])
+        $query = Quotation::with(['company:id,name,code', 'salaryRule:id,nama_salary_rule', 'ruleThr:id,nama'])
             ->where('leads_id', $lead->id)
             ->whereNull('deleted_at')
-            ->orderByDesc('id')
-            ->get()
-            ->map(function (Quotation $quotation) {
+            ->orderByDesc('id');
+
+        if ($spkId) {
+            $spk = Spk::with('spkSites:id,spk_id,quotation_id')->where('leads_id', $lead->id)->findOrFail($spkId);
+            $linkedQuotationIds = collect([$spk->quotation_id])
+                ->merge($spk->spkSites->pluck('quotation_id'))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($linkedQuotationIds->isEmpty()) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('id', $linkedQuotationIds->all());
+            }
+        }
+
+        if ($search !== null && $search !== '') {
+            switch ($searchBy) {
+                case 'tipe_quotation':
+                    $query->where('tipe_quotation', 'like', '%' . $search . '%');
+                    break;
+                case 'company_name':
+                    $query->whereHas('company', function ($companyQuery) use ($search) {
+                        $companyQuery->where('name', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'company_code':
+                    $query->whereHas('company', function ($companyQuery) use ($search) {
+                        $companyQuery->where('code', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'salary_rule':
+                    $query->whereHas('salaryRule', function ($salaryRuleQuery) use ($search) {
+                        $salaryRuleQuery->where('nama_salary_rule', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'rule_thr':
+                    $query->whereHas('ruleThr', function ($ruleThrQuery) use ($search) {
+                        $ruleThrQuery->where('nama', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'nomor':
+                default:
+                    $query->where('nomor', 'like', '%' . $search . '%');
+                    break;
+            }
+        }
+
+        $paginator = $query->paginate($perPage);
+        $collection = $paginator->getCollection()->map(function (Quotation $quotation) {
                 $company = $quotation->getRelation('company');
                 $salaryRule = $quotation->getRelation('salaryRule');
                 $ruleThr = $quotation->getRelation('ruleThr');
@@ -262,6 +317,19 @@ class PksWizardService
                     'status_quotation_id' => $quotation->status_quotation_id,
                     'tipe_quotation' => $quotation->tipe_quotation,
                     'company_id' => $quotation->company_id,
+                    'linked_spk_ids' => Spk::query()
+                        ->where('leads_id', $quotation->leads_id)
+                        ->where(function ($query) use ($quotation) {
+                            $query->where('quotation_id', $quotation->id)
+                                ->orWhereHas('spkSites', function ($spkSiteQuery) use ($quotation) {
+                                    $spkSiteQuery->where('quotation_id', $quotation->id)
+                                        ->whereNull('deleted_at');
+                                });
+                        })
+                        ->pluck('id')
+                        ->unique()
+                        ->values()
+                        ->all(),
                     'company' => $company ? [
                         'id' => $company->id,
                         'name' => $company->name,
@@ -276,28 +344,66 @@ class PksWizardService
                         'nama' => $ruleThr->nama,
                     ] : null,
                 ];
-            })
-            ->all();
+            });
+
+        return $paginator->setCollection($collection);
     }
 
-    public function getAvailableSpkByLeads(int $leadsId): array
+    public function getAvailableSpkByLeads(
+        int $leadsId,
+        ?string $search = null,
+        string $searchBy = 'nomor',
+        int $perPage = 10
+    ): LengthAwarePaginator
     {
         $lead = Leads::filterByUserRole()->findOrFail($leadsId);
 
-        return Spk::with(['quotation:id,nomor,company_id,salary_rule_id,rule_thr_id', 'quotation.company:id,name,code'])
+        $query = Spk::with(['quotation:id,nomor,company_id,salary_rule_id,rule_thr_id', 'quotation.company:id,name,code', 'spkSites:id,spk_id,quotation_id'])
             ->where('leads_id', $lead->id)
             ->whereNull('deleted_at')
-            ->orderByDesc('id')
-            ->get()
-            ->map(function (Spk $spk) {
+            ->orderByDesc('id');
+
+        if ($search !== null && $search !== '') {
+            switch ($searchBy) {
+                case 'quotation_nomor':
+                    $query->whereHas('quotation', function ($quotationQuery) use ($search) {
+                        $quotationQuery->where('nomor', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'company_name':
+                    $query->whereHas('quotation.company', function ($companyQuery) use ($search) {
+                        $companyQuery->where('name', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'company_code':
+                    $query->whereHas('quotation.company', function ($companyQuery) use ($search) {
+                        $companyQuery->where('code', 'like', '%' . $search . '%');
+                    });
+                    break;
+                case 'nomor':
+                default:
+                    $query->where('nomor', 'like', '%' . $search . '%');
+                    break;
+            }
+        }
+
+        $paginator = $query->paginate($perPage);
+        $collection = $paginator->getCollection()->map(function (Spk $spk) {
                 $quotation = $spk->getRelation('quotation');
                 $company = $quotation?->getRelation('company');
+                $linkedQuotationIds = collect([$spk->quotation_id])
+                    ->merge($spk->spkSites->pluck('quotation_id'))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
 
                 return [
                     'id' => $spk->id,
                     'nomor' => $spk->nomor,
                     'status_spk_id' => $spk->status_spk_id,
                     'quotation_id' => $spk->quotation_id,
+                    'linked_quotation_ids' => $linkedQuotationIds,
                     'quotation' => $quotation ? [
                         'id' => $quotation->id,
                         'nomor' => $quotation->nomor,
@@ -311,8 +417,9 @@ class PksWizardService
                         ] : null,
                     ] : null,
                 ];
-            })
-            ->all();
+            });
+
+        return $paginator->setCollection($collection);
     }
 
     private function mergeTemplatePayload(Pks $pks, array $payload): array
