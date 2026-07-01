@@ -3008,6 +3008,16 @@ class QuotationStepService
             // FIX Bug 2: syncWageDataForStep11 dihapus — ditulis sebelum reset, efeknya nol
             $this->resetAllCalculatedValues($quotation, $user, $currentDateTime);
 
+            // FIX: Terapkan persentase BPJS dari request ke tabel HPP SEBELUM kalkulasi.
+            // resetAllCalculatedValues() sudah menull-kan nominal bpjs_* & persen_bpjs_*.
+            // Dengan menuliskan persen baru di sini (nominal tetap null), calculateBpjs()
+            // akan memakai fallback (base * persen) sehingga NOMINAL ikut dihitung ulang
+            // dari persentase baru. Tanpa ini, hanya persen yang tersimpan sementara nominal
+            // tetap memakai hasil hitung default (persen & nominal jadi tidak konsisten).
+            if ($request->has('bpjs_persentase_data') && is_array($request->bpjs_persentase_data)) {
+                $this->applyBpjsPersentaseToHpp($quotation, $request->bpjs_persentase_data, $user, $currentDateTime);
+            }
+
             if ($request->filled('persen_insentif')) {
                 $quotation->persen_insentif = (float) str_replace(['.', ','], ['', '.'], $request->persen_insentif);
             }
@@ -3156,7 +3166,63 @@ class QuotationStepService
         return $data;
     }
     /**
+     * Terapkan persentase BPJS (TK & KS) dari request ke tabel HPP (persen_bpjs_*).
+     *
+     * Dipanggil SETELAH resetAllCalculatedValues() dan SEBELUM calculateQuotation().
+     * Hanya menulis kolom persen_bpjs_*; kolom nominal bpjs_* dibiarkan null (hasil
+     * reset) agar calculateBpjs() menghitung ulang nominal dari persentase baru.
+     * Bebas efek samping — tidak menyentuh THR/kompensasi/lembur (berbeda dengan
+     * updateBpjsPersentaseFromRequest yang di-deprecate).
+     */
+    private function applyBpjsPersentaseToHpp(Quotation $quotation, array $bpjsPersentaseData, string $user, Carbon $currentDateTime): void
+    {
+        $fieldMap = [
+            'persen_bpjs_jkk' => 'jkk',
+            'persen_bpjs_jkm' => 'jkm',
+            'persen_bpjs_jht' => 'jht',
+            'persen_bpjs_jp'  => 'jp',
+            'persen_bpjs_kes' => 'kes',
+        ];
+
+        $detailIds = $quotation->quotationDetails->pluck('id')->all();
+
+        foreach ($bpjsPersentaseData as $detailId => $bpjsData) {
+            if (!is_array($bpjsData) || !in_array($detailId, $detailIds)) {
+                continue;
+            }
+
+            $updateData = [];
+            foreach ($fieldMap as $field => $key) {
+                if (!isset($bpjsData[$key])) {
+                    continue;
+                }
+                $value = $bpjsData[$key];
+                if (is_string($value) && !is_numeric($value)) {
+                    $value = (float) str_replace(['.', ','], ['', '.'], $value);
+                }
+                $updateData[$field] = (float) $value;
+            }
+
+            if (empty($updateData)) {
+                continue;
+            }
+
+            $updateData['updated_by'] = $user;
+            $updateData['updated_at'] = $currentDateTime;
+
+            QuotationDetailHpp::where('quotation_detail_id', $detailId)->update($updateData);
+        }
+
+        \Log::info("Applied BPJS persentase ke HPP sebelum kalkulasi", [
+            'quotation_id' => $quotation->id,
+            'details_count' => count($bpjsPersentaseData),
+        ]);
+    }
+    /**
      * Update persentase BPJS dari request Step 11
+     *
+     * @deprecated Dinonaktifkan di commit 9eab6de1 (efek samping meng-clear
+     * THR/kompensasi/lembur). Jangan dipanggil. Gunakan applyBpjsPersentaseToHpp().
      */
     private function updateBpjsPersentaseFromRequest(Quotation $quotation, array $bpjsPersentaseData, string $user, Carbon $currentDateTime): void
     {
