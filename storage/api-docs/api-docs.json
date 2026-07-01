@@ -19538,7 +19538,7 @@
                     "PKS Wizard"
                 ],
                 "summary": "Get available quotations for PKS wizard source selection",
-                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard.",
+                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard. Jika query param spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
                 "operationId": "a6e391f2337fe5e61120fc1f621e7179",
                 "parameters": [
                     {
@@ -19548,6 +19548,42 @@
                         "schema": {
                             "type": "integer",
                             "example": 123
+                        }
+                    },
+                    {
+                        "name": "spk_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 789
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "SIG"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],
@@ -19579,6 +19615,33 @@
                         "schema": {
                             "type": "integer",
                             "example": 123
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "SPK-001"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
                         }
                     }
                 ],

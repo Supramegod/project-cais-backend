@@ -1434,9 +1434,37 @@ class PksController extends Controller
      *     summary="Get available leads for PKS creation",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\Response(
-     *         response=200,
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         required=false,
+     *         description="Keyword pencarian. Jika diisi, filter tanggal tidak dipakai.",
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         required=false,
+     *         description="Kolom pencarian (default: nama_perusahaan)",
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "provinsi", "kota", "created_by"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         required=false,
+     *         description="Jumlah data per halaman",
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         required=false,
+     *         description="Nomor halaman",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+      *
+      *     @OA\Response(
+      *         response=200,
      *         description="Successful operation",
      *
      *         @OA\JsonContent(
@@ -1458,14 +1486,20 @@ class PksController extends Controller
      *     )
      * )
      */
-    public function getAvailableLeads(): JsonResponse
+    public function getAvailableLeads(Request $request): JsonResponse
     {
         try {
-            $leads = $this->getAvailableLeadsData();
+            $leads = $this->getAvailableLeadsData($request);
 
             return response()->json([
                 'success' => true,
-                'data' => $leads,
+                'data' => $leads->items(),
+                'pagination' => [
+                    'current_page' => $leads->currentPage(),
+                    'last_page' => $leads->lastPage(),
+                    'total' => $leads->total(),
+                    'total_per_page' => $leads->count(),
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -2873,9 +2907,9 @@ class PksController extends Controller
         return $prefix . $month . $year . '-' . $sequence;
     }
 
-    private function getAvailableLeadsData()
+    private function getAvailableLeadsData(Request $request)
     {
-        return Leads::filterByuserRole()
+        $query = Leads::filterByUserRole()
             ->whereHas('spkSites', function ($query) {
                 $query->whereNull('sl_spk_site.deleted_at')
                     ->whereHas('spk', function ($subQuery) {
@@ -2886,10 +2920,25 @@ class PksController extends Controller
                         $siteQuery->whereNull('sl_site.deleted_at');
                     });
             })
-            ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+            ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota', 'created_by')
             ->distinct()
-            ->orderBy('id', 'desc')
-            ->get();
+            ->orderBy('id', 'desc');
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+            if ($searchBy === 'nama_perusahaan') {
+                $searchTerm = str_contains($searchTerm, ' ')
+                    ? '"' . $searchTerm . '"'
+                    : $searchTerm . '*';
+                $query->whereRaw('MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
+            } elseif (in_array($searchBy, ['nomor', 'provinsi', 'kota', 'created_by'], true)) {
+                $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+            }
+        }
+
+        return $query->paginate($request->get('per_page', 15));
     }
 
     private function getAvailableSitesData($leadsId, $tipe = 'baru')

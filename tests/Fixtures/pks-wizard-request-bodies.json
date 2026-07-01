@@ -12,10 +12,10 @@
   },
   "source_picker_usage": {
     "quotation": {
-      "description": "Pakai endpoint source quotations untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Gunakan field id sebagai quotation_id."
+      "description": "Pakai endpoint source quotations untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Endpoint ini bisa diberi query spk_id jika frontend ingin quotation yang ditampilkan hanya yang terkait dengan SPK terpilih. Endpoint ini juga mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai quotation_id."
     },
     "spk": {
-      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Gunakan field id sebagai spk_id."
+      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Endpoint ini tidak perlu diberi quotation_id sebagai filter. Endpoint ini mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai spk_id."
     }
   },
   "initialize": {
