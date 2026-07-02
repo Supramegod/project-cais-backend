@@ -273,6 +273,7 @@ class PksWizardService
 
         $query = Quotation::with(['company:id,name,code', 'salaryRule:id,nama_salary_rule', 'ruleThr:id,nama'])
             ->where('leads_id', $lead->id)
+            ->whereIn('status_quotation_id', [3,4])
             ->whereNull('deleted_at')
             ->orderByDesc('id');
 
@@ -386,25 +387,31 @@ class PksWizardService
     {
         $lead = Leads::filterByUserRole()->findOrFail($leadsId);
 
-        $query = Spk::with(['quotation:id,nomor,company_id,salary_rule_id,rule_thr_id', 'quotation.company:id,name,code', 'spkSites:id,spk_id,quotation_id'])
+        $query = Spk::with([
+                'spkSites:id,spk_id,quotation_id',
+                'spkSites.quotation:id,nomor,company_id,salary_rule_id,rule_thr_id',
+                'spkSites.quotation.company:id,name,code',
+                'statusSpk:id,nama',
+            ])
             ->where('leads_id', $lead->id)
+            ->where('status_spk_id', 2) // Exclude canceled SPK
             ->whereNull('deleted_at')
             ->orderByDesc('id');
 
         if ($search !== null && $search !== '') {
             switch ($searchBy) {
                 case 'quotation_nomor':
-                    $query->whereHas('quotation', function ($quotationQuery) use ($search) {
+                    $query->whereHas('spkSites.quotation', function ($quotationQuery) use ($search) {
                         $quotationQuery->where('nomor', 'like', '%' . $search . '%');
                     });
                     break;
                 case 'company_name':
-                    $query->whereHas('quotation.company', function ($companyQuery) use ($search) {
+                    $query->whereHas('spkSites.quotation.company', function ($companyQuery) use ($search) {
                         $companyQuery->where('name', 'like', '%' . $search . '%');
                     });
                     break;
                 case 'company_code':
-                    $query->whereHas('quotation.company', function ($companyQuery) use ($search) {
+                    $query->whereHas('spkSites.quotation.company', function ($companyQuery) use ($search) {
                         $companyQuery->where('code', 'like', '%' . $search . '%');
                     });
                     break;
@@ -417,33 +424,29 @@ class PksWizardService
 
         $paginator = $query->paginate($perPage);
         $collection = $paginator->getCollection()->map(function (Spk $spk) {
-                $quotation = $spk->getRelation('quotation');
-                $company = $quotation?->getRelation('company');
-                $linkedQuotationIds = collect([$spk->quotation_id])
-                    ->merge($spk->spkSites->pluck('quotation_id'))
+
+
+                $quotations = $spk->spkSites
+                    ->pluck('quotation')
                     ->filter()
-                    ->unique()
+                    ->unique('id')
                     ->values()
-                    ->all();
+                    ->map(fn(Quotation $q) => [
+                        'id' => $q->id,
+                        'nomor' => $q->nomor,
+                        'company' => $q->getRelation('company') ? [
+                            'id' => $q->getRelation('company')->id,
+                            'name' => $q->getRelation('company')->name,
+                            'code' => $q->getRelation('company')->code,
+                        ] : null,
+                    ]);
 
                 return [
                     'id' => $spk->id,
                     'nomor' => $spk->nomor,
-                    'status_spk_id' => $spk->status_spk_id,
-                    'quotation_id' => $spk->quotation_id,
-                    'linked_quotation_ids' => $linkedQuotationIds,
-                    'quotation' => $quotation ? [
-                        'id' => $quotation->id,
-                        'nomor' => $quotation->nomor,
-                        'company_id' => $quotation->company_id,
-                        'salary_rule_id' => $quotation->salary_rule_id,
-                        'rule_thr_id' => $quotation->rule_thr_id,
-                        'company' => $company ? [
-                            'id' => $company->id,
-                            'name' => $company->name,
-                            'code' => $company->code,
-                        ] : null,
-                    ] : null,
+                    'nama_perusahaan' => $spk->nama_perusahaan,
+                    'status_spk' => $spk->statusSpk?->nama,
+                    'quotations' => $quotations,
                 ];
             });
 

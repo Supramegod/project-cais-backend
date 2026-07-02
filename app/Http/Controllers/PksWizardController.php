@@ -649,7 +649,7 @@ class PksWizardController extends Controller
      * @OA\Get(
      *     path="/api/pks-wizard/source/spk/{leadsId}",
      *     summary="Get available SPK for PKS wizard source selection",
-     *     description="Mengambil daftar SPK berdasarkan leads yang bisa dipakai frontend untuk memilih spk_id saat initialize wizard tipe baru.",
+     *     description="Mengambil daftar SPK berdasarkan leads. Quotation dilampirkan sebagai array quotations, bukan object quotation tunggal, karena satu SPK bisa memiliki banyak quotation melalui spk_site.",
      *     tags={"PKS Wizard"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
