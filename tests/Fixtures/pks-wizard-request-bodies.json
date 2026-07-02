@@ -12,29 +12,37 @@
   },
   "source_picker_usage": {
     "quotation": {
-      "description": "Pakai endpoint source quotations untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Endpoint ini bisa diberi query spk_id jika frontend ingin quotation yang ditampilkan hanya yang terkait dengan SPK terpilih. Endpoint ini juga mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai quotation_id."
+      "description": "Pakai endpoint source quotations dengan method POST untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Request body bisa berisi spk_ids array untuk mempersempit quotation yang tampil berdasarkan banyak SPK terpilih. Endpoint ini juga mendukung search, search_by, page, dan per_page. Gunakan field id sebagai candidate_quotation_ids[]."
     },
     "spk": {
-      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Endpoint ini tidak perlu diberi quotation_id sebagai filter. Endpoint ini mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai spk_id."
+      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Endpoint ini mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai candidate_spk_ids[]."
+    }
+  },
+  "source_quotation_request": {
+    "filter_by_spk_ids": {
+      "spk_ids": [789, 790],
+      "search": "SIG",
+      "search_by": "company_name",
+      "per_page": 10,
+      "page": 1
     }
   },
   "initialize": {
     "baru": {
       "leads_id": 123,
       "company_id": 13,
-      "quotation_id": 456,
-      "spk_id": 789
+      "candidate_spk_ids": [789, 790],
+      "candidate_quotation_ids": [456, 457]
     },
     "rekontrak": {
       "leads_id": 123,
       "company_id": 13,
-      "quotation_id": 456,
-      "spk_id": null
+      "candidate_quotation_ids": [456, 457]
     },
     "addendum": {
       "leads_id": 123,
       "pks_induk_id": 22,
-      "quotation_id": 456,
+      "candidate_quotation_ids": [456, 457],
       "company_id": 13
     }
   },
@@ -95,7 +103,8 @@
         "site_ids": [
           11,
           12
-        ]
+        ],
+        "primary_quotation_id": 456
       }
     },
     "step_3_sites_rekontrak": {
@@ -104,7 +113,8 @@
         "quotation_site_ids": [
           21,
           22
-        ]
+        ],
+        "primary_quotation_id": 456
       }
     },
     "step_3_sites_addendum": {

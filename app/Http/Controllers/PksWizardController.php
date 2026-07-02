@@ -52,24 +52,24 @@ class PksWizardController extends Controller
      *         @OA\JsonContent(
      *             oneOf={
      *                 @OA\Schema(
-     *                     required={"leads_id", "company_id", "spk_id"},
+     *                     required={"leads_id", "company_id", "candidate_spk_ids"},
      *                     @OA\Property(property="leads_id", type="integer", example=123),
      *                     @OA\Property(property="company_id", type="integer", example=13),
-     *                     @OA\Property(property="quotation_id", type="integer", nullable=true, example=456),
-     *                     @OA\Property(property="spk_id", type="integer", nullable=true, example=789)
+     *                     @OA\Property(property="candidate_spk_ids", type="array", @OA\Items(type="integer"), example={789,790}),
+     *                     @OA\Property(property="candidate_quotation_ids", type="array", @OA\Items(type="integer"), example={456,457})
      *                 ),
      *                 @OA\Schema(
-     *                     required={"leads_id", "company_id", "quotation_id"},
+     *                     required={"leads_id", "company_id", "candidate_quotation_ids"},
      *                     @OA\Property(property="leads_id", type="integer", example=123),
      *                     @OA\Property(property="company_id", type="integer", example=13),
-     *                     @OA\Property(property="quotation_id", type="integer", example=456),
-     *                     @OA\Property(property="spk_id", type="integer", nullable=true, example=null)
+     *                     @OA\Property(property="candidate_quotation_ids", type="array", @OA\Items(type="integer"), example={456,457}),
+     *                     @OA\Property(property="candidate_spk_ids", type="array", @OA\Items(type="integer"), example={789})
      *                 ),
      *                 @OA\Schema(
      *                     required={"leads_id", "pks_induk_id"},
      *                     @OA\Property(property="leads_id", type="integer", example=123),
      *                     @OA\Property(property="pks_induk_id", type="integer", example=22),
-     *                     @OA\Property(property="quotation_id", type="integer", nullable=true, example=456),
+     *                     @OA\Property(property="candidate_quotation_ids", type="array", @OA\Items(type="integer"), example={456,457}),
      *                     @OA\Property(property="company_id", type="integer", nullable=true, example=13)
      *                 )
      *             }
@@ -584,18 +584,23 @@ class PksWizardController extends Controller
     }
 
     /**
-     * @OA\Get(
+     * @OA\Post(
      *     path="/api/pks-wizard/source/quotations/{leadsId}",
      *     summary="Get available quotations for PKS wizard source selection",
-     *     description="Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard. Jika query param spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
+     *     description="Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih candidate quotation saat initialize wizard. Jika request body spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
      *     tags={"PKS Wizard"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="leadsId", in="path", required=true, @OA\Schema(type="integer", example=123)),
-     *     @OA\Parameter(name="spk_id", in="query", required=false, @OA\Schema(type="integer", example=789)),
-     *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string", example="SIG")),
-     *     @OA\Parameter(name="search_by", in="query", required=false, @OA\Schema(type="string", enum={"nomor", "tipe_quotation", "company_name", "company_code", "salary_rule", "rule_thr"}, example="company_name")),
-     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", example=10)),
-     *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer", example=1)),
+     *     @OA\RequestBody(
+     *         required=false,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="spk_ids", type="array", @OA\Items(type="integer"), example={789,790}),
+     *             @OA\Property(property="search", type="string", example="SIG"),
+     *             @OA\Property(property="search_by", type="string", enum={"nomor", "tipe_quotation", "company_name", "company_code", "salary_rule", "rule_thr"}, example="company_name"),
+     *             @OA\Property(property="per_page", type="integer", example=10),
+     *             @OA\Property(property="page", type="integer", example=1)
+     *         )
+     *     ),
      *     @OA\Response(response=200, description="Available quotations retrieved successfully")
      * )
      */
@@ -604,10 +609,10 @@ class PksWizardController extends Controller
         try {
             $quotations = $this->pksWizardService->getAvailableQuotationsByLeads(
                 $leadsId,
-                $request->integer('spk_id') ?: null,
-                $request->query('search'),
-                $request->query('search_by', 'nomor'),
-                max(1, $request->integer('per_page', 10))
+                collect($request->input('spk_ids', []))->map(fn($id) => (int) $id)->filter()->values()->all(),
+                $request->input('search'),
+                $request->input('search_by', 'nomor'),
+                max(1, (int) $request->input('per_page', 10))
             );
 
             return response()->json([

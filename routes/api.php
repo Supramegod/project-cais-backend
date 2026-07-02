@@ -427,7 +427,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::delete('/perjanjian/{id}', 'destroyPasal');         // Bandingkan dua versi
     });
     Route::prefix('pks-wizard')->controller(PksWizardController::class)->group(function () {
-        Route::get('/source/quotations/{leadsId}', 'getAvailableQuotations');
+        Route::post('/source/quotations/{leadsId}', 'getAvailableQuotations');
         Route::get('/source/spk/{leadsId}', 'getAvailableSpk');
         Route::post('/initialize/{tipe}', 'initialize');
         Route::get('/{pksId}/step/{step}', 'getStep');

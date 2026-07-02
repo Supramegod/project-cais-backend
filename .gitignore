@@ -43,6 +43,7 @@ _ide_helper_models.php
 /.phpunit.cache
 /.phpunit.result.cache
 /database/database.sqlite
+/storage/framework/testing-*.sqlite
 /coverage
 
 # Tools
