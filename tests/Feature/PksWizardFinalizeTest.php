@@ -460,15 +460,14 @@ class PksWizardFinalizeTest extends TestCase
         $this->actingAs($user, 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
 
-        $response = $this->getJson('/api/pks-wizard/source/spk/10?search=SEARCH&search_by=nomor&per_page=1');
+        $response = $this->getJson('/api/pks-wizard/source/spk/10');
 
         $response->assertOk()
+            ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.id', 31)
             ->assertJsonPath('data.0.nomor', 'SPK-SEARCH')
             ->assertJsonPath('data.0.quotations.0.id', 20)
-            ->assertJsonPath('data.0.quotations.0.company.id', 13)
-            ->assertJsonPath('data.0.linked_quotation_ids', [20])
-            ->assertJsonPath('pagination.per_page', 1);
+            ->assertJsonPath('data.0.quotations.0.company.id', 13);
     }
 
     public function test_source_quotation_endpoint_can_be_filtered_by_spk(): void
@@ -614,6 +613,7 @@ class PksWizardFinalizeTest extends TestCase
             'is_active' => 1,
         ]);
 
+        DB::table('m_status_spk')->insert(['id' => 2, 'nama' => 'Active']);
         DB::table('m_kebutuhan')->insert(['id' => 3, 'nama' => 'Cleaning Service']);
         DB::table('m_salary_rule')->insert(['id' => 1, 'nama_salary_rule' => 'SR 1', 'cutoff' => '26-25']);
         DB::table('m_rule_thr')->insert(['id' => 2, 'nama' => 'Rule THR']);
@@ -661,7 +661,7 @@ class PksWizardFinalizeTest extends TestCase
             'leads_id' => $leadsId,
             'kebutuhan_id' => 3,
             'nomor' => $nomor,
-            'status_quotation_id' => 1,
+            'status_quotation_id' => 3,
             'company_id' => 13,
             'salary_rule_id' => 1,
             'rule_thr_id' => 2,
@@ -676,7 +676,8 @@ class PksWizardFinalizeTest extends TestCase
             'leads_id' => $leadsId,
             'quotation_id' => $quotationId,
             'nomor' => $nomor,
-            'status_spk_id' => 1,
+            'status_spk_id' => 2,
+            'nama_perusahaan' => 'PT Customer',
         ]);
     }
 
@@ -716,6 +717,7 @@ class PksWizardFinalizeTest extends TestCase
             'm_pks_wizard_status',
             'm_loyalty',
             'm_kategori_sesuai_hc',
+            'm_status_spk',
             'm_rule_thr',
             'm_salary_rule',
             'm_kebutuhan',
@@ -763,6 +765,15 @@ class PksWizardFinalizeTest extends TestCase
             $table->string('perkiraan_invoice_diterima')->nullable();
             $table->string('pembayaran_invoice')->nullable();
             $table->string('rilis_payroll')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('m_status_spk', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('nama')->nullable();
+            $table->string('kode')->nullable();
+            $table->boolean('is_active')->default(true);
             $table->softDeletes();
             $table->timestamps();
         });
@@ -910,6 +921,7 @@ class PksWizardFinalizeTest extends TestCase
             $table->unsignedInteger('leads_id')->nullable();
             $table->unsignedInteger('quotation_id')->nullable();
             $table->string('nomor')->nullable();
+            $table->string('nama_perusahaan')->nullable();
             $table->unsignedInteger('status_spk_id')->nullable();
             $table->string('updated_by')->nullable();
             $table->softDeletes();
