@@ -433,7 +433,11 @@ class PksWizardFinalizeTest extends TestCase
         $this->actingAs($user, 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
 
-        $response = $this->getJson('/api/pks-wizard/source/quotations/10?search=SEARCH&search_by=nomor&per_page=1');
+        $response = $this->postJson('/api/pks-wizard/source/quotations/10', [
+            'search' => 'SEARCH',
+            'search_by' => 'nomor',
+            'per_page' => 1,
+        ]);
 
         $response->assertOk()
             ->assertJsonPath('data.0.id', 21)
@@ -476,11 +480,34 @@ class PksWizardFinalizeTest extends TestCase
         $this->actingAs($user, 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
 
-        $response = $this->getJson('/api/pks-wizard/source/quotations/10?spk_id=30');
+        $response = $this->postJson('/api/pks-wizard/source/quotations/10', [
+            'spk_ids' => [30],
+        ]);
 
         $response->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', 20);
+    }
+
+    public function test_source_quotation_endpoint_can_be_filtered_by_multiple_spk(): void
+    {
+        $user = $this->seedUser(14, 54, 'CRM Multi SPK');
+        $this->seedCommonMasterData();
+        $this->seedLead(10);
+        $this->seedQuotation(20, 10, 'Q-001');
+        $this->seedQuotation(21, 10, 'Q-002');
+        $this->seedSpk(30, 10, 20);
+        $this->seedSpk(31, 10, 21, 'SPK-002');
+
+        $this->actingAs($user, 'web');
+        $this->withoutMiddleware(CheckTokenExpiry::class);
+
+        $response = $this->postJson('/api/pks-wizard/source/quotations/10', [
+            'spk_ids' => [30, 31],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonCount(2, 'data');
     }
 
     public function test_source_quotation_endpoint_supports_search_by_company_name(): void
@@ -493,11 +520,44 @@ class PksWizardFinalizeTest extends TestCase
         $this->actingAs($user, 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
 
-        $response = $this->getJson('/api/pks-wizard/source/quotations/10?search=SIG&search_by=company_name');
+        $response = $this->postJson('/api/pks-wizard/source/quotations/10', [
+            'search' => 'SIG',
+            'search_by' => 'company_name',
+        ]);
 
         $response->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', 20);
+    }
+
+    public function test_step_three_derives_source_ids_and_primary_quotation(): void
+    {
+        $user = $this->seedUser(15, 2, 'Step Three');
+        $this->seedCommonMasterData();
+        $this->seedLead(10);
+        $this->seedQuotation(20, 10, 'Q-001');
+        $this->seedQuotation(21, 10, 'Q-002');
+        $this->seedSpk(30, 10, 20);
+        $this->seedSpk(31, 10, 21, 'SPK-002');
+        $this->seedSpkSite(40, 30, 20, 10, 'Site A');
+        $this->seedSpkSite(41, 31, 21, 10, 'Site B');
+
+        $pks = app(PksWizardService::class)->initialize('baru', [
+            'leads_id' => 10,
+            'company_id' => 13,
+            'candidate_spk_ids' => [30, 31],
+            'candidate_quotation_ids' => [20, 21],
+        ], $user);
+
+        $updated = app(PksWizardService::class)->updateStep($pks, 3, [
+            'site_ids' => [40, 41],
+            'primary_quotation_id' => 21,
+        ], true, $user);
+
+        $sitesPayload = $updated->wizard_payload['sites'];
+        $this->assertSame([30, 31], $sitesPayload['derived_spk_ids']);
+        $this->assertSame([20, 21], $sitesPayload['derived_quotation_ids']);
+        $this->assertSame(21, $sitesPayload['primary_quotation_id']);
     }
 
     public function test_initialize_validation_rejects_mismatched_spk_and_quotation(): void
@@ -515,12 +575,12 @@ class PksWizardFinalizeTest extends TestCase
         $response = $this->postJson('/api/pks-wizard/initialize/baru', [
             'leads_id' => 10,
             'company_id' => 13,
-            'spk_id' => 30,
-            'quotation_id' => 21,
+            'candidate_spk_ids' => [30],
+            'candidate_quotation_ids' => [21],
         ]);
 
         $response->assertStatus(422)
-            ->assertJsonPath('message.quotation_id.0', 'Quotation yang dipilih tidak terhubung dengan SPK yang dipilih');
+            ->assertJsonPath('message.candidate_quotation_ids.0', 'Ada quotation candidate yang tidak terhubung dengan SPK candidate yang dipilih');
     }
 
     private function seedUser(int $id, int $roleId, string $fullName): User

@@ -18056,6 +18056,55 @@
                 ],
                 "summary": "Get available leads for PKS creation",
                 "operationId": "493170ec0def5926dc5e87bd1031fbf9",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian. Jika diisi, filter tanggal tidak dipakai.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom pencarian (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "provinsi",
+                                "kota",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful operation",
@@ -18759,7 +18808,7 @@
                                         "required": [
                                             "leads_id",
                                             "company_id",
-                                            "spk_id"
+                                            "candidate_spk_ids"
                                         ],
                                         "properties": {
                                             "leads_id": {
@@ -18770,15 +18819,25 @@
                                                 "type": "integer",
                                                 "example": 13
                                             },
-                                            "quotation_id": {
-                                                "type": "integer",
-                                                "example": 456,
-                                                "nullable": true
+                                            "candidate_spk_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    789,
+                                                    790
+                                                ]
                                             },
-                                            "spk_id": {
-                                                "type": "integer",
-                                                "example": 789,
-                                                "nullable": true
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
                                             }
                                         },
                                         "type": "object"
@@ -18787,7 +18846,7 @@
                                         "required": [
                                             "leads_id",
                                             "company_id",
-                                            "quotation_id"
+                                            "candidate_quotation_ids"
                                         ],
                                         "properties": {
                                             "leads_id": {
@@ -18798,14 +18857,24 @@
                                                 "type": "integer",
                                                 "example": 13
                                             },
-                                            "quotation_id": {
-                                                "type": "integer",
-                                                "example": 456
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
                                             },
-                                            "spk_id": {
-                                                "type": "integer",
-                                                "example": null,
-                                                "nullable": true
+                                            "candidate_spk_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    789
+                                                ]
                                             }
                                         },
                                         "type": "object"
@@ -18824,10 +18893,15 @@
                                                 "type": "integer",
                                                 "example": 22
                                             },
-                                            "quotation_id": {
-                                                "type": "integer",
-                                                "example": 456,
-                                                "nullable": true
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
                                             },
                                             "company_id": {
                                                 "type": "integer",
@@ -19533,13 +19607,13 @@
             }
         },
         "/api/pks-wizard/source/quotations/{leadsId}": {
-            "get": {
+            "post": {
                 "tags": [
                     "PKS Wizard"
                 ],
                 "summary": "Get available quotations for PKS wizard source selection",
-                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih quotation_id saat initialize wizard. Jika query param spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
-                "operationId": "a6e391f2337fe5e61120fc1f621e7179",
+                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih candidate quotation saat initialize wizard. Jika request body spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
+                "operationId": "4ebdbb16cd8ece8cd63c70acdf372da8",
                 "parameters": [
                     {
                         "name": "leadsId",
@@ -19549,44 +19623,54 @@
                             "type": "integer",
                             "example": 123
                         }
-                    },
-                    {
-                        "name": "spk_id",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 789
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "SIG"
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 10
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "example": 1
-                        }
                     }
                 ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "spk_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            789,
+                                            790
+                                        ]
+                                    },
+                                    "search": {
+                                        "type": "string",
+                                        "example": "SIG"
+                                    },
+                                    "search_by": {
+                                        "type": "string",
+                                        "enum": [
+                                            "nomor",
+                                            "tipe_quotation",
+                                            "company_name",
+                                            "company_code",
+                                            "salary_rule",
+                                            "rule_thr"
+                                        ],
+                                        "example": "company_name"
+                                    },
+                                    "per_page": {
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "page": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Available quotations retrieved successfully"
@@ -19624,6 +19708,21 @@
                         "schema": {
                             "type": "string",
                             "example": "SPK-001"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nomor",
+                                "quotation_nomor",
+                                "company_name",
+                                "company_code"
+                            ],
+                            "example": "quotation_nomor"
                         }
                     },
                     {

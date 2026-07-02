@@ -57,6 +57,7 @@ class PksWizardStepRequest extends BaseRequest
                     $rules['step_data.skipped'] = FluentRule::boolean()->required();
                     $rules['step_data.reason'] = FluentRule::string()->nullable()->max(255);
                 }
+                $rules['step_data.primary_quotation_id'] = FluentRule::integer()->nullable()->exists('sl_quotation', 'id');
                 break;
 
             case 4:

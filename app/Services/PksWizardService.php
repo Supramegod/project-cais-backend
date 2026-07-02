@@ -45,8 +45,15 @@ class PksWizardService
 
         return DB::transaction(function () use ($tipe, $data, $user) {
             $leads = Leads::filterByUserRole($user)->findOrFail($data['leads_id']);
-            $quotation = !empty($data['quotation_id']) ? Quotation::find($data['quotation_id']) : null;
-            $spk = !empty($data['spk_id']) ? Spk::find($data['spk_id']) : null;
+            $candidateSpkIds = collect($data['candidate_spk_ids'] ?? [])->map(fn($id) => (int) $id)->unique()->values();
+            $candidateQuotationIds = collect($data['candidate_quotation_ids'] ?? [])->map(fn($id) => (int) $id)->unique()->values();
+
+            $candidateSpks = $candidateSpkIds->isNotEmpty()
+                ? Spk::query()->whereIn('id', $candidateSpkIds->all())->get(['id', 'nomor', 'status_spk_id', 'quotation_id'])
+                : collect();
+            $candidateQuotations = $candidateQuotationIds->isNotEmpty()
+                ? Quotation::query()->whereIn('id', $candidateQuotationIds->all())->get(['id', 'nomor', 'status_quotation_id', 'kebutuhan_id'])
+                : collect();
 
             $pksInduk = null;
             $companyId = $data['company_id'] ?? null;
@@ -54,7 +61,10 @@ class PksWizardService
             if ($tipe === 'addendum') {
                 $pksInduk = Pks::with('quotations')->findOrFail($data['pks_induk_id']);
                 $companyId ??= $pksInduk->company_id;
-                $quotation ??= $pksInduk->quotations;
+                if ($candidateQuotations->isEmpty() && $pksInduk->quotation_id) {
+                    $candidateQuotationIds = collect([$pksInduk->quotation_id]);
+                    $candidateQuotations = Quotation::query()->whereIn('id', $candidateQuotationIds->all())->get(['id', 'nomor', 'status_quotation_id', 'kebutuhan_id']);
+                }
             }
 
             $company = $companyId ? Company::find($companyId) : null;
@@ -67,15 +77,18 @@ class PksWizardService
                 ? $this->generateNomorAddendum($pksInduk)
                 : $this->generateNomor($leads, $company);
 
-            $layananId = $quotation?->kebutuhan_id ?? $leads->kebutuhan_id;
+            $primaryQuotation = $candidateQuotations->first();
+            $primarySpk = $candidateSpks->first();
+
+            $layananId = $primaryQuotation?->kebutuhan_id ?? $leads->kebutuhan_id;
             $kebutuhan = $layananId ? Kebutuhan::find($layananId) : null;
 
             $wizardPayload = [
                 'source' => [
                     'tipe_pks' => $tipe,
                     'leads_id' => $leads->id,
-                    'quotation_id' => $quotation?->id,
-                    'spk_id' => $spk?->id,
+                    'candidate_quotation_ids' => $candidateQuotationIds->all(),
+                    'candidate_spk_ids' => $candidateSpkIds->all(),
                     'pks_induk_id' => $pksInduk?->id,
                     'company_id' => $companyId,
                     'leads' => [
@@ -86,16 +99,17 @@ class PksWizardService
                         'branch_id' => $leads->branch_id,
                         'pic' => $leads->pic,
                     ],
-                    'quotation' => $quotation ? [
+                    'candidate_quotations' => $candidateQuotations->map(fn($quotation) => [
                         'id' => $quotation->id,
                         'nomor' => $quotation->nomor,
                         'status_quotation_id' => $quotation->status_quotation_id,
-                    ] : null,
-                    'spk' => $spk ? [
+                    ])->values()->all(),
+                    'candidate_spk' => $candidateSpks->map(fn($spk) => [
                         'id' => $spk->id,
                         'nomor' => $spk->nomor,
                         'status_spk_id' => $spk->status_spk_id,
-                    ] : null,
+                        'quotation_id' => $spk->quotation_id,
+                    ])->values()->all(),
                     'pks_induk' => $pksInduk ? [
                         'id' => $pksInduk->id,
                         'nomor' => $pksInduk->nomor,
@@ -134,7 +148,7 @@ class PksWizardService
 
             return Pks::create([
                 'leads_id' => $leads->id,
-                'quotation_id' => $quotation?->id,
+                'quotation_id' => $primaryQuotation?->id,
                 'branch_id' => $leads->branch_id,
                 'nomor' => 'draft/' . $nomorAsli,
                 'kode_perusahaan' => $leads->nomor,
@@ -199,6 +213,10 @@ class PksWizardService
         $completedSteps = $pks->wizard_completed_steps ?? [];
         $stepKey = self::STEP_PAYLOAD_KEYS[$step];
 
+        if ($step === 3) {
+            $stepData = $this->prepareSitesStepData($pks, $stepData, $payload);
+        }
+
         if ($step === 5) {
             $stepData = $this->resolveCommercialSnapshot($pks);
         }
@@ -245,7 +263,7 @@ class PksWizardService
 
     public function getAvailableQuotationsByLeads(
         int $leadsId,
-        ?int $spkId = null,
+        array $spkIds = [],
         ?string $search = null,
         string $searchBy = 'nomor',
         int $perPage = 10
@@ -258,11 +276,21 @@ class PksWizardService
             ->whereNull('deleted_at')
             ->orderByDesc('id');
 
-        if ($spkId) {
-            $spk = Spk::with('spkSites:id,spk_id,quotation_id')->where('leads_id', $lead->id)->findOrFail($spkId);
-            $linkedQuotationIds = collect([$spk->quotation_id])
-                ->merge($spk->spkSites->pluck('quotation_id'))
+        $spkIds = collect($spkIds)->map(fn($id) => (int) $id)->filter()->unique()->values();
+        if ($spkIds->isNotEmpty()) {
+            $spks = Spk::with('spkSites:id,spk_id,quotation_id')
+                ->where('leads_id', $lead->id)
+                ->whereIn('id', $spkIds->all())
+                ->get();
+
+            if ($spks->count() !== $spkIds->count()) {
+                throw (new \Illuminate\Database\Eloquent\ModelNotFoundException())->setModel(Spk::class);
+            }
+
+            $linkedQuotationIds = $spks->pluck('quotation_id')
+                ->merge($spks->flatMap(fn($spk) => $spk->spkSites->pluck('quotation_id')))
                 ->filter()
+                ->map(fn($id) => (int) $id)
                 ->unique()
                 ->values();
 
@@ -463,6 +491,9 @@ class PksWizardService
 
         $templatePayload['commercial'] = Arr::get($payload, 'commercial_snapshot', $templatePayload['commercial'] ?? []);
         $templatePayload['sites'] = Arr::get($payload, 'sites', $templatePayload['sites'] ?? []);
+        $templatePayload['related_quotation_ids'] = Arr::get($payload, 'sites.derived_quotation_ids', Arr::get($payload, 'source.candidate_quotation_ids', []));
+        $templatePayload['related_spk_ids'] = Arr::get($payload, 'sites.derived_spk_ids', Arr::get($payload, 'source.candidate_spk_ids', []));
+        $templatePayload['primary_quotation_id'] = Arr::get($payload, 'sites.primary_quotation_id', $pks->quotation_id);
 
         return $templatePayload;
     }
@@ -499,6 +530,8 @@ class PksWizardService
                 'available_sites' => $this->getAvailableSitesData($pks->leads_id, $tipePks),
                 'selection_mode' => $tipePks === 'baru' ? 'site_ids' : ($tipePks === 'rekontrak' ? 'quotation_site_ids' : 'skipped'),
                 'is_read_only' => $tipePks === 'addendum',
+                'candidate_spk_ids' => Arr::get($payload, 'source.candidate_spk_ids', []),
+                'candidate_quotation_ids' => Arr::get($payload, 'source.candidate_quotation_ids', []),
             ],
             4 => [
                 'contact_defaults' => [
@@ -510,6 +543,7 @@ class PksWizardService
             ],
             5 => [
                 'commercial_snapshot' => $this->resolveCommercialSnapshot($pks),
+                'primary_quotation_options' => Arr::get($payload, 'sites.derived_quotation_ids', []),
                 'is_read_only' => true,
             ],
             6 => [
@@ -548,11 +582,16 @@ class PksWizardService
             return $existing;
         }
 
-        if (!$pks->quotation_id) {
+        $payload = $pks->wizard_payload ?? [];
+        $quotationId = Arr::get($payload, 'sites.primary_quotation_id')
+            ?? Arr::get($payload, 'source.candidate_quotation_ids.0')
+            ?? $pks->quotation_id;
+
+        if (!$quotationId) {
             return [];
         }
 
-        $quotation = Quotation::with(['salaryRule', 'ruleThr'])->find($pks->quotation_id);
+        $quotation = Quotation::with(['salaryRule', 'ruleThr'])->find($quotationId);
         if (!$quotation) {
             return [];
         }
@@ -593,7 +632,87 @@ class PksWizardService
                 'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice,
                 'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr,
             ] : null,
+            'primary_quotation_id' => $quotation->id,
         ];
+    }
+
+    private function prepareSitesStepData(Pks $pks, array $stepData, array $payload): array
+    {
+        $tipePks = $this->resolveTipePks($pks, $payload);
+
+        if ($tipePks === 'addendum') {
+            return $stepData;
+        }
+
+        [$derivedSpkIds, $derivedQuotationIds] = $tipePks === 'baru'
+            ? $this->deriveFromSpkSites($stepData['site_ids'] ?? [])
+            : $this->deriveFromQuotationSites($stepData['quotation_site_ids'] ?? []);
+
+        if (empty($derivedQuotationIds)) {
+            throw new \InvalidArgumentException('Site yang dipilih tidak menghasilkan quotation final');
+        }
+
+        $candidateSpkIds = collect(Arr::get($payload, 'source.candidate_spk_ids', []))->map(fn($id) => (int) $id);
+        $candidateQuotationIds = collect(Arr::get($payload, 'source.candidate_quotation_ids', []))->map(fn($id) => (int) $id);
+
+        if ($candidateSpkIds->isNotEmpty() && collect($derivedSpkIds)->diff($candidateSpkIds)->isNotEmpty()) {
+            throw new \InvalidArgumentException('Ada site yang berasal dari SPK di luar candidate source');
+        }
+
+        if ($candidateQuotationIds->isNotEmpty() && collect($derivedQuotationIds)->diff($candidateQuotationIds)->isNotEmpty()) {
+            throw new \InvalidArgumentException('Ada site yang berasal dari quotation di luar candidate source');
+        }
+
+        $primaryQuotationId = isset($stepData['primary_quotation_id']) && $stepData['primary_quotation_id']
+            ? (int) $stepData['primary_quotation_id']
+            : (count($derivedQuotationIds) === 1 ? (int) $derivedQuotationIds[0] : null);
+
+        if (count($derivedQuotationIds) > 1 && !$primaryQuotationId) {
+            throw new \InvalidArgumentException('Primary quotation wajib dipilih jika source menghasilkan lebih dari satu quotation');
+        }
+
+        if ($primaryQuotationId !== null && !in_array($primaryQuotationId, $derivedQuotationIds, true)) {
+            throw new \InvalidArgumentException('Primary quotation harus termasuk dalam quotation hasil derive site');
+        }
+
+        $stepData['derived_spk_ids'] = $derivedSpkIds;
+        $stepData['derived_quotation_ids'] = $derivedQuotationIds;
+        $stepData['primary_quotation_id'] = $primaryQuotationId;
+
+        return $stepData;
+    }
+
+    private function deriveFromSpkSites(array $siteIds): array
+    {
+        $sites = SpkSite::query()
+            ->whereIn('id', $siteIds)
+            ->whereNull('deleted_at')
+            ->get(['id', 'spk_id', 'quotation_id']);
+
+        return [
+            $sites->pluck('spk_id')->filter()->map(fn($id) => (int) $id)->unique()->values()->all(),
+            $sites->pluck('quotation_id')->filter()->map(fn($id) => (int) $id)->unique()->values()->all(),
+        ];
+    }
+
+    private function deriveFromQuotationSites(array $siteIds): array
+    {
+        $sites = QuotationSite::query()
+            ->whereIn('id', $siteIds)
+            ->whereNull('deleted_at')
+            ->get(['id', 'quotation_id']);
+
+        $quotationIds = $sites->pluck('quotation_id')->filter()->map(fn($id) => (int) $id)->unique()->values();
+        $spkIds = SpkSite::query()
+            ->whereIn('quotation_site_id', $siteIds)
+            ->whereNull('deleted_at')
+            ->pluck('spk_id')
+            ->filter()
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        return [$spkIds->all(), $quotationIds->all()];
     }
 
     private function getAvailableLeadsData(): array

@@ -41,6 +41,10 @@ class PksWizardFinalizeService
             $pic = Arr::get($payload, 'pic', []);
             $sitesPayload = Arr::get($payload, 'sites', []);
             $preview = $lockedPks->pasal_preview_payload ?? [];
+            [$derivedSpkIds, $derivedQuotationIds] = $this->resolveDerivedSourceIds($lockedPks, $sitesPayload);
+            $primaryQuotationId = Arr::get($sitesPayload, 'primary_quotation_id')
+                ?? Arr::get($payload, 'source.candidate_quotation_ids.0')
+                ?? $lockedPks->quotation_id;
 
             $leads = $lockedPks->leads ?? Leads::findOrFail($lockedPks->leads_id);
             $company = Company::findOrFail($header['company_id'] ?? $lockedPks->company_id);
@@ -54,6 +58,7 @@ class PksWizardFinalizeService
 
             $lockedPks->update([
                 'nomor' => $nomorFinal,
+                'quotation_id' => $primaryQuotationId,
                 'tgl_pks' => $header['tanggal_pks'] ?? $lockedPks->tgl_pks,
                 'kontrak_awal' => $header['tanggal_awal_kontrak'] ?? $lockedPks->kontrak_awal,
                 'kontrak_akhir' => $header['tanggal_akhir_kontrak'] ?? $lockedPks->kontrak_akhir,
@@ -99,15 +104,17 @@ class PksWizardFinalizeService
                 ]);
             }
 
-            Spk::where('leads_id', $leads->id)
-                ->whereNotIn('status_spk_id', [100])
-                ->update([
-                    'status_spk_id' => 3,
-                    'updated_by' => $user->full_name,
-                ]);
+            if (!empty($derivedSpkIds)) {
+                Spk::whereIn('id', $derivedSpkIds)
+                    ->whereNotIn('status_spk_id', [100])
+                    ->update([
+                        'status_spk_id' => 3,
+                        'updated_by' => $user->full_name,
+                    ]);
+            }
 
-            if ($lockedPks->quotation_id) {
-                Quotation::where('id', $lockedPks->quotation_id)
+            if (!empty($derivedQuotationIds)) {
+                Quotation::whereIn('id', $derivedQuotationIds)
                     ->where('status_quotation_id', '!=', 100)
                     ->update([
                         'status_quotation_id' => 5,
@@ -150,12 +157,82 @@ class PksWizardFinalizeService
             throw new \InvalidArgumentException('Pasal preview belum tersedia');
         }
 
+        [, $derivedQuotationIds] = $this->resolveDerivedSourceIds($pks, Arr::get($pks->wizard_payload ?? [], 'sites', []));
+        $primaryQuotationId = Arr::get($pks->wizard_payload ?? [], 'sites.primary_quotation_id')
+            ?? $pks->quotation_id;
+
+        if ($pks->tipe_pks !== 'addendum' && empty($derivedQuotationIds)) {
+            throw new \InvalidArgumentException('Source quotation final belum terderive dari site');
+        }
+
+        if (count($derivedQuotationIds) > 1 && !$primaryQuotationId) {
+            throw new \InvalidArgumentException('Primary quotation wajib dipilih');
+        }
+
+        if ($primaryQuotationId && !empty($derivedQuotationIds) && !in_array((int) $primaryQuotationId, $derivedQuotationIds, true)) {
+            throw new \InvalidArgumentException('Primary quotation tidak termasuk source quotation final');
+        }
+
         $header = Arr::get($pks->wizard_payload ?? [], 'header', []);
         foreach (['tanggal_pks', 'tanggal_awal_kontrak', 'tanggal_akhir_kontrak', 'company_id', 'salary_rule_id', 'rule_thr_id'] as $field) {
             if (empty($header[$field])) {
                 throw new \InvalidArgumentException("Header PKS belum lengkap: {$field}");
             }
         }
+    }
+
+    private function resolveDerivedSourceIds(Pks $pks, array $sitesPayload): array
+    {
+        $derivedSpkIds = collect(Arr::get($sitesPayload, 'derived_spk_ids', []))
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+        $derivedQuotationIds = collect(Arr::get($sitesPayload, 'derived_quotation_ids', []))
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($derivedSpkIds->isNotEmpty() || $derivedQuotationIds->isNotEmpty()) {
+            return [$derivedSpkIds->all(), $derivedQuotationIds->all()];
+        }
+
+        if ($pks->tipe_pks === 'baru') {
+            $sites = SpkSite::query()
+                ->whereIn('id', Arr::get($sitesPayload, 'site_ids', []))
+                ->whereNull('deleted_at')
+                ->get(['spk_id', 'quotation_id']);
+
+            return [
+                $sites->pluck('spk_id')->filter()->map(fn($id) => (int) $id)->unique()->values()->all(),
+                $sites->pluck('quotation_id')->filter()->map(fn($id) => (int) $id)->unique()->values()->all(),
+            ];
+        }
+
+        if ($pks->tipe_pks === 'rekontrak') {
+            $siteIds = Arr::get($sitesPayload, 'quotation_site_ids', []);
+            $quotationIds = QuotationSite::query()
+                ->whereIn('id', $siteIds)
+                ->whereNull('deleted_at')
+                ->pluck('quotation_id')
+                ->filter()
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
+            $spkIds = SpkSite::query()
+                ->whereIn('quotation_site_id', $siteIds)
+                ->whereNull('deleted_at')
+                ->pluck('spk_id')
+                ->filter()
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            return [$spkIds->all(), $quotationIds->all()];
+        }
+
+        return [[], []];
     }
 
     private function syncFinalSites(Pks $pks, array $sitesPayload, string $nomorFinal, Kebutuhan $kebutuhan, Leads $leads, User $user): void

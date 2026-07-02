@@ -8,7 +8,7 @@ Dokumen ini dibuat berdasarkan implementasi backend saat ini, bukan sekadar plan
 
 Flow umum frontend:
 
-1. Panggil endpoint source untuk mengambil kandidat `quotation_id` atau `spk_id` jika dibutuhkan.
+1. Panggil endpoint source untuk mengambil kandidat `candidate_quotation_ids` atau `candidate_spk_ids` jika dibutuhkan.
 2. Panggil `initialize` untuk membuat draft PKS wizard dan mendapatkan `pksId`.
 3. Ambil data step dengan `GET /step/{step}`.
 4. Simpan data per step dengan `POST /step/{step}`.
@@ -51,10 +51,10 @@ Nilai `tipe` yang didukung pada wizard:
 Perbedaan penting:
 
 - `baru`
-: sumber utama site berasal dari `SPK Site`, dan `spk_id` wajib saat initialize.
+: sumber utama site berasal dari `SPK Site`, dan `candidate_spk_ids` wajib saat initialize.
 
 - `rekontrak`
-: sumber utama site berasal dari `Quotation Site`, dan `quotation_id` wajib saat initialize.
+: sumber utama site berasal dari `Quotation Site`, dan `candidate_quotation_ids` wajib saat initialize.
 
 - `addendum`
 : tidak membuat site baru saat finalize, wajib memiliki `pks_induk_id`, dan preview pasal bisa diisi manual lewat `additional_articles`.
@@ -81,19 +81,19 @@ Catatan untuk frontend:
 **Endpoint**
 
 ```text
-GET /api/pks-wizard/source/quotations/{leadsId}
+POST /api/pks-wizard/source/quotations/{leadsId}
 ```
 
 ### Tujuan
 
 - Mengambil daftar quotation kandidat berdasarkan leads
-- Dipakai frontend untuk mendapatkan `quotation_id` sebelum `initialize`
+- Dipakai frontend untuk mendapatkan candidate quotation sebelum `initialize`
 - Sangat berguna untuk flow `rekontrak` dan `addendum`
 
 ### Optional Query Param
 
 - `spk_id`
-: optional. Jika dikirim, backend hanya mengembalikan quotation yang memang terhubung dengan SPK tersebut. Ini dipakai jika frontend ingin memastikan pilihan quotation selalu sinkron dengan SPK yang sudah dipilih user.
+: optional. Dikirim lewat request body. Jika diisi, backend hanya mengembalikan quotation yang memang terhubung dengan SPK tersebut. Ini dipakai jika frontend ingin memastikan pilihan quotation selalu sinkron dengan SPK yang sudah dipilih user.
 
 - `search`
 : optional. Search keyword multi-kolom. Saat ini bisa mencocokkan `nomor`, `tipe_quotation`, nama/code company, nama salary rule, dan nama rule THR.
@@ -111,6 +111,21 @@ GET /api/pks-wizard/source/quotations/{leadsId}
 
 - `leadsId`
 : ID leads yang dipilih user.
+
+### Request Body Contoh
+
+```json
+{
+  "spk_ids": [789, 790],
+  "search": "SIG",
+  "search_by": "company_name",
+  "per_page": 10,
+  "page": 1
+}
+```
+
+- `spk_ids`
+: optional. Array SPK kandidat yang dipilih user. Jika diisi, backend hanya mengembalikan quotation yang terhubung ke salah satu SPK dalam array tersebut.
 
 ### Response Contoh
 
@@ -152,7 +167,7 @@ GET /api/pks-wizard/source/quotations/{leadsId}
 ### Field Penting untuk Frontend
 
 - `id`
-: pakai ini sebagai `quotation_id` saat initialize
+: pakai ini sebagai item dalam `candidate_quotation_ids` saat initialize
 
 - `nomor`
 : tampilkan ke user sebagai nomor quotation
@@ -183,7 +198,7 @@ GET /api/pks-wizard/source/spk/{leadsId}
 ### Tujuan
 
 - Mengambil daftar SPK kandidat berdasarkan leads
-- Dipakai frontend untuk mendapatkan `spk_id` sebelum `initialize`
+- Dipakai frontend untuk mendapatkan candidate SPK sebelum `initialize`
 - Paling relevan untuk flow `baru`
 
 Catatan:
@@ -250,7 +265,7 @@ Catatan:
 ### Field Penting untuk Frontend
 
 - `id`
-: pakai ini sebagai `spk_id` saat initialize tipe `baru`
+: pakai ini sebagai item dalam `candidate_spk_ids` saat initialize tipe `baru`
 
 - `nomor`
 : tampilkan sebagai nomor SPK
@@ -287,8 +302,8 @@ POST /api/pks-wizard/initialize/{tipe}
 {
   "leads_id": 123,
   "company_id": 13,
-  "quotation_id": 456,
-  "spk_id": 789
+  "candidate_spk_ids": [789, 790],
+  "candidate_quotation_ids": [456, 457]
 }
 ```
 
@@ -300,11 +315,11 @@ POST /api/pks-wizard/initialize/{tipe}
 - `company_id`
 : ID entitas/perusahaan Shelter yang akan dipakai untuk PKS dan template pasal. Wajib. Harus valid di `mysqlhris.m_company`.
 
-- `quotation_id`
-: ID quotation terkait. Optional pada `baru`, tetapi disarankan diisi jika memang sumber quotation sudah ada.
+- `candidate_spk_ids`
+: array kandidat SPK awal yang dipilih user. Wajib untuk `baru`.
 
-- `spk_id`
-: ID SPK sumber. Wajib untuk `baru`. Harus valid di `sl_spk`.
+- `candidate_quotation_ids`
+: array kandidat quotation awal. Optional untuk `baru`. Bisa dipakai kalau frontend ingin narrowing source sejak awal.
 
 ### Request Body: Tipe `rekontrak`
 
@@ -312,8 +327,7 @@ POST /api/pks-wizard/initialize/{tipe}
 {
   "leads_id": 123,
   "company_id": 13,
-  "quotation_id": 456,
-  "spk_id": null
+  "candidate_quotation_ids": [456, 457]
 }
 ```
 
@@ -325,11 +339,11 @@ POST /api/pks-wizard/initialize/{tipe}
 - `company_id`
 : ID company/template yang dipakai di PKS. Wajib.
 
-- `quotation_id`
-: ID quotation sumber rekontrak. Wajib.
+- `candidate_quotation_ids`
+: array quotation kandidat untuk rekontrak. Wajib.
 
-- `spk_id`
-: Tidak wajib untuk rekontrak. Bisa `null`.
+- `candidate_spk_ids`
+: optional kalau frontend tetap ingin menyimpan kandidat SPK awal untuk referensi/filter.
 
 ### Request Body: Tipe `addendum`
 
@@ -337,7 +351,7 @@ POST /api/pks-wizard/initialize/{tipe}
 {
   "leads_id": 123,
   "pks_induk_id": 22,
-  "quotation_id": 456,
+  "candidate_quotation_ids": [456, 457],
   "company_id": 13
 }
 ```
@@ -350,8 +364,8 @@ POST /api/pks-wizard/initialize/{tipe}
 - `pks_induk_id`
 : ID PKS induk yang akan ditambahi addendum. Wajib. Harus valid di `sl_pks`.
 
-- `quotation_id`
-: Optional. Jika ada quotation addendum yang terkait, boleh diisi.
+- `candidate_quotation_ids`
+: optional. Jika ada quotation addendum yang terkait, bisa diisi sebagai daftar kandidat.
 
 - `company_id`
 : Optional. Jika tidak diisi, backend akan mencoba memakai `company_id` dari PKS induk.
@@ -375,8 +389,8 @@ POST /api/pks-wizard/initialize/{tipe}
 
 - Simpan `pks_id` hasil initialize.
 - Semua endpoint step, preview, dan finalize berikutnya memakai `pks_id` ini.
-- Untuk `baru`, ambil `spk_id` dari endpoint source SPK jika UI membutuhkan source picker.
-- Untuk `rekontrak` dan `addendum`, ambil `quotation_id` dari endpoint source quotation jika UI membutuhkan source picker.
+- Untuk `baru`, ambil `candidate_spk_ids` dari endpoint source SPK jika UI membutuhkan source picker.
+- Untuk `rekontrak` dan `addendum`, ambil `candidate_quotation_ids` dari endpoint source quotation jika UI membutuhkan source picker.
 
 ## Endpoint 2: Get Step Data
 

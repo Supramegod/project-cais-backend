@@ -21,8 +21,12 @@ class PksWizardInitializeRequest extends BaseRequest
 
         $rules = [
             'leads_id' => FluentRule::integer()->required()->exists('sl_leads', 'id'),
-            'quotation_id' => FluentRule::integer()->nullable()->exists('sl_quotation', 'id'),
-            'spk_id' => FluentRule::integer()->nullable()->exists('sl_spk', 'id'),
+            'candidate_spk_ids' => FluentRule::array()->nullable()->children([
+                '*' => FluentRule::integer()->required()->exists('sl_spk', 'id'),
+            ]),
+            'candidate_quotation_ids' => FluentRule::array()->nullable()->children([
+                '*' => FluentRule::integer()->required()->exists('sl_quotation', 'id'),
+            ]),
         ];
 
         if ($tipe === 'addendum') {
@@ -33,95 +37,118 @@ class PksWizardInitializeRequest extends BaseRequest
         }
 
         if ($tipe === 'baru') {
-            $rules['spk_id'] = FluentRule::integer()->required()->exists('sl_spk', 'id');
+            $rules['candidate_spk_ids'] = FluentRule::array()->required()->min(1)->children([
+                '*' => FluentRule::integer()->required()->exists('sl_spk', 'id'),
+            ]);
         }
 
         if ($tipe === 'rekontrak') {
-            $rules['quotation_id'] = FluentRule::integer()->required()->exists('sl_quotation', 'id');
+            $rules['candidate_quotation_ids'] = FluentRule::array()->required()->min(1)->children([
+                '*' => FluentRule::integer()->required()->exists('sl_quotation', 'id'),
+            ]);
         }
 
         return $rules;
+    }
+
+    protected function prepareForValidation()
+    {
+        $candidateSpkIds = $this->input('candidate_spk_ids', []);
+        $candidateQuotationIds = $this->input('candidate_quotation_ids', []);
+
+        if ($this->filled('spk_id')) {
+            $candidateSpkIds[] = (int) $this->input('spk_id');
+        }
+
+        if ($this->filled('quotation_id')) {
+            $candidateQuotationIds[] = (int) $this->input('quotation_id');
+        }
+
+        $candidateSpkIds = collect($candidateSpkIds)->filter()->map(fn($id) => (int) $id)->unique()->values()->all();
+        $candidateQuotationIds = collect($candidateQuotationIds)->filter()->map(fn($id) => (int) $id)->unique()->values()->all();
+
+        if ($this->route('tipe') === 'baru' && !empty($candidateSpkIds) && empty($candidateQuotationIds)) {
+            $derivedQuotationIds = Spk::query()
+                ->whereIn('id', $candidateSpkIds)
+                ->pluck('quotation_id')
+                ->merge(
+                    SpkSite::query()
+                        ->whereIn('spk_id', $candidateSpkIds)
+                        ->whereNull('deleted_at')
+                        ->pluck('quotation_id')
+                )
+                ->filter()
+                ->map(fn($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $candidateQuotationIds = $derivedQuotationIds;
+        }
+
+        $this->merge([
+            'candidate_spk_ids' => $candidateSpkIds,
+            'candidate_quotation_ids' => $candidateQuotationIds,
+        ]);
     }
 
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
             $tipe = $this->route('tipe');
-            $leadsId = $this->input('leads_id');
-            $quotationId = $this->input('quotation_id');
-            $spkId = $this->input('spk_id');
+            $leadsId = (int) $this->input('leads_id');
+            $candidateSpkIds = collect($this->input('candidate_spk_ids', []))->map(fn($id) => (int) $id);
+            $candidateQuotationIds = collect($this->input('candidate_quotation_ids', []))->map(fn($id) => (int) $id);
             $pksIndukId = $this->input('pks_induk_id');
 
-            if ($quotationId) {
-                $quotation = Quotation::query()->select(['id', 'leads_id'])->find($quotationId);
-                if ($quotation && (int) $quotation->leads_id !== (int) $leadsId) {
-                    $validator->errors()->add('quotation_id', 'Quotation tidak terhubung dengan leads yang dipilih');
+            if ($candidateQuotationIds->isNotEmpty()) {
+                $invalidQuotationExists = Quotation::query()
+                    ->whereIn('id', $candidateQuotationIds->all())
+                    ->where('leads_id', '!=', $leadsId)
+                    ->exists();
+
+                if ($invalidQuotationExists) {
+                    $validator->errors()->add('candidate_quotation_ids', 'Ada quotation yang tidak terhubung dengan leads yang dipilih');
                 }
             }
 
-            if ($spkId) {
-                $spk = Spk::query()->select(['id', 'leads_id', 'quotation_id'])->find($spkId);
-                if ($spk && (int) $spk->leads_id !== (int) $leadsId) {
-                    $validator->errors()->add('spk_id', 'SPK tidak terhubung dengan leads yang dipilih');
-                }
+            if ($candidateSpkIds->isNotEmpty()) {
+                $invalidSpkExists = Spk::query()
+                    ->whereIn('id', $candidateSpkIds->all())
+                    ->where('leads_id', '!=', $leadsId)
+                    ->exists();
 
-                if ($spk && $quotationId) {
-                    $linkedQuotationId = $this->resolveSpkQuotationId($spk);
-                    if ($linkedQuotationId !== null && (int) $linkedQuotationId !== (int) $quotationId) {
-                        $validator->errors()->add('quotation_id', 'Quotation yang dipilih tidak terhubung dengan SPK yang dipilih');
-                    }
+                if ($invalidSpkExists) {
+                    $validator->errors()->add('candidate_spk_ids', 'Ada SPK yang tidak terhubung dengan leads yang dipilih');
+                }
+            }
+
+            if ($candidateSpkIds->isNotEmpty() && $candidateQuotationIds->isNotEmpty()) {
+                $linkedQuotationIds = Spk::query()
+                    ->whereIn('id', $candidateSpkIds->all())
+                    ->pluck('quotation_id')
+                    ->merge(
+                        SpkSite::query()
+                            ->whereIn('spk_id', $candidateSpkIds->all())
+                            ->whereNull('deleted_at')
+                            ->pluck('quotation_id')
+                    )
+                    ->filter()
+                    ->map(fn($id) => (int) $id)
+                    ->unique();
+
+                $outsideSelection = $candidateQuotationIds->diff($linkedQuotationIds);
+                if ($outsideSelection->isNotEmpty()) {
+                    $validator->errors()->add('candidate_quotation_ids', 'Ada quotation candidate yang tidak terhubung dengan SPK candidate yang dipilih');
                 }
             }
 
             if ($tipe === 'addendum' && $pksIndukId) {
-                $pksInduk = Pks::query()->select(['id', 'leads_id', 'quotation_id'])->find($pksIndukId);
-                if ($pksInduk && (int) $pksInduk->leads_id !== (int) $leadsId) {
+                $pksInduk = Pks::query()->select(['id', 'leads_id'])->find($pksIndukId);
+                if ($pksInduk && (int) $pksInduk->leads_id !== $leadsId) {
                     $validator->errors()->add('pks_induk_id', 'PKS induk tidak terhubung dengan leads yang dipilih');
-                }
-
-                if ($pksInduk && $quotationId && $pksInduk->quotation_id && (int) $pksInduk->quotation_id !== (int) $quotationId) {
-                    $validator->errors()->add('quotation_id', 'Quotation yang dipilih tidak sama dengan quotation pada PKS induk');
                 }
             }
         });
-    }
-
-    protected function prepareForValidation()
-    {
-        $tipe = $this->route('tipe');
-        $spkId = $this->input('spk_id');
-        $quotationId = $this->input('quotation_id');
-
-        if ($tipe === 'baru' && $spkId && !$quotationId) {
-            $spk = Spk::query()->select(['id', 'quotation_id'])->find($spkId);
-            $resolvedQuotationId = $spk ? $this->resolveSpkQuotationId($spk) : null;
-
-            if ($resolvedQuotationId) {
-                $this->merge([
-                    'quotation_id' => $resolvedQuotationId,
-                ]);
-            }
-        }
-    }
-
-    private function resolveSpkQuotationId(Spk $spk): ?int
-    {
-        if ($spk->quotation_id) {
-            return (int) $spk->quotation_id;
-        }
-
-        $quotationIds = SpkSite::query()
-            ->where('spk_id', $spk->id)
-            ->whereNull('deleted_at')
-            ->pluck('quotation_id')
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($quotationIds->count() === 1) {
-            return (int) $quotationIds->first();
-        }
-
-        return null;
     }
 }
