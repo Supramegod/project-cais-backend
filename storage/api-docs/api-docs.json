@@ -19689,7 +19689,7 @@
                     "PKS Wizard"
                 ],
                 "summary": "Get available SPK for PKS wizard source selection",
-                "description": "Mengambil daftar SPK berdasarkan leads yang bisa dipakai frontend untuk memilih spk_id saat initialize wizard tipe baru.",
+                "description": "Mengambil daftar SPK berdasarkan leads. Quotation dilampirkan sebagai array quotations, bukan object quotation tunggal, karena satu SPK bisa memiliki banyak quotation melalui spk_site.",
                 "operationId": "b9e2a2271ad3ba926bb7084081b891ec",
                 "parameters": [
                     {
