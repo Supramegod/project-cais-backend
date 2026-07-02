@@ -454,6 +454,8 @@ class PksWizardFinalizeTest extends TestCase
         $this->seedQuotation(20, 10);
         $this->seedSpk(30, 10, 20);
         $this->seedSpk(31, 10, 20, 'SPK-SEARCH');
+        $this->seedSpkSite(40, 30, 20, 10, 'Site A');
+        $this->seedSpkSite(41, 31, 20, 10, 'Site B');
 
         $this->actingAs($user, 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
@@ -463,8 +465,9 @@ class PksWizardFinalizeTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.0.id', 31)
             ->assertJsonPath('data.0.nomor', 'SPK-SEARCH')
-            ->assertJsonPath('data.0.quotation.id', 20)
-            ->assertJsonPath('data.0.quotation.company.id', 13)
+            ->assertJsonPath('data.0.quotations.0.id', 20)
+            ->assertJsonPath('data.0.quotations.0.company.id', 13)
+            ->assertJsonPath('data.0.linked_quotation_ids', [20])
             ->assertJsonPath('pagination.per_page', 1);
     }
 
