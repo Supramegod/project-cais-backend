@@ -21,6 +21,7 @@
   "source_quotation_request": {
     "filter_by_spk_ids": {
       "spk_ids": [789, 790],
+      "tipe_pks": "rekontrak",
       "search": "SIG",
       "search_by": "company_name",
       "per_page": 10,

@@ -264,6 +264,7 @@ class PksWizardService
     public function getAvailableQuotationsByLeads(
         int $leadsId,
         array $spkIds = [],
+        ?string $tipePks = null,
         ?string $search = null,
         string $searchBy = 'nomor',
         int $perPage = 10
@@ -274,6 +275,7 @@ class PksWizardService
         $query = Quotation::with(['company:id,name,code', 'salaryRule:id,nama_salary_rule', 'ruleThr:id,nama'])
             ->where('leads_id', $lead->id)
             ->whereIn('status_quotation_id', [3,4])
+            ->when($tipePks === 'rekontrak', fn($q) => $q->where('tipe_quotation', 'rekontrak'))
             ->whereNull('deleted_at')
             ->orderByDesc('id');
 

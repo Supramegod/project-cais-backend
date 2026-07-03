@@ -117,6 +117,7 @@ POST /api/pks-wizard/source/quotations/{leadsId}
 ```json
 {
   "spk_ids": [789, 790],
+  "tipe_pks": "rekontrak",
   "search": "SIG",
   "search_by": "company_name",
   "per_page": 10,
@@ -126,6 +127,9 @@ POST /api/pks-wizard/source/quotations/{leadsId}
 
 - `spk_ids`
 : optional. Array SPK kandidat yang dipilih user. Jika diisi, backend hanya mengembalikan quotation yang terhubung ke salah satu SPK dalam array tersebut.
+
+- `tipe_pks`
+: optional. Jika `rekontrak`, backend hanya mengembalikan quotation dengan `tipe_quotation = 'rekontrak'`. Untuk `baru` dan `addendum`, tidak ada filter tambahan (belum diterapkan).
 
 ### Response Contoh
 
@@ -237,19 +241,21 @@ Catatan:
       "id": 789,
       "nomor": "SPK-001",
       "status_spk_id": 1,
-      "quotation_id": 456,
-      "quotation": {
-        "id": 456,
-        "nomor": "Q-001",
-        "company_id": 13,
-        "salary_rule_id": 1,
-        "rule_thr_id": 2,
-        "company": {
-          "id": 13,
-          "name": "PT SIG",
-          "code": "SIG"
+      "linked_quotation_ids": [456],
+      "quotations": [
+        {
+          "id": 456,
+          "nomor": "Q-001",
+          "company_id": 13,
+          "salary_rule_id": 1,
+          "rule_thr_id": 2,
+          "company": {
+            "id": 13,
+            "name": "PT SIG",
+            "code": "SIG"
+          }
         }
-      }
+      ]
     }
   ],
   "pagination": {
@@ -273,11 +279,11 @@ Catatan:
 - `status_spk_id`
 : status SPK saat ini
 
-- `quotation_id`
-: relasi quotation yang melekat pada SPK, bisa dipakai frontend untuk autofill jika dibutuhkan
+- `linked_quotation_ids`
+: array ID quotation dari spk_site yang terhubung ke SPK ini. Satu SPK bisa punya beberapa quotation.
 
-- `quotation.company_id`
-: referensi tambahan untuk mempermudah prefill company
+- `quotations`
+: array objek quotation dari spk_site, masing-masing berisi `id`, `nomor`, `company_id`, `salary_rule_id`, `rule_thr_id`, dan `company`.
 
 ## Endpoint 1: Initialize PKS Wizard
 
