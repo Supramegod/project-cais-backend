@@ -595,6 +595,7 @@ class PksWizardController extends Controller
      *         required=false,
      *         @OA\JsonContent(
      *             @OA\Property(property="spk_ids", type="array", @OA\Items(type="integer"), example={789,790}),
+     *             @OA\Property(property="tipe_pks", type="string", enum={"baru", "rekontrak", "addendum"}, nullable=true, example="rekontrak", description="Jika rekontrak, hanya quotation tipe rekontrak yang dikembalikan"),
      *             @OA\Property(property="search", type="string", example="SIG"),
      *             @OA\Property(property="search_by", type="string", enum={"nomor", "tipe_quotation", "company_name", "company_code", "salary_rule", "rule_thr"}, example="company_name"),
      *             @OA\Property(property="per_page", type="integer", example=10),
@@ -610,6 +611,7 @@ class PksWizardController extends Controller
             $quotations = $this->pksWizardService->getAvailableQuotationsByLeads(
                 $leadsId,
                 collect($request->input('spk_ids', []))->map(fn($id) => (int) $id)->filter()->values()->all(),
+                $request->input('tipe_pks'),
                 $request->input('search'),
                 $request->input('search_by', 'nomor'),
                 max(1, (int) $request->input('per_page', 10))

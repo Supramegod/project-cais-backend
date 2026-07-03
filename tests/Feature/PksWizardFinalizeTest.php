@@ -532,6 +532,27 @@ class PksWizardFinalizeTest extends TestCase
             ->assertJsonPath('data.0.id', 20);
     }
 
+    public function test_source_quotation_endpoint_filters_by_rekontrak_tipe_pks(): void
+    {
+        $user = $this->seedUser(16, 2, 'Rekontrak Filter');
+        $this->seedCommonMasterData();
+        $this->seedLead(10);
+        $this->seedQuotation(20, 10, 'Q-BARU');
+        $this->seedQuotation(21, 10, 'Q-REKONTRAK', 'rekontrak');
+
+        $this->actingAs($user, 'web');
+        $this->withoutMiddleware(CheckTokenExpiry::class);
+
+        $response = $this->postJson('/api/pks-wizard/source/quotations/10', [
+            'tipe_pks' => 'rekontrak',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', 21)
+            ->assertJsonPath('data.0.tipe_quotation', 'rekontrak');
+    }
+
     public function test_step_three_derives_source_ids_and_primary_quotation(): void
     {
         $user = $this->seedUser(15, 2, 'Step Three');
@@ -654,7 +675,7 @@ class PksWizardFinalizeTest extends TestCase
         ]);
     }
 
-    private function seedQuotation(int $id, int $leadsId, string $nomor = 'Q-001'): void
+    private function seedQuotation(int $id, int $leadsId, string $nomor = 'Q-001', ?string $tipeQuotation = null): void
     {
         DB::table('sl_quotation')->insert([
             'id' => $id,
@@ -665,6 +686,7 @@ class PksWizardFinalizeTest extends TestCase
             'company_id' => 13,
             'salary_rule_id' => 1,
             'rule_thr_id' => 2,
+            'tipe_quotation' => $tipeQuotation,
             'persentase' => 10,
         ]);
     }
@@ -849,6 +871,7 @@ class PksWizardFinalizeTest extends TestCase
             $table->unsignedInteger('company_id')->nullable();
             $table->unsignedInteger('salary_rule_id')->nullable();
             $table->unsignedInteger('rule_thr_id')->nullable();
+            $table->string('tipe_quotation')->nullable();
             $table->decimal('persentase', 10, 2)->nullable();
             $table->string('updated_by')->nullable();
             $table->softDeletes();
