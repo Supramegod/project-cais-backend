@@ -64,9 +64,9 @@ class QuotationService
             $this->calculateFirstPass($quotation, $jumlahHc, $result);
             $this->recalculateWithGrossUp($quotation, $jumlahHc, $result);
 
-            // Mark calculation as cached
-            $quotation->calculated_at = now();
-            $quotation->save();
+            // Mark calculation as cached — use direct update to avoid
+            // persisting dynamic properties (_hpp_map, _coss_map, etc.)
+            $quotation->where('id', $quotation->id)->update(['calculated_at' => now()]);
 
             return $result;
 
