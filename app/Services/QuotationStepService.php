@@ -79,13 +79,10 @@ class QuotationStepService
             9 => $step9, 10 => $step10, 11 => $step11, 12 => $step12,
         ];
 
-        // Resolve circular dependency: inject QuotationService into Step11Service
-        // QuotationService also injects QuotationStepService → circular.
-        // Using runtime resolution (app()) inside Step11Service's fallback,
-        // but we set the service here for the primary path.
-        $quotationService = app()->make(QuotationService::class);
-        $step11->setQuotationService($quotationService);
-        $step12->setQuotationService($quotationService);
+        // Circular dependency: QuotationService needs QuotationStepService, and
+        // Step11Service/Step12Service need QuotationService. Resolved lazily:
+        // both Step services use app(QuotationService::class) at runtime via
+        // getQuotationService() fallback — no injection at construction time.
     }
 
     /**
