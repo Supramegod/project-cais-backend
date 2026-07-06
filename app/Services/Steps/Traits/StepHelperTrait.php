@@ -2,6 +2,7 @@
 
 namespace App\Services\Steps\Traits;
 
+use App\DTO\QuotationCalculationResult;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
