@@ -250,7 +250,7 @@ class QuotationStepController extends Controller
         $startTime = microtime(true);
 
         $updateMethod = 'updateStep'.$step;
-        if (! method_exists($this->quotationStepService, $updateMethod)) {
+        if (! method_exists($this->quotationStepService, $updateMethod) && ! preg_match('/^updateStep(1[0-2]|[1-9])$/', $updateMethod)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Step method not found',
