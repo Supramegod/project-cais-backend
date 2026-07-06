@@ -7,12 +7,12 @@ use App\Models\LogNotification;
 use App\Models\Pks;
 use App\Models\Quotation;
 use App\Models\QuotationDetailRequirement;
-use App\Models\QuotationKerjasama;
 use App\Models\QuotationSite;
 use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\AddendumService;
+use App\Services\KerjasamaService;
 use App\Services\QuotationBusinessService;
 use App\Services\QuotationNotificationService;
 use Carbon\Carbon;
@@ -41,21 +41,23 @@ class ProcessQuotationFinalization implements ShouldQueue
     public function handle(
         QuotationBusinessService $businessService,
         QuotationNotificationService $notificationService,
+        KerjasamaService $kerjasamaService,
     ): void {
         $quotation = Quotation::with([
             'quotationDetails.quotationDetailRequirements',
         ])->find($this->quotationId);
 
-        if (!$quotation) {
+        if (! $quotation) {
             Log::warning('ProcessQuotationFinalization: Quotation not found', [
                 'id' => $this->quotationId,
             ]);
+
             return;
         }
 
         $now = Carbon::now();
 
-        $this->updateKerjasamaData($quotation, $this->kerjasamaData, $now);
+        $kerjasamaService->syncFromFinalization($quotation, $this->kerjasamaData, $now, $this->user);
         $this->insertRequirements($quotation, $now);
 
         if ($this->statusQuotationId == 2) {
@@ -86,87 +88,10 @@ class ProcessQuotationFinalization implements ShouldQueue
             );
         }
 
-        Log::info("ProcessQuotationFinalization: completed", [
+        Log::info('ProcessQuotationFinalization: completed', [
             'quotation_id' => $quotation->id,
             'status_quotation_id' => $this->statusQuotationId,
         ]);
-    }
-
-    private function updateKerjasamaData(Quotation $quotation, ?array $kerjasamaData, Carbon $now): void
-    {
-        if ($kerjasamaData !== null) {
-            $this->syncKerjasamaData($quotation, $kerjasamaData, $now, $this->user);
-        } else {
-            QuotationKerjasama::where('quotation_id', $quotation->id)
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => $now,
-                    'deleted_by' => $this->user,
-                ]);
-        }
-    }
-
-    private function syncKerjasamaData(Quotation $quotation, array $kerjasamas, Carbon $now, string $user): void
-    {
-        if (empty($kerjasamas)) {
-            QuotationKerjasama::where('quotation_id', $quotation->id)
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => $now,
-                    'deleted_by' => $user,
-                ]);
-            return;
-        }
-
-        $upsertData = [];
-        $incomingIds = [];
-
-        foreach ($kerjasamas as $kerjasamaData) {
-            $perjanjian = trim($kerjasamaData['perjanjian'] ?? '');
-            if ($perjanjian === '') continue;
-
-            $item = [
-                'quotation_id' => $quotation->id,
-                'perjanjian' => $perjanjian,
-                'is_delete' => $kerjasamaData['is_delete'] ?? 1,
-                'updated_at' => $now,
-                'updated_by' => $user,
-            ];
-
-            if (!empty($kerjasamaData['id'])) {
-                $item['id'] = $kerjasamaData['id'];
-                $incomingIds[] = $kerjasamaData['id'];
-            } else {
-                $item['created_at'] = $now;
-                $item['created_by'] = $user;
-            }
-            $upsertData[] = $item;
-        }
-
-        if (!empty($upsertData)) {
-            QuotationKerjasama::upsert(
-                $upsertData,
-                ['id'],
-                ['perjanjian', 'is_delete', 'updated_at', 'updated_by'],
-            );
-        }
-
-        if (!empty($incomingIds)) {
-            QuotationKerjasama::where('quotation_id', $quotation->id)
-                ->whereNotIn('id', $incomingIds)
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => $now,
-                    'deleted_by' => $user,
-                ]);
-        } else {
-            QuotationKerjasama::where('quotation_id', $quotation->id)
-                ->whereNull('deleted_at')
-                ->update([
-                    'deleted_at' => $now,
-                    'deleted_by' => $user,
-                ]);
-        }
     }
 
     private function insertRequirements(Quotation $quotation, Carbon $now): void
@@ -175,7 +100,9 @@ class ProcessQuotationFinalization implements ShouldQueue
             return $detail->quotationDetailRequirements->count() == 0;
         });
 
-        if ($detailsWithoutReqs->isEmpty()) return;
+        if ($detailsWithoutReqs->isEmpty()) {
+            return;
+        }
 
         $positionIds = $detailsWithoutReqs->pluck('id')->unique()->toArray();
 
@@ -199,7 +126,7 @@ class ProcessQuotationFinalization implements ShouldQueue
             }
         }
 
-        if (!empty($batchInsert)) {
+        if (! empty($batchInsert)) {
             QuotationDetailRequirement::insert($batchInsert);
         }
     }
@@ -230,7 +157,7 @@ class ProcessQuotationFinalization implements ShouldQueue
             ]);
         }
 
-        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/' . $quotation->id;
+        $approvalUrl = 'https://cais2.shelterapp2.co.id/quotation/view/'.$quotation->id;
         $notificationService->sendApprovalNotification(
             quotation: $quotation,
             creatorName: $creatorName,
@@ -256,10 +183,14 @@ class ProcessQuotationFinalization implements ShouldQueue
         SpkSite::where('quotation_id', $oldQuotation->id)
             ->each(function (SpkSite $spkSite) use ($oldSites, $newSitesByNama, $newQuotation) {
                 $oldSite = $oldSites->get($spkSite->quotation_site_id);
-                if (!$oldSite) return;
+                if (! $oldSite) {
+                    return;
+                }
 
                 $newSite = $newSitesByNama->get($oldSite->nama_site);
-                if (!$newSite) return;
+                if (! $newSite) {
+                    return;
+                }
 
                 $spkSite->update([
                     'quotation_id' => $newQuotation->id,
@@ -271,10 +202,14 @@ class ProcessQuotationFinalization implements ShouldQueue
         Site::where('quotation_id', $oldQuotation->id)
             ->each(function (Site $site) use ($oldSites, $newSitesByNama, $newQuotation) {
                 $oldSite = $oldSites->get($site->quotation_site_id);
-                if (!$oldSite) return;
+                if (! $oldSite) {
+                    return;
+                }
 
                 $newSite = $newSitesByNama->get($oldSite->nama_site);
-                if (!$newSite) return;
+                if (! $newSite) {
+                    return;
+                }
 
                 $site->update([
                     'quotation_id' => $newQuotation->id,
@@ -288,12 +223,10 @@ class ProcessQuotationFinalization implements ShouldQueue
 
     private function updateRevisionStatuses(Quotation $quotation): void
     {
-        Spk::whereHas('spkSites', fn($q) =>
-            $q->where('quotation_id', $quotation->id)
+        Spk::whereHas('spkSites', fn ($q) => $q->where('quotation_id', $quotation->id)
         )->update(['status_spk_id' => 1]);
 
-        Pks::whereHas('sites', fn($q) =>
-            $q->where('quotation_id', $quotation->id)
+        Pks::whereHas('sites', fn ($q) => $q->where('quotation_id', $quotation->id)
         )->update(['status_pks_id' => 5]);
     }
 
@@ -301,19 +234,19 @@ class ProcessQuotationFinalization implements ShouldQueue
     {
         $quotationIds = array_filter([$quotation->id, $quotation->quotation_referensi_id]);
 
-        Spk::whereHas('spkSites', fn($q) =>
-            $q->whereIn('quotation_id', $quotationIds)
+        Spk::whereHas('spkSites', fn ($q) => $q->whereIn('quotation_id', $quotationIds)
         )->update(['status_spk_id' => 6]);
 
-        Pks::whereHas('sites', fn($q) =>
-            $q->whereIn('quotation_id', $quotationIds)
+        Pks::whereHas('sites', fn ($q) => $q->whereIn('quotation_id', $quotationIds)
         )->update(['status_pks_id' => 10]);
     }
 
     private function updateDownstreamReferencesForAddendum(Quotation $quotation, QuotationBusinessService $businessService): void
     {
         $oldQuotation = Quotation::find($quotation->quotation_referensi_id);
-        if (!$oldQuotation) return;
+        if (! $oldQuotation) {
+            return;
+        }
 
         SpkSite::where('quotation_id', $oldQuotation->id)
             ->update(['quotation_id' => $quotation->id, 'updated_by' => $this->user]);
