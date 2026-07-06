@@ -510,7 +510,6 @@ class PksWizardService
         return match ($step) {
             1 => [
                 'source_summary' => Arr::get($payload, 'source', []),
-                'available_leads' => $this->getAvailableLeadsData(),
                 'available_sites' => $this->getAvailableSitesData($pks->leads_id, $tipePks),
                 'is_read_only' => true,
             ],
@@ -719,29 +718,6 @@ class PksWizardService
 
         return [$spkIds->all(), $quotationIds->all()];
     }
-
-    private function getAvailableLeadsData(): array
-    {
-        return Leads::filterByUserRole()
-            ->whereHas('spkSites', function ($query) {
-                $query->whereNull('sl_spk_site.deleted_at')
-                    ->whereHas('spk', fn($subQuery) => $subQuery->whereNull('sl_spk.deleted_at'))
-                    ->whereDoesntHave('site', fn($siteQuery) => $siteQuery->whereNull('sl_site.deleted_at'));
-            })
-            ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
-            ->distinct()
-            ->orderBy('id', 'desc')
-            ->get()
-            ->map(fn(Leads $lead) => [
-                'id' => $lead->id,
-                'nomor' => $lead->nomor,
-                'nama_perusahaan' => $lead->nama_perusahaan,
-                'provinsi' => $lead->provinsi,
-                'kota' => $lead->kota,
-            ])
-            ->all();
-    }
-
     private function getAvailableSitesData(int $leadsId, ?string $tipe): array
     {
         $tipe = $tipe ?: 'baru';
@@ -779,9 +755,9 @@ class PksWizardService
                     'nominal_upah' => $site->nominal_upah ?? null,
                     'quotation_id' => $site->quotation?->id,
                     'spk_id' => $site->spk_id ?? null,
-                    'company' => $site->quotation?->company ? [
-                        'id' => $site->quotation->company->id,
-                        'name' => $site->quotation->company->name,
+                    'company' => $site->quotation->relationLoaded('company') && $site->quotation->getRelation('company') ? [
+                        'id' => $site->quotation->getRelation('company')->id,
+                        'name' => $site->quotation->getRelation('company')->name,
                     ] : null,
                 ];
             })
