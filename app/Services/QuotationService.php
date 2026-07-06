@@ -683,24 +683,12 @@ class QuotationService
 
     private function calculateBpjs($detail, $quotation, $hpp): void
     {
-        if ($detail->penjamin_kesehatan === 'BPU') {
-            foreach ([
-                'bpjs_jkk',
-                'bpjs_jkm',
-                'bpjs_jht',
-                'bpjs_jp',
-                'bpjs_kes',
-                'persen_bpjs_jkk',
-                'persen_bpjs_jkm',
-                'persen_bpjs_jht',
-                'persen_bpjs_jp',
-                'persen_bpjs_kes',
-            ] as $f) {
-                $detail->{$f} = 0;
-            }
-            $this->updateQuotationBpjs($detail, $quotation);
-
-            return;
+        $isBpu = ($detail->penjamin_kesehatan === 'BPU');
+        if ($isBpu) {
+            // BPU menangani BPJS Kesehatan saja — hanya zero-kan field kesehatan,
+            // BPJS Ketenagakerjaan (JKK, JKM, JHT, JP) tetap dihitung normal.
+            $detail->bpjs_kes = 0;
+            $detail->persen_bpjs_kes = 0;
         }
 
         // 2. Cek apakah Program BPJS di Quotation aktif
@@ -783,6 +771,9 @@ class QuotationService
             } elseif ($key === 'kes' && in_array($detail->penjamin_kesehatan, ['Asuransi Swasta', 'Takaful'])) {
                 // Khusus Kesehatan jika menggunakan provider non-BPJS
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
+                $detail->{$config['percent']} = 0;
+            } elseif ($key === 'kes' && $isBpu) {
+                // BPU: BPJS Kesehatan sudah di-0-kan di atas — jangan timpa
                 $detail->{$config['percent']} = 0;
             } elseif ($hpp && $hpp->{$hppField} !== null) {
                 // ✅ PRIORITAS: Ambil nominal langsung dari HPP jika tersedia
