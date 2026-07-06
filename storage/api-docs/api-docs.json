@@ -19641,6 +19641,17 @@
                                             790
                                         ]
                                     },
+                                    "tipe_pks": {
+                                        "description": "Jika rekontrak, hanya quotation tipe rekontrak yang dikembalikan",
+                                        "type": "string",
+                                        "enum": [
+                                            "baru",
+                                            "rekontrak",
+                                            "addendum"
+                                        ],
+                                        "example": "rekontrak",
+                                        "nullable": true
+                                    },
                                     "search": {
                                         "type": "string",
                                         "example": "SIG"
