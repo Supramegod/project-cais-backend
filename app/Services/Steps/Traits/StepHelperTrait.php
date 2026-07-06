@@ -214,15 +214,25 @@ trait StepHelperTrait
             ];
         }
 
-        if (! empty($hppUpdates)) {
-            QuotationDetailHpp::upsert($hppUpdates, ['quotation_detail_id'], ['bpjs_ks', 'updated_by', 'updated_at']);
+        // HPP/COSS records already exist — use individual updates (not upsert,
+        // which would require position_id for INSERT path).
+        foreach ($hppUpdates as $data) {
+            QuotationDetailHpp::where('quotation_detail_id', $data['quotation_detail_id'])->update([
+                'bpjs_ks' => $data['bpjs_ks'],
+                'updated_by' => $data['updated_by'],
+                'updated_at' => $data['updated_at'],
+            ]);
         }
 
-        if (! empty($cossUpdates)) {
-            QuotationDetailCoss::upsert($cossUpdates, ['quotation_detail_id'], ['bpjs_ks', 'updated_by', 'updated_at']);
+        foreach ($cossUpdates as $data) {
+            QuotationDetailCoss::where('quotation_detail_id', $data['quotation_detail_id'])->update([
+                'bpjs_ks' => $data['bpjs_ks'],
+                'updated_by' => $data['updated_by'],
+                'updated_at' => $data['updated_at'],
+            ]);
         }
 
-        Log::info('Updated BPJS KS nominal via upsert', [
+        Log::info('Updated BPJS KS nominal', [
             'quotation_id' => $quotation->id,
             'hpp_count' => count($hppUpdates),
             'coss_count' => count($cossUpdates),
@@ -379,12 +389,21 @@ trait StepHelperTrait
                 QuotationDetailCoss::insert($cossInsert);
             }
 
-            // Use upsert for bulk updates instead of foreach+update
-            if (! empty($hppUpdate)) {
-                QuotationDetailHpp::upsert($hppUpdate, ['id'], ['jumlah_hc', 'updated_at', 'updated_by']);
+            // Bulk update existing records — HPP/COSS rows are pre-created,
+            // so use individual updates (not upsert, which would require position_id).
+            foreach ($hppUpdate as $data) {
+                QuotationDetailHpp::where('id', $data['id'])->update([
+                    'jumlah_hc' => $data['jumlah_hc'],
+                    'updated_at' => $data['updated_at'] ?? now(),
+                    'updated_by' => $data['updated_by'] ?? auth()->user()->full_name,
+                ]);
             }
-            if (! empty($cossUpdate)) {
-                QuotationDetailCoss::upsert($cossUpdate, ['id'], ['jumlah_hc', 'updated_at', 'updated_by']);
+            foreach ($cossUpdate as $data) {
+                QuotationDetailCoss::where('id', $data['id'])->update([
+                    'jumlah_hc' => $data['jumlah_hc'],
+                    'updated_at' => $data['updated_at'] ?? now(),
+                    'updated_by' => $data['updated_by'] ?? auth()->user()->full_name,
+                ]);
             }
 
         } catch (\Exception $e) {
@@ -742,16 +761,21 @@ trait StepHelperTrait
             $cossFinalData[] = array_intersect_key($cossFull, $cossAllowed);
         }
 
-        // 3. EKSEKUSI DATABASE (Batch Upsert)
-        $updateFieldsHpp = array_diff(array_keys($hppAllowed), ['id', 'created_at', 'quotation_detail_id']);
-        $updateFieldsCoss = array_diff(array_keys($cossAllowed), ['id', 'created_at', 'quotation_detail_id']);
-
-        if (! empty($hppFinalData)) {
-            QuotationDetailHpp::upsert($hppFinalData, ['quotation_detail_id'], $updateFieldsHpp);
+        // 3. EKSEKUSI DATABASE (Batch Update)
+        // HPP/COSS records already exist from Step 3 — use updateOrCreate to
+        // safely handle edge cases where a record might not exist yet.
+        foreach ($hppFinalData as $data) {
+            QuotationDetailHpp::updateOrCreate(
+                ['quotation_detail_id' => $data['quotation_detail_id'] ?? 0],
+                $data
+            );
         }
 
-        if (! empty($cossFinalData)) {
-            QuotationDetailCoss::upsert($cossFinalData, ['quotation_detail_id'], $updateFieldsCoss);
+        foreach ($cossFinalData as $data) {
+            QuotationDetailCoss::updateOrCreate(
+                ['quotation_detail_id' => $data['quotation_detail_id'] ?? 0],
+                $data
+            );
         }
     }
 
