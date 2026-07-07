@@ -567,11 +567,20 @@ class PksController extends Controller
                     ->get()
                     ->keyBy('id');  // akses O(1) di bawah
 
-                // Loop ini tidak menembak query sama sekali
+                // Cache QuotationResource per quotation_id: satu quotation bisa
+                // dipakai banyak site (multi-site), dan konstruktor QuotationResource
+                // menjalankan calculateQuotation. Tanpa cache, quotation yang sama
+                // dihitung ulang tiap site — dedup agar hanya sekali per quotation.
+                $resourceCache = [];
                 foreach ($siteData as $item) {
-                    $quotation = $quotations->get($item->quotation_id);
-                    if ($quotation) {
-                        $quotationDataArray[] = new QuotationResource($quotation);
+                    $qid = $item->quotation_id;
+                    if (! array_key_exists($qid, $resourceCache)) {
+                        $quotation = $quotations->get($qid);
+                        $resourceCache[$qid] = $quotation ? new QuotationResource($quotation) : null;
+                    }
+
+                    if ($resourceCache[$qid]) {
+                        $quotationDataArray[] = $resourceCache[$qid];
                     }
 
                     $spk = $spks->get($item->spk_id);
