@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RoleUpdatePermissionsRequest;
 use App\Models\Role;
 use App\Models\Sysmenu;
 use App\Models\SysmenuRole;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 /**
  * @OA\Tag(
  *     name="Roles",
@@ -43,13 +42,7 @@ class RoleController extends Controller
      */
     public function index(): JsonResponse
     {
-        try {
-            $roles = Role::active()->get();
-            return $this->successResponse($roles);
-        } catch (\Exception $e) {
-            $this->logError('Fetch roles error', $e);
-            return $this->errorResponse();
-        }
+        return $this->successResponse(Role::active()->get());
     }
 
 
@@ -108,38 +101,33 @@ class RoleController extends Controller
      */
     public function show($id): JsonResponse
     {
-        try {
-            // Ambil role dari connection mysqlhris
-            $role = Role::find($id);
+        // Ambil role dari connection mysqlhris
+        $role = Role::find($id);
 
-            if (!$role) {
-                return $this->notFoundResponse('Role not found');
-            }
-
-            // Ambil semua menu dengan permissions untuk role ini
-            $menus = Sysmenu::active()
-                ->withPermissions($id)
-                ->withGroupInfo()
-                ->selectMenuFields()
-                ->ordered()
-                ->get();
-
-            // Bangun hierarchical menu structure
-            $menuTree = $this->buildMenuTreeWithPermissions($menus);
-
-            // Format response
-            $roleData = [
-                'id' => $role->id,
-                'name' => $role->name,
-                'Is_active' => $role->Is_active,
-                'menus' => $menuTree
-            ];
-
-            return $this->successResponse($roleData);
-        } catch (\Exception $e) {
-            $this->logError('Fetch role error', $e, ['cais_role_id' => $id]);
-            return $this->errorResponse();
+        if (!$role) {
+            return $this->notFoundResponse('Role not found');
         }
+
+        // Ambil semua menu dengan permissions untuk role ini
+        $menus = Sysmenu::active()
+            ->withPermissions($id)
+            ->withGroupInfo()
+            ->selectMenuFields()
+            ->ordered()
+            ->get();
+
+        // Bangun hierarchical menu structure
+        $menuTree = $this->buildMenuTreeWithPermissions($menus);
+
+        // Format response
+        $roleData = [
+            'id' => $role->id,
+            'name' => $role->name,
+            'Is_active' => $role->Is_active,
+            'menus' => $menuTree
+        ];
+
+        return $this->successResponse($roleData);
     }
 
 
@@ -197,69 +185,63 @@ class RoleController extends Controller
      */
     public function menuPermissions(): JsonResponse
     {
-        try {
-            $user = Auth::user();
-            if (!$user || !$user->cais_role_id) {
-                return $this->forbiddenResponse('User role not found');
-            }
-
-            // Ambil semua menu aktif dengan LEFT JOIN ke permissions
-            $menus = Sysmenu::active()
-                ->withPermissions($user->cais_role_id)
-                ->withGroupInfo()
-                ->selectMenuFields()
-                ->ordered()
-                ->get();
-
-            // Filter: hanya ambil menu yang memiliki is_view = 1 atau belum ada permission record
-            $filteredMenus = $menus->filter(function ($menu) {
-                return $menu->is_view == 1 || is_null($menu->is_view);
-            });
-
-            // Jika tidak ada menu yang memenuhi kriteria, return empty response
-            if ($filteredMenus->isEmpty()) {
-                return $this->successResponse([
-                    'ungrouped' => [],
-                    'grouped' => []
-                ]);
-            }
-
-            // Bangun tree + pewarisan group
-            $menuTree = $this->buildMenuTreeWithGroup($filteredMenus);
-
-            $groupedMenus = [];
-            $ungroupedMenus = [];
-
-            foreach ($menuTree as $menu) {
-                if (empty($menu['group_id'])) {
-                    $ungroupedMenus[] = $menu;
-                } else {
-                    $groupId = $menu['group_id'];
-                    $groupName = $menu['group_name'] ?? 'Tanpa Nama';
-
-                    if (!isset($groupedMenus[$groupId])) {
-                        $groupedMenus[$groupId] = [
-                            'group_id' => $groupId,
-                            'group_name' => $groupName,
-                            'menus' => [],
-                        ];
-                    }
-
-                    $groupedMenus[$groupId]['menus'][] = $menu;
-                }
-            }
-
-            $response = [
-                'ungrouped' => $ungroupedMenus,
-                'grouped' => array_values($groupedMenus),
-            ];
-
-            return $this->successResponse($response);
-
-        } catch (\Exception $e) {
-            $this->logError('Fetch menu permissions error', $e, ['user_id' => Auth::id()]);
-            return $this->errorResponse();
+        $user = Auth::user();
+        if (!$user || !$user->cais_role_id) {
+            return $this->errorResponse('User role not found', 403);
         }
+
+        // Ambil semua menu aktif dengan LEFT JOIN ke permissions
+        $menus = Sysmenu::active()
+            ->withPermissions($user->cais_role_id)
+            ->withGroupInfo()
+            ->selectMenuFields()
+            ->ordered()
+            ->get();
+
+        // Filter: hanya ambil menu yang memiliki is_view = 1 atau belum ada permission record
+        $filteredMenus = $menus->filter(function ($menu) {
+            return $menu->is_view == 1 || is_null($menu->is_view);
+        });
+
+        // Jika tidak ada menu yang memenuhi kriteria, return empty response
+        if ($filteredMenus->isEmpty()) {
+            return $this->successResponse([
+                'ungrouped' => [],
+                'grouped' => []
+            ]);
+        }
+
+        // Bangun tree + pewarisan group
+        $menuTree = $this->buildMenuTreeWithGroup($filteredMenus);
+
+        $groupedMenus = [];
+        $ungroupedMenus = [];
+
+        foreach ($menuTree as $menu) {
+            if (empty($menu['group_id'])) {
+                $ungroupedMenus[] = $menu;
+            } else {
+                $groupId = $menu['group_id'];
+                $groupName = $menu['group_name'] ?? 'Tanpa Nama';
+
+                if (!isset($groupedMenus[$groupId])) {
+                    $groupedMenus[$groupId] = [
+                        'group_id' => $groupId,
+                        'group_name' => $groupName,
+                        'menus' => [],
+                    ];
+                }
+
+                $groupedMenus[$groupId]['menus'][] = $menu;
+            }
+        }
+
+        $response = [
+            'ungrouped' => $ungroupedMenus,
+            'grouped' => array_values($groupedMenus),
+        ];
+
+        return $this->successResponse($response);
     }
     /**
      * @OA\Post(
@@ -306,31 +288,20 @@ class RoleController extends Controller
      *     )
      * )
      */
-    public function updatePermissions(Request $request, $id): JsonResponse
+    public function updatePermissions(RoleUpdatePermissionsRequest $request, $id): JsonResponse
     {
-        DB::beginTransaction();
+        $permissions = $request->input('akses', []);
 
-        try {
-            $permissions = $request->input('akses', []);
-
+        DB::transaction(function () use ($permissions, $id) {
             foreach ($permissions as $permission) {
                 $this->updateOrCreatePermission($id, $permission);
 
                 // Jika yang diupdate adalah menu parent, update juga semua child menus
                 $this->cascadePermissionToChildren($id, $permission);
             }
+        });
 
-            DB::commit();
-            return $this->successResponse(null, 'Permissions updated successfully');
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            $this->logError('Update permissions error', $e, [
-                'cais_role_id' => $id,
-                'permissions' => $request->input('akses')
-            ]);
-            return $this->errorResponse('Failed to update permissions');
-        }
+        return $this->successResponse(null, 'Permissions updated successfully');
     }
 
     /**
@@ -498,53 +469,5 @@ class RoleController extends Controller
         }
 
         return $tree;
-    }
-
-    private function successResponse($data = null, string $message = null): JsonResponse
-    {
-        $response = ['success' => true];
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
-
-        if ($message) {
-            $response['message'] = $message;
-        }
-
-        return response()->json($response);
-    }
-
-    private function errorResponse(string $message = 'Internal server error'): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => $message
-        ], 500);
-    }
-    private function forbiddenResponse(string $message = 'Access denied'): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => $message
-        ], 403);
-    }
-
-
-    private function notFoundResponse(string $message = 'Resource not found'): JsonResponse
-    {
-        return response()->json([
-            'success' => false,
-            'message' => $message
-        ], 404);
-    }
-
-    private function logError(string $message, \Exception $e, array $context = []): void
-    {
-        Log::error("$message: {$e->getMessage()}", array_merge([
-            'user_id' => Auth::id(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine()
-        ], $context));
     }
 }

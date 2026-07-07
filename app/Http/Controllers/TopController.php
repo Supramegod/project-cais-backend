@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TopRequest;
 use App\Models\Top;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @OA\Tag(
@@ -70,19 +71,9 @@ class TopController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $data = Top::all();
+        $data = Top::all();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
-        }
+        return $this->successResponse($data);
     }
 
     /**
@@ -151,49 +142,15 @@ class TopController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(TopRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255|unique:m_top,nama',
-                'persentase' => 'required|numeric|min:0|max:100'
-            ], [
-                'nama.required' => 'Nama TOP harus diisi',
-                'nama.max' => 'Nama maksimal 255 karakter',
-                'nama.unique' => 'Nama TOP sudah ada',
-                'persentase.required' => 'Persentase harus diisi',
-                'persentase.numeric' => 'Persentase harus berupa angka',
-                'persentase.min' => 'Persentase minimal 0',
-                'persentase.max' => 'Persentase maksimal 100'
-            ]);
+        $top = Top::create([
+            'nama' => $request->nama,
+            'persentase' => $request->persentase,
+            'created_by' => Auth::user()->full_name ?? 'System',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $top = Top::create([
-                'nama' => $request->nama,
-                'persentase' => $request->persentase,
-                'created_by' => Auth::user()->full_name ?? 'System',
-                'created_by_user_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'TOP berhasil dibuat',
-                'data' => $top
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
-        }
+        return $this->successResponse($top, 'TOP berhasil dibuat', 201);
     }
 
     /**
@@ -253,27 +210,13 @@ class TopController extends Controller
      */
     public function view($id)
     {
-        try {
-            $top = Top::find($id);
+        $top = Top::find($id);
 
-            if (!$top) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'TOP tidak ditemukan'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $top
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
+        if (!$top) {
+            return $this->notFoundResponse('TOP tidak ditemukan');
         }
+
+        return $this->successResponse($top);
     }
 
     /**
@@ -358,57 +301,21 @@ class TopController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(TopRequest $request, $id)
     {
-        try {
-            $top = Top::find($id);
+        $top = Top::find($id);
 
-            if (!$top) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'TOP tidak ditemukan'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255|unique:m_top,nama,' . $id,
-                'persentase' => 'required|numeric|min:0|max:100'
-            ], [
-                'nama.required' => 'Nama TOP harus diisi',
-                'nama.max' => 'Nama maksimal 255 karakter',
-                'nama.unique' => 'Nama TOP sudah ada',
-                'persentase.required' => 'Persentase harus diisi',
-                'persentase.numeric' => 'Persentase harus berupa angka',
-                'persentase.min' => 'Persentase minimal 0',
-                'persentase.max' => 'Persentase maksimal 100'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $top->update([
-                'nama' => $request->nama,
-                'persentase' => $request->persentase,
-                'updated_by' => Auth::user()->full_name ?? 'System'
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'TOP berhasil diupdate',
-                'data' => $top
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
+        if (!$top) {
+            return $this->notFoundResponse('TOP tidak ditemukan');
         }
+
+        $top->update([
+            'nama' => $request->nama,
+            'persentase' => $request->persentase,
+            'updated_by' => Auth::user()->full_name ?? 'System'
+        ]);
+
+        return $this->successResponse($top, 'TOP berhasil diupdate');
     }
 
     /**
@@ -469,31 +376,21 @@ class TopController extends Controller
      */
     public function delete($id)
     {
-        try {
-            $top = Top::find($id);
+        $top = Top::find($id);
 
-            if (!$top) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'TOP tidak ditemukan'
-                ], 404);
-            }
+        if (!$top) {
+            return $this->notFoundResponse('TOP tidak ditemukan');
+        }
 
+        // Two writes on the same row (stamp deleted_by, then soft-delete):
+        // wrap so the audit stamp and the delete commit atomically.
+        DB::transaction(function () use ($top) {
             $top->update([
                 'deleted_by' => Auth::user()->full_name ?? 'System'
             ]);
             $top->delete();
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'TOP berhasil dihapus'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
-        }
+        return $this->messageResponse('TOP berhasil dihapus');
     }
 }
