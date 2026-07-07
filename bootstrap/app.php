@@ -1,9 +1,15 @@
 <?php
 
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -30,7 +36,45 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Pemetaan exception → envelope JSON tersentralisasi untuk request API.
+        // Hanya berlaku untuk request yang mengharapkan JSON (rute /api/*),
+        // sehingga rute web tetap memakai handler default.
+        $exceptions->render(function (\Throwable $e, $request) {
+            if (! $request->is('api/*') && ! $request->expectsJson()) {
+                return null; // biarkan handler default menangani
+            }
+
+            // Validasi → samakan dengan bentuk BaseRequest: { message: { field: [..] } }
+            if ($e instanceof ValidationException) {
+                return response()->json(['message' => $e->errors()], 422);
+            }
+
+            if ($e instanceof AuthenticationException) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+            }
+
+            if ($e instanceof AuthorizationException) {
+                return response()->json(['success' => false, 'message' => 'Anda tidak memiliki akses'], 403);
+            }
+
+            if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
+                return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+            }
+
+            // HttpException lain (403/405/dll) — pertahankan status & pesannya
+            if ($e instanceof HttpExceptionInterface) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Error',
+                ], $e->getStatusCode());
+            }
+
+            // Fallback 500 — sembunyikan detail di produksi
+            return response()->json([
+                'success' => false,
+                'message' => config('app.debug') ? $e->getMessage() : 'Terjadi kesalahan server',
+            ], 500);
+        });
     })->create();
 
 // Tambahkan ini di luar return statement
