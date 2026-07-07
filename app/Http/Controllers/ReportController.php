@@ -129,14 +129,14 @@ class ReportController extends Controller
         }
 
         $salesNames = $salesData->pluck('nama_sales')->toArray();
+        $userIds = $salesData->pluck('user_id')->filter()->values()->toArray();
 
-        $aggThisMonth = $this->getMonthlyAggregation($startThisMonth, $endThisMonth, $salesNames);
+        $aggThisMonth = $this->getMonthlyAggregation($startThisMonth, $endThisMonth, $userIds);
 
         $data = [];
         $no = 1;
         foreach ($salesData as $sales) {
-            $nama = $sales->nama_sales;
-            $actThis = $aggThisMonth->firstWhere('created_by', $nama);
+            $actThis = $aggThisMonth->firstWhere('created_by_user_id', $sales->user_id);
 
             $thisMonthData = $this->formatMonthlyCounts($actThis);
             $thisMonthData = $this->attachPercentages($thisMonthData);
@@ -144,7 +144,7 @@ class ReportController extends Controller
             $data[] = [
                 'no' => $no++,
                 'user_id' => $sales->user_id ?? null,
-                'nama_sales' => $nama,
+                'nama_sales' => $sales->nama_sales,
                 'cabang' => $sales->cabang,
                 'aggregat' => $thisMonthData,
             ];
@@ -274,11 +274,13 @@ class ReportController extends Controller
         }
 
         $salesNames = $salesData->pluck('nama_sales')->toArray();
+        $userIds = $salesData->pluck('user_id')->filter()->values()->toArray();
 
         //mentah
         $weeklyActivity = DB::table('sl_activity_sales')
             ->select(
-                'created_by',
+                DB::raw('ANY_VALUE(created_by) as created_by'),
+                'created_by_user_id',
                 DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
                 DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
                 DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_quot"),
@@ -304,8 +306,8 @@ class ReportController extends Controller
                 DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_pks")
             )
             ->whereBetween('tgl_activity', [$startMonth, $endMonth])
-            ->whereIn('created_by', $salesNames)
-            ->groupBy('created_by')
+            ->whereIn('created_by_user_id', $userIds)
+            ->groupBy('created_by_user_id')
             ->get();
 
         // Alur: Kirim Proposal → Appointment → Visit → Quotation → SPK → PKS
@@ -562,7 +564,7 @@ class ReportController extends Controller
         $no = 1;
         foreach ($salesData as $sales) {
             $nama = $sales->nama_sales;
-            $act = $weeklyActivity->firstWhere('created_by', $nama);
+            $act = $weeklyActivity->firstWhere('created_by_user_id', $sales->user_id);
 
             $w1 = ['appt' => 0, 'visit' => 0, 'quot' => 0, 'spk' => 0, 'pks' => 0];
             $w2 = ['appt' => 0, 'visit' => 0, 'quot' => 0, 'spk' => 0, 'pks' => 0];
@@ -697,17 +699,16 @@ class ReportController extends Controller
             ]);
         }
 
-        // Kumpulkan user_id (untuk join ke sl_leads) dan nama (untuk filter sl_activity_sales)
+        // Kumpulkan user_id (untuk join ke sl_leads dan filter sl_customer_activity)
         $userIds = $salesData->pluck('user_id')->toArray();
-        $salesNames = $salesData->pluck('nama_sales')->toArray();
 
-        $aggData = $this->getRole30MonthlyAggregation($startMonth, $endMonth, $salesNames);
+        $aggData = $this->getRole30MonthlyAggregation($startMonth, $endMonth, $userIds);
 
         $data = [];
         $no = 1;
         foreach ($salesData as $sales) {
             $nama = $sales->nama_sales;
-            $agg = $aggData->firstWhere('created_by', $nama);
+            $agg = $aggData->firstWhere('user_id', $sales->user_id);
 
             $jumlahLeads = $agg ? (int) $agg->jumlah_leads : 0;
             $jumlahAssignment = $agg ? (int) $agg->jumlah_assignment : 0;
@@ -848,10 +849,12 @@ class ReportController extends Controller
         }
 
         $salesNames = $salesData->pluck('nama_sales')->toArray();
+        $userIds = $salesData->pluck('user_id')->filter()->values()->toArray();
 
         $weeklyActivity = DB::table('sl_customer_activity as sa')
             ->select(
-                'sa.created_by',
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
+                'sa.user_id',
 
                 // ── WEEK 1 (tgl 1-7) ──────────────────────────────────────
                 DB::raw("COUNT(DISTINCT CASE
@@ -942,10 +945,10 @@ class ReportController extends Controller
                     THEN 1 ELSE 0 END) as w4_appt")
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
-            ->whereIn('sa.created_by', $salesNames)
+            ->whereIn('sa.user_id', $userIds)
             // Hanya ambil baris yang relevan dengan alur Leads→Assignment→Appointment
             ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
-            ->groupBy('sa.created_by')
+            ->groupBy('sa.user_id')
             ->get();
         // ── Query agregasi mingguan untuk 3 metrik (Leads, Assignment, Appointment) ──
         //
@@ -1063,7 +1066,7 @@ class ReportController extends Controller
         $no = 1;
         foreach ($salesData as $sales) {
             $nama = $sales->nama_sales;
-            $act = $weeklyActivity->firstWhere('created_by', $nama);
+            $act = $weeklyActivity->firstWhere('user_id', $sales->user_id);
 
             $w1 = $emptyWeek;
             $w2 = $emptyWeek;
@@ -1268,7 +1271,7 @@ class ReportController extends Controller
                 'l.nama_perusahaan'
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
-            ->where('sa.created_by', $salesName)
+            ->where('sa.created_by_user_id', $userId)
             ->orderBy('sa.tgl_activity', 'asc')
             ->orderBy('sa.created_at', 'asc')
             ->get();
@@ -1479,6 +1482,7 @@ class ReportController extends Controller
         $cabang = $matched->cabang;
 
         // ── 4. Query aktivitas (hanya Leads, Assignment, Appointment) ─────────
+
         $activities = DB::table('sl_customer_activity as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
             ->select(
@@ -1486,13 +1490,14 @@ class ReportController extends Controller
                 'sa.leads_id',
                 'sa.tgl_activity',
                 'sa.tipe',
+                'sa.tipe',
                 DB::raw("COALESCE(sa.notulen, '') AS notulen"),
                 'sa.created_by',
                 'sa.created_at',
                 'l.nama_perusahaan'
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
-            ->where('sa.created_by', $salesName)
+            ->where('sa.user_id', $userId)
             ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
             ->orderBy('sa.tgl_activity', 'asc')
             ->orderBy('sa.created_at', 'asc')
@@ -1588,11 +1593,12 @@ class ReportController extends Controller
     /**
      * mentah
      */
-    private function getMonthlyAggregation($start, $end, array $salesNames)
+    private function getMonthlyAggregation($start, $end, array $userIds)
     {
         return DB::table('sl_activity_sales')
             ->select(
-                'created_by',
+                DB::raw('ANY_VALUE(created_by) as created_by'),
+                'created_by_user_id',
                 DB::raw("COUNT(CASE WHEN jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
                 DB::raw("COUNT(CASE WHEN jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
                 DB::raw("COUNT(CASE WHEN jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon') THEN 1 END) as jumlah_visit"),
@@ -1602,8 +1608,8 @@ class ReportController extends Controller
                 DB::raw("COUNT(CASE WHEN jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
             )
             ->whereBetween('tgl_activity', [$start, $end])
-            ->whereIn('created_by', $salesNames)
-            ->groupBy('created_by')
+            ->whereIn('created_by_user_id', $userIds)
+            ->groupBy('created_by_user_id')
             ->get();
     }
     // private function getMonthlyAggregation($start, $end, array $salesNames)
@@ -1685,11 +1691,12 @@ class ReportController extends Controller
 
 
     //mentah
-    private function getRole30MonthlyAggregation($start, $end, array $salesNames)
+    private function getRole30MonthlyAggregation($start, $end, array $userIds)
     {
         return DB::table('sl_customer_activity as sa')
             ->select(
-                'sa.created_by',
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
+                'sa.user_id',
 
                 // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
@@ -1707,9 +1714,9 @@ class ReportController extends Controller
                 THEN 1 END) as jumlah_appointment")
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
-            ->whereIn('sa.created_by', $salesNames)
+            ->whereIn('sa.user_id', $userIds)
             ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
-            ->groupBy('sa.created_by')
+            ->groupBy('sa.user_id')
             ->get();
     }
     // private function getRole30MonthlyAggregation($start, $end, array $salesNames)

@@ -419,12 +419,19 @@ class SalesActivityController extends Controller
                 'jenis_activity' => $request->jenis_activity,
                 'notulen' => $request->notulen,
                 'created_by' => $user ? $user->full_name : 'System',
+                'created_by_user_id' => $user ? $user->id : null,
                 'start' => $request->start,
                 'end' => $request->end,
                 'durasi' => $request->durasi,
                 'penerima' => $request->penerima,
-                'jenis_visit'=> $request->jenis_visit,
+                'jenis_visit' => $request->jenis_visit,
             ]);
+            // ========== TAMBAHAN : UPDATE tgl_leads DI TABEL leads ==========
+            $lead = Leads::find($request->leads_id);
+            if ($lead) {
+                $lead->tgl_leads = $request->tgl_activity; // set ke tanggal activity terbaru
+                $lead->save();
+            }
 
             // Handle file uploads dari multipart/form-data
             if ($request->hasFile('files')) {
@@ -888,6 +895,7 @@ class SalesActivityController extends Controller
                 'nama_file' => $file->getClientOriginalName(),
                 'url_file' => $fileUrl,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'created_at' => Carbon::now()
             ]);
 

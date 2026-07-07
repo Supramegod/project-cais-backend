@@ -178,7 +178,8 @@ class TopController extends Controller
             $top = Top::create([
                 'nama' => $request->nama,
                 'persentase' => $request->persentase,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

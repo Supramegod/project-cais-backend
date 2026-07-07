@@ -4571,8 +4571,10 @@
                             "type": "string",
                             "enum": [
                                 "nama_perusahaan",
-                                "nomor",
-                                "kebutuhan"
+                                "tipe",
+                                "branch",
+                                "kebutuhan",
+                                "sales"
                             ],
                             "example": "nama_perusahaan"
                         }
@@ -8344,6 +8346,109 @@
                 ]
             }
         },
+        "/api/dashboard-pks/summary": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "Ringkasan status & jumlah kontrak PKS",
+                "operationId": "271a9418705da68e0cf0066dbcd2ae90",
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/expiring": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS teratas yang mendekati habis kontrak (pagination)",
+                "operationId": "0e1d0b5a07198851fcbf1f4264ea9dc0",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/dashboard-pks/list": {
+            "get": {
+                "tags": [
+                    "Dashboard PKS"
+                ],
+                "summary": "List PKS by tipe (terbaru / belum-aktivasi / site-aktif)",
+                "operationId": "d0238cef11a6028811e0fe0b0abc1ffc",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "latest",
+                                "belum-aktivasi",
+                                "site-aktif"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/devices/list": {
             "get": {
                 "tags": [
@@ -11110,369 +11215,6 @@
                     },
                     "500": {
                         "description": "Internal Server Error"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/leads/add": {
-            "post": {
-                "tags": [
-                    "Leads"
-                ],
-                "summary": "Membuat lead baru dengan assign sales ke kebutuhan",
-                "description": "Endpoint ini digunakan untuk membuat data lead baru. Sistem akan melakukan validasi nama perusahaan untuk mencegah duplikasi, generate nomor lead otomatis, membuat aktivitas pertama, dan assign sales ke kebutuhan berdasarkan role user:\n     *                 - User role 29 (Sales): Auto assign ke semua kebutuhan\n     *                 - User role 30,31,32,33,53,96: Bisa manual assign multiple sales ke multiple kebutuhan\n     *                 - User lainnya: Hanya sync kebutuhan tanpa sales",
-                "operationId": "4214eac4602ababdf9addbc28de2d8c4",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_perusahaan",
-                                    "pic",
-                                    "branch",
-                                    "kebutuhan",
-                                    "provinsi",
-                                    "kota"
-                                ],
-                                "properties": {
-                                    "nama_perusahaan": {
-                                        "description": "Nama perusahaan leads",
-                                        "type": "string",
-                                        "maxLength": 100,
-                                        "minLength": 3,
-                                        "example": "PT ABC Indonesia"
-                                    },
-                                    "telp_perusahaan": {
-                                        "description": "Nomor telepon perusahaan",
-                                        "type": "string",
-                                        "example": "021-1234567"
-                                    },
-                                    "jenis_perusahaan": {
-                                        "description": "ID jenis perusahaan (PT, CV, UD, dll)",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "bidang_perusahaan": {
-                                        "description": "ID bidang usaha perusahaan",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "branch": {
-                                        "description": "ID cabang yang menangani lead ini",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "platform": {
-                                        "description": "ID platform sumber lead (website, referral, social media)",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "kebutuhan": {
-                                        "description": "Array ID kebutuhan produk/layanan yang diinginkan (minimal 1)",
-                                        "type": "array",
-                                        "items": {
-                                            "type": "integer"
-                                        },
-                                        "example": [
-                                            1,
-                                            2,
-                                            3
-                                        ]
-                                    },
-                                    "alamat_perusahaan": {
-                                        "description": "Alamat lengkap perusahaan",
-                                        "type": "string",
-                                        "example": "Jl. Sudirman No. 123, Jakarta"
-                                    },
-                                    "pic": {
-                                        "description": "Nama Person In Charge / contact person",
-                                        "type": "string",
-                                        "example": "John Doe"
-                                    },
-                                    "jabatan_pic": {
-                                        "description": "Jabatan PIC di perusahaan",
-                                        "type": "string",
-                                        "example": "Manager Purchasing"
-                                    },
-                                    "no_telp": {
-                                        "description": "Nomor telepon/HP PIC",
-                                        "type": "string",
-                                        "example": "08123456789"
-                                    },
-                                    "email": {
-                                        "description": "Email PIC",
-                                        "type": "string",
-                                        "format": "email",
-                                        "example": "john@abc.com"
-                                    },
-                                    "pma": {
-                                        "description": "Apakah perusahaan PMA (Penanaman Modal Asing)",
-                                        "type": "string",
-                                        "example": "PMDN"
-                                    },
-                                    "detail_leads": {
-                                        "description": "Catatan/detail tambahan tentang lead",
-                                        "type": "string",
-                                        "example": "Tertarik dengan produk A untuk kebutuhan X"
-                                    },
-                                    "provinsi": {
-                                        "description": "ID provinsi lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 10
-                                    },
-                                    "kota": {
-                                        "description": "ID kota/kabupaten lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 259
-                                    },
-                                    "kecamatan": {
-                                        "description": "ID kecamatan lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 3515170
-                                    },
-                                    "kelurahan": {
-                                        "description": "ID kelurahan/desa lokasi perusahaan",
-                                        "type": "integer",
-                                        "example": 9471083530
-                                    },
-                                    "benua": {
-                                        "description": "ID benua (untuk perusahaan luar negeri)",
-                                        "type": "integer",
-                                        "example": 2
-                                    },
-                                    "negara": {
-                                        "description": "ID negara (untuk perusahaan luar negeri)",
-                                        "type": "integer",
-                                        "example": 79
-                                    },
-                                    "assignments": {
-                                        "description": "Array assignment sales ke kebutuhan (hanya untuk user role 30,31,32,33,53,96)",
-                                        "type": "array",
-                                        "items": {
-                                            "properties": {
-                                                "tim_sales_d_id": {
-                                                    "description": "ID Tim Sales Detail",
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "kebutuhan_ids": {
-                                                    "description": "Array ID kebutuhan yang diassign ke sales ini",
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "integer"
-                                                    },
-                                                    "example": [
-                                                        1,
-                                                        2
-                                                    ]
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "example": [
-                                            {
-                                                "tim_sales_d_id": 1,
-                                                "kebutuhan_ids": [
-                                                    1,
-                                                    2
-                                                ]
-                                            },
-                                            {
-                                                "tim_sales_d_id": 2,
-                                                "kebutuhan_ids": [
-                                                    3,
-                                                    4
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Lead berhasil dibuat",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Leads PT ABC Indonesia berhasil disimpan dengan nomor: AAAAB"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "lead": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "nomor": {
-                                                            "type": "string",
-                                                            "example": "AAAAB"
-                                                        },
-                                                        "nama_perusahaan": {
-                                                            "type": "string",
-                                                            "example": "PT ABC Indonesia"
-                                                        },
-                                                        "tgl_leads": {
-                                                            "type": "string",
-                                                            "example": "2024-01-15 10:30:00"
-                                                        },
-                                                        "tim_sales_id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        },
-                                                        "tim_sales_d_id": {
-                                                            "type": "integer",
-                                                            "example": 1
-                                                        }
-                                                    },
-                                                    "type": "object"
-                                                },
-                                                "assignments": {
-                                                    "description": "Detail assignment sales yang berhasil dilakukan",
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "type": {
-                                                                "description": "auto_assign atau manual_assign",
-                                                                "type": "string",
-                                                                "example": "auto_assign"
-                                                            },
-                                                            "sales_assigned": {
-                                                                "properties": {
-                                                                    "tim_sales_d_id": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    },
-                                                                    "sales_name": {
-                                                                        "type": "string",
-                                                                        "example": "John Sales"
-                                                                    },
-                                                                    "tim_sales_id": {
-                                                                        "type": "integer",
-                                                                        "example": 1
-                                                                    },
-                                                                    "tim_sales_name": {
-                                                                        "type": "string",
-                                                                        "example": "Tim Sales Jakarta"
-                                                                    }
-                                                                },
-                                                                "type": "object"
-                                                            },
-                                                            "kebutuhan_assigned": {
-                                                                "type": "array",
-                                                                "items": {
-                                                                    "type": "integer"
-                                                                },
-                                                                "example": [
-                                                                    1,
-                                                                    2,
-                                                                    3
-                                                                ]
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Validation Error atau nama perusahaan terlalu mirip",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "nama_perusahaan": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Masukkan nama_perusahaan minimal 3"
-                                                    }
-                                                },
-                                                "kebutuhan": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Kebutuhan harus dipilih minimal 1"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan: Error message"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
                     }
                 },
                 "security": [
@@ -18314,6 +18056,55 @@
                 ],
                 "summary": "Get available leads for PKS creation",
                 "operationId": "493170ec0def5926dc5e87bd1031fbf9",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Keyword pencarian. Jika diisi, filter tanggal tidak dipakai.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "PT ABC"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "Kolom pencarian (default: nama_perusahaan)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nama_perusahaan",
+                                "nomor",
+                                "provinsi",
+                                "kota",
+                                "created_by"
+                            ],
+                            "example": "nama_perusahaan"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Jumlah data per halaman",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Nomor halaman",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Successful operation",
@@ -18700,6 +18491,56 @@
                         "bearerAuth": []
                     }
                 ]
+            },
+            "delete": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Hapus pasal dari perjanjian PKS",
+                "description": "Menghapus (soft-delete) satu pasal dari perjanjian PKS berdasarkan ID pasal.",
+                "operationId": "b6879e9f29e73dac6e291564f119600b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "ID pasal (sl_pks_perjanjian.id)",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 42
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pasal berhasil dihapus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil dihapus"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pasal tidak ditemukan"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/pks/perjanjian/{id}/history": {
@@ -18807,6 +18648,1116 @@
                 "responses": {
                     "200": {
                         "description": "Hasil komparasi"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks/{pks_id}/perjanjian": {
+            "post": {
+                "tags": [
+                    "PKS"
+                ],
+                "summary": "Tambah pasal baru ke perjanjian PKS",
+                "description": "Menambahkan pasal baru ke dalam perjanjian suatu PKS. Nomor pasal harus unik dalam satu PKS.",
+                "operationId": "b098bb3dc661a0bdee69d578ba2d9fd2",
+                "parameters": [
+                    {
+                        "name": "pks_id",
+                        "in": "path",
+                        "description": "ID PKS",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 5
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pasal",
+                                    "judul",
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "pasal": {
+                                        "description": "Nomor/label pasal, unik per PKS",
+                                        "type": "string",
+                                        "example": "Pasal 12"
+                                    },
+                                    "judul": {
+                                        "description": "Judul pasal",
+                                        "type": "string",
+                                        "example": "KETENTUAN LAIN-LAIN"
+                                    },
+                                    "raw_text": {
+                                        "description": "Isi lengkap pasal",
+                                        "type": "string",
+                                        "example": "Hal-hal yang tidak diatur..."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pasal berhasil ditambahkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal berhasil ditambahkan"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 42
+                                                },
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "pasal": {
+                                                    "type": "string",
+                                                    "example": "Pasal 12"
+                                                },
+                                                "judul": {
+                                                    "type": "string",
+                                                    "example": "KETENTUAN LAIN-LAIN"
+                                                },
+                                                "raw_text": {
+                                                    "type": "string",
+                                                    "example": "Hal-hal yang tidak diatur..."
+                                                },
+                                                "created_by": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS tidak ditemukan"
+                    },
+                    "422": {
+                        "description": "Validasi gagal atau pasal sudah ada"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/initialize/{tipe}": {
+            "post": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Initialize PKS wizard",
+                "description": "Membuat draft PKS wizard awal dengan nomor draft dan menyimpan snapshot source awal ke sl_pks.",
+                "operationId": "aa5734d95ed1bfb8796ca6ce26a49003",
+                "parameters": [
+                    {
+                        "name": "tipe",
+                        "in": "path",
+                        "description": "Tipe PKS wizard",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "baru",
+                                "rekontrak",
+                                "addendum"
+                            ],
+                            "example": "baru"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "required": [
+                                            "leads_id",
+                                            "company_id",
+                                            "candidate_spk_ids"
+                                        ],
+                                        "properties": {
+                                            "leads_id": {
+                                                "type": "integer",
+                                                "example": 123
+                                            },
+                                            "company_id": {
+                                                "type": "integer",
+                                                "example": 13
+                                            },
+                                            "candidate_spk_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    789,
+                                                    790
+                                                ]
+                                            },
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "required": [
+                                            "leads_id",
+                                            "company_id",
+                                            "candidate_quotation_ids"
+                                        ],
+                                        "properties": {
+                                            "leads_id": {
+                                                "type": "integer",
+                                                "example": 123
+                                            },
+                                            "company_id": {
+                                                "type": "integer",
+                                                "example": 13
+                                            },
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
+                                            },
+                                            "candidate_spk_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    789
+                                                ]
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    {
+                                        "required": [
+                                            "leads_id",
+                                            "pks_induk_id"
+                                        ],
+                                        "properties": {
+                                            "leads_id": {
+                                                "type": "integer",
+                                                "example": 123
+                                            },
+                                            "pks_induk_id": {
+                                                "type": "integer",
+                                                "example": 22
+                                            },
+                                            "candidate_quotation_ids": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                },
+                                                "example": [
+                                                    456,
+                                                    457
+                                                ]
+                                            },
+                                            "company_id": {
+                                                "type": "integer",
+                                                "example": 13,
+                                                "nullable": true
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "PKS wizard initialized successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 99
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "draft/PKS/SIG/LDS001-062026-00001"
+                                                },
+                                                "wizard_status_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "wizard_current_step": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS wizard initialized successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "object",
+                                            "example": {
+                                                "leads_id": [
+                                                    "The leads id field is required."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to initialize PKS wizard"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/{pksId}/step/{step}": {
+            "get": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Get PKS wizard step data",
+                "description": "Mengambil payload step PKS wizard yang tersimpan di sl_pks.",
+                "operationId": "9768679faee41cb00434b7acfb1fbf7d",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 7,
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Step data retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 99
+                                                },
+                                                "step": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "wizard_status_id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "wizard_status": {
+                                                    "type": "string",
+                                                    "example": "Initialized"
+                                                },
+                                                "wizard_current_step": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "wizard_completed_steps": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                },
+                                                "nomor": {
+                                                    "type": "string",
+                                                    "example": "draft/PKS/SIG/LDS001-062026-00001"
+                                                },
+                                                "tipe_pks": {
+                                                    "type": "string",
+                                                    "example": "baru"
+                                                },
+                                                "step_data": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step data retrieved successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid step",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step wizard tidak valid"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Update PKS wizard step data",
+                "description": "Menyimpan payload per step ke wizard_payload pada sl_pks dan mengupdate progress wizard.",
+                "operationId": "ab4ce936b3bb0022ec99eebf358b690a",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 7,
+                            "minimum": 1,
+                            "example": 2
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "mark_as_complete": {
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "step_data": {
+                                        "type": "object",
+                                        "example": {
+                                            "tanggal_pks": "2026-07-01",
+                                            "tanggal_awal_kontrak": "2026-07-01",
+                                            "tanggal_akhir_kontrak": "2027-06-30",
+                                            "company_id": 13,
+                                            "salary_rule_id": 1,
+                                            "rule_thr_id": 2,
+                                            "kategori_sesuai_hc_id": 1,
+                                            "loyalty_id": 1
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Step updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 2 updated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "object",
+                                            "example": {
+                                                "step_data": [
+                                                    "The step data must be an array."
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to update step data"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Error details"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/{pksId}/preview-pasal": {
+            "post": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Generate PKS wizard pasal preview",
+                "description": "Generate atau regenerate preview pasal wizard dari template PKS existing. Untuk addendum dapat menerima pasal tambahan manual.",
+                "operationId": "a1b3d6cd57cb37e11c72354cfc40ca30",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "regenerate": {
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "additional_articles": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "pasal": {
+                                                    "type": "string",
+                                                    "example": "Addendum 1"
+                                                },
+                                                "judul": {
+                                                    "type": "string",
+                                                    "example": "PASAL TAMBAHAN"
+                                                },
+                                                "raw_text": {
+                                                    "type": "string",
+                                                    "example": "<p>Isi pasal tambahan</p>"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pasal preview generated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal preview generated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/{pksId}/preview-pasal/{pasalKey}": {
+            "put": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Update PKS wizard pasal preview",
+                "description": "Update raw text pasal preview sebelum finalize.",
+                "operationId": "bc39647484bab840e1922eca24d385ca",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    },
+                    {
+                        "name": "pasalKey",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "section_0"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "raw_text"
+                                ],
+                                "properties": {
+                                    "pasal": {
+                                        "type": "string",
+                                        "example": "Pasal 1"
+                                    },
+                                    "judul": {
+                                        "type": "string",
+                                        "example": "RUANG LINGKUP PERJANJIAN"
+                                    },
+                                    "raw_text": {
+                                        "type": "string",
+                                        "example": "<p>Raw text hasil edit</p>"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Pasal preview updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Pasal preview updated successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/{pksId}/finalize": {
+            "post": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Finalize PKS wizard",
+                "description": "Mengubah draft PKS wizard menjadi finalized, menyimpan site final, insert pasal final, dan menjalankan side effect status/activity.",
+                "operationId": "744f2342efbc73a4c6f493056139acbe",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "confirm_finalize"
+                                ],
+                                "properties": {
+                                    "confirm_finalize": {
+                                        "type": "boolean",
+                                        "example": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "PKS wizard finalized successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS wizard finalized successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/{pksId}": {
+            "delete": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Cancel PKS wizard",
+                "description": "Membatalkan PKS wizard draft dengan mengubah wizard status menjadi cancelled. Tidak berlaku untuk PKS yang sudah finalized.",
+                "operationId": "a42310949c3167b4df560e6e3ca4bc57",
+                "parameters": [
+                    {
+                        "name": "pksId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 99
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PKS wizard cancelled successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS wizard cancelled successfully"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/source/quotations/{leadsId}": {
+            "post": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Get available quotations for PKS wizard source selection",
+                "description": "Mengambil daftar quotation berdasarkan leads yang bisa dipakai frontend untuk memilih candidate quotation saat initialize wizard. Jika request body spk_id dikirim, hasil akan difilter hanya quotation yang terhubung dengan SPK tersebut.",
+                "operationId": "4ebdbb16cd8ece8cd63c70acdf372da8",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "spk_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            789,
+                                            790
+                                        ]
+                                    },
+                                    "tipe_pks": {
+                                        "description": "Jika rekontrak, hanya quotation tipe rekontrak yang dikembalikan",
+                                        "type": "string",
+                                        "enum": [
+                                            "baru",
+                                            "rekontrak",
+                                            "addendum"
+                                        ],
+                                        "example": "rekontrak",
+                                        "nullable": true
+                                    },
+                                    "search": {
+                                        "type": "string",
+                                        "example": "SIG"
+                                    },
+                                    "search_by": {
+                                        "type": "string",
+                                        "enum": [
+                                            "nomor",
+                                            "tipe_quotation",
+                                            "company_name",
+                                            "company_code",
+                                            "salary_rule",
+                                            "rule_thr"
+                                        ],
+                                        "example": "company_name"
+                                    },
+                                    "per_page": {
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "page": {
+                                        "type": "integer",
+                                        "example": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Available quotations retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-wizard/source/spk/{leadsId}": {
+            "get": {
+                "tags": [
+                    "PKS Wizard"
+                ],
+                "summary": "Get available SPK for PKS wizard source selection",
+                "description": "Mengambil daftar SPK berdasarkan leads. Quotation dilampirkan sebagai array quotations, bukan object quotation tunggal, karena satu SPK bisa memiliki banyak quotation melalui spk_site.",
+                "operationId": "b9e2a2271ad3ba926bb7084081b891ec",
+                "parameters": [
+                    {
+                        "name": "leadsId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 123
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "SPK-001"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "nomor",
+                                "quotation_nomor",
+                                "company_name",
+                                "company_code"
+                            ],
+                            "example": "quotation_nomor"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available SPK retrieved successfully"
                     }
                 },
                 "security": [
@@ -22270,7 +23221,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Bulanan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\r\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan bulanan khusus user dengan cais_role_id=30.\n     *     Hanya menghitung alur: Leads → Assignment → Appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "135d3bfa5ea4abd2f286cb1bf285de7d",
                 "parameters": [
                     {
@@ -22399,7 +23350,7 @@
                     "Sales Report"
                 ],
                 "summary": "Laporan Aktivitas Mingguan - Role 30 (Leads → Assignment → Appointment)",
-                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\r\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\r\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
+                "description": "Menampilkan laporan mingguan khusus user dengan cais_role_id=30.\n     *     Breakdown per minggu untuk: jumlah_leads, jumlah_assignment, jumlah_appointment.\n     *     Follow Up dan aktivitas lain TIDAK dihitung.",
                 "operationId": "d1a40b7baf91fcb2502d9e295b3b3244",
                 "parameters": [
                     {
@@ -33390,6 +34341,10 @@
             "description": "API untuk data dashboard approval quotation"
         },
         {
+            "name": "Dashboard PKS",
+            "description": "API untuk dashboard monitoring kontrak PKS"
+        },
+        {
             "name": "Jenis Barang",
             "description": "API Endpoints untuk Master Jenis Barang"
         },
@@ -33420,6 +34375,10 @@
         {
             "name": "PKS",
             "description": "API untuk manajemen PKS (Perjanjian Kerja Sama)"
+        },
+        {
+            "name": "PKS Wizard",
+            "description": "API untuk inisialisasi, step, dan preview pasal PKS Wizard"
         },
         {
             "name": "Position",

@@ -17,6 +17,7 @@ class Kebutuhan extends Model
         'nama',
         'icon',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];
@@ -66,6 +67,7 @@ class Kebutuhan extends Model
         static::creating(function ($model) {
             if (auth()->check() && !$model->created_by) {
                 $model->created_by = auth()->user()->full_name ?? auth()->user()->name ?? 'system';
+                $model->created_by_user_id = auth()->id();
             }
         });
 

@@ -10,8 +10,12 @@ use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\LogApproval;
 use App\Models\LogNotification;
+use App\Models\Pks;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationSite;
+use App\Models\Site;
+use App\Models\Spk;
+use App\Models\SpkSite;
 use App\Models\TimSalesDetail;
 use App\Models\User;
 use App\Services\AddendumService;
@@ -511,6 +515,10 @@ class QuotationController extends Controller
 
             QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
 
+            if ($tipe_quotation === 'revisi' && $quotationReferensi) {
+                $this->updateRevisionStatuses($quotationReferensi);
+            }
+
             DB::commit();
 
             // Reload untuk response
@@ -731,27 +739,31 @@ class QuotationController extends Controller
     public function submitForApproval(QuotationApproveRequest $request): JsonResponse
     {
         try {
-            $id = $request->validated('id');                // sudah pasti valid
-
+            $id = $request->validated('id');
             $quotation = Quotation::notDeleted()
                 ->with(['quotationDetails.wage'])
                 ->findOrFail($id);
 
-            $data = $request->validated();                  // ['id', 'is_approved', 'alasan']
+            $data = $request->validated();
+            $user = Auth::user();
 
-            // Service masih menerima 'is_approved' & 'notes', jadi mapping 'alasan' → 'notes'
+            DB::beginTransaction();
+
             $result = $this->submitApproval(
                 $quotation,
                 [
                     'is_approved' => $data['is_approved'],
                     'notes' => $data['alasan'] ?? null,
                 ],
-                Auth::user()
+                $user
             );
 
             if (!$result['success']) {
+                DB::rollBack();
                 return response()->json($result, 400);
             }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
@@ -762,6 +774,7 @@ class QuotationController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan sistem',
@@ -1381,7 +1394,7 @@ class QuotationController extends Controller
         bool $isApproved,
         ?string $notes
     ): array {
-        // Panggil fresh() SEKALI saja
+        // Panggil fresh() untuk data terbaru
         $freshQuotation = $quotation->fresh();
 
         $this->sendNotificationToSales($freshQuotation, $user, $isApproved, $notes);
@@ -1391,7 +1404,37 @@ class QuotationController extends Controller
             && $freshQuotation->status_quotation_id === 3
             && $freshQuotation->tipe_quotation === 'addendum'
         ) {
-            app(AddendumService::class)->process($freshQuotation);
+            app(AddendumService::class)->process($freshQuotation, $user->full_name, $user->id);
+        }
+
+        if (
+            $isApproved
+            && $freshQuotation->status_quotation_id === 3
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            Spk::whereHas('spkSites', fn($q) =>
+                $q->where('quotation_id', $freshQuotation->id)
+            )->update(['status_spk_id' => 1]);
+
+            Pks::whereHas('sites', fn($q) =>
+                $q->where('quotation_id', $freshQuotation->id)
+            )->update(['status_pks_id' => 5]);
+        }
+
+        if (
+            !$isApproved
+            && $freshQuotation->status_quotation_id === 8
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            $quotationIds = array_filter([$freshQuotation->id, $freshQuotation->quotation_referensi_id]);
+
+            Spk::whereHas('spkSites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_spk_id' => 6]);
+
+            Pks::whereHas('sites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_pks_id' => 10]);
         }
 
         return ['success' => true, 'data' => $freshQuotation];
@@ -1416,6 +1459,7 @@ class QuotationController extends Controller
             'approval_date' => $now,
             'created_at' => $now,
             'created_by' => $user->full_name,
+            'created_by_user_id' => $user->id,
         ]);
     }
 
@@ -1451,7 +1495,8 @@ class QuotationController extends Controller
             'pesan' => $msg,
             'is_read' => 0,
             'created_at' => Carbon::now(),
-            'created_by' => $approver->full_name
+            'created_by' => $approver->full_name,
+            'created_by_user_id' => $approver->id
         ]);
 
         // $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
@@ -1494,7 +1539,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 
@@ -1504,7 +1550,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirKeu()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
             ->delay(now()->addDay());
@@ -1530,7 +1576,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 
@@ -1539,7 +1586,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirSales()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
             ->delay(now()->addDay());
@@ -1569,6 +1616,28 @@ class QuotationController extends Controller
         return ['success' => true, 'data' => $quotation->fresh()];
     }
 
+    private function updateRevisionStatuses(Quotation $quotationReferensi): void
+    {
+        $updated = Spk::whereHas('spkSites', fn($q) =>
+            $q->where('quotation_id', $quotationReferensi->id)
+        )->update(['status_spk_id' => 5]);
+
+        Log::info($updated
+            ? 'Revision: SPK status updated to 5'
+            : 'Revision: no SPK found for quotation', [
+            'quotation_id' => $quotationReferensi->id,
+        ]);
+
+        $updated = Pks::whereHas('sites', fn($q) =>
+            $q->where('quotation_id', $quotationReferensi->id)
+        )->update(['status_pks_id' => 8]);
+
+        Log::info($updated
+            ? 'Revision: PKS status updated to 8'
+            : 'Revision: no PKS found for quotation', [
+            'quotation_id' => $quotationReferensi->id,
+        ]);
+    }
 
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
@@ -1608,7 +1677,7 @@ class QuotationController extends Controller
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 6, 7, 8]);
+                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 7, 8]);
 
                 break;
             case 'addendum':

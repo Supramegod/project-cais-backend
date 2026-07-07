@@ -17,6 +17,7 @@ use App\Models\Loyalty;
 use App\Models\Pks;
 use App\Models\PksPerjanjian;
 use App\Models\PksPerjanjianHistory;
+use App\Models\PksWizardStatus;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDetailCoss;
@@ -31,6 +32,7 @@ use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\PksPerjanjianTemplateService;
+use App\Services\PksTemplate\PksTemplateFactory;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -225,12 +227,17 @@ class PksController extends Controller
                 'sl_pks.kontrak_awal',
                 'sl_pks.kontrak_akhir',
                 'sl_pks.status_pks_id', // ✅ WAJIB untuk eager load statusPks
+                'sl_pks.wizard_status_id',
+                'sl_pks.wizard_current_step',
+                'sl_pks.wizard_completed_steps',
+                'sl_pks.initialized_at',
                 'sl_pks.created_at',
                 'sl_pks.created_by',
             ])
                 ->with([
                     // ✅ Batasi kolom — jangan load semua
                     'statusPks:id,nama',
+                    'wizardStatus:id,kode,nama',
                     'sites:id,pks_id,nama_site',
                 ])
                 // ✅ JOIN leads sekali — dipakai untuk filter branch
@@ -251,7 +258,10 @@ class PksController extends Controller
                     $query->where("sl_pks.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
                 }
             } else {
-                $query->whereBetween('sl_pks.tgl_pks', [$tglDari, $tglSampai]);
+                $query->whereBetween(
+                    DB::raw('DATE(COALESCE(sl_pks.tgl_pks, sl_pks.initialized_at, sl_pks.created_at))'),
+                    [$tglDari, $tglSampai]
+                );
             }
 
             if ($request->filled('status')) {
@@ -290,21 +300,45 @@ class PksController extends Controller
             $pksList = $query->paginate($request->get('per_page', 15));
 
             $pksList->getCollection()->transform(function ($pks) {
+                $tglPks = $pks->getRawOriginal('tgl_pks');
+                $initializedAt = $pks->getRawOriginal('initialized_at') ?: $pks->getRawOriginal('created_at');
+
                 return [
                     'id' => $pks->id,
                     'nomor' => $pks->nomor,
                     'nama_perusahaan' => $pks->nama_perusahaan,
-                    // ✅ getRawOriginal karena ada accessor getTglPksAttribute di model
-                    'tgl_pks' => Carbon::parse($pks->getRawOriginal('tgl_pks'))
-                        ->locale('id')->isoFormat('D MMMM Y'),
+                    'tgl_pks' => $tglPks
+                        ? Carbon::parse($tglPks)->locale('id')->isoFormat('D MMMM Y')
+                        : null,
+                    'initialized_at' => $initializedAt,
                     'nama_site' => $pks->sites->pluck('nama_site')->toArray(),
                     'kontrak_awal' => $pks->getRawOriginal('kontrak_awal'),
                     'kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir'),
-                    'formatted_kontrak_awal' => Carbon::parse($pks->getRawOriginal('kontrak_awal'))->locale('id')->isoFormat('D MMMM Y'),
-                    'formatted_kontrak_akhir' => Carbon::parse($pks->getRawOriginal('kontrak_akhir'))->locale('id')->isoFormat('D MMMM Y'),
+                    'formatted_kontrak_awal' => $pks->getRawOriginal('kontrak_awal')
+                        ? Carbon::parse($pks->getRawOriginal('kontrak_awal'))->locale('id')->isoFormat('D MMMM Y')
+                        : null,
+                    'formatted_kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir')
+                        ? Carbon::parse($pks->getRawOriginal('kontrak_akhir'))->locale('id')->isoFormat('D MMMM Y')
+                        : null,
                     'status' => $pks->statusPks->nama ?? '-',
-                    'berakhir_dalam' => $this->hitungBerakhirKontrak($pks->getRawOriginal('kontrak_akhir')),
-                    'status_berlaku' => $this->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir')),
+                    'wizard_status' => $pks->wizardStatus ? [
+                        'id' => $pks->wizardStatus->id,
+                        'kode' => $pks->wizardStatus->kode,
+                        'nama' => $pks->wizardStatus->nama,
+                    ] : null,
+                    'wizard_current_step' => $pks->wizard_current_step,
+                    'wizard_completed_steps' => $pks->wizard_completed_steps ?? [],
+                    'is_wizard_in_progress' => in_array($pks->wizard_status_id, [
+                        PksWizardStatus::INITIALIZED,
+                        PksWizardStatus::IN_PROGRESS,
+                        PksWizardStatus::READY_TO_FINALIZE,
+                    ], true),
+                    'berakhir_dalam' => $pks->getRawOriginal('kontrak_akhir')
+                        ? $this->hitungBerakhirKontrak($pks->getRawOriginal('kontrak_akhir'))
+                        : null,
+                    'status_berlaku' => $pks->getRawOriginal('kontrak_akhir')
+                        ? $this->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir'))
+                        : null,
                     'created_at' => $pks->getRawOriginal('created_at'),
                     'created_by' => $pks->created_by,
                 ];
@@ -1219,6 +1253,10 @@ class PksController extends Controller
                 ], 404);
             }
 
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                return $response;
+            }
+
             $this->approvePks($pks, $request->ot);
 
             return response()->json([
@@ -1280,6 +1318,12 @@ class PksController extends Controller
                     'success' => false,
                     'message' => 'PKS not found',
                 ], 404);
+            }
+
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                DB::rollBack();
+                DB::connection('mysqlhris')->rollBack();
+                return $response;
             }
 
             // Step 1: Update PKS and Leads Status
@@ -1390,9 +1434,37 @@ class PksController extends Controller
      *     summary="Get available leads for PKS creation",
      *     tags={"PKS"},
      *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\Response(
-     *         response=200,
+     *     @OA\Parameter(
+     *         name="search",
+     *         in="query",
+     *         required=false,
+     *         description="Keyword pencarian. Jika diisi, filter tanggal tidak dipakai.",
+     *         @OA\Schema(type="string", example="PT ABC")
+     *     ),
+     *     @OA\Parameter(
+     *         name="search_by",
+     *         in="query",
+     *         required=false,
+     *         description="Kolom pencarian (default: nama_perusahaan)",
+     *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "provinsi", "kota", "created_by"}, example="nama_perusahaan")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         required=false,
+     *         description="Jumlah data per halaman",
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         required=false,
+     *         description="Nomor halaman",
+     *         @OA\Schema(type="integer", example=1)
+     *     ),
+      *
+      *     @OA\Response(
+      *         response=200,
      *         description="Successful operation",
      *
      *         @OA\JsonContent(
@@ -1414,14 +1486,20 @@ class PksController extends Controller
      *     )
      * )
      */
-    public function getAvailableLeads(): JsonResponse
+    public function getAvailableLeads(Request $request): JsonResponse
     {
         try {
-            $leads = $this->getAvailableLeadsData();
+            $leads = $this->getAvailableLeadsData($request);
 
             return response()->json([
                 'success' => true,
-                'data' => $leads,
+                'data' => $leads->items(),
+                'pagination' => [
+                    'current_page' => $leads->currentPage(),
+                    'last_page' => $leads->lastPage(),
+                    'total' => $leads->total(),
+                    'total_per_page' => $leads->count(),
+                ],
             ]);
 
         } catch (\Exception $e) {
@@ -1805,6 +1883,11 @@ class PksController extends Controller
                     'success' => false,
                     'message' => 'PKS not found',
                 ], 404);
+            }
+
+            if ($response = $this->ensureWizardFinalizedOrLegacy($pks)) {
+                DB::rollBack();
+                return $response;
             }
 
             // Hapus file lama jika ada
@@ -2198,6 +2281,7 @@ class PksController extends Controller
                 'judul' => $request->judul,
                 'raw_text' => $request->raw_text,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
                 'updated_by' => Auth::user()->full_name,
             ]);
 
@@ -2215,6 +2299,7 @@ class PksController extends Controller
                     'is_activity' => 0,
                     'user_id' => Auth::id(),
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -2299,6 +2384,7 @@ class PksController extends Controller
                     'is_activity' => 0,
                     'user_id' => Auth::id(),
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
 
@@ -2404,6 +2490,7 @@ class PksController extends Controller
             'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
             'tipe_pks' => $tipe,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
 
         // 6. Create Sites (Conditional)
@@ -2496,6 +2583,7 @@ class PksController extends Controller
                 'kebutuhan_id' => $leads->kebutuhan_id,
                 'kebutuhan' => $kebutuhan->nama ?? null,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
 
                 'spk_id' => $isBaru ? $sourceSite->spk_id : null,
                 'spk_site_id' => $isBaru ? $sourceSite->id : null,
@@ -2514,8 +2602,8 @@ class PksController extends Controller
     private function createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor)
     {
         try {
-            // Inisialisasi service
-            $templateService = new PksPerjanjianTemplateService(
+            // Pilih template sesuai company, fallback ke PksPerjanjianTemplateService
+            $templateService = (new PksTemplateFactory)->make(
                 $leads,
                 $company,
                 $kebutuhan,
@@ -2527,7 +2615,7 @@ class PksController extends Controller
             // Insert agreement sections
             $templateService->insertAgreementSections($pks->id, Auth::user()->full_name);
 
-            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id);
+            \Log::info('PKS Perjanjian created successfully for PKS ID: ' . $pks->id . ' using ' . get_class($templateService));
 
         } catch (\Exception $e) {
             \Log::error('Failed to create PKS Perjanjian: ' . $e->getMessage());
@@ -2555,7 +2643,12 @@ class PksController extends Controller
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
     private function createSalesActivity(Pks $pks, string $createdBy): void
@@ -2580,6 +2673,7 @@ class PksController extends Controller
             'jenis_activity' => 'PKS',
             'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$kebutuhanNama}",
             'created_by' => $createdBy,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -2635,6 +2729,7 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -2812,9 +2907,9 @@ class PksController extends Controller
         return $prefix . $month . $year . '-' . $sequence;
     }
 
-    private function getAvailableLeadsData()
+    private function getAvailableLeadsData(Request $request)
     {
-        return Leads::filterByuserRole()
+        $query = Leads::filterByUserRole()
             ->whereHas('spkSites', function ($query) {
                 $query->whereNull('sl_spk_site.deleted_at')
                     ->whereHas('spk', function ($subQuery) {
@@ -2825,10 +2920,25 @@ class PksController extends Controller
                         $siteQuery->whereNull('sl_site.deleted_at');
                     });
             })
-            ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
+            ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota', 'created_by')
             ->distinct()
-            ->orderBy('id', 'desc')
-            ->get();
+            ->orderBy('id', 'desc');
+
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+            if ($searchBy === 'nama_perusahaan') {
+                $searchTerm = str_contains($searchTerm, ' ')
+                    ? '"' . $searchTerm . '"'
+                    : $searchTerm . '*';
+                $query->whereRaw('MATCH(nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
+            } elseif (in_array($searchBy, ['nomor', 'provinsi', 'kota', 'created_by'], true)) {
+                $query->where($searchBy, 'LIKE', '%' . $searchTerm . '%');
+            }
+        }
+
+        return $query->paginate($request->get('per_page', 15));
     }
 
     private function getAvailableSitesData($leadsId, $tipe = 'baru')
@@ -2860,7 +2970,7 @@ class PksController extends Controller
             $query = QuotationSite::with([
                 'quotation' => function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', $tipeQuotation)
+                        ->whereIn('tipe_quotation', [$tipeQuotation, 'revisi'])
                         ->with(['company', 'salaryRule', 'ruleThr']);
                 },
                 'leads',
@@ -2868,7 +2978,7 @@ class PksController extends Controller
                 ->where('leads_id', $leadsId)
                 ->whereHas('quotation', function ($q) use ($leadsId, $tipeQuotation) {
                     $q->where('leads_id', $leadsId)
-                        ->where('tipe_quotation', $tipeQuotation)
+                        ->whereIn('tipe_quotation', [$tipeQuotation, 'revisi'])
                         ->whereNull('deleted_at');
                 });
 
@@ -2889,6 +2999,9 @@ class PksController extends Controller
                     ->whereColumn($orderTable . '.id', $orderColumn)
                     ->limit(1);
             }, 'asc')
+            ->whereHas('quotation', function ($q) {
+                $q->whereNotIn('status_quotation_id', [1, 2]); // skip Terminated
+            })
             ->get()
             ->filter(function ($site) {
                 return $site->quotation !== null;
@@ -3022,6 +3135,7 @@ class PksController extends Controller
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
+            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);
@@ -3086,6 +3200,7 @@ class PksController extends Controller
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
+            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);
@@ -3235,6 +3350,7 @@ class PksController extends Controller
             'gpm_harga_pokok' => $totalData['gpmCoss'],
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -3257,7 +3373,12 @@ class PksController extends Controller
             'user_id' => Auth::user()->id,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     /**
@@ -3282,6 +3403,7 @@ class PksController extends Controller
             'user_id' => Auth::id(),
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
     }
 
@@ -3307,6 +3429,7 @@ class PksController extends Controller
                 'email' => $picData['email'],
                 'created_at' => $current_date_time,
                 'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id(),
             ]);
 
         } catch (\Exception $e) {
@@ -3352,7 +3475,12 @@ class PksController extends Controller
             'is_activity' => 0,
             'user_id' => Auth::id(),
             'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     /**
@@ -3390,8 +3518,13 @@ class PksController extends Controller
                     'tipe' => 'PKS_PERJANJIAN',
                     'notes' => "Perubahan pasal {$perjanjian->pasal} diedit oleh " . Auth::user()->full_name,
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
             }
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
     private function autoSyncCustomerActiveStatus(): void
@@ -3414,5 +3547,21 @@ class PksController extends Controller
             ->whereNotIn('id', $activeLeadsIds)
             ->where('customer_active', '!=', 0)
             ->update(['customer_active' => 0]);
+    }
+
+    private function ensureWizardFinalizedOrLegacy(Pks $pks): ?JsonResponse
+    {
+        if ($pks->wizard_status_id === null) {
+            return null;
+        }
+
+        if ((int) $pks->wizard_status_id !== PksWizardStatus::FINALIZED) {
+            return response()->json([
+                'success' => false,
+                'message' => 'PKS wizard belum finalized',
+            ], 422);
+        }
+
+        return null;
     }
 }

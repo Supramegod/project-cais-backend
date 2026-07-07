@@ -499,7 +499,8 @@ class SpkController extends Controller
                 'tim_sales_d_id' => $leads->tim_sales_d_id,
                 'link_spk_disetujui' => null,
                 'status_spk_id' => 1,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             $this->createSpkSites($spk, $siteIds);
@@ -693,6 +694,7 @@ class SpkController extends Controller
                     'id' => $quotation->id,
                     'nomor_quotation' => $quotation->nomor ?? null,
                     'nama_perusahaan' => $quotation->nama_perusahaan ?? null,
+                    'status_quotation' => $quotation->status_quotation_id ?? null,
                     'kebutuhan' => $quotation->kebutuhan ?? null,
                     'jenis_kontrak' => $quotation->jenis_kontrak ?? null,
                     'tanggal_penempatan' => $quotation->tgl_penempatan ?? null,
@@ -1623,6 +1625,11 @@ class SpkController extends Controller
                     $this->createDeleteActivity($spk);
                 }
             }
+            $lead = Leads::find($spkSite->leads_id);
+            if ($lead) {
+                $lead->tgl_leads = Carbon::now();
+                $lead->save();
+            }
 
             DB::commit();
 
@@ -1853,7 +1860,8 @@ class SpkController extends Controller
                 'kebutuhan' => $quotationSite->quotation->kebutuhan,
                 'jenis_site' => $quotationSite->quotation->jumlah_site,
                 'nomor_quotation' => $quotationSite->quotation->nomor,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
         }
     }
@@ -1878,8 +1886,13 @@ class SpkController extends Controller
                 'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::user()->id
             ]);
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
 
@@ -1906,7 +1919,8 @@ class SpkController extends Controller
                     'tgl_activity' => Carbon::now(),
                     'jenis_activity' => 'spk',
                     'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
-                    'created_by' => $user->full_name
+                    'created_by' => $user->full_name,
+                    'created_by_user_id' => $user->id
                 ]);
             }
         }
@@ -2118,7 +2132,8 @@ class SpkController extends Controller
             'notes' => 'Quotation dengan nomor : ' . $quotationAsal->nomor . ' di ajukan ulang',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::user()->id
         ]);
 
         // Activity for new quotation creation
@@ -2132,7 +2147,8 @@ class SpkController extends Controller
             'notes' => 'Quotation dengan nomor : ' . $newQuotation->nomor . ' terbentuk dari ajukan ulang quotation dengan nomor : ' . $quotationAsal->nomor,
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::user()->id
         ]);
 
         // Activity untuk SPK sites yang dihapus
@@ -2148,7 +2164,8 @@ class SpkController extends Controller
                 'notes' => $spkSiteCount . ' SPK site dihapus karena quotation diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::user()->id
             ]);
         }
 
@@ -2165,7 +2182,8 @@ class SpkController extends Controller
                 'notes' => $quotationSiteCount . ' Quotation site dihapus karena diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::user()->id
             ]);
         }
 
@@ -2181,8 +2199,13 @@ class SpkController extends Controller
                 'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus karena semua quotation site diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::user()->id
             ]);
+        }
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
         }
     }
     /**
@@ -2222,8 +2245,13 @@ class SpkController extends Controller
             'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::user()->id
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
     /**
      * Helper method untuk membuat aktivitas upload SPK
@@ -2242,8 +2270,13 @@ class SpkController extends Controller
             'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
-            'created_by' => Auth::user()->full_name
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::user()->id
         ]);
+        if ($leads) {
+            $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
+            $leads->save();
+        }
     }
 
     private function errorResponse(string $message, string $error = null, int $status = 500)
@@ -2298,7 +2331,8 @@ class SpkController extends Controller
             'leads_id' => $quotation->leads_id,
             'is_kuasa' => 0, // Default tidak kuasa
             'created_at' => $currentDateTime,
-            'created_by' => $user->full_name
+            'created_by' => $user->full_name,
+            'created_by_user_id' => $user->id
         ]);
     }
 }

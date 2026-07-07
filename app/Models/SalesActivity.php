@@ -25,7 +25,8 @@ class SalesActivity extends Model
         'jenis_visit',
         'jenis_activity',
         'notulen',
-        'created_by'
+        'created_by',
+        'created_by_user_id'
     ];
 
     /**
@@ -58,7 +59,7 @@ class SalesActivity extends Model
     public function creator()
     {
         // Sesuaikan dengan model User kamu, biasanya App\Models\User
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by_user_id', 'id');
     }
     public function getCreatedAtAttribute($value)
     {

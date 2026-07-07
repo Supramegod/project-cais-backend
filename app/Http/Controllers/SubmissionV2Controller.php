@@ -262,6 +262,7 @@ class SubmissionV2Controller extends Controller
                     'status_leads_id' => $submission->status_leads_id ?: 1,
                     'notes' => $submission->notes,
                     'created_by' => $userName,
+                    'created_by_user_id' => Auth::id(),
                 ]);
 
                 CustomerActivity::create([
@@ -275,6 +276,7 @@ class SubmissionV2Controller extends Controller
                     'is_activity' => 0,
                     'user_id' => Auth::id(),
                     'created_by' => $userName,
+                    'created_by_user_id' => Auth::id(),
                 ]);
 
                 $submission->update([
@@ -449,6 +451,7 @@ class SubmissionV2Controller extends Controller
                         'source_row_no' => $sourceRowNo,
                         'created_at' => $now,
                         'created_by' => $userName,
+                        'created_by_user_id' => Auth::id(),
                     ]));
                     $inserted++;
                 }

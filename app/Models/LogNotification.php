@@ -31,6 +31,7 @@ class LogNotification extends Model
         'reason',
         'is_read',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];
@@ -69,7 +70,7 @@ class LogNotification extends Model
      */
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by', 'full_name');
+        return $this->belongsTo(User::class, 'created_by_user_id', 'id');
     }
 
     /**
@@ -252,7 +253,8 @@ class LogNotification extends Model
         $defaults = [
             'is_read' => false,
             'created_at' => now(),
-            'created_by' => auth()->user()->full_name ?? 'System'
+            'created_by' => auth()->user()->full_name ?? 'System',
+            'created_by_user_id' => auth()->id()
         ];
         
         return self::create(array_merge($defaults, $data));
@@ -288,7 +290,8 @@ class LogNotification extends Model
             'doc_id' => $quotationId,
             'transaksi' => 'Quotation',
             'pesan' => $message,
-            'created_by' => $approverName
+            'created_by' => $approverName,
+            'created_by_user_id' => Auth::id()
         ]);
     }
 

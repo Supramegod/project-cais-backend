@@ -7,9 +7,11 @@ use App\Models\Company;
 use App\Models\Kebutuhan;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
+use App\Services\PksTemplate\PksTemplateInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
-class PksPerjanjianTemplateService
+class PksPerjanjianTemplateService implements PksTemplateInterface
 {
     private $leads;
     private $company;
@@ -39,7 +41,7 @@ class PksPerjanjianTemplateService
     /**
      * Generate all agreement sections
      */
-    public function generateAllSections()
+    public function generateAllSections(): array
     {
         return [
             [
@@ -955,7 +957,7 @@ font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN"><o:p></o:p></span
     /**
      * Insert all agreement sections into database
      */
-    public function insertAgreementSections($pksId, $createdBy)
+    public function insertAgreementSections($pksId, $createdBy): void
     {
         $sections = $this->generateAllSections();
         $insertData = [];
@@ -968,6 +970,7 @@ font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN"><o:p></o:p></span
                 'raw_text' => $section['raw_text'],
                 'created_at' => $this->currentDateTime,
                 'created_by' => $createdBy,
+                'created_by_user_id' => Auth::id(),
                 'updated_at' => $this->currentDateTime,
             ];
         }

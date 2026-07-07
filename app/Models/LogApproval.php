@@ -31,6 +31,7 @@ class LogApproval extends Model
         'approval_date',
         'note',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];
@@ -61,7 +62,7 @@ class LogApproval extends Model
      */
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by', 'full_name');
+        return $this->belongsTo(User::class, 'created_by_user_id', 'id');
     }
 
     /**

@@ -317,7 +317,8 @@ class BarangController extends Controller
                 'merk' => $request->merk,
                 'jumlah_default' => $request->jumlah_default,
                 'urutan' => $request->urutan,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([
@@ -774,6 +775,7 @@ class BarangController extends Controller
                     'qty_default' => $request->qty_default,
                     'layanan' => $layanan->nama,
                     'created_by' => Auth::user()->full_name,
+                    'created_by_user_id' => Auth::id(),
                 ]);
 
                 return response()->json([
@@ -1081,6 +1083,7 @@ class BarangController extends Controller
                         'qty_default' => $qty['qty_default'],
                         'layanan' => $layanan->nama,
                         'created_by' => Auth::user()->full_name,
+                        'created_by_user_id' => Auth::id(),
                     ]);
                     $created++;
                 }

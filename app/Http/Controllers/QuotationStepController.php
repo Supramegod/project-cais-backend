@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Http\Requests\QuotationStepRequest;
 use App\Models\AplikasiPendukung;
 use App\Models\Barang;
 use App\Models\BarangDefaultQty;
@@ -15,6 +15,7 @@ use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDevices;
 use App\Models\QuotationKaporlap;
+use App\Models\QuotationManagementFee;
 use App\Models\SalaryRule;
 use App\Models\Top;
 use App\Models\Training;
@@ -22,16 +23,14 @@ use App\Models\Umk;
 use App\Models\Ump;
 use App\Models\Umsk;
 use App\Models\Umsp;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use App\Services\QuotationStepService;
 use App\Services\QuotationBarangService;
 use App\Services\QuotationService;
-use App\Http\Requests\QuotationStepRequest;
-use App\Http\Resources\QuotationStepResource;
+use App\Services\QuotationStepService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -55,7 +54,9 @@ use Carbon\Carbon;
 class QuotationStepController extends Controller
 {
     protected QuotationStepService $quotationStepService;
+
     protected QuotationBarangService $quotationBarangService;
+
     protected QuotationService $quotationService;
 
     public function __construct(
@@ -77,7 +78,7 @@ class QuotationStepController extends Controller
         1 => ['kebutuhan'],
         2 => ['quotationSites'],
         3 => ['quotationDetails.quotationDetailRequirements', 'quotationDetails.quotationDetailTunjangans', 'quotationSites'],
-        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites'],
+        4 => ['quotationDetails.wage', 'quotationDetails.quotationSite', 'quotationSites', 'managementFeeConfig'],
         5 => ['quotationDetails', 'jenisPerusahaan', 'leads.jenisperusahaan'],
         6 => ['quotationAplikasis'],
         7 => ['quotationDetails', 'quotationKaporlaps'],
@@ -103,7 +104,6 @@ class QuotationStepController extends Controller
         12 => ['quotationKerjasamas', 'quotationPics'],
     ];
 
-
     // =========================================================================
     // PUBLIC ENDPOINTS
     // =========================================================================
@@ -116,23 +116,33 @@ class QuotationStepController extends Controller
      *    summary="Get quotation data for specific step",
      *     tags={"Quotations"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string")),
      *     @OA\Parameter(name="step", in="path", required=true, @OA\Schema(type="integer", minimum=1, maximum=12)),
+     *
      *     @OA\Response(
      *         response=200, description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object"),
      *             @OA\Property(property="message", type="string", example="Step data retrieved successfully"),
      *             @OA\Property(property="processing_time", type="string", example="42.30ms")
      *         )
      *     ),
+     *
      *     @OA\Response(response=404, description="Not found",
+     *
      *         @OA\JsonContent(@OA\Property(property="success", type="boolean", example=false),
+     *
      *             @OA\Property(property="message", type="string", example="Quotation not found"))
      *     ),
+     *
      *     @OA\Response(response=500, description="Server error",
+     *
      *         @OA\JsonContent(@OA\Property(property="success", type="boolean", example=false),
+     *
      *             @OA\Property(property="message", type="string", example="Failed to get step data"),
      *             @OA\Property(property="error", type="string"))
      *     )
@@ -148,6 +158,13 @@ class QuotationStepController extends Controller
             $relations = $this->resolveStepRelations($step);
             $quotation = Quotation::with($relations)->notDeleted()->findOrFail($id);
 
+            if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Quotation has been finalized and cannot be accessed.',
+                ], 403);
+            }
+
             $stepData = $this->prepareStepData($quotation, $step);
 
             return response()->json([
@@ -162,7 +179,7 @@ class QuotationStepController extends Controller
                 'message' => 'Quotation not found',
             ], 404);
         } catch (\Exception $e) {
-            Log::error("QuotationStepController@getStep: " . $e->getMessage(), [
+            Log::error('QuotationStepController@getStep: '.$e->getMessage(), [
                 'id' => $id,
                 'step' => $step,
                 'trace' => $e->getTraceAsString(),
@@ -184,30 +201,45 @@ class QuotationStepController extends Controller
      *    summary="Update specific quotation step",
      *     tags={"Quotations"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string")),
      *     @OA\Parameter(name="step", in="path", required=true, @OA\Schema(type="integer", minimum=1, maximum=12)),
+     *
      *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *
      *         @OA\Property(property="edit", type="boolean", example=false)
      *     )),
+     *
      *     @OA\Response(response=200, description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object"),
      *             @OA\Property(property="message", type="string", example="Step 1 updated successfully"),
      *             @OA\Property(property="processing_time", type="string", example="85.10ms")
      *         )
      *     ),
+     *
      *     @OA\Response(response=404, description="Not found",
+     *
      *         @OA\JsonContent(@OA\Property(property="success", type="boolean", example=false),
+     *
      *             @OA\Property(property="message", type="string", example="Step method not found"))
      *     ),
+     *
      *     @OA\Response(response=422, description="Validation error",
+     *
      *         @OA\JsonContent(@OA\Property(property="success", type="boolean", example=false),
+     *
      *             @OA\Property(property="message", type="string", example="Validation failed"),
      *             @OA\Property(property="errors", type="object"))
      *     ),
+     *
      *     @OA\Response(response=500, description="Server error",
+     *
      *         @OA\JsonContent(@OA\Property(property="success", type="boolean", example=false),
+     *
      *             @OA\Property(property="message", type="string", example="Failed to update step 1"),
      *             @OA\Property(property="error", type="string"))
      *     )
@@ -217,17 +249,31 @@ class QuotationStepController extends Controller
     {
         $startTime = microtime(true);
 
-        $updateMethod = 'updateStep' . $step;
-        if (!method_exists($this->quotationStepService, $updateMethod)) {
+        $updateMethod = 'updateStep'.$step;
+        if (! method_exists($this->quotationStepService, $updateMethod) && ! preg_match('/^updateStep(1[0-2]|[1-9])$/', $updateMethod)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Step method not found',
             ], 404);
         }
 
+        // Step sequence validation — prevent jumping ahead
+        $quotation = Quotation::notDeleted()->findOrFail($id);
+        if ($step > $quotation->step + 1) {
+            return response()->json([
+                'success' => false,
+                'message' => "Cannot update step {$step}. Please complete previous steps first (current step: {$quotation->step}).",
+            ], 422);
+        }
+
         // Gunakan closure transaction – otomatis rollback jika exception
-        DB::transaction(function () use ($request, $id, $step, $updateMethod, $startTime) {
+        DB::transaction(function () use ($request, $id, $step, $updateMethod) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
+
+            if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
+                throw new \Symfony\Component\HttpKernel\Exception\HttpException(403, 'Quotation has been finalized and cannot be updated.');
+            }
+
             $this->quotationStepService->$updateMethod($quotation, $request);
 
             if ($quotation->step < 12) {
@@ -241,7 +287,7 @@ class QuotationStepController extends Controller
         // Hanya sukses jika transaction selesai tanpa exception
         return response()->json([
             'success' => true,
-            'data' => new QuotationStepResource(Quotation::notDeleted()->findOrFail($id), $step),
+            'data' => $this->prepareStepData(Quotation::notDeleted()->findOrFail($id), $step),
             'message' => "Step {$step} updated successfully",
             'processing_time' => $this->elapsedMs($startTime),
         ]);
@@ -258,12 +304,12 @@ class QuotationStepController extends Controller
 
     private function prepareStepData(Quotation $quotation, int $step): array
     {
-        $additionalDataMethod = 'buildAdditionalDataStep' . $step;
+        $additionalDataMethod = 'buildAdditionalDataStep'.$step;
         $additionalData = method_exists($this, $additionalDataMethod)
             ? $this->$additionalDataMethod($quotation)
             : [];
 
-        $stepDataMethod = 'buildStepDataStep' . $step;
+        $stepDataMethod = 'buildStepDataStep'.$step;
         $stepData = method_exists($this, $stepDataMethod)
             ? $this->$stepDataMethod($quotation, $additionalData)
             : [];
@@ -279,8 +325,10 @@ class QuotationStepController extends Controller
             $baseData['nama_perusahaan'] = $this->nama_perusahaan ?? $quotation->nama_perusahaan;
             $baseData['kebutuhan'] = $this->kebutuhan ?? $quotation->kebutuhan;
         }
+
         return $baseData;
     }
+
     private function buildStepDataStep1(Quotation $quotation, array $additionalData): array
     {
         return [
@@ -327,9 +375,7 @@ class QuotationStepController extends Controller
 
         if ($quotation->relationLoaded('quotationDetails')) {
             $quotationDetails = $quotation->quotationDetails->map(function ($detail) {
-
-
-                return [
+                $data = [
                     'id' => $detail->id,
                     'nama_site' => $detail->nama_site,
                     'quotation_site_id' => $detail->quotation_site_id,
@@ -338,6 +384,50 @@ class QuotationStepController extends Controller
                     'jumlah_hc' => $detail->jumlah_hc,
                     'nominal_upah' => $detail->nominal_upah,
                 ];
+
+                // PERBAIKI: Cek relasi requirements dengan cara yang lebih reliable
+                $requirements = [];
+                if (method_exists($detail, 'quotationDetailRequirements') && $detail->relationLoaded('quotationDetailRequirements')) {
+                    $requirements = $detail->quotationDetailRequirements->pluck('requirement')->toArray();
+                } else {
+                    // Fallback: load relasi jika belum dimuat
+                    try {
+                        $requirements = $detail->quotationDetailRequirements()->pluck('requirement')->toArray();
+                    } catch (\Exception $e) {
+                        $requirements = [];
+                    }
+                }
+                $data['requirements'] = $requirements;
+
+                // PERBAIKI: Cek relasi tunjangan dengan cara yang lebih reliable
+                $tunjangans = [];
+                if (method_exists($detail, 'quotationDetailTunjangans') && $detail->relationLoaded('quotationDetailTunjangans')) {
+                    $tunjangans = $detail->quotationDetailTunjangans->map(function ($tunjangan) {
+                        return [
+                            'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                            'nominal' => $tunjangan->nominal,
+                            'nominal_coss' => $tunjangan->nominal_coss,
+                            'jenis' => $tunjangan->jenis,
+                        ];
+                    })->toArray();
+                } else {
+                    // Fallback: load relasi jika belum dimuat
+                    try {
+                        $tunjangans = $detail->quotationDetailTunjangans()->get()->map(function ($tunjangan) {
+                            return [
+                                'nama_tunjangan' => $tunjangan->nama_tunjangan,
+                                'nominal' => $tunjangan->nominal,
+                                'nominal_coss' => $tunjangan->nominal_coss,
+                                'jenis' => $tunjangan->jenis,
+                            ];
+                        })->toArray();
+                    } catch (\Exception $e) {
+                        $tunjangans = [];
+                    }
+                }
+                $data['tunjangans'] = $tunjangans;
+
+                return $data;
             })->toArray();
         }
 
@@ -345,7 +435,6 @@ class QuotationStepController extends Controller
             'quotation_details' => $quotationDetails,
         ];
     }
-
 
     private function buildStepDataStep4(Quotation $quotation, array $additionalData): array
     {
@@ -358,7 +447,7 @@ class QuotationStepController extends Controller
                 $site = $detail->quotationSite;
 
                 // 1. Logika Penentuan Keterangan Minimal Upah
-                $keteranganMinUpah = "Data UMK tidak ditemukan";
+                $keteranganMinUpah = 'Data UMK tidak ditemukan';
 
                 if ($site && $site->kota_id) {
                     // Mencari data UMK aktif berdasarkan kota_id dari site
@@ -366,7 +455,7 @@ class QuotationStepController extends Controller
 
                     if ($umkData) {
                         $minUpahNominal = $umkData->umk * 0.85;
-                        $keteranganMinUpah = "Upah kurang dari 85% UMK ( Rp " . number_format($minUpahNominal, 0, ',', '.') . " ) membutuhkan approval ";
+                        $keteranganMinUpah = 'Upah kurang dari 85% UMK ( Rp '.number_format($minUpahNominal, 0, ',', '.').' ) membutuhkan approval ';
                     }
                 }
 
@@ -408,12 +497,13 @@ class QuotationStepController extends Controller
         // 3. Return Struktur Akhir (Step Data & Global Data)
         return [
             'position_data' => $positionData,
+            // SESUDAH — tambah satu baris saja:
             'global_data' => [
                 'is_ppn' => $quotation->is_ppn ?? false,
-                'jenis_kontrak' => $quotation->jenis_kontrak ?? '',
                 'ppn_pph_dipotong' => $quotation->ppn_pph_dipotong ?? false,
                 'management_fee_id' => $quotation->management_fee_id ?? null,
                 'persentase' => $quotation->persentase ?? 0,
+                'management_fee_components' => $this->resolveMfConfig($quotation), // ← INI
             ],
         ];
     }
@@ -423,7 +513,7 @@ class QuotationStepController extends Controller
         $bpjsPerPosition = [];
 
         if ($quotation->relationLoaded('quotationDetails')) {
-            $bpjsPerPosition = $quotation->quotationDetails->map(fn($detail) => [
+            $bpjsPerPosition = $quotation->quotationDetails->map(fn ($detail) => [
                 'detail_id' => $detail->id,
                 'position_id' => $detail->position_id,
                 'position_name' => $detail->jabatan_kebutuhan,
@@ -468,7 +558,6 @@ class QuotationStepController extends Controller
         ];
     }
 
-
     private function buildStepDataStep8(Quotation $quotation, array $additionalData): array
     {
         $devicesData = $this->quotationBarangService->prepareBarangData($quotation, 'devices');
@@ -478,7 +567,6 @@ class QuotationStepController extends Controller
             'devices_total' => $devicesData['total'],
         ];
     }
-
 
     private function buildStepDataStep9(Quotation $quotation, array $additionalData): array
     {
@@ -509,7 +597,7 @@ class QuotationStepController extends Controller
             'jumlah_kunjungan_tim_crm' => $jumlahCrm,
             'bulan_tahun_kunjungan_tim_crm' => $periodeCrm,
             'keterangan_kunjungan_tim_crm' => $quotation->keterangan_kunjungan_tim_crm,
-            'ada_training' => !empty($quotationTrainings) ? 'Ada' : 'Tidak Ada',
+            'ada_training' => ! empty($quotationTrainings) ? 'Ada' : 'Tidak Ada',
             'training' => $quotation->training,
             'persen_bunga_bank' => $quotation->persen_bunga_bank,
             'quotation_ohcs' => $ohcData['data'],
@@ -551,17 +639,16 @@ class QuotationStepController extends Controller
                 'quotationDetailHpps',
                 'quotationDetailCosses',
                 'wage',
-                'quotationDetailTunjangans' => fn($q) => $q->whereNull('deleted_at'),
+                'quotationDetailTunjangans' => fn ($q) => $q->whereNull('deleted_at'),
             ]);
         }
 
         // Helper untuk mengecek RO
         // $isRo = fn($detail) => strtoupper(trim($detail->jabatan_kebutuhan ?? '')) === 'RO';
 
-
         // Helper untuk resolve tampilan tunjangan
         $resolveDisplay = function ($wage, $jenisField, $hppValue, $cossValue, $fieldDitagihkan = null) {
-            if (!$wage) {
+            if (! $wage) {
                 return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
             }
             $jenis = strtolower(trim($wage->$jenisField ?? ''));
@@ -586,19 +673,13 @@ class QuotationStepController extends Controller
             if (in_array($jenis, ['diberikan langsung', 'diberikan langsung oleh client'])) {
                 return ['hpp' => 'Diberikan Langsung Oleh Client', 'coss' => 'Diberikan Langsung Oleh Client'];
             }
+
             return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
         };
 
         $quotationDetails = [];
         if ($calculatedQuotation && $calculatedQuotation->quotation) {
             foreach ($calculatedQuotation->quotation->quotationDetails as $detail) {
-                $isRoDetail = $this->isRo($detail);
-                \Log::info('RO Check', [
-                    'detail_id' => $detail->id,
-                    'jabatan' => $detail->jabatan_kebutuhan,
-                    'is_ro' => $isRoDetail,
-                    'will_add_coss' => !$isRoDetail
-                ]);
                 $wage = $detail->wage ?? null;
                 $detailCalc = $calculatedQuotation->detail_calculations[$detail->id] ?? null;
 
@@ -612,18 +693,17 @@ class QuotationStepController extends Controller
                     $cossData = $coss ? $coss->toArray() : [];
                 }
 
-                $tunjanganData = $detail->quotationDetailTunjangans->map(fn($t) => [
+                $tunjanganData = $detail->quotationDetailTunjangans->map(fn ($t) => [
                     'nama_tunjangan' => $t->nama_tunjangan,
                     'nominal' => $t->nominal,
                     'nominal_coss' => $t->nominal_coss,
+                    'jenis' => $t->jenis,
                 ])->values()->toArray();
 
                 $thrDisplay = $resolveDisplay($wage, 'thr', $hppData['tunjangan_hari_raya'] ?? 0, $cossData['tunjangan_hari_raya'] ?? 0);
                 $kompDisplay = $resolveDisplay($wage, 'kompensasi', $hppData['kompensasi'] ?? 0, $cossData['kompensasi'] ?? 0);
                 $lemburDisplay = $resolveDisplay($wage, 'lembur', $hppData['lembur'] ?? 0, $cossData['lembur'] ?? 0, 'lembur_ditagihkan');
                 $holidayDisplay = $resolveDisplay($wage, 'tunjangan_holiday', $hppData['tunjangan_hari_libur_nasional'] ?? 0, $cossData['tunjangan_hari_libur_nasional'] ?? 0);
-
-                $isRoDetail = $this->isRo($detail);
 
                 // Data HPP (selalu ada)
                 $hppArray = [
@@ -665,14 +745,10 @@ class QuotationStepController extends Controller
                     'penjamin_kesehatan' => $detail->penjamin_kesehatan,
                     'upah' => $wage?->upah ?? 0,
                     'jumlah_hc_hpp' => $hppData['jumlah_hc'] ?? 0,
-                    'jumlah_hc_coss' => $isRoDetail ? 0 : ($cossData['jumlah_hc'] ?? 0),
+                    'jumlah_hc_coss' => $cossData['jumlah_hc'] ?? 0,
                     'tunjangan_data' => $tunjanganData,
                     'hpp' => $hppArray,
-                ];
-
-                // **Hanya tambahkan key 'coss' jika bukan RO**
-                if (!$isRoDetail) {
-                    $detailItem['coss'] = [
+                    'coss' => [
                         'nominal_upah' => $cossData['gaji_pokok'] ?? 0,
                         'total_tunjangan' => $cossData['total_tunjangan'] ?? 0,
                         'tunjangan_hari_raya' => $thrDisplay['coss'],
@@ -702,8 +778,8 @@ class QuotationStepController extends Controller
                         'total_exclude_base_manpower' => $cossData['total_exclude_base_manpower'] ?? 0,
                         'bunga_bank' => $cossData['bunga_bank'] ?? 0,
                         'insentif' => $cossData['insentif'] ?? 0,
-                    ];
-                }
+                    ],
+                ];
 
                 $quotationDetails[] = $detailItem;
             }
@@ -721,7 +797,7 @@ class QuotationStepController extends Controller
             'persen_bunga_bank' => $quotation->persen_bunga_bank ?? 0,
             'persen_insentif' => $quotation->persen_insentif ?? 0,
             'quotation_pics' => $quotation->relationLoaded('quotationPics')
-                ? $quotation->quotationPics->map(fn($pic) => [
+                ? $quotation->quotationPics->map(fn ($pic) => [
                     'id' => $pic->id,
                     'nama' => $pic->nama,
                     'jabatan_id' => $pic->jabatan_id,
@@ -773,6 +849,7 @@ class QuotationStepController extends Controller
             ] : null,
         ];
     }
+
     private function buildStepDataStep12(Quotation $quotation, array $additionalData): array
     {
         $calculatedQuotation = $additionalData['calculated_quotation'] ?? null;
@@ -782,7 +859,7 @@ class QuotationStepController extends Controller
                 ->whereNull('deleted_at')
                 ->sortBy('id')
                 ->values()
-                ->map(fn($kerjasama, $index) => [
+                ->map(fn ($kerjasama, $index) => [
                     'id' => $kerjasama->id,
                     'order' => $index + 1,
                     'perjanjian' => $kerjasama->perjanjian,
@@ -800,28 +877,26 @@ class QuotationStepController extends Controller
 
         if ($calculatedQuotation) {
             $finalData['final_calculation'] = [
-                'total_invoice' => $summary->total_invoice ?? 0,
-                'total_invoice_coss' => $summary->total_invoice_coss ?? 0,
-                'pembulatan' => $summary->pembulatan ?? 0,
-                'pembulatan_coss' => $summary->pembulatan_coss ?? 0,
-                'grand_total_sebelum_pajak' => $summary->grand_total_sebelum_pajak ?? 0,
-                'grand_total_sebelum_pajak_coss' => $summary->grand_total_sebelum_pajak_coss ?? 0,
-                'margin' => $summary->margin ?? 0,
-                'margin_coss' => $summary->margin_coss ?? 0,
-                'gpm' => $summary->gpm ?? 0,
-                'gpm_coss' => $summary->gpm_coss ?? 0,
+                'total_invoice' => $calculatedQuotation->calculation_summary->total_invoice ?? 0,
+                'total_invoice_coss' => $calculatedQuotation->calculation_summary->total_invoice_coss ?? 0,
+                'pembulatan' => $calculatedQuotation->calculation_summary->pembulatan ?? 0,
+                'pembulatan_coss' => $calculatedQuotation->calculation_summary->pembulatan_coss ?? 0,
+                'grand_total_sebelum_pajak' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak ?? 0,
+                'grand_total_sebelum_pajak_coss' => $calculatedQuotation->calculation_summary->grand_total_sebelum_pajak_coss ?? 0,
+                'margin' => $calculatedQuotation->calculation_summary->margin ?? 0,
+                'margin_coss' => $calculatedQuotation->calculation_summary->margin_coss ?? 0,
+                'gpm' => $calculatedQuotation->calculation_summary->gpm ?? 0,
+                'gpm_coss' => $calculatedQuotation->calculation_summary->gpm_coss ?? 0,
             ];
         }
 
         return $finalData;
     }
 
-
     private function buildAdditionalDataStep1(Quotation $quotation): array
     {
         return [];
     }
-
 
     private function buildAdditionalDataStep2(Quotation $quotation): array
     {
@@ -849,7 +924,7 @@ class QuotationStepController extends Controller
                 ->select('id', 'name')
                 ->get(),
             'quotation_sites' => $quotation->relationLoaded('quotationSites')
-                ? $quotation->quotationSites->map(fn($site) => [
+                ? $quotation->quotationSites->map(fn ($site) => [
                     'id' => $site->id,
                     'nama_site' => $site->nama_site,
                 ])->toArray()
@@ -865,19 +940,28 @@ class QuotationStepController extends Controller
         $umskPerSite = [];
 
         // Memastikan relasi quotationSites dimuat
-        if (!$quotation->relationLoaded('quotationSites')) {
+        if (! $quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
                     $query->whereNull('deleted_at');
-                }
+                },
             ]);
         }
 
-        foreach ($quotation->quotationSites as $site) {
-            $umk = Umk::byCity($site->kota_id)->active()->first();
-            $ump = Ump::byProvince($site->provinsi_id)->active()->first();
-            $umsk = Umsk::byCity($site->kota_id)->active()->first();
-            $umsp = Umsp::byProvince($site->provinsi_id)->active()->first();
+        $sites = $quotation->quotationSites;
+        $kotaIds = $sites->pluck('kota_id')->unique()->toArray();
+        $provinsiIds = $sites->pluck('provinsi_id')->unique()->toArray();
+
+        $umkList = Umk::whereIn('city_id', $kotaIds)->active()->get()->keyBy('city_id');
+        $umpList = Ump::whereIn('province_id', $provinsiIds)->active()->get()->keyBy('province_id');
+        $umskList = Umsk::whereIn('city_id', $kotaIds)->active()->get()->keyBy('city_id');
+        $umspList = Umsp::whereIn('province_id', $provinsiIds)->active()->get()->keyBy('province_id');
+
+        foreach ($sites as $site) {
+            $umk = $umkList->get($site->kota_id);
+            $ump = $umpList->get($site->provinsi_id);
+            $umsk = $umskList->get($site->kota_id);
+            $umsp = $umspList->get($site->provinsi_id);
 
             $umpPerSite[] = [
                 'site_id' => $site->id,
@@ -936,14 +1020,14 @@ class QuotationStepController extends Controller
             'umsk_per_site' => $umskPerSite,
 
             // Data Site (Disederhanakan)
-            'quotation_sites' => $quotation->quotationSites->map(fn($site) => [
+            'quotation_sites' => $quotation->quotationSites->map(fn ($site) => [
                 'id' => $site->id,
                 'nama_site' => $site->nama_site,
             ])->values()->toArray(), // Tambahkan values() untuk memastikan array
 
             // Data Details
             'quotation_details' => $quotation->relationLoaded('quotationDetails')
-                ? $quotation->quotationDetails->map(fn($detail) => [
+                ? $quotation->quotationDetails->map(fn ($detail) => [
                     'id' => $detail->id,
                     'position_id' => $detail->position_id,
                     'position_name' => $detail->jabatan_kebutuhan,
@@ -996,7 +1080,7 @@ class QuotationStepController extends Controller
 
             foreach ($listKaporlap as $kaporlap) {
                 foreach ($quotation->quotationDetails as $detail) {
-                    $fieldName = 'jumlah_' . $detail->id;
+                    $fieldName = 'jumlah_'.$detail->id;
                     $kaporlap->$fieldName = $defaultQtyMap->has($kaporlap->id)
                         ? $defaultQtyMap[$kaporlap->id]->qty_default
                         : 0;
@@ -1006,12 +1090,12 @@ class QuotationStepController extends Controller
             $existingMap = QuotationKaporlap::whereIn('barang_id', $barangIds)
                 ->whereIn('quotation_detail_id', $detailIds)
                 ->get()
-                ->groupBy(fn($item) => $item->barang_id . '_' . $item->quotation_detail_id);
+                ->groupBy(fn ($item) => $item->barang_id.'_'.$item->quotation_detail_id);
 
             foreach ($listKaporlap as $kaporlap) {
                 foreach ($quotation->quotationDetails as $detail) {
-                    $fieldName = 'jumlah_' . $detail->id;
-                    $key = $kaporlap->id . '_' . $detail->id;
+                    $fieldName = 'jumlah_'.$detail->id;
+                    $key = $kaporlap->id.'_'.$detail->id;
                     $kaporlap->$fieldName = $existingMap->has($key)
                         ? $existingMap[$key]->first()->jumlah
                         : 0;
@@ -1024,7 +1108,7 @@ class QuotationStepController extends Controller
             'kaporlap_list' => $listKaporlap,
             'quotation_details' => $quotation->relationLoaded('quotationDetails')
                 ? $quotation->quotationDetails
-                    ->map(fn($d) => [
+                    ->map(fn ($d) => [
                         'id' => $d->id,
                         'position_id' => $d->position_id,
                         'jumlah_hc' => $d->jumlah_hc,
@@ -1074,11 +1158,11 @@ class QuotationStepController extends Controller
             }
         }
 
-        if (!$quotation->relationLoaded('quotationSites')) {
+        if (! $quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
                     $query->whereNull('deleted_at');
-                }
+                },
             ]);
         }
 
@@ -1117,11 +1201,11 @@ class QuotationStepController extends Controller
                 return $chemical;
             });
 
-        if (!$quotation->relationLoaded('quotationSites')) {
+        if (! $quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
                     $query->whereNull('deleted_at');
-                }
+                },
             ]);
         }
 
@@ -1149,11 +1233,11 @@ class QuotationStepController extends Controller
             ->select('id', 'nama')
             ->get();
 
-        if (!$quotation->relationLoaded('quotationSites')) {
+        if (! $quotation->relationLoaded('quotationSites')) {
             $quotation->load([
                 'quotationSites' => function ($query) {
                     $query->whereNull('deleted_at');
-                }
+                },
             ]);
         }
 
@@ -1171,6 +1255,7 @@ class QuotationStepController extends Controller
                 ->get()
                 ->map(function ($ohc) {
                     $ohc->harga_formatted = number_format($ohc->harga, 0, ',', '.');
+
                     return $ohc;
                 }),
             'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
@@ -1190,6 +1275,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep11(Quotation $quotation): array
     {
         $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
+
         return [
             'calculated_quotation' => $calculatedQuotation,
         ];
@@ -1207,7 +1293,7 @@ class QuotationStepController extends Controller
         $cossValue,
         ?string $fieldDitagihkanTerpisah = null
     ): array {
-        if (!$wage) {
+        if (! $wage) {
             return ['hpp' => 'Tidak Ada', 'coss' => 'Tidak Ada'];
         }
 
@@ -1251,15 +1337,35 @@ class QuotationStepController extends Controller
         }
 
         $parts = explode(' ', $value, 2);
+
         return [$parts[0] ?? '', $parts[1] ?? ''];
     }
 
     private function elapsedMs(float $startTime): string
     {
-        return round((microtime(true) - $startTime) * 1000, 2) . 'ms';
+        return round((microtime(true) - $startTime) * 1000, 2).'ms';
     }
+
     private function isRo($detail): bool
     {
         return ($detail->position_id ?? null) === 224;
+    }
+
+    private function resolveMfConfig(Quotation $quotation): array
+    {
+        $config = $quotation->relationLoaded('managementFeeConfig')
+            ? $quotation->managementFeeConfig
+            : null;
+
+        $flags = QuotationManagementFee::componentFlags();
+
+        if (! $config) {
+            // Belum ada record (quotation lama) → default semua aktif
+            return array_fill_keys($flags, true);
+        }
+
+        return collect($flags)
+            ->mapWithKeys(fn ($flag) => [$flag => (bool) ($config->{$flag} ?? true)])
+            ->all();
     }
 }

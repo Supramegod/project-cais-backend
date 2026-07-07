@@ -250,7 +250,8 @@ public function view($provinceId)
                 'tgl_berlaku' => $request->tgl_berlaku,
                 'sumber' => $request->sumber,
                 'is_aktif' => 1,
-                'created_by' => Auth::user()->full_name ?? 'System'
+                'created_by' => Auth::user()->full_name ?? 'System',
+                'created_by_user_id' => Auth::id()
             ]);
 
             return response()->json([

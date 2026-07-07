@@ -605,7 +605,8 @@ class LeadsController extends Controller
                 'benua' => $benua ? $benua->nama_benua : null,
                 'negara_id' => $request->negara,
                 'negara' => $negara ? $negara->nama_negara : null,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             // Simpan daftar PIC (multi PIC). Fallback ke PIC tunggal lama bila pics kosong.
@@ -648,7 +649,8 @@ class LeadsController extends Controller
                 'status_leads_id' => 1,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ];
 
             if ($lead->tim_sales_d_id) {
@@ -660,14 +662,14 @@ class LeadsController extends Controller
 
             DB::commit();
 
-            $response = [
+            return response()->json([
                 'success' => true,
                 'message' => 'Leads ' . $request->nama_perusahaan . ' berhasil disimpan',
                 'data' => [
                     'lead' => $lead,
                     'assignments' => $assignmentResults
                 ]
-            ];
+            ]);
 
             return response()->json($response);
 
@@ -877,6 +879,7 @@ class LeadsController extends Controller
                 'benua' => $benua ? $benua->nama_benua : null,
                 'negara_id' => $request->negara,
                 'negara' => $negara ? $negara->nama_negara : null,
+                'tgl_leads' => Carbon::now()->toDateString(), // hasil: 2026-06-08
                 'updated_by' => Auth::user()->full_name
             ]);
 
@@ -913,7 +916,8 @@ class LeadsController extends Controller
                 'status_leads_id' => 1,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ];
 
             if ($lead->tim_sales_d_id) {
@@ -1393,7 +1397,8 @@ class LeadsController extends Controller
                 'email' => $leadsParent->email,
                 'status_leads_id' => 1,
                 'notes' => $leadsParent->notes,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             // Create activity
@@ -1409,7 +1414,8 @@ class LeadsController extends Controller
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
                 'created_at' => $current_date_time,
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             if (Auth::user()->cais_role_id == 29) {
@@ -2453,8 +2459,15 @@ class LeadsController extends Controller
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => $user->id,
-                'created_by' => $user->full_name
+                'created_by' => $user->full_name,
+                'created_by_user_id' => $user->id
             ]);
+
+
+            if ($lead) {
+                $lead->tgl_leads = Carbon::now()->toDateString();
+                $lead->save();
+            }
 
             DB::commit();
 
@@ -2559,7 +2572,8 @@ class LeadsController extends Controller
                 'status_leads_id' => $lead->status_leads_id,
                 'is_activity' => 0,
                 'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name
+                'created_by' => Auth::user()->full_name,
+                'created_by_user_id' => Auth::id()
             ]);
 
             DB::commit();
