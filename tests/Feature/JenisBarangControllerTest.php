@@ -192,13 +192,11 @@ class JenisBarangControllerTest extends TestCase
                 'message' => 'Jenis Barang berhasil dihapus',
             ]);
 
-        // NOTE (characterization): `deleted_at` is NOT in JenisBarang::$fillable,
-        // so the mass update silently drops it — the row is NOT actually soft
-        // deleted. Only `deleted_by` is persisted. Locking the current behavior.
-        $this->assertDatabaseHas('m_jenis_barang', [
+        // Row is now genuinely soft-deleted (deleted_at set via SoftDeletes),
+        // with the audit column deleted_by persisted.
+        $this->assertSoftDeleted('m_jenis_barang', [
             'id' => $row->id,
             'deleted_by' => 'Tester',
-            'deleted_at' => null,
         ]);
     }
 

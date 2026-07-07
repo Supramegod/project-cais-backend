@@ -164,24 +164,29 @@ class CustomerControllerTest extends TestCase
     }
 
     /**
-     * Characterization of a PRE-EXISTING latent bug: availableCustomer maps
-     * `$lead->kebutuhan->nama` where `kebutuhan` is a belongsToMany relation
-     * (a Collection), so `->nama` throws once any customer row exists. The
-     * controller's try/catch turns that into a clean JSON 500. This is locked
-     * as-is so the refactor keeps the exact same observable contract; it is NOT
-     * an endorsement of the behavior.
+     * Regression fix: availableCustomer previously threw once any customer row
+     * existed — `$lead->kebutuhan->nama` on a belongsToMany Collection — and the
+     * try/catch turned it into a 500. Now it returns 200 with the kebutuhan
+     * names joined.
      */
-    public function test_available_with_data_returns_500_current_behavior(): void
+    public function test_available_with_data_returns_joined_kebutuhan(): void
     {
-        $this->seedLead(['customer_id' => 55, 'nama_perusahaan' => 'PT Cust A']);
+        $leadId = $this->seedLead(['customer_id' => 55, 'nama_perusahaan' => 'PT Cust A']);
+
+        $cs = DB::table('m_kebutuhan')->insertGetId(['nama' => 'Cleaning Service']);
+        $sec = DB::table('m_kebutuhan')->insertGetId(['nama' => 'Security']);
+        DB::table('sl_leads_kebutuhan')->insert([
+            ['leads_id' => $leadId, 'kebutuhan_id' => $cs, 'deleted_at' => null],
+            ['leads_id' => $leadId, 'kebutuhan_id' => $sec, 'deleted_at' => null],
+        ]);
 
         $response = $this->getJson('/api/customer/available');
 
-        $response->assertStatus(500)
-            ->assertExactJson([
-                'success' => false,
-                'message' => 'Internal server error',
-            ]);
+        $response->assertOk()
+            ->assertJson(['success' => true])
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.nama_perusahaan', 'PT Cust A')
+            ->assertJsonPath('data.0.kebutuhan', 'Cleaning Service, Security');
     }
 
     private function rebuildSchema(): void

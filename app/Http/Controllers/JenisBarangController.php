@@ -160,10 +160,10 @@ class JenisBarangController extends Controller
             return $this->notFoundResponse();
         }
 
-        $jenisBarang->update([
-            'deleted_at' => Carbon::now(),
-            'deleted_by' => Auth::user()->full_name,
-        ]);
+        // Set audit column lalu soft-delete via SoftDeletes (deleted_at bukan
+        // fillable, jadi tak bisa lewat mass-update — harus pakai ->delete()).
+        $jenisBarang->update(['deleted_by' => Auth::user()->full_name]);
+        $jenisBarang->delete();
 
         return $this->messageResponse('Jenis Barang berhasil dihapus');
     }

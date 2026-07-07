@@ -373,7 +373,7 @@ class SiteController extends Controller
      */
     public function availableCustomer(): JsonResponse
     {
-        $query = Leads::with(['statusLeads', 'branch', 'platform', 'kebutuhan', 'timSales', 'timSalesDetail'])
+        $query = Leads::with(['statusLeads', 'branch', 'platform', 'kebutuhan', 'timSales', 'timSalesD'])
             ->whereNotNull('customer_id')
             ->whereNull('deleted_at');
 
@@ -385,7 +385,8 @@ class SiteController extends Controller
                 'id' => $item->id,
                 'tgl' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
                 'nama_perusahaan' => $item->nama_perusahaan,
-                'kebutuhan' => $item->kebutuhan->nama ?? '',
+                // kebutuhan() belongsToMany (Collection) — gabung nama, bukan ->nama.
+                'kebutuhan' => $item->kebutuhan->pluck('nama')->implode(', '),
                 'pic' => $item->pic,
                 'no_telp' => $item->no_telp,
                 'email' => $item->email,
@@ -393,7 +394,7 @@ class SiteController extends Controller
                 'branch' => $item->branch->name ?? '',
                 'platform' => $item->platform->nama ?? '',
                 'tim_sales' => $item->timSales->nama ?? '',
-                'sales' => $item->timSalesDetail->nama ?? '',
+                'sales' => $item->timSalesD->nama ?? '',
                 'ro' => $item->ro,
                 'crm' => $item->crm,
                 'warna_background' => $item->statusLeads->warna_background ?? '',
@@ -414,7 +415,7 @@ class SiteController extends Controller
         // Sales division
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             if ($user->cais_role_id == 29) { // Sales
-                $query->whereHas('timSalesDetail', function ($q) use ($user) {
+                $query->whereHas('timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
             } elseif ($user->cais_role_id == 31) { // SPV Sales
@@ -422,7 +423,7 @@ class SiteController extends Controller
                 if ($tim) {
                     $memberIds = TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
                         ->pluck('user_id');
-                    $query->whereHas('timSalesDetail', function ($q) use ($memberIds) {
+                    $query->whereHas('timSalesD', function ($q) use ($memberIds) {
                         $q->whereIn('user_id', $memberIds);
                     });
                 }

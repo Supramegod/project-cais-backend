@@ -7,7 +7,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Validation\ValidationException;
-use Laravel\Sanctum\Sanctum;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -77,5 +76,6 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })->create();
 
-// Tambahkan ini di luar return statement
-Sanctum::usePersonalAccessTokenModel(\App\Models\HrisPersonalAccessToken::class);
+// NOTE: Sanctum::usePersonalAccessTokenModel(HrisPersonalAccessToken::class) is
+// registered in AppServiceProvider::boot() / SanctumServiceProvider — a call here
+// (after `return`) would be unreachable dead code, so it is intentionally omitted.

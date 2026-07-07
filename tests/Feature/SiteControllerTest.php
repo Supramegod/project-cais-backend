@@ -169,15 +169,55 @@ class SiteControllerTest extends TestCase
         $this->assertArrayNotHasKey('message', $response->json());
     }
 
+    public function test_available_customer_with_data_joins_kebutuhan_names(): void
+    {
+        // Regression: with rows present, availableCustomer previously threw —
+        // (a) $lead->kebutuhan->nama on a belongsToMany Collection, and
+        // (b) eager-loading the non-existent 'timSalesDetail' relation.
+        // After the fix it returns 200 with kebutuhan names joined.
+        $lead = Leads::query()->create([
+            'nama_perusahaan' => 'PT. Multi Kebutuhan',
+            'customer_id' => 30,
+            'tgl_leads' => '2024-02-01',
+            'pic' => 'Budi',
+        ]);
+
+        $cs = DB::table('m_kebutuhan')->insertGetId(['nama' => 'Cleaning Service']);
+        $sec = DB::table('m_kebutuhan')->insertGetId(['nama' => 'Security']);
+        DB::table('sl_leads_kebutuhan')->insert([
+            ['leads_id' => $lead->id, 'kebutuhan_id' => $cs, 'deleted_at' => null],
+            ['leads_id' => $lead->id, 'kebutuhan_id' => $sec, 'deleted_at' => null],
+        ]);
+
+        $response = $this->getJson('/api/site/available-customer');
+
+        $response->assertOk()
+            ->assertJson(['success' => true])
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.nama_perusahaan', 'PT. Multi Kebutuhan')
+            ->assertJsonPath('data.0.kebutuhan', 'Cleaning Service, Security')
+            ->assertJsonPath('data.0.sales', '');
+    }
+
     private function rebuildSchema(): void
     {
         foreach ([
-            'm_user', 'sl_leads', 'sl_quotation_site', 'sl_spk_site', 'sl_site',
+            'm_user', 'sl_leads', 'sl_leads_kebutuhan', 'sl_quotation_site', 'sl_spk_site', 'sl_site',
             'sl_customer_activity', 'm_jabatan_pic', 'm_jenis_perusahaan',
             'm_kebutuhan', 'm_platform', 'm_branch',
         ] as $t) {
             Schema::dropIfExists($t);
         }
+
+        Schema::create('sl_leads_kebutuhan', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('leads_id')->nullable();
+            $table->unsignedInteger('kebutuhan_id')->nullable();
+            $table->unsignedInteger('tim_sales_id')->nullable();
+            $table->unsignedInteger('tim_sales_d_id')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
 
         Schema::create('m_user', function (Blueprint $table) {
             $table->increments('id');
