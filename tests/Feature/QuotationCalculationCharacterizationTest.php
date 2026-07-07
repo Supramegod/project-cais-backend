@@ -400,6 +400,32 @@ class QuotationCalculationCharacterizationTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('m_umk', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('city_id')->nullable();
+            $table->string('city_name')->nullable();
+            $table->decimal('umk', 20, 2)->nullable();
+            $table->date('tgl_berlaku')->nullable();
+            $table->string('sumber')->nullable();
+            $table->boolean('is_aktif')->default(true);
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('m_ump', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('province_id')->nullable();
+            $table->string('province_name')->nullable();
+            $table->decimal('ump', 20, 2)->nullable();
+            $table->date('tgl_berlaku')->nullable();
+            $table->string('sumber')->nullable();
+            $table->boolean('is_aktif')->default(true);
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
         Schema::create('m_barang', function (Blueprint $table) {
             $table->increments('id');
             $table->string('nama')->nullable();

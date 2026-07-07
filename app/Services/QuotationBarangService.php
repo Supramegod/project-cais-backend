@@ -105,9 +105,25 @@ class QuotationBarangService
                 $quotation->load('quotationSites');
             }
 
+            // Preload semua Barang non-custom sekali (hindari N+1 di processBarangItem)
+            $barangIds = collect($barangData)
+                ->reject(fn ($data) => isset($data['is_custom']) && $data['is_custom'])
+                ->pluck('barang_id')
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->all();
+
+            $barangMap = empty($barangIds)
+                ? collect()
+                : Barang::whereIn('id', $barangIds)
+                    ->whereIn('jenis_barang_id', $jenisBarangIds)
+                    ->get()
+                    ->keyBy('id');
+
             // 3. PROCESS each incoming item
             foreach ($barangData as $data) {
-                $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId, $useSiteId);
+                $result = $this->processBarangItem($quotation, $jenisBarang, $data, $modelClass, $jenisBarangIds, $useDetailId, $useSiteId, $barangMap);
 
                 if ($result['success']) {
                     if ($result['action'] === 'created') {
@@ -175,7 +191,7 @@ class QuotationBarangService
     /**
      * Process individual barang item
      */
-    private function processBarangItem($quotation, string $jenisBarang, array $data, string $modelClass, array $jenisBarangIds, bool $useDetailId, bool $useSiteId): array
+    private function processBarangItem($quotation, string $jenisBarang, array $data, string $modelClass, array $jenisBarangIds, bool $useDetailId, bool $useSiteId, $barangMap = null): array
     {
         // Validasi data minimal
         if (!isset($data['jumlah'])) {
@@ -217,10 +233,12 @@ class QuotationBarangService
 
             $barang_id = (int) $data['barang_id'];
 
-            // Cari barang
-            $barang = Barang::where('id', $barang_id)
-                ->whereIn('jenis_barang_id', $jenisBarangIds)
-                ->first();
+            // Cari barang dari map yang sudah di-preload (fallback query bila map tidak tersedia)
+            $barang = $barangMap !== null
+                ? $barangMap->get($barang_id)
+                : Barang::where('id', $barang_id)
+                    ->whereIn('jenis_barang_id', $jenisBarangIds)
+                    ->first();
 
             if (!$barang) {
                 return ['success' => false, 'reason' => 'barang_not_found'];

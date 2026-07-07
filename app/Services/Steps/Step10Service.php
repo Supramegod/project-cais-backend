@@ -109,8 +109,12 @@ class Step10Service
             ]);
         }
 
+        $trainingsToAdd = empty($trainingIdsToAdd)
+            ? collect()
+            : Training::whereIn('id', $trainingIdsToAdd)->get()->keyBy('id');
+
         foreach ($trainingIdsToAdd as $trainingId) {
-            $training = Training::find($trainingId);
+            $training = $trainingsToAdd->get($trainingId);
             if ($training) {
                 QuotationTraining::create([
                     'training_id' => $trainingId,

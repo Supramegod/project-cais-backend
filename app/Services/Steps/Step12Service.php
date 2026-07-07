@@ -253,6 +253,20 @@ class Step12Service
 
     private function isUnderMinimumWage(Quotation $quotation): bool
     {
+        // Preload UMK aktif untuk semua kota sekali (hindari N+1 per detail)
+        $kotaIds = $quotation->quotationDetails
+            ->map(fn ($d) => $d->quotationSite?->kota_id)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $umkByCity = empty($kotaIds)
+            ? collect()
+            : Umk::whereIn('city_id', $kotaIds)->active()->get()
+                ->groupBy('city_id')
+                ->map(fn ($group) => $group->first());
+
         foreach ($quotation->quotationDetails as $detail) {
             $wage = $detail->wage;
             $site = $detail->quotationSite;
@@ -266,7 +280,7 @@ class Step12Service
                 continue;
             }
 
-            $umkData = Umk::byCity($site->kota_id)->active()->first();
+            $umkData = $umkByCity->get($site->kota_id);
             if (! $umkData) {
                 continue;
             }
