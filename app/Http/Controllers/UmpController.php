@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUmpRequest;
 use App\Models\Ump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -55,15 +55,9 @@ class UmpController extends Controller
         try {
             $data = Ump::getActive();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
         }
     }
 
@@ -100,22 +94,13 @@ public function view($provinceId)
         $data = Ump::where('province_id', $provinceId)->first();
 
         if (!$data) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data UMP tidak ditemukan'
-            ], 404);
+            return $this->notFoundResponse('Data UMP tidak ditemukan');
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $data
-        ]);
+        return $this->successResponse($data);
 
     } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Internal server error: ' . $e->getMessage()
-        ], 500);
+        return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
     }
 }
 
@@ -159,16 +144,10 @@ public function view($provinceId)
         try {
             $data = Ump::getByProvince($provinceId);
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
         }
     }
 
@@ -204,37 +183,9 @@ public function view($provinceId)
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(StoreUmpRequest $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'province_id' => 'required|integer',
-                'province_name' => 'required|string|max:255',
-                'ump' => 'required|numeric|min:0',
-                'tgl_berlaku' => 'required|date',
-                'sumber' => 'required|url|max:500'
-            ], [
-                'province_id.required' => 'Province ID harus diisi',
-                'province_name.required' => 'Nama provinsi harus diisi',
-                'province_name.max' => 'Nama provinsi maksimal 255 karakter',
-                'ump.required' => 'Nilai UMP harus diisi',
-                'ump.numeric' => 'Nilai UMP harus berupa angka',
-                'ump.min' => 'Nilai UMP minimal 0',
-                'tgl_berlaku.required' => 'Tanggal berlaku harus diisi',
-                'tgl_berlaku.date' => 'Format tanggal tidak valid',
-                'sumber.required' => 'Sumber harus diisi',
-                'sumber.url' => 'Sumber harus berupa URL yang valid',
-                'sumber.max' => 'Sumber maksimal 500 karakter'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
             // Non-aktifkan UMP lama untuk province yang sama
             Ump::where('province_id', $request->province_id)
                 ->update([
@@ -254,17 +205,10 @@ public function view($provinceId)
                 'created_by_user_id' => Auth::id()
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data UMP berhasil ditambahkan',
-                'data' => $ump
-            ]);
+            return $this->successResponse($ump, 'Data UMP berhasil ditambahkan');
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data gagal ditambahkan: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Data gagal ditambahkan: ' . $e->getMessage());
         }
     }
 }
