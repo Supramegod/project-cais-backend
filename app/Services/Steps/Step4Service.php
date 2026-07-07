@@ -88,9 +88,10 @@ class Step4Service
                 ]);
             }
 
-            if ($request->has('management_fee_components')) {
-                $this->saveManagementFeeConfig($quotation, $request->management_fee_components);
-            }
+            // ── COMMENTED: management_fee_components (tidak dipakai oleh old calculateManagementFee) ──
+            // if ($request->has('management_fee_components')) {
+            //     $this->saveManagementFeeConfig($quotation, $request->management_fee_components);
+            // }
 
             // Update quotation timestamp
             $quotation->update([
@@ -112,22 +113,23 @@ class Step4Service
         }
     }
 
-    private function saveManagementFeeConfig(Quotation $quotation, array $components): void
-    {
-        $allowedFlags = QuotationManagementFee::componentFlags();
+    // ── COMMENTED: saveManagementFeeConfig (tidak dipakai oleh old calculateManagementFee) ──
+    // private function saveManagementFeeConfig(Quotation $quotation, array $components): void
+    // {
+    //     $allowedFlags = QuotationManagementFee::componentFlags();
 
-        $sanitizedFlags = [];
-        foreach ($allowedFlags as $flag) {
-            $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
-        }
+    //     $sanitizedFlags = [];
+    //     foreach ($allowedFlags as $flag) {
+    //         $sanitizedFlags[$flag] = isset($components[$flag]) && (bool) $components[$flag];
+    //     }
 
-        QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
+    //     QuotationManagementFee::upsertForQuotation($quotation->id, $sanitizedFlags);
 
-        Log::info('Saved management fee component ', [
-            'quotation_id' => $quotation->id,
-            'flags' => $sanitizedFlags,
-        ]);
-    }
+    //     Log::info('Saved management fee component ', [
+    //         'quotation_id' => $quotation->id,
+    //         'flags' => $sanitizedFlags,
+    //     ]);
+    // }
 
     private function updatePositionStep4(Quotation $quotation, array $positionData): void
     {

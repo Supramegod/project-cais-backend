@@ -1176,56 +1176,87 @@ class QuotationService
         );
     }
 
+    // ── ⬇ OLD calculateManagementFee (dikembalikan ke rumus management_fee_id) ⬇ ──
     private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
     {
         $summary = $result->calculation_summary;
-        $mfConfig = $quotation->_mf_config; // QuotationManagementFee | default stdClass
-        $persentase = (float) ($quotation->persentase ?? 0);
 
-        // ── BASIS: gaji pokok selalu masuk (tidak ada flag) ───────────────────
-        $base = (float) ($summary->{"upah_pokok{$suffix}"} ?? 0);
-
-        // ── Komponen opsional: flag → summary field ────────────────────────────
-        //    Menggunakan summary field yang sudah dihitung di calculateBaseTotals
-        //    → ZERO tambahan query, ZERO N+1
-        $componentMap = [
-            'is_thr' => "total_thr{$suffix}",
-            'is_kompensasi' => "total_kompensasi{$suffix}",
-            'is_thl' => "total_thl{$suffix}",
-            'is_lembur' => "total_lembur{$suffix}",
-            'is_bpjs_kes' => "total_bpjs_kesehatan{$suffix}",
-            'is_bpjs_tk' => "total_bpjs{$suffix}",
-            'is_chemical' => "total_chemical{$suffix}",
-            'is_kaporlap' => "total_kaporlap{$suffix}",
-            'is_device' => "total_device{$suffix}",
-            'is_ohc' => "total_ohc{$suffix}",
-            'is_tunjangan_lain' => "total_tunjangan_lain{$suffix}",
+        $managementFeeCalculations = [
+            1 => fn() => $summary->{"total_base_manpower{$suffix}"} * $quotation->persentase / 100,
+            4 => fn() => $summary->{"total_sebelum_management_fee{$suffix}"} * $quotation->persentase / 100,
+            5 => fn() => $summary->{"upah_pokok{$suffix}"} * $quotation->persentase / 100,
+            6 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"}) * $quotation->persentase / 100,
+            7 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
+            8 => fn() => ($summary->{"upah_pokok{$suffix}"} + $summary->{"total_bpjs_kesehatan{$suffix}"}) * $quotation->persentase / 100,
         ];
 
-        foreach ($componentMap as $flag => $summaryField) {
-            // Jika config tidak punya property tersebut (fallback object), default true
-            $isActive = $mfConfig->{$flag} ?? true;
-            if ($isActive) {
-                $base += (float) ($summary->{$summaryField} ?? 0);
-            }
-        }
+        $calculation = $managementFeeCalculations[$quotation->management_fee_id] ?? $managementFeeCalculations[1];
+        $summary->{"nominal_management_fee{$suffix}"} = $calculation();
+        $summary->{"grand_total_sebelum_pajak{$suffix}"} = $summary->{"total_sebelum_management_fee{$suffix}"} + $summary->{"nominal_management_fee{$suffix}"};
 
-        $nominalMf = $persentase > 0 ? round($base * $persentase / 100, 2) : 0.0;
-
-        $summary->{"nominal_management_fee{$suffix}"} = $nominalMf;
-        $summary->{"grand_total_sebelum_pajak{$suffix}"} =
-            ($summary->{"total_sebelum_management_fee{$suffix}"} ?? 0) + $nominalMf;
-
-        \Log::debug("calculateManagementFee [{$suffix}]", [
+        \Log::info("Management Fee calculated", [
             'quotation_id' => $quotation->id,
-            'base' => $base,
-            'persentase' => $persentase,
-            'nominal_mf' => $nominalMf,
-            'active_flags' => array_keys(array_filter(
-                array_map(fn ($f) => $mfConfig->{$f} ?? true, array_flip(array_keys($componentMap))),
-            )),
+            'type' => $suffix ? 'COSS' : 'HPP',
+            'management_fee_id' => $quotation->management_fee_id,
+            'persentase' => $quotation->persentase,
+            'nominal_management_fee' => $summary->{"nominal_management_fee{$suffix}"},
+            'grand_total_sebelum_pajak' => $summary->{"grand_total_sebelum_pajak{$suffix}"}
         ]);
     }
+    // ── ⬆ END OLD calculateManagementFee ⬆ ──
+
+    // ── ⬇ NEW calculateManagementFee (dinamis — dicomment, tidak dihapus) ⬇ ──
+    // private function calculateManagementFee(&$quotation, $suffix, QuotationCalculationResult $result): void
+    // {
+    //     $summary = $result->calculation_summary;
+    //     $mfConfig = $quotation->_mf_config; // QuotationManagementFee | default stdClass
+    //     $persentase = (float) ($quotation->persentase ?? 0);
+
+    //     // ── BASIS: gaji pokok selalu masuk (tidak ada flag) ───────────────────
+    //     $base = (float) ($summary->{"upah_pokok{$suffix}"} ?? 0);
+
+    //     // ── Komponen opsional: flag → summary field ────────────────────────────
+    //     //    Menggunakan summary field yang sudah dihitung di calculateBaseTotals
+    //     //    → ZERO tambahan query, ZERO N+1
+    //     $componentMap = [
+    //         'is_thr' => "total_thr{$suffix}",
+    //         'is_kompensasi' => "total_kompensasi{$suffix}",
+    //         'is_thl' => "total_thl{$suffix}",
+    //         'is_lembur' => "total_lembur{$suffix}",
+    //         'is_bpjs_kes' => "total_bpjs_kesehatan{$suffix}",
+    //         'is_bpjs_tk' => "total_bpjs{$suffix}",
+    //         'is_chemical' => "total_chemical{$suffix}",
+    //         'is_kaporlap' => "total_kaporlap{$suffix}",
+    //         'is_device' => "total_device{$suffix}",
+    //         'is_ohc' => "total_ohc{$suffix}",
+    //         'is_tunjangan_lain' => "total_tunjangan_lain{$suffix}",
+    //     ];
+
+    //     foreach ($componentMap as $flag => $summaryField) {
+    //         // Jika config tidak punya property tersebut (fallback object), default true
+    //         $isActive = $mfConfig->{$flag} ?? true;
+    //         if ($isActive) {
+    //             $base += (float) ($summary->{$summaryField} ?? 0);
+    //         }
+    //     }
+
+    //     $nominalMf = $persentase > 0 ? round($base * $persentase / 100, 2) : 0.0;
+
+    //     $summary->{"nominal_management_fee{$suffix}"} = $nominalMf;
+    //     $summary->{"grand_total_sebelum_pajak{$suffix}"} =
+    //         ($summary->{"total_sebelum_management_fee{$suffix}"} ?? 0) + $nominalMf;
+
+    //     \Log::debug("calculateManagementFee [{$suffix}]", [
+    //         'quotation_id' => $quotation->id,
+    //         'base' => $base,
+    //         'persentase' => $persentase,
+    //         'nominal_mf' => $nominalMf,
+    //         'active_flags' => array_keys(array_filter(
+    //             array_map(fn ($f) => $mfConfig->{$f} ?? true, array_flip(array_keys($componentMap))),
+    //         )),
+    //     ]);
+    // }
+    // ── ⬆ END NEW calculateManagementFee (dicoment) ⬆ ──
 
     private function calculateTaxes(&$quotation, $suffix, $model, QuotationCalculationResult $result): void
     {
