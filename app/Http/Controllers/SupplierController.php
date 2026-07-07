@@ -3,10 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\SupplierRequest;
 use App\Models\Supplier;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -50,21 +49,11 @@ class SupplierController extends Controller
      *     )
      * )
      */
-    public function list(Request $request)
+    public function list()
     {
-        try {
-            $data = Supplier::getAllSuppliers();
+        $data = Supplier::getAllSuppliers();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($data);
     }
 
     /**
@@ -96,39 +85,25 @@ class SupplierController extends Controller
      */
     public function view($id)
     {
-        try {
-            $data = Supplier::select(
-                'id',
-                'nama_supplier',
-                'alamat',
-                'kontak',
-                'pic',
-                'npwp',
-                'kategori_barang',
-                'created_at',
-                'created_by',
-                'updated_at',
-                'updated_by'
-            )->find($id);
+        $data = Supplier::select(
+            'id',
+            'nama_supplier',
+            'alamat',
+            'kontak',
+            'pic',
+            'npwp',
+            'kategori_barang',
+            'created_at',
+            'created_by',
+            'updated_at',
+            'updated_by'
+        )->find($id);
 
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data supplier tidak ditemukan'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+        if (! $data) {
+            return $this->notFoundResponse('Data supplier tidak ditemukan');
         }
+
+        return $this->successResponse($data);
     }
 
     /**
@@ -164,55 +139,20 @@ class SupplierController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(SupplierRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'pic' => 'required|string|max:255',
-                'alamat' => 'required|string',
-                'kontak' => 'required|string|max:50'
-            ], [
-                'nama.required' => 'Nama supplier harus diisi',
-                'nama.max' => 'Nama supplier maksimal 255 karakter',
-                'pic.required' => 'PIC harus diisi',
-                'pic.max' => 'PIC maksimal 255 karakter',
-                'alamat.required' => 'Alamat harus diisi',
-                'kontak.required' => 'Kontak harus diisi',
-                'kontak.max' => 'Kontak maksimal 50 karakter'
-            ]);
+        $supplier = Supplier::create([
+            'nama_supplier' => $request->nama,
+            'pic' => $request->pic,
+            'alamat' => $request->alamat,
+            'kontak' => $request->kontak,
+            'npwp' => $request->npwp ?? null,
+            'kategori_barang' => $request->kategori_barang ?? null,
+            'created_by' => Auth::user()->full_name ?? 'System',
+            'created_by_user_id' => Auth::id()
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $supplier = Supplier::create([
-                'nama_supplier' => $request->nama,
-                'pic' => $request->pic,
-                'alamat' => $request->alamat,
-                'kontak' => $request->kontak,
-                'npwp' => $request->npwp ?? null,
-                'kategori_barang' => $request->kategori_barang ?? null,
-                'created_by' => Auth::user()->full_name ?? 'System',
-                'created_by_user_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier berhasil dibuat',
-                'data' => $supplier
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($supplier, 'Supplier berhasil dibuat', 201);
     }
 
     /**
@@ -259,63 +199,25 @@ class SupplierController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(SupplierRequest $request, $id)
     {
-        try {
-            $supplier = Supplier::find($id);
+        $supplier = Supplier::find($id);
 
-            if (!$supplier) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Supplier tidak ditemukan'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'pic' => 'required|string|max:255',
-                'alamat' => 'required|string',
-                'kontak' => 'required|string|max:50'
-            ], [
-                'nama.required' => 'Nama supplier harus diisi',
-                'nama.max' => 'Nama supplier maksimal 255 karakter',
-                'pic.required' => 'PIC harus diisi',
-                'pic.max' => 'PIC maksimal 255 karakter',
-                'alamat.required' => 'Alamat harus diisi',
-                'kontak.required' => 'Kontak harus diisi',
-                'kontak.max' => 'Kontak maksimal 50 karakter'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $supplier->update([
-                'nama_supplier' => $request->nama,
-                'pic' => $request->pic,
-                'alamat' => $request->alamat,
-                'kontak' => $request->kontak,
-                'npwp' => $request->npwp ?? null,
-                'kategori_barang' => $request->kategori_barang ?? null,
-                'updated_by' => Auth::user()->full_name ?? 'System'
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier berhasil diupdate',
-                'data' => $supplier
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+        if (! $supplier) {
+            return $this->notFoundResponse('Supplier tidak ditemukan');
         }
+
+        $supplier->update([
+            'nama_supplier' => $request->nama,
+            'pic' => $request->pic,
+            'alamat' => $request->alamat,
+            'kontak' => $request->kontak,
+            'npwp' => $request->npwp ?? null,
+            'kategori_barang' => $request->kategori_barang ?? null,
+            'updated_by' => Auth::user()->full_name ?? 'System'
+        ]);
+
+        return $this->successResponse($supplier, 'Supplier berhasil diupdate');
     }
 
     /**
@@ -347,32 +249,18 @@ class SupplierController extends Controller
      */
     public function delete($id)
     {
-        try {
-            $supplier = Supplier::find($id);
+        $supplier = Supplier::find($id);
 
-            if (!$supplier) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Supplier tidak ditemukan'
-                ], 404);
-            }
-
-            $supplier->update([
-                'deleted_by' => Auth::user()->full_name ?? 'System'
-            ]);
-            $supplier->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Supplier berhasil dihapus'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+        if (! $supplier) {
+            return $this->notFoundResponse('Supplier tidak ditemukan');
         }
+
+        $supplier->update([
+            'deleted_by' => Auth::user()->full_name ?? 'System'
+        ]);
+        $supplier->delete();
+
+        return $this->messageResponse('Supplier berhasil dihapus');
     }
 
 }
