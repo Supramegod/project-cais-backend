@@ -141,10 +141,17 @@ class Step11Service
 
             foreach (['hpp_editable_data' => QuotationDetailHpp::class, 'coss_data' => QuotationDetailCoss::class] as $key => $model) {
                 if ($request->has($key) && is_array($request->$key)) {
+                    // Group detail id per nilai jumlah_hc identik → satu UPDATE per nilai
+                    // (bukan satu UPDATE per detail).
+                    $idsByValue = [];
                     foreach ($request->$key as $detailId => $data) {
                         if (isset($data['jumlah_hc'])) {
-                            $model::where('quotation_detail_id', $detailId)->update(['jumlah_hc' => $data['jumlah_hc']]);
+                            $idsByValue[(string) $data['jumlah_hc']][] = $detailId;
                         }
+                    }
+
+                    foreach ($idsByValue as $value => $ids) {
+                        $model::whereIn('quotation_detail_id', $ids)->update(['jumlah_hc' => $value]);
                     }
                 }
             }
