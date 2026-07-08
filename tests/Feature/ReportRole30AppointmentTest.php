@@ -117,6 +117,15 @@ class ReportRole30AppointmentTest extends TestCase
         $this->assertSame(1, $row['aggregat']['jumlah_assignment']);
     }
 
+    public function test_monthly_tele_invalid_month_returns_422_baserequest_shape(): void
+    {
+        // Validation now via ReportPeriodRequiredRequest -> BaseRequest 422 shape.
+        $response = $this->getJson('/api/sales-report/monthly/tele?month=99&year=2026');
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['message' => ['month']]);
+    }
+
     public function test_inactive_telesales_is_excluded(): void
     {
         // Role-30 user but is_active = 0 -> must not appear in reports.

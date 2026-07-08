@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\ReportPeriodOptionalRequest;
+use App\Http\Requests\ReportPeriodRequiredRequest;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use OpenApi\Annotations as OA;
 
@@ -97,21 +97,8 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function monthly(Request $request)
+    public function monthly(ReportPeriodRequiredRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         $month = (int) $request->month;
         $year = (int) $request->year;
         $branchId = $request->branch_id;
@@ -243,21 +230,8 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function weekly(Request $request)
+    public function weekly(ReportPeriodRequiredRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         $month = (int) $request->month;
         $year = (int) $request->year;
         $branchId = $request->branch_id;
@@ -666,21 +640,8 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function monthlyRole30(Request $request)
+    public function monthlyRole30(ReportPeriodRequiredRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         $month = (int) $request->month;
         $year = (int) $request->year;
         $branchId = $request->branch_id;
@@ -816,21 +777,8 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function weeklyRole30(Request $request)
+    public function weeklyRole30(ReportPeriodRequiredRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         $month = (int) $request->month;
         $year = (int) $request->year;
         $branchId = $request->branch_id;
@@ -1228,22 +1176,9 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function activityDetail(Request $request, int $userId)
+    public function activityDetail(ReportPeriodOptionalRequest $request, int $userId)
     {
         // ── 1. Validasi query params ──────────────────────────────────────────
-        $validator = Validator::make($request->all(), [
-            'month' => 'nullable|integer|between:1,12',
-            'year' => 'nullable|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         // ── 2. Resolusi parameter ─────────────────────────────────────────────
         $month = (int) ($request->month ?? now()->month);
         $year = (int) ($request->year ?? now()->year);
@@ -1261,10 +1196,7 @@ class ReportController extends Controller
         $matched = $salesCollection->firstWhere('user_id', $userId);
 
         if (!$matched) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User ID tidak ditemukan dalam daftar sales aktif.',
-            ], 404);
+            return $this->notFoundResponse('User ID tidak ditemukan dalam daftar sales aktif.');
         }
 
         $salesName = $matched->nama_sales;
@@ -1452,22 +1384,9 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function activityDetailTele(Request $request, int $userId)
+    public function activityDetailTele(ReportPeriodOptionalRequest $request, int $userId)
     {
         // ── 1. Validasi query params ──────────────────────────────────────────
-        $validator = Validator::make($request->all(), [
-            'month' => 'nullable|integer|between:1,12',
-            'year' => 'nullable|integer|digits:4',
-            'branch_id' => 'nullable|integer|exists:mysqlhris.m_branch,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
         // ── 2. Resolusi parameter ─────────────────────────────────────────────
         $month = (int) ($request->month ?? now()->month);
         $year = (int) ($request->year ?? now()->year);
@@ -1485,10 +1404,7 @@ class ReportController extends Controller
         $matched = $salesCollection->firstWhere('user_id', $userId);
 
         if (!$matched) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User ID tidak ditemukan dalam daftar telesales aktif.',
-            ], 404);
+            return $this->notFoundResponse('User ID tidak ditemukan dalam daftar telesales aktif.');
         }
 
         $salesName = $matched->nama_sales;
