@@ -133,7 +133,12 @@ class JenisBarangControllerTest extends TestCase
             ])
             ->assertJsonPath('data.nama', 'Elektronik');
 
-        $this->assertDatabaseHas('m_jenis_barang', ['nama' => 'Elektronik']);
+        // created_by_user_id is now persisted (was silently dropped before the
+        // column was added to $fillable).
+        $this->assertDatabaseHas('m_jenis_barang', [
+            'nama' => 'Elektronik',
+            'created_by_user_id' => 1,
+        ]);
     }
 
     public function test_add_validation_error_returns_422(): void
@@ -234,6 +239,7 @@ class JenisBarangControllerTest extends TestCase
             $table->increments('id');
             $table->string('nama')->nullable();
             $table->string('created_by')->nullable();
+            $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->string('updated_by')->nullable();
             $table->string('deleted_by')->nullable();
             $table->softDeletes();

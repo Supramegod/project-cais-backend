@@ -191,6 +191,7 @@ class TopControllerTest extends TestCase
             $table->string('nama')->nullable();
             $table->decimal('persentase', 8, 2)->nullable();
             $table->string('created_by')->nullable();
+            $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->string('updated_by')->nullable();
             $table->string('deleted_by')->nullable();
             $table->softDeletes();

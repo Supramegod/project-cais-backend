@@ -23,6 +23,7 @@ class Ump extends Model
         'sumber',
         'is_aktif',
         'created_by',
+        'created_by_user_id',
         'updated_by',
     ];
 

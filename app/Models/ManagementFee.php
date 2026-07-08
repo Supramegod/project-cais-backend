@@ -12,7 +12,7 @@ class ManagementFee extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'm_management_fee';
-    protected $fillable = ['nama','created_by','updated_by','deleted_by'];
+    protected $fillable = ['nama','created_by','created_by_user_id','updated_by','deleted_by'];
     protected $hidden = ['updated_at', 'deleted_at'];
 
     // Relation jika diperlukan di masa depan

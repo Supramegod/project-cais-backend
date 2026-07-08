@@ -31,6 +31,7 @@ class SalaryRule extends Model
         'rilis_payroll',
         'tgl_rilis_payroll',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];

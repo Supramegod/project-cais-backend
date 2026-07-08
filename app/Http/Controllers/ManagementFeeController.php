@@ -48,6 +48,7 @@ class ManagementFeeController extends Controller
         $managementFee = ManagementFee::create([
             'nama' => $request->nama,
             'created_by' => Auth::user()->full_name ?? 'System',
+            'created_by_user_id' => Auth::id(),
         ]);
 
         return $this->successResponse($managementFee, 'Management Fee berhasil dibuat', 201);

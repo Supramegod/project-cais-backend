@@ -47,6 +47,7 @@ class SalaryRuleController extends Controller
     {
         $salaryRule = SalaryRule::create($this->buildAttributes($request) + [
             'created_by' => Auth::user()->full_name ?? 'System',
+            'created_by_user_id' => Auth::id(),
         ]);
 
         return $this->successResponse($salaryRule, 'Salary Rule berhasil dibuat', 201);

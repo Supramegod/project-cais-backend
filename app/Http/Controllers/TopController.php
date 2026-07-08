@@ -148,6 +148,7 @@ class TopController extends Controller
             'nama' => $request->nama,
             'persentase' => $request->persentase,
             'created_by' => Auth::user()->full_name ?? 'System',
+            'created_by_user_id' => Auth::id(),
         ]);
 
         return $this->successResponse($top, 'TOP berhasil dibuat', 201);

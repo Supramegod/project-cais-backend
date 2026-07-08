@@ -195,6 +195,7 @@ class UmpControllerTest extends TestCase
             $table->string('sumber', 500)->nullable();
             $table->boolean('is_aktif')->default(true);
             $table->string('created_by')->nullable();
+            $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->string('updated_by')->nullable();
             $table->softDeletes();
             $table->timestamps();

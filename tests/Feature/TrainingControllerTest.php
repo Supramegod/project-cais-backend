@@ -217,6 +217,7 @@ class TrainingControllerTest extends TestCase
             $table->integer('menit')->nullable();
             $table->integer('total')->nullable();
             $table->string('created_by')->nullable();
+            $table->unsignedBigInteger('created_by_user_id')->nullable();
             $table->string('updated_by')->nullable();
             $table->string('deleted_by')->nullable();
             $table->softDeletes();
