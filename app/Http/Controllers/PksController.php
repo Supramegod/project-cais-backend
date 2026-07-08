@@ -2441,7 +2441,7 @@ class PksController extends Controller
                 $quotationId = $firstSite->quotation_id;
             } else {
                 // Gunakan select('id', 'kebutuhan_id') untuk optimasi memori
-                $quotation = Quotation::select('id', 'kebutuhan_id')->where('leads_id', $leads->id)->first();
+                $quotation = Quotation::select('id', 'kebutuhan_id', 'persentase')->where('leads_id', $leads->id)->first();
                 $quotationId = $quotation->id ?? null;
             }
         }
@@ -2450,7 +2450,7 @@ class PksController extends Controller
         if ($tipe !== 'addendum' && isset($quotation)) {
             $layananId = $quotation->kebutuhan_id;
         } else {
-            $quotation = $quotationId ? Quotation::select('id', 'kebutuhan_id')->find($quotationId) : null;
+            $quotation = $quotationId ? Quotation::select('id', 'kebutuhan_id', 'persentase')->find($quotationId) : null;
             $layananId = $quotation ? $quotation->kebutuhan_id : $leads->kebutuhan_id;
         }
 
@@ -2519,7 +2519,8 @@ class PksController extends Controller
             $kebutuhan,     // reuse variabel awal
             $ruleThr,       // reuse variabel awal
             $salaryRule,    // reuse variabel awal
-            $pksNomor
+            $pksNomor,
+            $quotation->persentase ?? null
         );
 
         // 8. Bulk Update Status Model Lain
@@ -2608,17 +2609,21 @@ class PksController extends Controller
     /**
      * Create PKS Perjanjian using service
      */
-    private function createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor)
+    private function createPksPerjanjian($pks, $leads, $company, $kebutuhan, $ruleThr, $salaryRule, $pksNomor, $persentase = null)
     {
         try {
-            // Pilih template sesuai company, fallback ke PksPerjanjianTemplateService
+            // Pilih template sesuai company, fallback ke PksPerjanjianTemplateService.
+            // Oper $pks (tanggal kontrak) & $persentase (management fee) agar
+            // placeholder dinamis pada template terisi.
             $templateService = (new PksTemplateFactory)->make(
                 $leads,
                 $company,
                 $kebutuhan,
                 $ruleThr,
                 $salaryRule,
-                $pksNomor
+                $pksNomor,
+                $pks,
+                $persentase
             );
 
             // Insert agreement sections
