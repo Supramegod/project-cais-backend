@@ -15,6 +15,7 @@ class SalesActivityFile extends Model
         'nama_file',
         'url_file',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];
