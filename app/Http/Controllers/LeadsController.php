@@ -2805,7 +2805,7 @@ class LeadsController extends Controller
 
             // Urutkan berdasarkan created_at (datetime) secara descending
             $allActivities = $allActivities->sortByDesc(function ($activity) {
-                return Carbon::parse($activity['created_at']);
+                return Carbon::parse($activity['tgl_activity'] );
             })->values(); // Reset array keys
 
             return response()->json([

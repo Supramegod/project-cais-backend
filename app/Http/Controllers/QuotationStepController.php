@@ -159,10 +159,7 @@ class QuotationStepController extends Controller
             $quotation = Quotation::with($relations)->notDeleted()->findOrFail($id);
 
             if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Quotation has been finalized and cannot be accessed.',
-                ], 403);
+                return $this->errorResponse('Quotation has been finalized and cannot be accessed.', 403);
             }
 
             $stepData = $this->prepareStepData($quotation, $step);
@@ -174,10 +171,7 @@ class QuotationStepController extends Controller
                 'processing_time' => $this->elapsedMs($startTime),
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Quotation not found',
-            ], 404);
+            return $this->notFoundResponse('Quotation not found');
         } catch (\Exception $e) {
             Log::error('QuotationStepController@getStep: '.$e->getMessage(), [
                 'id' => $id,
@@ -251,19 +245,13 @@ class QuotationStepController extends Controller
 
         $updateMethod = 'updateStep'.$step;
         if (! method_exists($this->quotationStepService, $updateMethod) && ! preg_match('/^updateStep(1[0-2]|[1-9])$/', $updateMethod)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Step method not found',
-            ], 404);
+            return $this->notFoundResponse('Step method not found');
         }
 
         // Step sequence validation — prevent jumping ahead
         $quotation = Quotation::notDeleted()->findOrFail($id);
         if ($step > $quotation->step + 1) {
-            return response()->json([
-                'success' => false,
-                'message' => "Cannot update step {$step}. Please complete previous steps first (current step: {$quotation->step}).",
-            ], 422);
+            return $this->errorResponse("Cannot update step {$step}. Please complete previous steps first (current step: {$quotation->step}).", 422);
         }
 
         // Gunakan closure transaction – otomatis rollback jika exception

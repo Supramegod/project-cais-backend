@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\QuotationApproveRequest;
+use App\Http\Requests\QuotationReferenceRequest;
 use App\Jobs\EscalateQuotationJob;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
@@ -175,8 +176,7 @@ class QuotationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $query = Quotation::select([
+        $query = Quotation::select([
                 'id',
                 'leads_id',            // ✅ WAJIB — untuk byUserRole dan eager load
                 'nomor',
@@ -252,25 +252,18 @@ class QuotationController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $data->items(),
-                'pagination' => [
-                    'current_page' => $data->currentPage(),
-                    'last_page' => $data->lastPage(),
-                    'total' => $data->total(),
-                    'total_per_page' => $data->count(),
-                ],
-                'message' => 'Quotations retrieved successfully',
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotations',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // Bespoke pagination shape (dijaga apa adanya — bukan bentuk `meta` trait).
+        return response()->json([
+            'success' => true,
+            'data' => $data->items(),
+            'pagination' => [
+                'current_page' => $data->currentPage(),
+                'last_page' => $data->lastPage(),
+                'total' => $data->total(),
+                'total_per_page' => $data->count(),
+            ],
+            'message' => 'Quotations retrieved successfully',
+        ]);
     }
 
 
@@ -593,9 +586,8 @@ class QuotationController extends Controller
     public function show($id)
     {
         set_time_limit(0);
-        try {
-            // Load semua relasi yang diperlukan
-            $quotation = Quotation::with([
+        // Load semua relasi yang diperlukan
+        $quotation = Quotation::with([
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
                 'quotationDetails.wage',
@@ -614,19 +606,10 @@ class QuotationController extends Controller
                 'quotationKerjasamas',
                 'logNotifications',
                 'logApprovals',
-            ])->findOrFail($id);
+        ])->findOrFail($id);
 
-            // ✅ BENAR: Melewatkan model Quotation ke Resource
-            return new QuotationResource($quotation);
-
-        } catch (\Exception $e) {
-            \Log::error("Error in quotation show: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        // ✅ BENAR: Melewatkan model Quotation ke Resource (biarkan apa adanya).
+        return new QuotationResource($quotation);
     }
     /**
      * @OA\Delete(
@@ -672,9 +655,9 @@ class QuotationController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        DB::beginTransaction();
-        try {
-            $user = Auth::user();
+        $user = Auth::user();
+
+        DB::transaction(function () use ($id, $user) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
             // Soft delete relations first
@@ -684,22 +667,9 @@ class QuotationController extends Controller
             $quotation->deleted_at = Carbon::now();
             $quotation->deleted_by = $user->full_name;
             $quotation->save();
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Quotation deleted successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->messageResponse('Quotation deleted successfully');
     }
 
 
@@ -765,13 +735,12 @@ class QuotationController extends Controller
 
             DB::commit();
 
-            return response()->json([
-                'success' => true,
-                'message' => $data['is_approved']
+            return $this->successResponse(
+                $result['data'] ?? null,
+                $data['is_approved']
                     ? 'Quotation approved successfully'
-                    : 'Quotation rejected successfully',
-                'data' => $result['data'] ?? null,
-            ]);
+                    : 'Quotation rejected successfully'
+            );
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -858,11 +827,7 @@ class QuotationController extends Controller
             return response()->json($result, 400);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Approval berhasil direset',
-            'data' => $result['data']
-        ]);
+        return $this->successResponse($result['data'], 'Approval berhasil direset');
     }
 
 
@@ -907,10 +872,10 @@ class QuotationController extends Controller
         try {
             // Validasi parameter tipe_quotation
             if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum'
-                ], 400);
+                return $this->errorResponse(
+                    'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum',
+                    400
+                );
             }
 
             $user = auth()->user();
@@ -972,17 +937,12 @@ class QuotationController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => "Data leads untuk quotation {$tipe_quotation} berhasil diambil",
-                'data' => $data,
-
-            ]);
+            return $this->successResponse(
+                $data,
+                "Data leads untuk quotation {$tipe_quotation} berhasil diambil"
+            );
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+            return $this->errorResponse('Terjadi kesalahan: ' . $e->getMessage(), 500);
         }
     }
 
@@ -1055,39 +1015,14 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function getReferenceQuotations(string $leadsId, Request $request): JsonResponse
+    public function getReferenceQuotations(string $leadsId, QuotationReferenceRequest $request): JsonResponse
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'tipe_quotation' => 'required|in:baru,revisi,rekontrak,addendum'
-            ]);
+        // ✅ 1 query — cukup untuk validasi leads exists
+        Leads::withoutTrashed()->findOrFail($leadsId);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+        $quotations = $this->getFilteredQuotations($leadsId, $request->validated('tipe_quotation'));
 
-            // ✅ 1 query — cukup untuk validasi leads exists
-            Leads::withoutTrashed()->findOrFail($leadsId);
-
-            $quotations = $this->getFilteredQuotations($leadsId, $request->tipe_quotation);
-
-            return response()->json([
-                'success' => true,
-                'data' => $quotations,
-                'message' => 'Quotation references retrieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotation references',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($quotations, 'Quotation references retrieved successfully');
     }
     /**
      * Check if site already exists for this leads (optimized)
