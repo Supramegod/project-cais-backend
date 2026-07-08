@@ -5,20 +5,26 @@ namespace App\Services;
 use App\Models\Leads;
 use App\Models\Company;
 use App\Models\Kebutuhan;
+use App\Models\Pks;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
+use App\Services\PksTemplate\Concerns\FillsPksTemplateData;
 use App\Services\PksTemplate\PksTemplateInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
 class PksPerjanjianTemplateService implements PksTemplateInterface
 {
+    use FillsPksTemplateData;
+
     private $leads;
     private $company;
     private $kebutuhan;
     private $ruleThr;
     private $salaryRule;
     private $pksNomor;
+    private $pks;
+    private $persentase;
     private $currentDateTime;
 
     public function __construct(
@@ -27,7 +33,9 @@ class PksPerjanjianTemplateService implements PksTemplateInterface
         Kebutuhan $kebutuhan,
         RuleThr $ruleThr,
         SalaryRule $salaryRule,
-        string $pksNomor
+        string $pksNomor,
+        ?Pks $pks = null,
+        $persentase = null
     ) {
         $this->leads = $leads;
         $this->company = $company;
@@ -35,6 +43,8 @@ class PksPerjanjianTemplateService implements PksTemplateInterface
         $this->ruleThr = $ruleThr;
         $this->salaryRule = $salaryRule;
         $this->pksNomor = $pksNomor;
+        $this->pks = $pks;
+        $this->persentase = $persentase;
         $this->currentDateTime = Carbon::now();
     }
 
@@ -145,11 +155,9 @@ mso-ansi-language:IN">&nbsp;</span></b></p>
 <p class="MsoNoSpacing" style="margin-left:211.5pt;text-align:justify;text-justify:
 inter-ideograph;text-indent:-211.5pt;tab-stops:202.5pt"><b><span lang="EN-US" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif">' . $this->leads->nama_perusahaan . '</span></b><b><span lang="IN" style="font-size:12.0pt;
 font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </span></b><span lang="IN" style="font-size:12.0pt;
-font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN">:<b>&nbsp; </b>Dalam hal ini diwakili oleh </span><b><span lang="EN-US" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif">Bapak/Ibu </span></b><span lang="IN" style="font-size:12.0pt;font-family:
+font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN">:<b>&nbsp; </b>Dalam hal ini diwakili oleh </span><b><span lang="EN-US" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif">' . $this->tplPicPihakPertama() . ' </span></b><span lang="IN" style="font-size:12.0pt;font-family:
 &quot;Arial&quot;,sans-serif;mso-ansi-language:IN">sebagai</span><span lang="IN" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif"> </span><b><span lang="EN-US" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif">Direktur </span></b><span lang="IN" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:
-IN">yang berkedudukan di <span style="background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">Jala</span></span><span lang="EN-US" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">n </span><span lang="EN-US" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">Pos
-No. 2, Ps. Baru, Kecamatan Sawah Besar, Kota Jakarta Pusat, Daerah Khusus Ibukota
-Jakarta 10710 </span><span lang="IN" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">dan b</span><span lang="IN" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN">ertindak
+IN">yang berkedudukan di <span style="background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">' . $this->tplAlamatPihakPertama() . ' Kota ' . $this->tplKotaPihakPertama() . ' Provinsi ' . $this->tplProvinsiPihakPertama() . '</span></span><span lang="EN-US" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;"></span><span lang="EN-US" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;"></span><span lang="IN" style="font-size: 12pt; font-family: Arial, sans-serif; background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;">dan b</span><span lang="IN" style="font-size:12.0pt;font-family:&quot;Arial&quot;,sans-serif;mso-ansi-language:IN">ertindak
 untuk dan atas nama <b>' . $this->leads->nama_perusahaan . '</b>, untuk selanjutnya dalam
 perjanjian ini disebut sebagai <b>PIHAK PERTAMA</b>.<span style="background-image: initial; background-position: initial; background-size: initial; background-repeat: initial; background-attachment: initial; background-origin: initial; background-clip: initial;"><o:p></o:p></span></span></p>
 
@@ -574,7 +582,7 @@ inter-ideograph;text-indent:-13.7pt;mso-pagination:widow-orphan;mso-list:l1 leve
 mso-layout-grid-align:auto;text-autospace:ideograph-numeric ideograph-other"><!--[if !supportLists]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;mso-fareast-font-family:Arial">b.<span style="font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-stretch: normal; font-size: 7pt; line-height: normal; font-family: &quot;Times New Roman&quot;;">&nbsp; </span></span><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Biaya kontrak sudah termasuk
 upah pokok beserta <i>variable</i> <i>breakdown</i> lainnya, seperti tunjangan, premi BPJS Ketenagakerjaan, BPJS
 Kesehatan, biaya monitoring dan kontrol, biaya provisi seragam, biaya provisi
-chemical dan tools, ppn 12%, pph -2% dan <i>managemen</i><i>t fee</i> yang telah disepakati.<o:p></o:p></span></p>
+chemical dan tools, ppn 12%, pph -2% dan <i>managemen</i><i>t fee</i> yang telah disepakati sebesar ' . $this->tplManagementFeePersen() . ' dari nilai invoice.<o:p></o:p></span></p>
 
 <p class="MsoNormal" style="margin-left:31.7pt;text-align:justify;text-justify:
 inter-ideograph;mso-pagination:widow-orphan;mso-layout-grid-align:auto;
@@ -773,52 +781,17 @@ ditunda berdasarkan kesepakatan </span><b style="font-family: Arial, sans-serif;
     private function generatePasal7()
     {
         return '<p class="ListParagraph1CxSpFirst" align="center" style="margin-left:0cm;
-mso-add-space:auto;text-align:center;tab-stops:0cm"><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Pasal 6<o:p></o:p></span></b></p><p class="ListParagraph1CxSpMiddle" align="center" style="margin-left:0cm;
-mso-add-space:auto;text-align:center;tab-stops:0cm"><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">FORCE MAJEURE<o:p></o:p></span></b></p><p class="ListParagraph1CxSpMiddle" style="margin-left:0cm;mso-add-space:auto;
+mso-add-space:auto;text-align:center;tab-stops:0cm"><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Pasal 7<o:p></o:p></span></b></p><p class="ListParagraph1CxSpMiddle" align="center" style="margin-left:0cm;
+mso-add-space:auto;text-align:center;tab-stops:0cm"><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">JANGKA WAKTU PERJANJIAN<o:p></o:p></span></b></p><p class="ListParagraph1CxSpMiddle" style="margin-left:0cm;mso-add-space:auto;
 text-align:justify;text-justify:inter-ideograph"><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">&nbsp;</span></b></p><p class="ListParagraph1" style="margin-top:0cm;margin-right:0cm;margin-bottom:
 6.0pt;margin-left:18.0pt;text-align:justify;text-justify:inter-ideograph;
 text-indent:-18.0pt;mso-list:l0 level1 lfo1"><!--[if !supportLists]--><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;
-mso-fareast-font-family:Arial">1.<span style="font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-weight: normal; font-stretch: normal; font-size: 7pt; line-height: normal; font-family: &quot;Times New Roman&quot;;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Yang dimaksud dengan <i>force majeure</i> adalah keadaan yang tidak
-dapat dipenuhinya pelaksanaan Perjanjian oleh <b>PARA PIHAK</b>, karena terjadi
-suatu peristiwa yang bukan karena kesalahan Para Pihak, peristiwa mana tidak
-dapat diketahui/ tidak dapat diduga sebelumnya dan di luar kemampuan manusia, seperti
-bencana alam (gempa bumi, angin topan, kebakaran, banjir), huru-hara, perang,
-pemogokan umum yang bukan kesalahan <b>PARA PIHAK</b>, <i>sabotase</i>, pemberontakan, dan <i>epidemi</i>
-yang secara keseluruhan ada hubungan langsung dengan penyelesaian pelaksanaan
-Perjanjian ini;<b><o:p></o:p></b></span></p><p class="ListParagraph1" style="margin-top:0cm;margin-right:0cm;margin-bottom:
+mso-fareast-font-family:Arial">1.<span style="font-size:7pt;line-height:normal;font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Masa berlakunya Perjanjian ini adalah terhitung dari <b>' . $this->tplKontrakAwal() . ' sampai dengan ' . $this->tplKontrakAkhir() . '</b> dan dapat ditinjau kembali oleh <b>PARA PIHAK</b>;<o:p></o:p></span></p><p class="ListParagraph1" style="margin-top:0cm;margin-right:0cm;margin-bottom:
 6.0pt;margin-left:18.0pt;text-align:justify;text-justify:inter-ideograph;
 text-indent:-18.0pt;mso-list:l0 level1 lfo1"><!--[if !supportLists]--><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;
-mso-fareast-font-family:Arial">2.<span style="font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-weight: normal; font-stretch: normal; font-size: 7pt; line-height: normal; font-family: &quot;Times New Roman&quot;;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Apabila terjadi <i>force majeure</i>, maka Pihak yang terkena <i>force majeure</i> harus memberitahukan
-secara tertulis kepada Pihak yang tidak terkena <i>force majeure</i> selambat-lambatnya 7 (tujuh) hari kalender sejak
-terjadinya <i>force majeure</i> tersebut
-disertai bukti-bukti yang sah, selanjutnya Pihak yang tidak terkena <i>force majeure</i> akan menanggapi;<b><o:p></o:p></b></span></p><p class="ListParagraph1" style="margin-top:0cm;margin-right:0cm;margin-bottom:
-6.0pt;margin-left:18.0pt;text-align:justify;text-justify:inter-ideograph;
-text-indent:-18.0pt;mso-list:l0 level1 lfo1"><!--[if !supportLists]--><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;
-mso-fareast-font-family:Arial">3.<span style="font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-weight: normal; font-stretch: normal; font-size: 7pt; line-height: normal; font-family: &quot;Times New Roman&quot;;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Apabila hal tersebut tidak
-dilakukan oleh Pihak yang terkena <i>force
-majeure</i>, maka Pihak yang tidak terkena <i>force
-majeure</i> menganggap tidak terjadi <i>force
-majeure</i>;<b><o:p></o:p></b></span></p><p class="MsoNoSpacing" style="margin-top:0cm;margin-right:0cm;margin-bottom:
-6.0pt;margin-left:18.0pt;text-align:justify;text-justify:inter-ideograph;
-text-indent:-18.0pt;mso-list:l0 level2 lfo1">
-
-
-
-
-
-
-
-
-
-
-
-</p><p class="ListParagraph1CxSpLast" style="margin-left:18.0pt;mso-add-space:auto;
-text-align:justify;text-justify:inter-ideograph;text-indent:-18.0pt;mso-list:
-l0 level1 lfo1"><!--[if !supportLists]--><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;mso-fareast-font-family:Arial">4.<span style="font-variant-numeric: normal; font-variant-east-asian: normal; font-variant-alternates: normal; font-size-adjust: none; font-kerning: auto; font-optical-sizing: auto; font-feature-settings: normal; font-variation-settings: normal; font-variant-position: normal; font-variant-emoji: normal; font-weight: normal; font-stretch: normal; font-size: 7pt; line-height: normal; font-family: &quot;Times New Roman&quot;;">&nbsp;&nbsp;&nbsp;
-</span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Dalam
-hal terjadi <i>force majeure</i>, maka
-pelaksanaan kewajiban masing-masing Pihak akan ditunda berdasarkan kesepakatan <b>PARA
-PIHAK</b>.<b><o:p></o:p></b></span></p>';
+mso-fareast-font-family:Arial">2.<span style="font-size:7pt;line-height:normal;font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Sebelum perjanjian ini berakhir <b>PARA PIHAK</b> akan memberitahukan secara tertulis maksud untuk memperpanjang atau tidak memperpanjang Perjanjian ini 30 (tiga puluh) hari sebelum berakhirnya perjanjian ini;<o:p></o:p></span></p><p class="ListParagraph1CxSpLast" style="margin-left:18.0pt;mso-add-space:auto;
+text-align:justify;text-justify:inter-ideograph;text-indent:-18.0pt;mso-list:l0 level1 lfo1"><!--[if !supportLists]--><b><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif;
+mso-fareast-font-family:Arial">3.<span style="font-size:7pt;line-height:normal;font-family:&quot;Times New Roman&quot;">&nbsp;&nbsp;&nbsp; </span></span></b><!--[endif]--><span lang="EN-US" style="font-family:&quot;Arial&quot;,sans-serif">Apabila <b>PARA PIHAK</b> tidak memberitahukan hal tersebut maka secara otomatis perjanjian ini diperpanjang dengan mendasarkan pada ketentuan Upah Minimum Kabupaten/Kota yang berlaku.<o:p></o:p></span></p>';
     }
 
     /**

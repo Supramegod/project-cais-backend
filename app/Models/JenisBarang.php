@@ -11,7 +11,7 @@ class JenisBarang extends Model
     use SoftDeletes;
 
     protected $table = 'm_jenis_barang';
-    protected $fillable = ['nama', 'created_by', 'updated_by', 'deleted_by'];
+    protected $fillable = ['nama', 'created_by', 'created_by_user_id', 'updated_by', 'deleted_by'];
 
     public function getCreatedAtAttribute($value)
     {

@@ -763,21 +763,51 @@ trait StepHelperTrait
             $cossFinalData[] = array_intersect_key($cossFull, $cossAllowed);
         }
 
-        // 3. EKSEKUSI DATABASE (Batch Update)
-        // HPP/COSS records already exist from Step 3 — use updateOrCreate to
-        // safely handle edge cases where a record might not exist yet.
-        foreach ($hppFinalData as $data) {
-            QuotationDetailHpp::updateOrCreate(
-                ['quotation_detail_id' => $data['quotation_detail_id'] ?? 0],
-                $data
-            );
+        // 3. EKSEKUSI DATABASE
+        // HPP/COSS records already exist from Step 3, tapi tetap tangani edge case
+        // record belum ada. Tidak memakai upsert() karena tabel tidak punya unique
+        // index pada quotation_detail_id (upsert akan meng-INSERT duplikat).
+        // Preload id existing sekali → update langsung (tanpa SELECT per baris),
+        // sisanya batch insert.
+        $this->persistCalculationRows(QuotationDetailHpp::class, $hppFinalData, $currentDateTime);
+        $this->persistCalculationRows(QuotationDetailCoss::class, $cossFinalData, $currentDateTime);
+    }
+
+    /**
+     * Persist baris HPP/COSS: update baris yang sudah ada (1 query per baris,
+     * tanpa SELECT dari updateOrCreate) dan batch-insert baris yang belum ada.
+     * Setara semantik updateOrCreate (create-if-missing) tanpa butuh unique index.
+     */
+    private function persistCalculationRows(string $modelClass, array $rows, Carbon $currentDateTime): void
+    {
+        if (empty($rows)) {
+            return;
         }
 
-        foreach ($cossFinalData as $data) {
-            QuotationDetailCoss::updateOrCreate(
-                ['quotation_detail_id' => $data['quotation_detail_id'] ?? 0],
-                $data
-            );
+        $detailIds = array_values(array_filter(array_map(
+            fn ($row) => $row['quotation_detail_id'] ?? null,
+            $rows
+        )));
+
+        $existingIds = empty($detailIds)
+            ? collect()
+            : $modelClass::whereIn('quotation_detail_id', $detailIds)
+                ->pluck('quotation_detail_id')
+                ->flip();
+
+        $inserts = [];
+        foreach ($rows as $data) {
+            $detailId = $data['quotation_detail_id'] ?? 0;
+
+            if ($existingIds->has($detailId)) {
+                $modelClass::where('quotation_detail_id', $detailId)->update($data);
+            } else {
+                $inserts[] = $data + ['created_at' => $currentDateTime];
+            }
+        }
+
+        if (! empty($inserts)) {
+            $modelClass::insert($inserts);
         }
     }
 

@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\DashboardApprovalListRequest;
+use App\Http\Requests\NotificationIndexRequest;
 use App\Models\Quotation;
 use App\Models\LogNotification;
 use Illuminate\Http\JsonResponse;
@@ -99,12 +100,8 @@ class DashboardApprovalController extends Controller
      *     )
      * )
      */
-    public function getListDashboardApprovalData(Request $request): JsonResponse
+    public function getListDashboardApprovalData(DashboardApprovalListRequest $request): JsonResponse
     {
-        $request->validate([
-            'tipe' => 'nullable|in:menunggu-anda,menunggu-approval,quotation-belum-lengkap'
-        ]);
-
         $user = Auth::user();
 
         // Base query factory — kondisi dasar yang berlaku untuk semua keperluan
@@ -269,69 +266,46 @@ class DashboardApprovalController extends Controller
      *     )
      * )
      */
-    public function getNotifications(Request $request): JsonResponse
+    public function getNotifications(NotificationIndexRequest $request): JsonResponse
     {
-        try {
-            $request->validate([
-                'is_read' => 'nullable|in:0,1',
-                'limit' => 'nullable|integer|min:1|max:100',
-                'offset' => 'nullable|integer|min:0',
-            ]);
+        $user = Auth::user();
+        $limit = $request->input('limit', 10);
+        $offset = $request->input('offset', 0);
 
-            $user = Auth::user();
-            $limit = $request->input('limit', 10);
-            $offset = $request->input('offset', 0);
+        $query = LogNotification::where('user_id', $user->id)
+            ->where('tabel', 'sl_quotation')
+            ->orderBy('created_at', 'desc');
 
-            $query = LogNotification::where('user_id', $user->id)
-                ->where('tabel', 'sl_quotation')
-                ->orderBy('created_at', 'desc');
-
-            if ($request->has('is_read')) {
-                $query->where('is_read', (bool) $request->input('is_read'));
-            }
-
-            $total = $query->count();
-            $unreadCount = LogNotification::where('user_id', $user->id)
-                ->where('is_read', false)
-                ->count();
-
-            $notifications = $query->skip($offset)->take($limit)->get();
-
-            $transformedNotifications = $notifications->map(fn($n) => [
-                'id' => $n->id,
-                'tabel' => $n->tabel,
-                'doc_id' => $n->doc_id,
-                'transaksi' => $n->transaksi,
-                'pesan' => $n->pesan,
-                'is_read' => (bool) $n->is_read,
-                'created_at' => $n->created_at,
-                'created_by' => $n->created_by,
-                'time_ago' => $n->created_at?->diffForHumans(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'notifications' => $transformedNotifications,
-                    'unread_count' => $unreadCount,
-                    'total' => $total,
-                    'limit' => $limit,
-                    'offset' => $offset,
-                ],
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('getNotifications error', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan, silakan coba lagi.',
-            ], 500);
+        if ($request->has('is_read')) {
+            $query->where('is_read', (bool) $request->input('is_read'));
         }
+
+        $total = $query->count();
+        $unreadCount = LogNotification::where('user_id', $user->id)
+            ->where('is_read', false)
+            ->count();
+
+        $notifications = $query->skip($offset)->take($limit)->get();
+
+        $transformedNotifications = $notifications->map(fn($n) => [
+            'id' => $n->id,
+            'tabel' => $n->tabel,
+            'doc_id' => $n->doc_id,
+            'transaksi' => $n->transaksi,
+            'pesan' => $n->pesan,
+            'is_read' => (bool) $n->is_read,
+            'created_at' => $n->created_at,
+            'created_by' => $n->created_by,
+            'time_ago' => $n->created_at?->diffForHumans(),
+        ]);
+
+        return $this->successResponse([
+            'notifications' => $transformedNotifications,
+            'unread_count' => $unreadCount,
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset,
+        ]);
     }
 
     /**
@@ -379,22 +353,15 @@ class DashboardApprovalController extends Controller
         $notification = LogNotification::forUser($user->id)->find($id);
 
         if (!$notification) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Notification not found'
-            ], 404);
+            return $this->notFoundResponse('Notification not found');
         }
 
         $notification->markAsRead($user->full_name);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Notification marked as read',
-            'data' => [
-                'id' => $notification->id,
-                'is_read' => $notification->is_read
-            ]
-        ]);
+        return $this->successResponse([
+            'id' => $notification->id,
+            'is_read' => $notification->is_read,
+        ], 'Notification marked as read');
     }
 
     /**
@@ -431,13 +398,9 @@ class DashboardApprovalController extends Controller
                 'updated_by' => $user->full_name
             ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'All notifications marked as read',
-            'data' => [
-                'updated_count' => $updatedCount
-            ]
-        ]);
+        return $this->successResponse([
+            'updated_count' => $updatedCount,
+        ], 'All notifications marked as read');
     }
 
     /**
@@ -465,12 +428,9 @@ class DashboardApprovalController extends Controller
     {
         $user = Auth::user();
         $unreadCount = LogNotification::getUnreadCount($user->id);
-        
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'unread_count' => $unreadCount
-            ]
+
+        return $this->successResponse([
+            'unread_count' => $unreadCount,
         ]);
     }
 

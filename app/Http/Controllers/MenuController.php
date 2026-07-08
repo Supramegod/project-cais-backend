@@ -7,12 +7,15 @@ use App\Models\Role;
 use App\Models\SysmenuRole;
 use App\Models\SysmenuGroup;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\MenuStoreRequest;
+use App\Http\Requests\MenuUpdateRequest;
+use App\Http\Requests\MenuGroupStoreRequest;
+use App\Http\Requests\MenuAssignRequest;
 use App\Models\Sysmenu;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -54,47 +57,35 @@ class MenuController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            // Ambil semua menu aktif, urutkan berdasarkan ID biar stabil
-            $menus = Sysmenu::active()
-                ->orderBy('parent_id')
-                ->orderBy('id', 'asc')
-                ->get();
+        // Ambil semua menu aktif, urutkan berdasarkan ID biar stabil
+        $menus = Sysmenu::active()
+            ->orderBy('parent_id')
+            ->orderBy('id', 'asc')
+            ->get();
 
-            // Kelompokkan berdasarkan parent_id
-            $grouped = $menus->groupBy('parent_id');
+        // Kelompokkan berdasarkan parent_id
+        $grouped = $menus->groupBy('parent_id');
 
-            // Fungsi rekursif buat struktur tree (parent + child)
-            $buildTree = function ($parentId) use (&$buildTree, $grouped) {
-                return ($grouped[$parentId] ?? collect())->map(function ($menu) use (&$buildTree) {
-                    return [
-                        'id'         => $menu->id,
-                        'nama'       => $menu->nama,
-                        'url'        => $menu->url,
-                        'icon'       => $menu->icon,
-                        'created_at' => $menu->created_at
-                            ? Carbon::parse($menu->created_at)->isoFormat('D MMMM Y')
-                            : null,
-                        'children'   => $buildTree($menu->id),
-                    ];
-                })->values();
-            };
+        // Fungsi rekursif buat struktur tree (parent + child)
+        $buildTree = function ($parentId) use (&$buildTree, $grouped) {
+            return ($grouped[$parentId] ?? collect())->map(function ($menu) use (&$buildTree) {
+                return [
+                    'id'         => $menu->id,
+                    'nama'       => $menu->nama,
+                    'url'        => $menu->url,
+                    'icon'       => $menu->icon,
+                    'created_at' => $menu->created_at
+                        ? Carbon::parse($menu->created_at)->isoFormat('D MMMM Y')
+                        : null,
+                    'children'   => $buildTree($menu->id),
+                ];
+            })->values();
+        };
 
-            // Menu utama = parent_id NULL
-            $formattedMenus = $buildTree(null);
+        // Menu utama = parent_id NULL
+        $formattedMenus = $buildTree(null);
 
-            return response()->json([
-                'success' => true,
-                'data'    => $formattedMenus
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal Server Error',
-                'error'   => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($formattedMenus);
     }
 
     /**
@@ -131,27 +122,13 @@ class MenuController extends Controller
      */
     public function view(Request $request, $id)
     {
-        try {
-            $menu = Sysmenu::active()->find($id);
+        $menu = Sysmenu::active()->find($id);
 
-            if (!$menu) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Menu not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data'    => $menu
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal Server Error'
-            ], 500);
+        if (!$menu) {
+            return $this->notFoundResponse('Menu not found');
         }
+
+        return $this->successResponse($menu);
     }
 
     /**
@@ -188,46 +165,19 @@ class MenuController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(MenuStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'nama'      => 'required|string|max:100',
-            'parent_id' => 'nullable|exists:sysmenu,id',
-            'url'       => 'required|string|max:255',
-            'icon'      => 'nullable|string|max:100',
+        $menu = Sysmenu::create([
+            'nama'       => $request->nama,
+            'parent_id'  => $request->parent_id,
+            'url'        => $request->url,
+            'icon'       => $request->icon,
+            'created_at' => Carbon::now()->toDateTimeString(),
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id(),
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation Error',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $menu = Sysmenu::create([
-                'nama'       => $request->nama,
-                'parent_id'  => $request->parent_id,
-                'url'        => $request->url,
-                'icon'       => $request->icon,
-                'created_at' => Carbon::now()->toDateTimeString(),
-                'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::id(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data Berhasil Disimpan',
-                'data'    => $menu
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data Gagal Disimpan'
-            ], 500);
-        }
+        return $this->successResponse($menu, 'Data Berhasil Disimpan', 201);
     }
 
     /**
@@ -266,53 +216,24 @@ class MenuController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(MenuUpdateRequest $request, $id)
     {
         $menu = Sysmenu::active()->find($id);
 
         if (!$menu) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Menu not found'
-            ], 404);
+            return $this->notFoundResponse('Menu not found');
         }
 
-        $validator = Validator::make($request->all(), [
-            'nama'   => 'required|string|max:100',
-            'url'    => 'required|string|max:255',
-            'icon'   => 'nullable|string|max:100',
-            'status' => 'nullable|in:alpha,beta',
+        $menu->update([
+            'nama'       => $request->nama,
+            'url'        => $request->url,
+            'icon'       => $request->icon,
+            'status'     => $request->filled('status') ? $request->status : null,
+            'updated_at' => Carbon::now()->toDateTimeString(),
+            'updated_by' => Auth::user()->full_name,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation Error',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $menu->update([
-                'nama'       => $request->nama,
-                'url'        => $request->url,
-                'icon'       => $request->icon,
-                'status'     => $request->filled('status') ? $request->status : null,
-                'updated_at' => Carbon::now()->toDateTimeString(),
-                'updated_by' => Auth::user()->full_name,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data Berhasil Disimpan'
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data Gagal Disimpan'
-            ], 500);
-        }
+        return $this->messageResponse('Data Berhasil Disimpan');
     }
 
     /**
@@ -343,42 +264,20 @@ class MenuController extends Controller
      */
     public function delete(Request $request, $id)
     {
-        try {
-            DB::beginTransaction();
+        $menu = Sysmenu::active()->find($id);
 
-            $menu = Sysmenu::active()->find($id);
-
-            if (!$menu) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Menu not found'
-                ], 404);
-            }
-
-            $idDelete  = [$id];
-            $childIds  = $this->getChildId($id);
-            $idDelete  = array_merge($idDelete, $childIds);
-
-            Sysmenu::whereIn('id', $idDelete)->update([
-                'deleted_at' => Carbon::now()->toDateTimeString(),
-                'deleted_by' => Auth::user()->full_name,
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data Berhasil Dihapus'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menghapus menu'
-            ], 500);
+        if (!$menu) {
+            return $this->notFoundResponse('Menu not found');
         }
+
+        $idDelete = array_merge([$id], $this->getChildId($id));
+
+        Sysmenu::whereIn('id', $idDelete)->update([
+            'deleted_at' => Carbon::now()->toDateTimeString(),
+            'deleted_by' => Auth::user()->full_name,
+        ]);
+
+        return $this->messageResponse('Data Berhasil Dihapus');
     }
 
     // =========================================================================
@@ -421,44 +320,32 @@ class MenuController extends Controller
      */
     public function listGroup(Request $request)
     {
-        try {
-            $groups = SysmenuGroup::with(['sysmenus' => function ($query) {
-                // Hanya ambil menu aktif (belum di-soft-delete)
-                $query->whereNull('deleted_at')
-                    ->select('id', 'group_id', 'nama', 'url', 'icon')
-                    ->orderBy('id');
-            }])
-            ->orderBy('nama')
-            ->get();
+        $groups = SysmenuGroup::with(['sysmenus' => function ($query) {
+            // Hanya ambil menu aktif (belum di-soft-delete)
+            $query->whereNull('deleted_at')
+                ->select('id', 'group_id', 'nama', 'url', 'icon')
+                ->orderBy('id');
+        }])
+        ->orderBy('nama')
+        ->get();
 
-            $data = $groups->map(function ($group) {
-                return [
-                    'id'          => $group->id,
-                    'nama'        => $group->nama,
-                    'total_menu'  => $group->sysmenus->count(),
-                    'menus'       => $group->sysmenus->map(function ($menu) {
-                        return [
-                            'id'   => $menu->id,
-                            'nama' => $menu->nama,
-                            'url'  => $menu->url,
-                            'icon' => $menu->icon,
-                        ];
-                    })->values(),
-                ];
-            });
+        $data = $groups->map(function ($group) {
+            return [
+                'id'          => $group->id,
+                'nama'        => $group->nama,
+                'total_menu'  => $group->sysmenus->count(),
+                'menus'       => $group->sysmenus->map(function ($menu) {
+                    return [
+                        'id'   => $menu->id,
+                        'nama' => $menu->nama,
+                        'url'  => $menu->url,
+                        'icon' => $menu->icon,
+                    ];
+                })->values(),
+            ];
+        });
 
-            return response()->json([
-                'success' => true,
-                'data'    => $data
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal Server Error',
-                'error'   => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($data);
     }
 
     /**
@@ -496,42 +383,16 @@ class MenuController extends Controller
      *     )
      * )
      */
-    public function addGroup(Request $request)
+    public function addGroup(MenuGroupStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'nama' => 'required|string|max:100|unique:sysmenu_group,nama',
-        ], [
-            'nama.unique' => 'Nama grup sudah digunakan.',
+        $group = SysmenuGroup::create([
+            'nama' => $request->nama,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation Error',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            $group = SysmenuGroup::create([
-                'nama' => $request->nama,
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Grup Berhasil Dibuat',
-                'data'    => [
-                    'id'   => $group->id,
-                    'nama' => $group->nama,
-                ]
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal Membuat Grup'
-            ], 500);
-        }
+        return $this->successResponse([
+            'id'   => $group->id,
+            'nama' => $group->nama,
+        ], 'Grup Berhasil Dibuat', 201);
     }
 
     /**
@@ -586,29 +447,9 @@ class MenuController extends Controller
      *     )
      * )
      */
-    public function assignMenuToGroup(Request $request)
+    public function assignMenuToGroup(MenuAssignRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'group_id'    => 'required|integer|exists:sysmenu_group,id',
-            'menu_ids'    => 'required|array|min:1',
-            'menu_ids.*'  => 'required|integer|exists:sysmenu,id',
-        ], [
-            'group_id.exists'   => 'Grup tidak ditemukan.',
-            'menu_ids.required' => 'Minimal satu ID menu harus diisi.',
-            'menu_ids.*.exists' => 'Salah satu ID menu tidak ditemukan.',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation Error',
-                'errors'  => $validator->errors()
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
-
+        $result = DB::transaction(function () use ($request) {
             $group = SysmenuGroup::find($request->group_id);
 
             // Cari menu aktif yang sesuai dengan ID yang dikirim
@@ -633,27 +474,21 @@ class MenuController extends Controller
                     ]);
             }
 
-            DB::commit();
+            return [
+                'group'          => $group,
+                'assigned_count' => $assignedCount,
+                'not_found_ids'  => $notFoundIds,
+            ];
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => "{$assignedCount} menu berhasil ditambahkan ke grup \"{$group->nama}\"",
-                'data'    => [
-                    'group_id'       => $group->id,
-                    'group_nama'     => $group->nama,
-                    'assigned_count' => $assignedCount,
-                    'not_found_ids'  => $notFoundIds,
-                ]
-            ], 200);
+        $group = $result['group'];
 
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menambahkan menu ke grup'
-            ], 500);
-        }
+        return $this->successResponse([
+            'group_id'       => $group->id,
+            'group_nama'     => $group->nama,
+            'assigned_count' => $result['assigned_count'],
+            'not_found_ids'  => $result['not_found_ids'],
+        ], "{$result['assigned_count']} menu berhasil ditambahkan ke grup \"{$group->nama}\"");
     }
 
     // =========================================================================

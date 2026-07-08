@@ -2,152 +2,112 @@
 
 namespace App\Traits;
 
+/**
+ * Envelope response standar aplikasi.
+ *
+ * Bentuknya sengaja dijaga IDENTIK dengan pola manual yang sudah tersebar
+ * di controller (`response()->json(['success' => ...])`) supaya adopsi trait
+ * ini murni refactor — tidak menambah/menghapus field pada kontrak API:
+ *   - sukses:   { success: true, [message], [data] }   (message/data hanya muncul jika diberikan)
+ *   - error:    { success: false, message, [errors] }
+ *   - paginasi: { success: true, [message], data, meta }
+ */
 trait ApiResponser
 {
     /**
-     * Server error response format
-     *
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
+     * Success response. `message` dan `data` hanya disertakan jika non-null,
+     * meniru variasi yang ada (list/view tanpa message, delete tanpa data).
      */
-    protected function serverErrorResponse($message = 'Terjadi kesalahan server')
+    protected function successResponse($data = null, $message = null, int $statusCode = 200)
     {
-        return $this->errorResponse($message, [], 500);
+        $payload = ['success' => true];
+
+        if ($message !== null) {
+            $payload['message'] = $message;
+        }
+
+        if ($data !== null) {
+            $payload['data'] = $data;
+        }
+
+        return response()->json($payload, $statusCode);
     }
 
     /**
-     * Created response format
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
+     * Success response berisi pesan saja (tanpa data) — mis. hasil delete.
      */
-    protected function createdResponse($data = [], $message = 'Data berhasil dibuat')
+    protected function messageResponse(string $message, int $statusCode = 200)
+    {
+        return response()->json(['success' => true, 'message' => $message], $statusCode);
+    }
+
+    /**
+     * Created (201) response.
+     */
+    protected function createdResponse($data = null, string $message = 'Data berhasil dibuat')
     {
         return $this->successResponse($data, $message, 201);
     }
 
     /**
-     * Updated response format
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
+     * Error response. `errors` hanya disertakan jika diberikan.
      */
-    protected function updatedResponse($data = [], $message = 'Data berhasil diupdate')
+    protected function errorResponse(string $message = 'Error', int $statusCode = 400, $errors = null)
     {
-        return $this->successResponse($data, $message, 200);
+        $payload = ['success' => false, 'message' => $message];
+
+        if ($errors !== null) {
+            $payload['errors'] = $errors;
+        }
+
+        return response()->json($payload, $statusCode);
     }
 
     /**
-     * Deleted response format
-     *
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
+     * Not found (404) response.
      */
-    protected function deletedResponse($message = 'Data berhasil dihapus')
+    protected function notFoundResponse(string $message = 'Data tidak ditemukan')
     {
-        return $this->successResponse([], $message, 200);
+        return $this->errorResponse($message, 404);
     }
 
     /**
-     * Paginated response format
-     *
-     * @param mixed $data
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
+     * Unauthorized (401) response.
      */
-    protected function paginatedResponse($data, $message = 'Data berhasil diambil')
+    protected function unauthorizedResponse(string $message = 'Unauthorized')
     {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $data->items(),
-            'meta' => [
-                'current_page' => $data->currentPage(),
-                'from' => $data->firstItem(),
-                'last_page' => $data->lastPage(),
-                'per_page' => $data->perPage(),
-                'to' => $data->lastItem(),
-                'total' => $data->total(),
-            ],
-            'links' => [
-                'first' => $data->url(1),
-                'last' => $data->url($data->lastPage()),
-                'prev' => $data->previousPageUrl(),
-                'next' => $data->nextPageUrl(),
-            ],
-            'timestamp' => now()->toISOString()
-        ], 200);
-    }
-    /**  Success response format
-     *
-     * @param mixed $data
-     * @param string $message
-     * @param int $statusCode
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function successResponse($data = [], $message = 'Success', $statusCode = 200)
-    {
-        return response()->json([
-            'success' => true,
-            'message' => $message,
-            'data' => $data,
-            'timestamp' => now()->toISOString()
-        ], $statusCode);
+        return $this->errorResponse($message, 401);
     }
 
     /**
-     * Error response format
-     *
-     * @param string $message
-     * @param array $errors
-     * @param int $statusCode
-     * @return \Illuminate\Http\JsonResponse
+     * Server error (500) response.
      */
-    protected function errorResponse($message = 'Error', $errors = [], $statusCode = 400)
+    protected function serverErrorResponse(string $message = 'Terjadi kesalahan server')
     {
-        return response()->json([
-            'success' => false,
-            'message' => $message,
-            'errors' => $errors,
-            'timestamp' => now()->toISOString()
-        ], $statusCode);
+        return $this->errorResponse($message, 500);
     }
 
     /**
-     * Validation error response format
-     *
-     * @param \Illuminate\Contracts\Validation\Validator $validator
-     * @return \Illuminate\Http\JsonResponse
+     * Paginated response untuk LengthAwarePaginator.
      */
-    protected function validationErrorResponse($validator)
+    protected function paginatedResponse($paginator, ?string $message = null)
     {
-        return $this->errorResponse(
-            'Validasi gagal',
-            $validator->errors(),
-            422
-        );
-    }
+        $payload = ['success' => true];
 
-    /**
-     * Not found response format
-     *
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function notFoundResponse($message = 'Data tidak ditemukan')
-    {
-        return $this->errorResponse($message, [], 404);
-    }
+        if ($message !== null) {
+            $payload['message'] = $message;
+        }
 
-    /**
-     * Unauthorized response format
-     *
-     * @param string $message
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function unauthorizedResponse($message = 'Unauthorized')
-    {
-        return $this->errorResponse($message, [], 401);
-    }}
+        $payload['data'] = $paginator->items();
+        $payload['meta'] = [
+            'current_page' => $paginator->currentPage(),
+            'from' => $paginator->firstItem(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'to' => $paginator->lastItem(),
+            'total' => $paginator->total(),
+        ];
+
+        return response()->json($payload, 200);
+    }
+}

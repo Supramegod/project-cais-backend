@@ -21,6 +21,7 @@ class TimSales extends Model
         'branch',
         'user_id',
         'created_by',
+        'created_by_user_id',
         'updated_by',
     ];
 

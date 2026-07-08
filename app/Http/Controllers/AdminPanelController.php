@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Quotation;
 use App\Services\QuotationStepService;
@@ -88,54 +89,34 @@ class AdminPanelController extends Controller
      */
     public function updateStep3(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'headCountData' => 'required|array',
-                'headCountData.*.quotation_site_id' => 'required|integer|exists:sl_quotation_site,id',
-                'headCountData.*.position_id' => 'required|integer|exists:mysqlhris.m_position,id',
-                'headCountData.*.jumlah_hc' => 'required|integer|min:0',
-                'headCountData.*.jabatan_kebutuhan' => 'nullable|string|max:255',
-                'headCountData.*.nama_site' => 'nullable|string|max:255'
-            ]);
+        $validator = Validator::make($request->all(), [
+            'headCountData' => 'required|array',
+            'headCountData.*.quotation_site_id' => 'required|integer|exists:sl_quotation_site,id',
+            'headCountData.*.position_id' => 'required|integer|exists:mysqlhris.m_position,id',
+            'headCountData.*.jumlah_hc' => 'required|integer|min:0',
+            'headCountData.*.jabatan_kebutuhan' => 'nullable|string|max:255',
+            'headCountData.*.nama_site' => 'nullable|string|max:255'
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            Log::info('Admin Panel - Update Step 3', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'headcount_count' => count($request->headCountData)
-            ]);
-
-            // Panggil service untuk update step 3
-            $this->quotationStepService->updateStep3($quotation, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 3 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'headcount_updated' => count($request->headCountData)
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 3', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update step 3: ' . $e->getMessage()
-            ], 500);
+                'message' => $validator->errors()
+            ], 400);
         }
+
+        Log::info('Admin Panel - Update Step 3', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'headcount_count' => count($request->headCountData)
+        ]);
+
+        $this->quotationStepService->updateStep3($quotation, $request);
+
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'headcount_updated' => count($request->headCountData)
+        ], 'Step 3 berhasil diupdate');
     }
 
     /**
@@ -184,53 +165,34 @@ class AdminPanelController extends Controller
      */
     public function updateStep7(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'kaporlaps' => 'required|array',
-                'kaporlaps.*.barang_id' => 'required|integer|exists:m_barang,id',
-                'kaporlaps.*.quotation_detail_id' => 'required|integer|exists:sl_quotation_detail,id',
-                'kaporlaps.*.jumlah' => 'required|integer|min:0',
-                'kaporlaps.*.harga' => 'nullable|numeric|min:0',
-            ]);
+        $validator = Validator::make($request->all(), [
+            'kaporlaps' => 'required|array',
+            'kaporlaps.*.barang_id' => 'required|integer|exists:m_barang,id',
+            'kaporlaps.*.quotation_detail_id' => 'required|integer|exists:sl_quotation_detail,id',
+            'kaporlaps.*.jumlah' => 'required|integer|min:0',
+            'kaporlaps.*.harga' => 'nullable|numeric|min:0',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            Log::info('Admin Panel - Update Step 7', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'kaporlap_count' => count($request->kaporlaps)
-            ]);
-
-            // Panggil service untuk update step 7
-            $this->quotationStepService->updateStep7($quotation, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 7 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'step' => 7,
-                    'kaporlap_items' => count($request->kaporlaps)
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 7', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage()
-            ]);
-
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update step 7: ' . $e->getMessage()
-            ], 500);
+                'message' => $validator->errors()
+            ], 400);
         }
+
+        Log::info('Admin Panel - Update Step 7', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'kaporlap_count' => count($request->kaporlaps)
+        ]);
+
+        $this->quotationStepService->updateStep7($quotation, $request);
+
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'step' => 7,
+            'kaporlap_items' => count($request->kaporlaps)
+        ], 'Step 7 berhasil diupdate');
     }
 
     /**
@@ -278,52 +240,33 @@ class AdminPanelController extends Controller
      */
     public function updateStep8(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'devices' => 'required|array',
-                'devices.*.barang_id' => 'required|integer|exists:m_barang,id',
-                'devices.*.jumlah' => 'required|integer|min:0',
-                'devices.*.harga' => 'nullable|numeric|min:0',
-            ]);
+        $validator = Validator::make($request->all(), [
+            'devices' => 'required|array',
+            'devices.*.barang_id' => 'required|integer|exists:m_barang,id',
+            'devices.*.jumlah' => 'required|integer|min:0',
+            'devices.*.harga' => 'nullable|numeric|min:0',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 400);
-            }
-
-            Log::info('Admin Panel - Update Step 8', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'devices_count' => count($request->devices)
-            ]);
-
-            // Panggil service untuk update step 8
-            $this->quotationStepService->updateStep8($quotation, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 8 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'devices_items' => count($request->devices)
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 8', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage()
-            ]);
-
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update step 8: ' . $e->getMessage()
-            ], 500);
+                'message' => 'Validasi gagal',
+                'errors' => $validator->errors()
+            ], 400);
         }
+
+        Log::info('Admin Panel - Update Step 8', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'devices_count' => count($request->devices)
+        ]);
+
+        $this->quotationStepService->updateStep8($quotation, $request);
+
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'devices_items' => count($request->devices)
+        ], 'Step 8 berhasil diupdate');
     }
 
     /**
@@ -372,52 +315,33 @@ class AdminPanelController extends Controller
      */
     public function updateStep9(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'chemicals' => 'required|array',
-                'chemicals.*.barang_id' => 'required|integer|exists:m_barang,id',
-                'chemicals.*.jumlah' => 'required|integer|min:0',
-                'chemicals.*.harga' => 'nullable|numeric|min:0',
-                'chemicals.*.masa_pakai' => 'nullable|integer|min:1',
-            ]);
+        $validator = Validator::make($request->all(), [
+            'chemicals' => 'required|array',
+            'chemicals.*.barang_id' => 'required|integer|exists:m_barang,id',
+            'chemicals.*.jumlah' => 'required|integer|min:0',
+            'chemicals.*.harga' => 'nullable|numeric|min:0',
+            'chemicals.*.masa_pakai' => 'nullable|integer|min:1',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            Log::info('Admin Panel - Update Step 9', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'chemicals_count' => count($request->chemicals)
-            ]);
-
-            // Panggil service untuk update step 9
-            $this->quotationStepService->updateStep9($quotation, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 9 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'chemicals_items' => count($request->chemicals)
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 9', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage()
-            ]);
-
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update step 9: ' . $e->getMessage()
-            ], 500);
+                'message' => $validator->errors()
+            ], 400);
         }
+
+        Log::info('Admin Panel - Update Step 9', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'chemicals_count' => count($request->chemicals)
+        ]);
+
+        $this->quotationStepService->updateStep9($quotation, $request);
+
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'chemicals_items' => count($request->chemicals)
+        ], 'Step 9 berhasil diupdate');
     }
 
     /**
@@ -464,63 +388,45 @@ class AdminPanelController extends Controller
      */
     public function updateStep10(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input
-            // $validator = Validator::make($request->all(), [
-            //     'ohcs' => 'nullable|array',
-            //     'ohcs.*.barang_id' => 'required_with:ohcs|integer|exists:m_barang,id',
-            //     'ohcs.*.jumlah' => 'required_with:ohcs|integer|min:0',
-            //     'ohcs.*.harga' => 'nullable|numeric|min:0',
-            //     'quotation_trainings' => 'nullable|array',
-            //     'quotation_trainings.*' => 'integer|exists:m_training,id',
-            //     'jumlah_kunjungan_operasional' => 'nullable|integer|min:0',
-            //     'bulan_tahun_kunjungan_operasional' => 'nullable|string|in:Bulan,Tahun',
-            //     'keterangan_kunjungan_operasional' => 'nullable|string|max:500',
-            //     'jumlah_kunjungan_tim_crm' => 'nullable|integer|min:0',
-            //     'bulan_tahun_kunjungan_tim_crm' => 'nullable|string|in:Bulan,Tahun',
-            //     'keterangan_kunjungan_tim_crm' => 'nullable|string|max:500',
-            //     'training' => 'nullable|string|max:500',
-            //     'persen_bunga_bank' => 'nullable|numeric|min:0',
-            // ]);
+        // Validasi input
+        // $validator = Validator::make($request->all(), [
+        //     'ohcs' => 'nullable|array',
+        //     'ohcs.*.barang_id' => 'required_with:ohcs|integer|exists:m_barang,id',
+        //     'ohcs.*.jumlah' => 'required_with:ohcs|integer|min:0',
+        //     'ohcs.*.harga' => 'nullable|numeric|min:0',
+        //     'quotation_trainings' => 'nullable|array',
+        //     'quotation_trainings.*' => 'integer|exists:m_training,id',
+        //     'jumlah_kunjungan_operasional' => 'nullable|integer|min:0',
+        //     'bulan_tahun_kunjungan_operasional' => 'nullable|string|in:Bulan,Tahun',
+        //     'keterangan_kunjungan_operasional' => 'nullable|string|max:500',
+        //     'jumlah_kunjungan_tim_crm' => 'nullable|integer|min:0',
+        //     'bulan_tahun_kunjungan_tim_crm' => 'nullable|string|in:Bulan,Tahun',
+        //     'keterangan_kunjungan_tim_crm' => 'nullable|string|max:500',
+        //     'training' => 'nullable|string|max:500',
+        //     'persen_bunga_bank' => 'nullable|numeric|min:0',
+        // ]);
 
-            // if ($validator->fails()) {
-            //     return response()->json([
-            //         'success' => false,
-            //         'message' => $validator->errors()
-            //     ], 400);
-            // }
+        // if ($validator->fails()) {
+        //     return response()->json([
+        //         'success' => false,
+        //         'message' => $validator->errors()
+        //     ], 400);
+        // }
 
-            Log::info('Admin Panel - Update Step 10', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'ohc_count' => $request->has('ohcs') ? count($request->ohcs) : 0,
-                'training_count' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
-            ]);
+        Log::info('Admin Panel - Update Step 10', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'ohc_count' => $request->has('ohcs') ? count($request->ohcs) : 0,
+            'training_count' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
+        ]);
 
-            // Panggil service untuk update step 10
-            $this->quotationStepService->updateStep10($quotation, $request);
+        $this->quotationStepService->updateStep10($quotation, $request);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 10 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'ohc_items' => $request->has('ohcs') ? count($request->ohcs) : 0,
-                    'training_selected' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 10', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal update step 10: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'ohc_items' => $request->has('ohcs') ? count($request->ohcs) : 0,
+            'training_selected' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
+        ], 'Step 10 berhasil diupdate');
     }
 
     /**
@@ -713,94 +619,75 @@ class AdminPanelController extends Controller
      */
     public function updateStep11(Request $request, Quotation $quotation)
     {
-        try {
-            // Validasi input - DIPERBAIKI sesuai dengan nama field yang benar
-            $validator = Validator::make($request->all(), [
-                'penagihan' => 'required|string|max:100',
-                'persentase' => 'nullable|numeric|min:0|max:100',
-                'persen_insentif' => 'nullable|numeric|min:0|max:100',
-                'persen_bunga_bank' => 'nullable|numeric|min:0|max:100',
-                'note_harga_jual' => 'nullable|string',
+        // Validasi input - DIPERBAIKI sesuai dengan nama field yang benar
+        $validator = Validator::make($request->all(), [
+            'penagihan' => 'required|string|max:100',
+            'persentase' => 'nullable|numeric|min:0|max:100',
+            'persen_insentif' => 'nullable|numeric|min:0|max:100',
+            'persen_bunga_bank' => 'nullable|numeric|min:0|max:100',
+            'note_harga_jual' => 'nullable|string',
 
-                // Nominal upah data
-                'nominal_upah_data' => 'nullable|array',
-                'nominal_upah_data.*' => 'nullable|numeric|min:0',
+            // Nominal upah data
+            'nominal_upah_data' => 'nullable|array',
+            'nominal_upah_data.*' => 'nullable|numeric|min:0',
 
-                // BPJS persentase data
-                'bpjs_persentase_data' => 'nullable|array',
-                'bpjs_persentase_data.*.jkk' => 'nullable|numeric|min:0|max:100',
-                'bpjs_persentase_data.*.jkm' => 'nullable|numeric|min:0|max:100',
-                'bpjs_persentase_data.*.jht' => 'nullable|numeric|min:0|max:100',
-                'bpjs_persentase_data.*.jp' => 'nullable|numeric|min:0|max:100',
-                'bpjs_persentase_data.*.kes' => 'nullable|numeric|min:0|max:100',
+            // BPJS persentase data
+            'bpjs_persentase_data' => 'nullable|array',
+            'bpjs_persentase_data.*.jkk' => 'nullable|numeric|min:0|max:100',
+            'bpjs_persentase_data.*.jkm' => 'nullable|numeric|min:0|max:100',
+            'bpjs_persentase_data.*.jht' => 'nullable|numeric|min:0|max:100',
+            'bpjs_persentase_data.*.jp' => 'nullable|numeric|min:0|max:100',
+            'bpjs_persentase_data.*.kes' => 'nullable|numeric|min:0|max:100',
 
-                // HPP editable data (bukan hpp_data)
-                'hpp_editable_data' => 'nullable|array',
-                'hpp_editable_data.*.tunjangan_hari_raya' => 'nullable|numeric|min:0',
-                'hpp_editable_data.*.kompensasi' => 'nullable|numeric|min:0',
+            // HPP editable data (bukan hpp_data)
+            'hpp_editable_data' => 'nullable|array',
+            'hpp_editable_data.*.tunjangan_hari_raya' => 'nullable|numeric|min:0',
+            'hpp_editable_data.*.kompensasi' => 'nullable|numeric|min:0',
 
-                // COSS data
-                'coss_data' => 'nullable|array',
-                'coss_data.*.provisi_seragam' => 'nullable|numeric|min:0',
-                'coss_data.*.provisi_peralatan' => 'nullable|numeric|min:0',
-                'coss_data.*.provisi_chemical' => 'nullable|numeric|min:0',
-                'coss_data.*.provisi_ohc' => 'nullable|numeric|min:0',
+            // COSS data
+            'coss_data' => 'nullable|array',
+            'coss_data.*.provisi_seragam' => 'nullable|numeric|min:0',
+            'coss_data.*.provisi_peralatan' => 'nullable|numeric|min:0',
+            'coss_data.*.provisi_chemical' => 'nullable|numeric|min:0',
+            'coss_data.*.provisi_ohc' => 'nullable|numeric|min:0',
 
-                // Tunjangan data
-                'tunjangan_data' => 'nullable|array',
-                'tunjangan_data.*' => 'array',
-                'tunjangan_data.*.*.nama_tunjangan' => 'required_with:tunjangan_data.*|string|max:255',
-                'tunjangan_data.*.*.nominal' => 'required_with:tunjangan_data.*|numeric|min:0',
-            ]);
+            // Tunjangan data
+            'tunjangan_data' => 'nullable|array',
+            'tunjangan_data.*' => 'array',
+            'tunjangan_data.*.*.nama_tunjangan' => 'required_with:tunjangan_data.*|string|max:255',
+            'tunjangan_data.*.*.nominal' => 'required_with:tunjangan_data.*|numeric|min:0',
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            Log::info('Admin Panel - Update Step 11', [
-                'quotation_id' => $quotation->id,
-                'user_id' => auth()->id(),
-                'has_persentase' => $request->has('persentase'),
-                'has_nominal_upah_data' => $request->has('nominal_upah_data'),
-                'has_bpjs_persentase_data' => $request->has('bpjs_persentase_data'),
-                'has_hpp_editable_data' => $request->has('hpp_editable_data'),
-                'has_coss_data' => $request->has('coss_data'),
-                'has_tunjangan_data' => $request->has('tunjangan_data')
-            ]);
-
-            // Panggil service untuk update step 11
-            $this->quotationStepService->updateStep11($quotation, $request);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Step 11 berhasil diupdate',
-                'data' => [
-                    'quotation_id' => $quotation->id,
-                    'penagihan' => $request->penagihan,
-                    'persentase_updated' => $request->has('persentase'),
-                    'nominal_upah_updated' => $request->has('nominal_upah_data'),
-                    'bpjs_persentase_updated' => $request->has('bpjs_persentase_data'),
-                    'hpp_updated' => $request->has('hpp_editable_data'),
-                    'coss_updated' => $request->has('coss_data'),
-                    'tunjangan_updated' => $request->has('tunjangan_data')
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error update step 11', [
-                'quotation_id' => $quotation->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
+        if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal update step 11: ' . $e->getMessage()
-            ], 500);
+                'message' => $validator->errors()
+            ], 400);
         }
+
+        Log::info('Admin Panel - Update Step 11', [
+            'quotation_id' => $quotation->id,
+            'user_id' => auth()->id(),
+            'has_persentase' => $request->has('persentase'),
+            'has_nominal_upah_data' => $request->has('nominal_upah_data'),
+            'has_bpjs_persentase_data' => $request->has('bpjs_persentase_data'),
+            'has_hpp_editable_data' => $request->has('hpp_editable_data'),
+            'has_coss_data' => $request->has('coss_data'),
+            'has_tunjangan_data' => $request->has('tunjangan_data')
+        ]);
+
+        $this->quotationStepService->updateStep11($quotation, $request);
+
+        return $this->successResponse([
+            'quotation_id' => $quotation->id,
+            'penagihan' => $request->penagihan,
+            'persentase_updated' => $request->has('persentase'),
+            'nominal_upah_updated' => $request->has('nominal_upah_data'),
+            'bpjs_persentase_updated' => $request->has('bpjs_persentase_data'),
+            'hpp_updated' => $request->has('hpp_editable_data'),
+            'coss_updated' => $request->has('coss_data'),
+            'tunjangan_updated' => $request->has('tunjangan_data')
+        ], 'Step 11 berhasil diupdate');
     }
     /**
      * @OA\Get(
@@ -838,40 +725,23 @@ class AdminPanelController extends Controller
      */
     public function getStepData(Quotation $quotation, $step)
     {
-        try {
-            // Validasi step yang diperbolehkan
-            $allowedSteps = [3, 7, 8, 9, 10, 11];
-            if (!in_array($step, $allowedSteps)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Step tidak valid. Step yang diperbolehkan: ' . implode(', ', $allowedSteps)
-                ], 400);
-            }
-
-            // Ambil relations untuk step ini
-            $relations = $this->quotationStepService->getStepRelations($step);
-            $quotation->load($relations);
-
-            // Persiapkan data untuk step
-            $stepData = $this->quotationStepService->prepareStepData($quotation, $step);
-
-            return response()->json([
-                'success' => true,
-                'data' => $stepData
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Admin Panel - Error get step data', [
-                'quotation_id' => $quotation->id,
-                'step' => $step,
-                'error' => $e->getMessage()
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data step: ' . $e->getMessage()
-            ], 500);
+        // Validasi step yang diperbolehkan
+        $allowedSteps = [3, 7, 8, 9, 10, 11];
+        if (!in_array($step, $allowedSteps)) {
+            return $this->errorResponse(
+                'Step tidak valid. Step yang diperbolehkan: ' . implode(', ', $allowedSteps),
+                400
+            );
         }
+
+        // Ambil relations untuk step ini
+        $relations = $this->quotationStepService->getStepRelations($step);
+        $quotation->load($relations);
+
+        // Persiapkan data untuk step
+        $stepData = $this->quotationStepService->prepareStepData($quotation, $step);
+
+        return $this->successResponse($stepData);
     }
     /**
      * @OA\Get(
@@ -890,20 +760,10 @@ class AdminPanelController extends Controller
      */
     public function getConsultations()
     {
-        try {
-            // Mengambil semua data yang belum di-softdelete
-            $data = Consultation::all();
+        // Mengambil semua data yang belum di-softdelete
+        $data = Consultation::all();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($data);
     }
 
     /**
@@ -929,39 +789,10 @@ class AdminPanelController extends Controller
      * )
      * )
      */
-    public function storeConsultation(Request $request)
+    public function storeConsultation(StoreConsultationRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama_lengkap' => 'required|string|max:255',
-                'perusahaan' => 'required|string|max:255',
-                'aplikasi' => 'required|string|max:255',
-                'no_whatsapp' => 'required|string|max:20',
-                'alamat_email' => 'required|email|max:255',
-                'jadwal_konsultasi' => 'required|date_format:Y-m-d',
-            ]);
+        $consultation = Consultation::create($request->validated());
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 400);
-            }
-
-            $consultation = Consultation::create($request->all());
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Jadwal konsultasi berhasil disimpan',
-                'data' => $consultation
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menyimpan data: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($consultation, 'Jadwal konsultasi berhasil disimpan', 201);
     }
 }

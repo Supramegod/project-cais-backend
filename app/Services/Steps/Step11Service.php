@@ -31,9 +31,71 @@ class Step11Service
      */
     private ?QuotationService $quotationService = null;
 
+    /**
+     * Map preload scoped ke satu eksekusi updateAllQuotationData
+     * untuk menghindari N+1 (detail/wage/hpp/coss keyed by detail_id,
+     * site keyed by id, umk by kota_id, ump by provinsi_id).
+     */
+    private $_detailMap = null;
+
+    private $_wageMap = null;
+
+    private $_hppMap = null;
+
+    private $_cossMap = null;
+
+    private $_siteMap = null;
+
+    private $_umkMap = null;
+
+    private $_umpMap = null;
+
     public function setQuotationService(QuotationService $service): void
     {
         $this->quotationService = $service;
+    }
+
+    /**
+     * Preload semua data yang dibutuhkan loop update Step 11 dalam
+     * beberapa query whereIn (bukan per-detail). Dipanggil sekali di
+     * awal updateAllQuotationData; dibersihkan lewat clearStep11Maps().
+     */
+    private function preloadStep11Maps(Quotation $quotation): void
+    {
+        $quotation->loadMissing('quotationDetails');
+        $detailIds = $quotation->quotationDetails->pluck('id')->all();
+
+        $this->_detailMap = QuotationDetail::whereIn('id', $detailIds)
+            ->where('quotation_id', $quotation->id)
+            ->get()
+            ->keyBy('id');
+        $this->_wageMap = QuotationDetailWage::whereIn('quotation_detail_id', $detailIds)
+            ->get()
+            ->keyBy('quotation_detail_id');
+        $this->_hppMap = QuotationDetailHpp::whereIn('quotation_detail_id', $detailIds)
+            ->get()
+            ->keyBy('quotation_detail_id');
+        $this->_cossMap = QuotationDetailCoss::whereIn('quotation_detail_id', $detailIds)
+            ->get()
+            ->keyBy('quotation_detail_id');
+
+        $sites = QuotationSite::where('quotation_id', $quotation->id)->get();
+        $this->_siteMap = $sites->keyBy('id');
+        $this->_umkMap = Umk::whereIn('city_id', $sites->pluck('kota_id')->filter()->unique()->all())
+            ->active()->get()->keyBy('city_id');
+        $this->_umpMap = Ump::whereIn('province_id', $sites->pluck('provinsi_id')->filter()->unique()->all())
+            ->active()->get()->keyBy('province_id');
+    }
+
+    private function clearStep11Maps(): void
+    {
+        $this->_detailMap = null;
+        $this->_wageMap = null;
+        $this->_hppMap = null;
+        $this->_cossMap = null;
+        $this->_siteMap = null;
+        $this->_umkMap = null;
+        $this->_umpMap = null;
     }
 
     private function getQuotationService(): QuotationService
@@ -61,6 +123,8 @@ class Step11Service
             $user = Auth::user()->full_name;
             $currentDateTime = Carbon::now();
 
+            $this->preloadStep11Maps($quotation);
+
             if ($request->has('wage_data') && is_array($request->wage_data)) {
                 foreach ($request->wage_data as $detailId => $wageFields) {
                     $this->updateSingleWageData($detailId, $wageFields, $user, $currentDateTime, $quotation->id);
@@ -77,10 +141,17 @@ class Step11Service
 
             foreach (['hpp_editable_data' => QuotationDetailHpp::class, 'coss_data' => QuotationDetailCoss::class] as $key => $model) {
                 if ($request->has($key) && is_array($request->$key)) {
+                    // Group detail id per nilai jumlah_hc identik → satu UPDATE per nilai
+                    // (bukan satu UPDATE per detail).
+                    $idsByValue = [];
                     foreach ($request->$key as $detailId => $data) {
                         if (isset($data['jumlah_hc'])) {
-                            $model::where('quotation_detail_id', $detailId)->update(['jumlah_hc' => $data['jumlah_hc']]);
+                            $idsByValue[(string) $data['jumlah_hc']][] = $detailId;
                         }
+                    }
+
+                    foreach ($idsByValue as $value => $ids) {
+                        $model::whereIn('quotation_detail_id', $ids)->update(['jumlah_hc' => $value]);
                     }
                 }
             }
@@ -132,6 +203,8 @@ class Step11Service
             DB::rollBack();
             Log::error('Error in updateAllQuotationData: '.$e->getMessage());
             throw $e;
+        } finally {
+            $this->clearStep11Maps();
         }
     }
 
@@ -264,9 +337,10 @@ class Step11Service
 
     private function updateSingleWageData($detailId, array $wageFields, string $user, Carbon $currentDateTime, $quotationId): void
     {
-        $detail = QuotationDetail::where('id', $detailId)
-            ->where('quotation_id', $quotationId)
-            ->first();
+        $detail = $this->_detailMap?->get($detailId)
+            ?? QuotationDetail::where('id', $detailId)
+                ->where('quotation_id', $quotationId)
+                ->first();
 
         if (! $detail) {
             Log::warning("Detail not found or doesn't belong to quotation", [
@@ -277,7 +351,8 @@ class Step11Service
             return;
         }
 
-        $wage = QuotationDetailWage::where('quotation_detail_id', $detailId)->first();
+        $wage = $this->_wageMap?->get($detailId)
+            ?? QuotationDetailWage::where('quotation_detail_id', $detailId)->first();
 
         if (! $wage) {
             Log::warning('Wage not found for detail', ['detail_id' => $detailId]);
@@ -352,9 +427,10 @@ class Step11Service
 
         foreach ($detailData as $detailId => $data) {
             try {
-                $detail = QuotationDetail::where('id', $detailId)
-                    ->where('quotation_id', $quotation->id)
-                    ->first();
+                $detail = $this->_detailMap?->get($detailId)
+                    ?? QuotationDetail::where('id', $detailId)
+                        ->where('quotation_id', $quotation->id)
+                        ->first();
 
                 if (! $detail) {
                     Log::warning('Detail not found', [
@@ -452,12 +528,14 @@ class Step11Service
                 'updated_at' => $currentDateTime,
             ];
 
-            $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+            $hpp = $this->_hppMap?->get($detail->id)
+                ?? QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
             if ($hpp) {
                 $hpp->update($bpjsNominalFields);
             }
 
-            $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+            $coss = $this->_cossMap?->get($detail->id)
+                ?? QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
             if ($coss) {
                 $coss->update($bpjsNominalFields);
             }
@@ -466,7 +544,8 @@ class Step11Service
 
     private function updateDetailWage(QuotationDetail $detail, array $data, string $user, Carbon $currentDateTime, array &$statistics): void
     {
-        $wage = QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
+        $wage = $this->_wageMap?->get($detail->id)
+            ?? QuotationDetailWage::where('quotation_detail_id', $detail->id)->first();
 
         if (! $wage) {
             return;
@@ -561,12 +640,14 @@ class Step11Service
                     'updated_at' => $currentDateTime,
                 ];
 
-                $hpp = QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
+                $hpp = $this->_hppMap?->get($detail->id)
+                    ?? QuotationDetailHpp::where('quotation_detail_id', $detail->id)->first();
                 if ($hpp) {
                     $hpp->update($fieldsToClear);
                 }
 
-                $coss = QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
+                $coss = $this->_cossMap?->get($detail->id)
+                    ?? QuotationDetailCoss::where('quotation_detail_id', $detail->id)->first();
                 if ($coss) {
                     $coss->update($fieldsToClear);
                 }
@@ -576,14 +657,17 @@ class Step11Service
 
     private function isCustomUpah(QuotationDetail $detail, float $nominalUpah): bool
     {
-        $site = QuotationSite::find($detail->quotation_site_id);
+        $site = $this->_siteMap?->get($detail->quotation_site_id)
+            ?? QuotationSite::find($detail->quotation_site_id);
 
         if (! $site) {
             return false;
         }
 
-        $umk = Umk::byCity($site->kota_id)->active()->first();
-        $ump = Ump::byProvince($site->provinsi_id)->active()->first();
+        $umk = $this->_umkMap?->get($site->kota_id)
+            ?? Umk::byCity($site->kota_id)->active()->first();
+        $ump = $this->_umpMap?->get($site->provinsi_id)
+            ?? Ump::byProvince($site->provinsi_id)->active()->first();
 
         $umkValue = $umk ? $umk->umk : 0;
         $umpValue = $ump ? $ump->ump : 0;

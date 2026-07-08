@@ -113,71 +113,60 @@ class SiteController extends Controller
      */
     public function list(Request $request): JsonResponse
     {
-        try {
-            $query = QuotationSite::with(['leads', 'spkSite', 'site'])
-                ->whereHas('leads', function ($query) {
-                    $query->whereNull('deleted_at');
-                });
-
-            // Apply filters like in web controller
-            if (!empty($request->tgl_dari)) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('tgl_leads', '>=', $request->tgl_dari);
-                });
-            }
-
-            if (!empty($request->tgl_sampai)) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('tgl_leads', '<=', $request->tgl_sampai);
-                });
-            }
-
-            if (!empty($request->branch)) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('branch_id', $request->branch);
-                });
-            }
-
-            if (!empty($request->platform)) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('platform_id', $request->platform);
-                });
-            }
-
-            if (!empty($request->status)) {
-                $query->whereHas('leads', function ($q) use ($request) {
-                    $q->where('status_leads_id', $request->status);
-                });
-            }
-
-            $data = $query->orderBy('id', 'desc')->get();
-
-            $result = $data->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'nama_perusahaan' => $item->leads->nama_perusahaan ?? '',
-                    'nama_site' => $item->nama_site,
-                    'provinsi' => $item->provinsi,
-                    'kota' => $item->kota,
-                    'penempatan' => $item->penempatan,
-                    'created_at' => $item->created_at,
-                    'created_by' => $item->created_by,
-                    'spk' => !is_null($item->spkSite),
-                    'kontrak' => !is_null($item->site)
-                ];
+        $query = QuotationSite::with(['leads', 'spkSite', 'site'])
+            ->whereHas('leads', function ($query) {
+                $query->whereNull('deleted_at');
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $result
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve sites'
-            ], 500);
+        // Apply filters like in web controller
+        if (!empty($request->tgl_dari)) {
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->where('tgl_leads', '>=', $request->tgl_dari);
+            });
         }
+
+        if (!empty($request->tgl_sampai)) {
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->where('tgl_leads', '<=', $request->tgl_sampai);
+            });
+        }
+
+        if (!empty($request->branch)) {
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->where('branch_id', $request->branch);
+            });
+        }
+
+        if (!empty($request->platform)) {
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->where('platform_id', $request->platform);
+            });
+        }
+
+        if (!empty($request->status)) {
+            $query->whereHas('leads', function ($q) use ($request) {
+                $q->where('status_leads_id', $request->status);
+            });
+        }
+
+        $data = $query->orderBy('id', 'desc')->get();
+
+        $result = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama_perusahaan' => $item->leads->nama_perusahaan ?? '',
+                'nama_site' => $item->nama_site,
+                'provinsi' => $item->provinsi,
+                'kota' => $item->kota,
+                'penempatan' => $item->penempatan,
+                'created_at' => $item->created_at,
+                'created_by' => $item->created_by,
+                'spk' => !is_null($item->spkSite),
+                'kontrak' => !is_null($item->site)
+            ];
+        });
+
+        return $this->successResponse($result);
     }
 
     /**
@@ -285,59 +274,45 @@ class SiteController extends Controller
      */
     public function view($id): JsonResponse
     {
-        try {
-            $data = Leads::whereNotNull('customer_id')->find($id);
+        $data = Leads::whereNotNull('customer_id')->find($id);
 
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Site not found'
-                ], 404);
-            }
-
-            // Format dates
-            $data->stgl_leads = Carbon::parse($data->tgl_leads)->isoFormat('D MMMM Y');
-            $data->screated_at = Carbon::parse($data->created_at)->isoFormat('D MMMM Y');
-
-            // Get activities
-            $activities = CustomerActivity::where('leads_id', $id)
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($activity) {
-                    return [
-                        'screated_at' => Carbon::parse($activity->created_at)->isoFormat('D MMMM Y HH:mm'),
-                        'stgl_activity' => Carbon::parse($activity->tgl_activity)->isoFormat('D MMMM Y'),
-                        'notes' => $activity->notes,
-                        'tipe' => $activity->tipe
-                    ];
-                });
-
-            // Get master data like in web controller
-            $masterData = [
-                'branch' => DB::connection('mysqlhris')->table('m_branch')->where('is_active', 1)->get(),
-                'jabatan_pic' => DB::table('m_jabatan_pic')->whereNull('deleted_at')->get(),
-                'jenis_perusahaan' => DB::table('m_jenis_perusahaan')->whereNull('deleted_at')->get(),
-                'kebutuhan' => DB::table('m_kebutuhan')->whereNull('deleted_at')->get(),
-                'platform' => DB::table('m_platform')->whereNull('deleted_at')->get(),
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'leads' => $data,
-                    'activity' => $activities,
-                    'master_data' => $masterData
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve site details'
-            ], 500);
+        if (!$data) {
+            return $this->notFoundResponse('Site not found');
         }
+
+        // Format dates
+        $data->stgl_leads = Carbon::parse($data->tgl_leads)->isoFormat('D MMMM Y');
+        $data->screated_at = Carbon::parse($data->created_at)->isoFormat('D MMMM Y');
+
+        // Get activities
+        $activities = CustomerActivity::where('leads_id', $id)
+            ->whereNull('deleted_at')
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($activity) {
+                return [
+                    'screated_at' => Carbon::parse($activity->created_at)->isoFormat('D MMMM Y HH:mm'),
+                    'stgl_activity' => Carbon::parse($activity->tgl_activity)->isoFormat('D MMMM Y'),
+                    'notes' => $activity->notes,
+                    'tipe' => $activity->tipe
+                ];
+            });
+
+        // Get master data like in web controller
+        $masterData = [
+            'branch' => DB::connection('mysqlhris')->table('m_branch')->where('is_active', 1)->get(),
+            'jabatan_pic' => DB::table('m_jabatan_pic')->whereNull('deleted_at')->get(),
+            'jenis_perusahaan' => DB::table('m_jenis_perusahaan')->whereNull('deleted_at')->get(),
+            'kebutuhan' => DB::table('m_kebutuhan')->whereNull('deleted_at')->get(),
+            'platform' => DB::table('m_platform')->whereNull('deleted_at')->get(),
+        ];
+
+        return $this->successResponse([
+            'leads' => $data,
+            'activity' => $activities,
+            'master_data' => $masterData
+        ]);
     }
 
     /**
@@ -398,46 +373,36 @@ class SiteController extends Controller
      */
     public function availableCustomer(): JsonResponse
     {
-        try {
-            $query = Leads::with(['statusLeads', 'branch', 'platform', 'kebutuhan', 'timSales', 'timSalesDetail'])
-                ->whereNotNull('customer_id')
-                ->whereNull('deleted_at');
+        $query = Leads::with(['statusLeads', 'branch', 'platform', 'kebutuhan', 'timSales', 'timSalesD'])
+            ->whereNotNull('customer_id')
+            ->whereNull('deleted_at');
 
-            // Apply user role filters
-            $this->applyUserFilters($query);
+        // Apply user role filters
+        $this->applyUserFilters($query);
 
-            $result = $query->get()->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'tgl' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
-                    'nama_perusahaan' => $item->nama_perusahaan,
-                    'kebutuhan' => $item->kebutuhan->nama ?? '',
-                    'pic' => $item->pic,
-                    'no_telp' => $item->no_telp,
-                    'email' => $item->email,
-                    'status' => $item->statusLeads->nama ?? '',
-                    'branch' => $item->branch->name ?? '',
-                    'platform' => $item->platform->nama ?? '',
-                    'tim_sales' => $item->timSales->nama ?? '',
-                    'sales' => $item->timSalesDetail->nama ?? '',
-                    'ro' => $item->ro,
-                    'crm' => $item->crm,
-                    'warna_background' => $item->statusLeads->warna_background ?? '',
-                    'warna_font' => $item->statusLeads->warna_font ?? ''
-                ];
-            });
+        $result = $query->get()->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'tgl' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                'nama_perusahaan' => $item->nama_perusahaan,
+                // kebutuhan() belongsToMany (Collection) — gabung nama, bukan ->nama.
+                'kebutuhan' => $item->kebutuhan->pluck('nama')->implode(', '),
+                'pic' => $item->pic,
+                'no_telp' => $item->no_telp,
+                'email' => $item->email,
+                'status' => $item->statusLeads->nama ?? '',
+                'branch' => $item->branch->name ?? '',
+                'platform' => $item->platform->nama ?? '',
+                'tim_sales' => $item->timSales->nama ?? '',
+                'sales' => $item->timSalesD->nama ?? '',
+                'ro' => $item->ro,
+                'crm' => $item->crm,
+                'warna_background' => $item->statusLeads->warna_background ?? '',
+                'warna_font' => $item->statusLeads->warna_font ?? ''
+            ];
+        });
 
-            return response()->json([
-                'success' => true,
-                'data' => $result
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve available customers'
-            ], 500);
-        }
+        return $this->successResponse($result);
     }
 
     /**
@@ -450,7 +415,7 @@ class SiteController extends Controller
         // Sales division
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             if ($user->cais_role_id == 29) { // Sales
-                $query->whereHas('timSalesDetail', function ($q) use ($user) {
+                $query->whereHas('timSalesD', function ($q) use ($user) {
                     $q->where('user_id', $user->id);
                 });
             } elseif ($user->cais_role_id == 31) { // SPV Sales
@@ -458,7 +423,7 @@ class SiteController extends Controller
                 if ($tim) {
                     $memberIds = TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
                         ->pluck('user_id');
-                    $query->whereHas('timSalesDetail', function ($q) use ($memberIds) {
+                    $query->whereHas('timSalesD', function ($q) use ($memberIds) {
                         $q->whereIn('user_id', $memberIds);
                     });
                 }

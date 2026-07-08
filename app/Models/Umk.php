@@ -20,7 +20,8 @@ class Umk extends Model
         'umk',
         'tgl_berlaku',
         'sumber',
-        'is_aktif'
+        'is_aktif',
+        'created_by_user_id',
     ];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];

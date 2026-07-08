@@ -22,6 +22,7 @@ class Sysmenu extends Model
         'icon',
         'status',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];

@@ -36,15 +36,9 @@ class KaporlapController extends Controller
                 ->whereNull('deleted_at')
                 ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Error: ' . $e->getMessage());
         }
     }
 }

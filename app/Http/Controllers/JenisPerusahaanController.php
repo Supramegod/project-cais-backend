@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\JenisPerusahaanRequest;
 use App\Models\JenisPerusahaan;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 /**
  * @OA\Tag(
  *     name="Jenis Perusahaan",
@@ -43,7 +42,7 @@ use Illuminate\Support\Facades\Auth;
     {
         $data = JenisPerusahaan::with(['creator', 'updater', 'deleter'])->get();
 
-        return response()->json(['success' => true, 'data' => $data]);
+        return $this->successResponse($data);
     }
 
     /**
@@ -86,22 +85,13 @@ use Illuminate\Support\Facades\Auth;
      *     )
      * )
      */
-    public function save(Request $request)
+    public function save(JenisPerusahaanRequest $request)
     {
-        $validated = $request->validate([
-            'nama' => 'required|string|max:255',
-            'resiko' => 'required|string|max:100',
-        ]);
-
-        // $validated['created_by'] = Auth::user()->full_name ?? 'system';
+        $validated = $request->validated();
 
         $data = JenisPerusahaan::create($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Berhasil ditambahkan',
-            'data' => $data
-        ], 200);
+        return $this->successResponse($data, 'Berhasil ditambahkan');
     }
 
     /**
@@ -145,31 +135,19 @@ use Illuminate\Support\Facades\Auth;
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(JenisPerusahaanRequest $request, $id)
     {
-        $validated = $request->validate([
-            'nama' => 'required|string|max:255',
-            'resiko' => 'required|string|max:100',
-        ]);
+        $validated = $request->validated();
 
         $data = JenisPerusahaan::find($id);
 
         if (!$data) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak ditemukan'
-            ], 404);
+            return $this->notFoundResponse();
         }
-
-        // $validated['updated_by'] = Auth::user()->full_name ?? 'system';
 
         $data->update($validated);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Berhasil diperbarui',
-            'data' => $data
-        ], 200);
+        return $this->successResponse($data, 'Berhasil diperbarui');
     }
 
     /**
@@ -207,7 +185,7 @@ use Illuminate\Support\Facades\Auth;
     public function view($id)
     {
         $data = JenisPerusahaan::findOrFail($id);
-        return response()->json(['success' => true, 'data' => $data]);
+        return $this->successResponse($data);
     }
 
     /**
@@ -242,20 +220,11 @@ use Illuminate\Support\Facades\Auth;
         $data = JenisPerusahaan::find($id);
 
         if (!$data) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak ditemukan'
-            ], 404);
+            return $this->notFoundResponse();
         }
-
-        // $data->deleted_by = Auth::user()->full_name ?? 'system';
-        // $data->save();
 
         $data->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Berhasil dihapus'
-        ]);
+        return $this->messageResponse('Berhasil dihapus');
     }
 }
