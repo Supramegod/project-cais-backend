@@ -23,9 +23,8 @@ use App\Models\StatusQuotation;
 use App\Models\StatusSpk;
 use App\Models\User;
 use App\Models\Village;
+use App\Http\Requests\GetUsersOptionRequest;
 use Illuminate\Http\Request;
-use Exception;
-use Illuminate\Support\Facades\Validator;
 /**
  * @OA\Tag(
  *     name="Option",
@@ -79,26 +78,18 @@ class OptionController extends Controller
      */
     public function listEntitas(Request $request)
     {
-        try {
-            $data = Company::where('is_active', true)
-                ->select(['id', 'name', 'code'])
-                ->orderBy('name', 'asc')
-                ->get();
+        $data = Company::where('is_active', true)
+            ->select(['id', 'name', 'code'])
+            ->orderBy('name', 'asc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Company options retrieved successfully',
-                'data' => $data,
-                'total' => $data->count()
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
-        }
+        // Bespoke envelope: carries a top-level `total`, tak bisa direproduksi trait.
+        return response()->json([
+            'success' => true,
+            'message' => 'Company options retrieved successfully',
+            'data' => $data,
+            'total' => $data->count()
+        ], 200);
     }
     /**
      * @OA\Get(
@@ -144,22 +135,11 @@ class OptionController extends Controller
      */
     public function getBidangPerusahaan()
     {
-        try {
-            $bidangPerusahaan = BidangPerusahaan::whereNull('deleted_at')
-                ->orderBy('nama', 'asc')
-                ->get();
+        $bidangPerusahaan = BidangPerusahaan::whereNull('deleted_at')
+            ->orderBy('nama', 'asc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data bidang perusahaan berhasil diambil',
-                'data' => $bidangPerusahaan
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($bidangPerusahaan, 'Data bidang perusahaan berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -203,20 +183,9 @@ class OptionController extends Controller
      */
     public function getPlatforms()
     {
-        try {
-            $platforms = Platform::all();
+        $platforms = Platform::all();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data platform berhasil diambil',
-                'data' => $platforms
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($platforms, 'Data platform berhasil diambil');
     }
 
     /**
@@ -261,20 +230,9 @@ class OptionController extends Controller
      */
     public function getStatusLeads()
     {
-        try {
-            $statusleads = StatusLeads::all();
+        $statusleads = StatusLeads::all();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data status leads berhasil diambil',
-                'data' => $statusleads
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($statusleads, 'Data status leads berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -319,20 +277,9 @@ class OptionController extends Controller
      */
     public function getBenua()
     {
-        try {
-            $benua = Benua::all();
+        $benua = Benua::all();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data benua berhasil diambil',
-                'data' => $benua
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($benua, 'Data benua berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -378,21 +325,10 @@ class OptionController extends Controller
      */
     public function getJabatanPic()
     {
-        try {
-            // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
-            $jabatanPic = JabatanPic::whereNull('deleted_at')->get();
+        // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
+        $jabatanPic = JabatanPic::whereNull('deleted_at')->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data jabatan PIC berhasil diambil',
-                'data' => $jabatanPic
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($jabatanPic, 'Data jabatan PIC berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -454,34 +390,22 @@ class OptionController extends Controller
      */
     public function getBranchesByProvince($provinceId)
     {
-        try {
-            $branches = Branch::where('is_active', 1)
-                ->byProvince($provinceId)
-                ->with(['city:id,name,province_id'])
-                ->select('id', 'name', 'description', 'city_id', 'is_active')
-                ->get();
+        $branches = Branch::where('is_active', 1)
+            ->byProvince($provinceId)
+            ->with(['city:id,name,province_id'])
+            ->select('id', 'name', 'description', 'city_id', 'is_active')
+            ->get();
 
-            if ($branches->isEmpty()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tidak ada branch untuk provinsi ini',
-                    'data' => []
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar branch berhasil diambil',
-                'data' => $branches
-            ], 200);
-
-        } catch (Exception $e) {
+        if ($branches->isEmpty()) {
+            // Bespoke 404: menyertakan data => [] di samping envelope error.
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data branch',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+                'message' => 'Tidak ada branch untuk provinsi ini',
+                'data' => []
+            ], 404);
         }
+
+        return $this->successResponse($branches, 'Daftar branch berhasil diambil');
     }
 
     /**
@@ -521,30 +445,17 @@ class OptionController extends Controller
      */
     public function getBranches(Request $request)
     {
-        try {
-            $query = Branch::where('is_active', 1);
+        $query = Branch::where('is_active', 1);
 
-            // Filter berdasarkan province_id jika ada
-            if ($request->has('province_id') && !empty($request->province_id)) {
-                $query->byProvince($request->province_id);
-            }
-
-            $branches = $query->select('id', 'name', 'description', 'city_id', 'is_active')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar branch berhasil diambil',
-                'data' => $branches
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data branch',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        // Filter berdasarkan province_id jika ada
+        if ($request->has('province_id') && !empty($request->province_id)) {
+            $query->byProvince($request->province_id);
         }
+
+        $branches = $query->select('id', 'name', 'description', 'city_id', 'is_active')
+            ->get();
+
+        return $this->successResponse($branches, 'Daftar branch berhasil diambil');
     }
 
     /**
@@ -587,40 +498,15 @@ class OptionController extends Controller
      *     )
      * )
      */
-    public function getUsers(Request $request)
+    public function getUsers(GetUsersOptionRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'branch_id' => 'required|integer'
-            ]);
+        $users = User::where('is_active', 1)
+            ->whereIn('cais_role_id', [29, 31, 32, 33])
+            ->where('branch_id', $request->branch_id)
+            ->select('id', 'full_name', 'username', 'email', 'cais_role_id', 'branch_id')
+            ->get();
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $users = User::where('is_active', 1)
-                ->whereIn('cais_role_id', [29, 31, 32, 33])
-                ->where('branch_id', $request->branch_id)
-                ->select('id', 'full_name', 'username', 'email', 'cais_role_id', 'branch_id')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar user berhasil diambil',
-                'data' => $users
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data user',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($users, 'Daftar user berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -666,21 +552,10 @@ class OptionController extends Controller
      */
     public function getStatusQuotation()
     {
-        try {
-            // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
-            $jabatanPic = StatusQuotation::whereNull('deleted_at')->get();
+        // Menggunakan Eloquent Model JabatanPic tanpa filter is_active
+        $jabatanPic = StatusQuotation::whereNull('deleted_at')->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data jabatan PIC berhasil diambil',
-                'data' => $jabatanPic
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($jabatanPic, 'Data jabatan PIC berhasil diambil');
     }/**
      * @OA\Get(
      *     path="/api/options/entitas/{layanan_id}",
@@ -724,76 +599,69 @@ class OptionController extends Controller
      */
     public function getEntitas($layanan_id)
     {
-        try {
-            $query = Company::where('is_active', true)
-                ->select(['id', 'name', 'code'])
-                ->orderBy('name', 'asc');
+        $query = Company::where('is_active', true)
+            ->select(['id', 'name', 'code'])
+            ->orderBy('name', 'asc');
 
-            // Filter berdasarkan layanan_id sesuai dengan logika JavaScript
-            switch ($layanan_id) {
-                case 1:
-                    // Untuk layanan_id = 1: GSU atau SN
-                    $query->where(function ($q) {
-                        $q->where('code', 'GSU')
-                            ->orWhere('code', 'SN');
-                    });
-                    break;
+        // Filter berdasarkan layanan_id sesuai dengan logika JavaScript
+        switch ($layanan_id) {
+            case 1:
+                // Untuk layanan_id = 1: GSU atau SN
+                $query->where(function ($q) {
+                    $q->where('code', 'GSU')
+                        ->orWhere('code', 'SN');
+                });
+                break;
 
-                case 2:
-                case 4:
-                    // Untuk layanan_id = 2 atau 4: SIG atau SNI
-                    $query->where(function ($q) {
-                        $q->where('code', 'SIG')
-                            ->orWhere('code', 'SNI');
-                    });
-                    break;
+            case 2:
+            case 4:
+                // Untuk layanan_id = 2 atau 4: SIG atau SNI
+                $query->where(function ($q) {
+                    $q->where('code', 'SIG')
+                        ->orWhere('code', 'SNI');
+                });
+                break;
 
-                case 3:
-                    // Untuk layanan_id = 3: RCI atau SNI
-                    $query->where(function ($q) {
-                        $q->where('code', 'RCI')
-                            ->orWhere('code', 'SNI');
-                    });
-                    break;
+            case 3:
+                // Untuk layanan_id = 3: RCI atau SNI
+                $query->where(function ($q) {
+                    $q->where('code', 'RCI')
+                        ->orWhere('code', 'SNI');
+                });
+                break;
 
-                default:
-                    // Untuk layanan_id lainnya, kembalikan array kosong
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Company options retrieved successfully',
-                        'data' => [],
-                        'total' => 0
-                    ], 200);
-            }
-
-            $data = $query->get();
-
-            // Tambahkan opsi IONS secara manual (sesuai dengan JavaScript)
-            // Pastikan IONS belum ada dalam hasil query sebelum menambahkannya
-            $ionsExists = $data->contains('id', 17);
-            if (!$ionsExists) {
-                $ionsCompany = [
-                    'id' => 17,
-                    'name' => 'PT. Indah Optimal Nusantara',
-                    'code' => 'IONS'
-                ];
-                $data->push($ionsCompany);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Company options retrieved successfully',
-                'data' => $data,
-                'total' => $data->count()
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+            default:
+                // Untuk layanan_id lainnya, kembalikan array kosong.
+                // Bespoke envelope (top-level `total`) — tak direproduksi trait.
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Company options retrieved successfully',
+                    'data' => [],
+                    'total' => 0
+                ], 200);
         }
+
+        $data = $query->get();
+
+        // Tambahkan opsi IONS secara manual (sesuai dengan JavaScript)
+        // Pastikan IONS belum ada dalam hasil query sebelum menambahkannya
+        $ionsExists = $data->contains('id', 17);
+        if (!$ionsExists) {
+            $ionsCompany = [
+                'id' => 17,
+                'name' => 'PT. Indah Optimal Nusantara',
+                'code' => 'IONS'
+            ];
+            $data->push($ionsCompany);
+        }
+
+        // Bespoke envelope: carries a top-level `total`, tak bisa direproduksi trait.
+        return response()->json([
+            'success' => true,
+            'message' => 'Company options retrieved successfully',
+            'data' => $data,
+            'total' => $data->count()
+        ], 200);
     }
     /**
      * @OA\Get(
@@ -838,21 +706,10 @@ class OptionController extends Controller
      */
     public function getProvinsi()
     {
-        try {
-            // Menggunakan Eloquent Model Province
-            $provinsi = Province::all();
+        // Menggunakan Eloquent Model Province
+        $provinsi = Province::all();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data provinsi berhasil diambil',
-                'data' => $provinsi
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($provinsi, 'Data provinsi berhasil diambil');
     }
 
     /**
@@ -906,22 +763,11 @@ class OptionController extends Controller
 
     public function getKota($provinsiId)
     {
-        try {
-            // Menggunakan Eloquent Model City dan metode where
-            $kota = City::where('province_id', $provinsiId)
-                ->get();
+        // Menggunakan Eloquent Model City dan metode where
+        $kota = City::where('province_id', $provinsiId)
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data kota berhasil diambil',
-                'data' => $kota
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($kota, 'Data kota berhasil diambil');
     }
 
     /**
@@ -974,22 +820,11 @@ class OptionController extends Controller
      */
     public function getKecamatan($kotaId)
     {
-        try {
-            // Menggunakan Eloquent Model District
-            $kecamatan = District::where('city_id', $kotaId)
-                ->get();
+        // Menggunakan Eloquent Model District
+        $kecamatan = District::where('city_id', $kotaId)
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data kecamatan berhasil diambil',
-                'data' => $kecamatan
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($kecamatan, 'Data kecamatan berhasil diambil');
     }
 
     /**
@@ -1042,21 +877,10 @@ class OptionController extends Controller
      */
     public function getKelurahan($kecamatanId)
     {
-        try {
-            $kelurahan = Village::where('district_id', $kecamatanId)
-                ->get();
+        $kelurahan = Village::where('district_id', $kecamatanId)
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data kelurahan berhasil diambil',
-                'data' => $kelurahan
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($kelurahan, 'Data kelurahan berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -1109,21 +933,10 @@ class OptionController extends Controller
 
     public function getNegara($benuaId)
     {
-        try {
-            $negara = Negara::where('id_benua', $benuaId)
-                ->get();
+        $negara = Negara::where('id_benua', $benuaId)
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data negara berhasil diambil',
-                'data' => $negara
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($negara, 'Data negara berhasil diambil');
     }
 
     /**
@@ -1170,20 +983,9 @@ class OptionController extends Controller
      */
     public function loyaltylist()
     {
-        try {
-            $loyaltylist = Loyalty::get();
+        $loyaltylist = Loyalty::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data loyalty list berhasil diambil',
-                'data' => $loyaltylist
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($loyaltylist, 'Data loyalty list berhasil diambil');
     }
 
     /**
@@ -1230,20 +1032,9 @@ class OptionController extends Controller
      */
     public function kategorusesuaihc()
     {
-        try {
-            $kategorisesuaihc = KategoriSesuaiHc::get();
+        $kategorisesuaihc = KategoriSesuaiHc::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data kategori sesuai HC berhasil diambil',
-                'data' => $kategorisesuaihc
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($kategorisesuaihc, 'Data kategori sesuai HC berhasil diambil');
     }
 
     /**
@@ -1290,20 +1081,9 @@ class OptionController extends Controller
      */
     public function rulethr()
     {
-        try {
-            $rulethr = RuleThr::get();
+        $rulethr = RuleThr::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data rule THR berhasil diambil',
-                'data' => $rulethr
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($rulethr, 'Data rule THR berhasil diambil');
     }
 
     /**
@@ -1350,20 +1130,9 @@ class OptionController extends Controller
      */
     public function salaryrule()
     {
-        try {
-            $salaryrule = SalaryRule::get();
+        $salaryrule = SalaryRule::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data salary rule berhasil diambil',
-                'data' => $salaryrule
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($salaryrule, 'Data salary rule berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -1399,20 +1168,9 @@ class OptionController extends Controller
      */
     public function statusspk()
     {
-        try {
-            $statusspk = StatusSpk::get();
+        $statusspk = StatusSpk::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data status SPK berhasil diambil',
-                'data' => $statusspk
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($statusspk, 'Data status SPK berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -1448,20 +1206,9 @@ class OptionController extends Controller
      */
     public function statuspks()
     {
-        try {
-            $statusspk = StatusPks::get();
+        $statusspk = StatusPks::get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data status Pks berhasil diambil',
-                'data' => $statusspk
-            ]);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($statusspk, 'Data status Pks berhasil diambil');
     }
 
     /**
@@ -1501,26 +1248,13 @@ class OptionController extends Controller
      */
     public function getListUser()
     {
-        try {
-            $users = User::where('is_active', 1)
-                ->whereIn('cais_role_id', [4, 5, 29, 30, 31, 54])
-                ->select('id', 'full_name', 'username', 'email')
-                ->orderBy('full_name', 'asc')
-                ->get();
+        $users = User::where('is_active', 1)
+            ->whereIn('cais_role_id', [4, 5, 29, 30, 31, 54])
+            ->select('id', 'full_name', 'username', 'email')
+            ->orderBy('full_name', 'asc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar user berhasil diambil',
-                'data' => $users
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data user',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($users, 'Daftar user berhasil diambil');
     }
 
     /**
@@ -1558,24 +1292,11 @@ class OptionController extends Controller
      */
     public function getListJenisVisit()
     {
-        try {
-            $jenisVisit = JenisVisit::whereNull('deleted_at')
-                ->select('id', 'nama')
-                ->orderBy('nama', 'asc')
-                ->get();
+        $jenisVisit = JenisVisit::whereNull('deleted_at')
+            ->select('id', 'nama')
+            ->orderBy('nama', 'asc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar jenis visit berhasil diambil',
-                'data' => $jenisVisit
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data jenis visit',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($jenisVisit, 'Daftar jenis visit berhasil diambil');
     }
 }

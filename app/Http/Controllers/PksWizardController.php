@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -97,46 +96,19 @@ class PksWizardController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="object", example={"leads_id": {"The leads id field is required."}})
      *         )
-     *     ),
-     *     @OA\Response(
-     *         response=500,
-     *         description="Server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to initialize PKS wizard"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
      *     )
      * )
      */
     public function initialize(PksWizardInitializeRequest $request, string $tipe): JsonResponse
     {
-        try {
-            $pks = $this->pksWizardService->initialize($tipe, $request->validated(), Auth::user());
+        $pks = $this->pksWizardService->initialize($tipe, $request->validated(), Auth::user());
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'pks_id' => $pks->id,
-                    'nomor' => $pks->nomor,
-                    'wizard_status_id' => $pks->wizard_status_id,
-                    'wizard_current_step' => $pks->wizard_current_step,
-                ],
-                'message' => 'PKS wizard initialized successfully',
-            ], 201);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@initialize: ' . $e->getMessage(), [
-                'tipe' => $tipe,
-                'payload' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to initialize PKS wizard',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return $this->createdResponse([
+            'pks_id' => $pks->id,
+            'nomor' => $pks->nomor,
+            'wizard_status_id' => $pks->wizard_status_id,
+            'wizard_current_step' => $pks->wizard_current_step,
+        ], 'PKS wizard initialized successfully');
     }
 
     /**
@@ -188,33 +160,14 @@ class PksWizardController extends Controller
         try {
             $pks = $this->resolveAccessiblePks($pksId);
 
-            return response()->json([
-                'success' => true,
-                'data' => $this->pksWizardService->getStep($pks, $step),
-                'message' => 'Step data retrieved successfully',
-            ]);
+            return $this->successResponse(
+                $this->pksWizardService->getStep($pks, $step),
+                'Step data retrieved successfully'
+            );
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
+            return $this->notFoundResponse('PKS not found');
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@getStep: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'step' => $step,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get step data',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -266,13 +219,6 @@ class PksWizardController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="message", type="object", example={"step_data": {"The step data must be an array."}})
      *         )
-     *     ),
-     *     @OA\Response(response=500, description="Server error",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Failed to update step data"),
-     *             @OA\Property(property="error", type="string", example="Error details")
-     *         )
      *     )
      * )
      */
@@ -289,34 +235,14 @@ class PksWizardController extends Controller
                 Auth::user()
             );
 
-            return response()->json([
-                'success' => true,
-                'data' => $this->pksWizardService->getStep($updated, $step),
-                'message' => "Step {$step} updated successfully",
-            ]);
+            return $this->successResponse(
+                $this->pksWizardService->getStep($updated, $step),
+                "Step {$step} updated successfully"
+            );
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
+            return $this->notFoundResponse('PKS not found');
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@updateStep: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'step' => $step,
-                'payload' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update step data',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -362,28 +288,9 @@ class PksWizardController extends Controller
 
             $preview = $this->pksPasalPreviewService->generatePreview($pks, $request->validated());
 
-            return response()->json([
-                'success' => true,
-                'data' => $preview,
-                'message' => 'Pasal preview generated successfully',
-            ]);
+            return $this->successResponse($preview, 'Pasal preview generated successfully');
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@generatePasalPreview: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'payload' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate pasal preview',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->notFoundResponse('PKS not found');
         }
     }
 
@@ -423,34 +330,11 @@ class PksWizardController extends Controller
 
             $preview = $this->pksPasalPreviewService->updatePreview($pks, $pasalKey, $request->validated());
 
-            return response()->json([
-                'success' => true,
-                'data' => $preview,
-                'message' => 'Pasal preview updated successfully',
-            ]);
+            return $this->successResponse($preview, 'Pasal preview updated successfully');
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
+            return $this->notFoundResponse('PKS not found');
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@updatePasalPreview: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'pasal_key' => $pasalKey,
-                'payload' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update pasal preview',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -487,40 +371,18 @@ class PksWizardController extends Controller
 
             $finalized = $this->pksWizardFinalizeService->finalize($pks, Auth::user());
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'id' => $finalized->id,
-                    'nomor' => $finalized->nomor,
-                    'wizard_status_id' => $finalized->wizard_status_id,
-                    'finalized_at' => $finalized->finalized_at,
-                    'sites_count' => $finalized->sites->count(),
-                    'perjanjian_count' => $finalized->perjanjian->count(),
-                ],
-                'message' => 'PKS wizard finalized successfully',
-            ]);
+            return $this->successResponse([
+                'id' => $finalized->id,
+                'nomor' => $finalized->nomor,
+                'wizard_status_id' => $finalized->wizard_status_id,
+                'finalized_at' => $finalized->finalized_at,
+                'sites_count' => $finalized->sites->count(),
+                'perjanjian_count' => $finalized->perjanjian->count(),
+            ], 'PKS wizard finalized successfully');
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
+            return $this->notFoundResponse('PKS not found');
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@finalize: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'payload' => $request->all(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to finalize PKS wizard',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -550,36 +412,15 @@ class PksWizardController extends Controller
 
             $cancelled = $this->pksWizardService->cancel($pks, Auth::user());
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'id' => $cancelled->id,
-                    'wizard_status_id' => $cancelled->wizard_status_id,
-                    'wizard_status' => $cancelled->wizardStatus?->nama,
-                ],
-                'message' => 'PKS wizard cancelled successfully',
-            ]);
+            return $this->successResponse([
+                'id' => $cancelled->id,
+                'wizard_status_id' => $cancelled->wizard_status_id,
+                'wizard_status' => $cancelled->wizardStatus?->nama,
+            ], 'PKS wizard cancelled successfully');
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'PKS not found',
-            ], 404);
+            return $this->notFoundResponse('PKS not found');
         } catch (\InvalidArgumentException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 422);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@cancel: ' . $e->getMessage(), [
-                'pks_id' => $pksId,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to cancel PKS wizard',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -629,21 +470,7 @@ class PksWizardController extends Controller
                 'message' => 'Available quotations retrieved successfully',
             ]);
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Leads not found',
-            ], 404);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@getAvailableQuotations: ' . $e->getMessage(), [
-                'leads_id' => $leadsId,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get available quotations',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->notFoundResponse('Leads not found');
         }
     }
 
@@ -684,21 +511,7 @@ class PksWizardController extends Controller
                 'message' => 'Available SPK retrieved successfully',
             ]);
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Leads not found',
-            ], 404);
-        } catch (\Throwable $e) {
-            Log::error('PksWizardController@getAvailableSpk: ' . $e->getMessage(), [
-                'leads_id' => $leadsId,
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get available SPK',
-                'error' => $e->getMessage(),
-            ], 500);
+            return $this->notFoundResponse('Leads not found');
         }
     }
 
