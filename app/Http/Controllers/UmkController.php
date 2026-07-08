@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUmkRequest;
 use App\Models\Umk;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -55,15 +55,9 @@ class UmkController extends Controller
         try {
             $data = Umk::getActive();
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
         }
     }
 
@@ -100,22 +94,13 @@ class UmkController extends Controller
             $data = Umk::where('city_id', $cityId)->first();
 
             if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data UMK tidak ditemukan'
-                ], 404);
+                return $this->notFoundResponse('Data UMK tidak ditemukan');
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
         }
     }
 
@@ -158,16 +143,10 @@ class UmkController extends Controller
         try {
             $data = Umk::getByCity($cityId);
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Internal server error: ' . $e->getMessage());
         }
     }
 
@@ -203,37 +182,9 @@ class UmkController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(StoreUmkRequest $request)
     {
         try {
-            $validator = Validator::make($request->all(), [
-                'city_id' => 'required|integer',
-                'city_name' => 'required|string|max:255',
-                'umk' => 'required|numeric|min:0',
-                'tgl_berlaku' => 'required|date',
-                'sumber' => 'required|url|max:500'
-            ], [
-                'city_id.required' => 'City ID harus diisi',
-                'city_name.required' => 'Nama kota/kabupaten harus diisi',
-                'city_name.max' => 'Nama kota/kabupaten maksimal 255 karakter',
-                'umk.required' => 'Nilai UMK harus diisi',
-                'umk.numeric' => 'Nilai UMK harus berupa angka',
-                'umk.min' => 'Nilai UMK minimal 0',
-                'tgl_berlaku.required' => 'Tanggal berlaku harus diisi',
-                'tgl_berlaku.date' => 'Format tanggal tidak valid',
-                'sumber.required' => 'Sumber harus diisi',
-                'sumber.url' => 'Sumber harus berupa URL yang valid',
-                'sumber.max' => 'Sumber maksimal 500 karakter'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
             // Non-aktifkan UMK lama untuk city yang sama
             Umk::where('city_id', $request->city_id)
                 ->update([
@@ -253,17 +204,10 @@ class UmkController extends Controller
                 'created_by_user_id' => Auth::id()
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data UMK berhasil ditambahkan',
-                'data' => $umk
-            ]);
+            return $this->successResponse($umk, 'Data UMK berhasil ditambahkan');
 
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data gagal ditambahkan: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Data gagal ditambahkan: ' . $e->getMessage());
         }
     }
 

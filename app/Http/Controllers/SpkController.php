@@ -218,7 +218,7 @@ class SpkController extends Controller
                 ];
             });
 
-            return $this->successResponse('SPK data retrieved successfully', [
+            return $this->successResponse([
                 'list' => $data->items(),
                 'pagination' => [
                     'current_page' => $data->currentPage(),
@@ -226,10 +226,10 @@ class SpkController extends Controller
                     'total' => $data->total(),
                     'total_per_page' => $data->count(),
                 ],
-            ]);
+            ], 'SPK data retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching SPK data', $e->getMessage());
+            return $this->errorResponse('Error fetching SPK data', 500, $e->getMessage());
         }
     }
 
@@ -269,10 +269,10 @@ class SpkController extends Controller
                 ])
                 ->get();
 
-            return $this->successResponse('Deleted SPK data retrieved successfully', $data);
+            return $this->successResponse($data, 'Deleted SPK data retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching deleted SPK data', $e->getMessage());
+            return $this->errorResponse('Error fetching deleted SPK data', 500, $e->getMessage());
         }
     }
 
@@ -331,10 +331,10 @@ class SpkController extends Controller
                     ];
                 });
 
-            return $this->successResponse('Available quotations retrieved successfully', $data);
+            return $this->successResponse($data, 'Available quotations retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching available quotations', $e->getMessage());
+            return $this->errorResponse('Error fetching available quotations', 500, $e->getMessage());
         }
     }
     /**
@@ -390,11 +390,11 @@ class SpkController extends Controller
                 ->orderBy('id', 'desc')
                 ->get();
 
-            return $this->successResponse('Available leads retrieved successfully', $data);
+            return $this->successResponse($data, 'Available leads retrieved successfully');
 
         } catch (\Exception $e) {
             \Log::error('Error in availableLeads: ' . $e->getMessage());
-            return $this->errorResponse('Error fetching available leads', $e->getMessage());
+            return $this->errorResponse('Error fetching available leads', 500, $e->getMessage());
         }
     }
 
@@ -461,7 +461,7 @@ class SpkController extends Controller
             $leads = Leads::whereNull('deleted_at')->find($request->leads_id);
 
             if (!$leads) {
-                return $this->errorResponse("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.");
+                return $this->errorResponse("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.", 500);
             }
 
             // Validasi: pastikan semua site_ids termasuk dalam leads yang dipilih
@@ -470,7 +470,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($invalidSites) {
-                return $this->errorResponse("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+                return $this->errorResponse("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.", 500);
             }
 
             // Validasi: pastikan site belum memiliki SPK
@@ -479,7 +479,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($sitesWithSPK) {
-                return $this->errorResponse("Beberapa site yang dipilih sudah memiliki SPK.");
+                return $this->errorResponse("Beberapa site yang dipilih sudah memiliki SPK.", 500);
             }
 
             // Ambil quotation_id dari site pertama (jika diperlukan)
@@ -526,11 +526,11 @@ class SpkController extends Controller
 
             DB::commit();
 
-            return $this->successResponse('SPK created successfully', $spk->load(['spkSites', 'leads']), 201);
+            return $this->successResponse($spk->load(['spkSites', 'leads']), 'SPK created successfully', 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return $this->errorResponse('Error creating SPK', $e->getMessage());
+            return $this->errorResponse('Error creating SPK', 500, $e->getMessage());
         }
     }
 
@@ -803,14 +803,14 @@ class SpkController extends Controller
                 'sites' => $sitesInfo
             ];
 
-            return $this->successResponse('SPK details retrieved successfully', $responseData);
+            return $this->successResponse($responseData, 'SPK details retrieved successfully');
 
         } catch (\Exception $e) {
             // Untuk debugging, tambahkan ini:
             \Log::error('SPK View Error: ' . $e->getMessage());
             \Log::error('SPK View Stack Trace: ' . $e->getTraceAsString());
 
-            return $this->errorResponse('Error fetching SPK details', $e->getMessage());
+            return $this->errorResponse('Error fetching SPK details', 500, $e->getMessage());
         }
     }
 
@@ -884,7 +884,7 @@ class SpkController extends Controller
             $spkSites = SpkSite::where('spk_id', $id)->get();
 
             if ($spkSites->isEmpty()) {
-                return $this->errorResponse('No SPK sites found');
+                return $this->errorResponse('No SPK sites found', 500);
             }
 
             // LANGSUNG AMBIL DARI RELASI SPK
@@ -936,10 +936,10 @@ class SpkController extends Controller
                 'company' => $company
             ];
 
-            return $this->successResponse('SPK print data retrieved successfully', $data);
+            return $this->successResponse($data, 'SPK print data retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching SPK print data', $e->getMessage());
+            return $this->errorResponse('Error fetching SPK print data', 500, $e->getMessage());
         }
     }
 
@@ -1065,13 +1065,13 @@ class SpkController extends Controller
 
             $spk->load(['statusSpk']);
 
-            return $this->successResponse('SPK file uploaded successfully', [
+            return $this->successResponse([
                 'id' => $spk->id,
                 'nomor' => $spk->nomor,
                 'status_spk_id' => $spk->status_spk_id,
                 'status' => $spk->statusSpk->nama ?? null,
                 'link_spk_disetujui' => $spk->link_spk_disetujui
-            ]);
+            ], 'SPK file uploaded successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1080,7 +1080,7 @@ class SpkController extends Controller
                 Storage::disk('spk')->delete($fileName);
             }
 
-            return $this->errorResponse('Error uploading SPK file', $e->getMessage());
+            return $this->errorResponse('Error uploading SPK file', 500, $e->getMessage());
         }
     }
     /**
@@ -1157,14 +1157,14 @@ class SpkController extends Controller
             $allSpkSites = $spk->spkSites;
 
             if ($allSpkSites->isEmpty()) {
-                return $this->errorResponse('Tidak ada site yang terkait dengan SPK ini.');
+                return $this->errorResponse('Tidak ada site yang terkait dengan SPK ini.', 500);
             }
 
             // Filter spk_sites yang akan diajukan ulang berdasarkan quotation_site_ids
             $spkSitesToResubmit = $allSpkSites->whereIn('quotation_site_id', $request->quotation_site_ids);
 
             if ($spkSitesToResubmit->isEmpty()) {
-                return $this->errorResponse('Tidak ada site yang valid untuk diajukan ulang.');
+                return $this->errorResponse('Tidak ada site yang valid untuk diajukan ulang.', 500);
             }
 
             // Kelompokkan berdasarkan quotation_id
@@ -1254,11 +1254,11 @@ class SpkController extends Controller
                 ? 'Quotation successfully resubmitted and SPK deleted'
                 : 'Quotation successfully resubmitted for selected sites';
 
-            return $this->successResponse($message, $responseData);
+            return $this->successResponse($responseData, $message);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return $this->errorResponse('Error resubmitting quotation', $e->getMessage());
+            return $this->errorResponse('Error resubmitting quotation', 500, $e->getMessage());
         }
     }
 
@@ -1336,10 +1336,10 @@ class SpkController extends Controller
                     ];
                 });
 
-            return $this->successResponse('Deleted SPK sites retrieved successfully', $deletedSites);
+            return $this->successResponse($deletedSites, 'Deleted SPK sites retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching deleted SPK sites', $e->getMessage());
+            return $this->errorResponse('Error fetching deleted SPK sites', 500, $e->getMessage());
         }
     }
     /**
@@ -1397,10 +1397,10 @@ class SpkController extends Controller
                     return $site;
                 });
 
-            return $this->successResponse('Site list retrieved successfully', $sites);
+            return $this->successResponse($sites, 'Site list retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching site list', $e->getMessage());
+            return $this->errorResponse('Error fetching site list', 500, $e->getMessage());
         }
     }
 
@@ -1469,10 +1469,10 @@ class SpkController extends Controller
                     ];
                 });
 
-            return $this->successResponse('Available sites retrieved successfully', $sites);
+            return $this->successResponse($sites, 'Available sites retrieved successfully');
 
         } catch (\Exception $e) {
-            return $this->errorResponse('Error fetching available sites', $e->getMessage());
+            return $this->errorResponse('Error fetching available sites', 500, $e->getMessage());
         }
     }
     /**
@@ -1544,11 +1544,11 @@ class SpkController extends Controller
 
             DB::commit();
 
-            return $this->successResponse('SPK deleted successfully');
+            return $this->messageResponse('SPK deleted successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return $this->errorResponse('Error deleting SPK', $e->getMessage());
+            return $this->errorResponse('Error deleting SPK', 500, $e->getMessage());
         }
     }
     /**
@@ -1633,11 +1633,11 @@ class SpkController extends Controller
 
             DB::commit();
 
-            return $this->successResponse('SPK site deleted successfully');
+            return $this->messageResponse('SPK site deleted successfully');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return $this->errorResponse('Error deleting SPK site', $e->getMessage());
+            return $this->errorResponse('Error deleting SPK site', 500, $e->getMessage());
         }
     }
     /**
@@ -1944,7 +1944,7 @@ class SpkController extends Controller
         // Tambahkan pengecekan null untuk leads
         $leads = Leads::whereNull('deleted_at')->find($leadsId);
         if (!$leads) {
-            return $this->errorResponse("Leads dengan ID {$leadsId} tidak ditemukan");
+            return $this->errorResponse("Leads dengan ID {$leadsId} tidak ditemukan", 500);
         }
 
         $baseNumber = "SPK/" . $leads->nomor . "-";
@@ -2214,20 +2214,6 @@ class SpkController extends Controller
      * =============================================
      */
 
-    private function successResponse(string $message, $data = null, int $status = 200)
-    {
-        $response = [
-            'success' => true,
-            'message' => $message,
-        ];
-
-        if ($data !== null) {
-            $response['data'] = $data;
-        }
-
-        return response()->json($response, $status);
-    }
-
     /**
      * Helper method untuk membuat aktivitas penghapusan SPK
      */
@@ -2279,19 +2265,6 @@ class SpkController extends Controller
         }
     }
 
-    private function errorResponse(string $message, string $error = null, int $status = 500)
-    {
-        $response = [
-            'success' => false,
-            'message' => $message,
-        ];
-
-        if ($error && config('app.debug')) {
-            $response['error'] = $error;
-        }
-
-        return response()->json($response, $status);
-    }
     /**
      * Unified validation error response
      * Digunakan untuk semua jenis error (validation, not found, server error, dll)
@@ -2310,13 +2283,6 @@ class SpkController extends Controller
             'success' => false,
             'message' => $errors
         ], $status);
-    }
-    private function notFoundResponse(string $message = 'Resource not found')
-    {
-        return response()->json([
-            'success' => false,
-            'message' => $message
-        ], 404);
     }
     private function addDetailPic($quotation, $picData, $currentDateTime)
     {

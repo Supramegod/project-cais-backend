@@ -33,9 +33,9 @@ class PksWizardStepRequest extends BaseRequest
 
             case 2:
                 $rules['step_data'] = FluentRule::array()->required();
-                $rules['step_data.tanggal_pks'] = FluentRule::rule('date')->required();
-                $rules['step_data.tanggal_awal_kontrak'] = FluentRule::rule('date')->required();
-                $rules['step_data.tanggal_akhir_kontrak'] = FluentRule::rule('date')->required()->rule('after_or_equal:step_data.tanggal_awal_kontrak');
+                $rules['step_data.tanggal_pks'] = FluentRule::date()->required();
+                $rules['step_data.tanggal_awal_kontrak'] = FluentRule::date()->required();
+                $rules['step_data.tanggal_akhir_kontrak'] = FluentRule::date()->required()->rule('after_or_equal:step_data.tanggal_awal_kontrak');
                 $rules['step_data.company_id'] = FluentRule::integer()->required()->exists('mysqlhris.m_company', 'id');
                 $rules['step_data.salary_rule_id'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
                 $rules['step_data.rule_thr_id'] = FluentRule::integer()->required()->exists('m_rule_thr', 'id');
@@ -64,15 +64,15 @@ class PksWizardStepRequest extends BaseRequest
                 $rules['step_data'] = FluentRule::array()->required();
                 $rules['step_data.pic_1'] = FluentRule::string()->required()->max(255);
                 $rules['step_data.jabatan_pic_1'] = FluentRule::string()->nullable()->max(255);
-                $rules['step_data.email_pic_1'] = FluentRule::rule('email')->nullable()->max(255);
+                $rules['step_data.email_pic_1'] = FluentRule::email()->nullable()->max(255);
                 $rules['step_data.telp_pic_1'] = FluentRule::string()->nullable()->max(50);
                 $rules['step_data.pic_2'] = FluentRule::string()->nullable()->max(255);
                 $rules['step_data.jabatan_pic_2'] = FluentRule::string()->nullable()->max(255);
-                $rules['step_data.email_pic_2'] = FluentRule::rule('email')->nullable()->max(255);
+                $rules['step_data.email_pic_2'] = FluentRule::email()->nullable()->max(255);
                 $rules['step_data.telp_pic_2'] = FluentRule::string()->nullable()->max(50);
                 $rules['step_data.pic_3'] = FluentRule::string()->nullable()->max(255);
                 $rules['step_data.jabatan_pic_3'] = FluentRule::string()->nullable()->max(255);
-                $rules['step_data.email_pic_3'] = FluentRule::rule('email')->nullable()->max(255);
+                $rules['step_data.email_pic_3'] = FluentRule::email()->nullable()->max(255);
                 $rules['step_data.telp_pic_3'] = FluentRule::string()->nullable()->max(50);
                 break;
 

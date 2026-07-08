@@ -12,7 +12,7 @@ class Top extends Model
     use HasFactory, SoftDeletes;
 
     protected $table = 'm_top';
-    protected $fillable = ['nama', 'persentase','created_by','updated_by','deleted_by'];
+    protected $fillable = ['nama', 'persentase','created_by','created_by_user_id','updated_by','deleted_by'];
     protected $hidden = ['updated_at', 'deleted_at'];
 
     /**

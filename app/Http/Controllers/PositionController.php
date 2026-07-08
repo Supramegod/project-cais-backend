@@ -3,17 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\PositionSaveRequest;
+use App\Http\Requests\PositionEditRequest;
+use App\Http\Requests\PositionRequirementAddRequest;
+use App\Http\Requests\PositionRequirementEditRequest;
 use App\Models\Position;
-use App\Models\Company;
-use App\Models\Kebutuhan;
 use App\Models\RequirementPosisi;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Exception;
 
 /**
  * @OA\Tag(
@@ -96,58 +94,49 @@ class PositionController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $query = Position::with([
-                'company.creator',
-                'company.updater',
-                'kebutuhan:id,nama', // ambil hanya id & nama kebutuhan
-                'creator',
-                'updater'
-            ])->where('is_active', true);
+        $query = Position::with([
+            'company.creator',
+            'company.updater',
+            'kebutuhan:id,nama', // ambil hanya id & nama kebutuhan
+            'creator',
+            'updater'
+        ])->where('is_active', true);
 
-            if ($request->filled('entitas')) {
-                $query->where('company_id', $request->entitas);
-            }
-
-            if ($request->filled('layanan')) {
-                $query->where('layanan_id', $request->layanan);
-            }
-
-            $data = $query->orderBy('created_at', 'desc')->get();
-
-            // Mapping supaya kebutuhan return id & nama aja
-            $mappedData = $data->map(function ($pos) {
-                return [
-                    'id' => $pos->id,
-                    'name' => $pos->name,
-                    'description' => $pos->description,
-                    'company_id' => $pos->company_id,
-                    'company_name' => $pos->company ? $pos->company->name : null, // tambahkan ini
-                    'layanan_id' => $pos->layanan_id,
-                    'kebutuhan' => $pos->kebutuhan ? [
-                        'id' => $pos->kebutuhan->id,
-                        'nama' => $pos->kebutuhan->nama
-                    ] : null,
-                    'created_at' => $pos->created_at,
-                    'updated_at' => $pos->updated_at,
-                ];
-            });
-
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data retrieved successfully',
-                'data' => $mappedData,
-                'total' => $mappedData->count()
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        if ($request->filled('entitas')) {
+            $query->where('company_id', $request->entitas);
         }
+
+        if ($request->filled('layanan')) {
+            $query->where('layanan_id', $request->layanan);
+        }
+
+        $data = $query->orderBy('created_at', 'desc')->get();
+
+        // Mapping supaya kebutuhan return id & nama aja
+        $mappedData = $data->map(function ($pos) {
+            return [
+                'id' => $pos->id,
+                'name' => $pos->name,
+                'description' => $pos->description,
+                'company_id' => $pos->company_id,
+                'company_name' => $pos->company ? $pos->company->name : null, // tambahkan ini
+                'layanan_id' => $pos->layanan_id,
+                'kebutuhan' => $pos->kebutuhan ? [
+                    'id' => $pos->kebutuhan->id,
+                    'nama' => $pos->kebutuhan->nama
+                ] : null,
+                'created_at' => $pos->created_at,
+                'updated_at' => $pos->updated_at,
+            ];
+        });
+
+        // Bentuk bespoke (menyertakan `total`) dipertahankan apa adanya.
+        return response()->json([
+            'success' => true,
+            'message' => 'Data retrieved successfully',
+            'data' => $mappedData,
+            'total' => $mappedData->count()
+        ], 200);
     }
 
 
@@ -231,37 +220,19 @@ class PositionController extends Controller
      */
     public function view($id)
     {
-        try {
-            // Validate ID parameter
-            if (!is_numeric($id) || $id <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid position ID'
-                ], 400);
-            }
-
-            $data = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'requirements', 'creator', 'updater'])
-                ->find($id);
-
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Position not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data retrieved successfully',
-                'data' => $data
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        // Validate ID parameter
+        if (!is_numeric($id) || $id <= 0) {
+            return $this->errorResponse('Invalid position ID', 400);
         }
+
+        $data = Position::with(['company.creator', 'company.updater', 'kebutuhan', 'requirements', 'creator', 'updater'])
+            ->find($id);
+
+        if (!$data) {
+            return $this->notFoundResponse('Position not found');
+        }
+
+        return $this->successResponse($data, 'Data retrieved successfully');
     }
 
     /**
@@ -334,55 +305,19 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function save(Request $request)
+    public function save(PositionSaveRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-                'layanan' => 'required|integer|exists:m_kebutuhan,id',
-                'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
-                'deskripsi' => 'required|string',
-            ], [
-                'nama.unique' => 'Position name already exists',
-                'entitas.exists' => 'Selected company does not exist',
-                'layanan.exists' => 'Selected service does not exist',
-            ]);
+        $position = Position::create([
+            'company_id' => $request->entitas,
+            'name' => $request->nama,
+            'description' => $request->deskripsi,
+            'layanan_id' => $request->layanan,
+            'is_active' => true,
+            'created_by' => Auth::id() ?? 0,
+            'updated_by' => Auth::id() ?? 0, // Gunakan user ID, bukan name
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            DB::connection('mysqlhris')->beginTransaction();
-
-            $position = Position::create([
-                'company_id' => $request->entitas,
-                'name' => $request->nama,
-                'description' => $request->deskripsi,
-                'layanan_id' => $request->layanan,
-                'is_active' => true,
-                'created_by' => Auth::id() ?? 0, 
-                'updated_by' => Auth::id() ?? 0,// Gunakan user ID, bukan name
-            ]);
-
-            DB::connection('mysqlhris')->commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Position created successfully',
-                'data' => $position
-            ], 201);
-        } catch (Exception $e) {
-            DB::connection('mysqlhris')->rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
-        }
+        return $this->successResponse($position, 'Position created successfully', 201);
     }
 
     /**
@@ -470,44 +405,20 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function edit(Request $request, $id)
+    public function edit(PositionEditRequest $request, $id)
     {
-        try {
-            // Validate ID parameter
-            if (!is_numeric($id) || $id <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid position ID'
-                ], 400);
-            }
+        // Validate ID parameter
+        if (!is_numeric($id) || $id <= 0) {
+            return $this->errorResponse('Invalid position ID', 400);
+        }
 
-            $position = Position::find($id);
+        $position = Position::find($id);
 
-            if (!$position) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Position not found'
-                ], 404);
-            }
+        if (!$position) {
+            return $this->notFoundResponse('Position not found');
+        }
 
-            $validator = Validator::make($request->all(), [
-                'entitas' => 'required|integer|exists:mysqlhris.m_company,id',
-                'layanan' => 'required|integer|exists:m_kebutuhan,id',
-            ], [
-                'entitas.exists' => 'Selected company does not exist',
-                'layanan.exists' => 'Selected service does not exist',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            DB::beginTransaction();
-
+        DB::transaction(function () use ($request, $id, $position) {
             $position->update([
                 'company_id' => $request->entitas,
                 'name' => $request->nama,
@@ -520,22 +431,9 @@ class PositionController extends Controller
             RequirementPosisi::where('position_id', $id)
                 ->whereNull('deleted_at')
                 ->update(['kebutuhan_id' => $request->layanan]);
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Position updated successfully',
-                'data' => $position->fresh()
-            ], 200);
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
-        }
+        return $this->successResponse($position->fresh(), 'Position updated successfully');
     }
 
     /**
@@ -590,26 +488,18 @@ class PositionController extends Controller
      */
     public function delete(Request $request, $id)
     {
-        try {
-            // Validate ID parameter
-            if (!is_numeric($id) || $id <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid position ID'
-                ], 400);
-            }
+        // Validate ID parameter
+        if (!is_numeric($id) || $id <= 0) {
+            return $this->errorResponse('Invalid position ID', 400);
+        }
 
-            $position = Position::find($id);
+        $position = Position::find($id);
 
-            if (!$position) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Position not found'
-                ], 404);
-            }
+        if (!$position) {
+            return $this->notFoundResponse('Position not found');
+        }
 
-            DB::beginTransaction();
-
+        DB::transaction(function () use ($id, $position) {
             $position->update([
                 'is_active' => false,
                 'updated_by' => Auth::id() ?? 0,
@@ -619,21 +509,9 @@ class PositionController extends Controller
             RequirementPosisi::where('position_id', $id)
                 ->whereNull('deleted_at')
                 ->update(['deleted_at' => now()]);
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Position deleted successfully'
-            ], 200);
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
-        }
+        return $this->messageResponse('Position deleted successfully');
     }
 
     /**
@@ -692,41 +570,23 @@ class PositionController extends Controller
      */
     public function requirementList(Request $request, $position_id)
     {
-        try {
-            // Validate position_id parameter
-            if (!is_numeric($position_id) || $position_id <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid position ID'
-                ], 400);
-            }
-
-            // Check if position exists
-            $position = Position::find($position_id);
-            if (!$position) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Position not found'
-                ], 404);
-            }
-
-            $data = RequirementPosisi::where('position_id', $position_id)
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data retrieved successfully',
-                'data' => $data
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        // Validate position_id parameter
+        if (!is_numeric($position_id) || $position_id <= 0) {
+            return $this->errorResponse('Invalid position ID', 400);
         }
+
+        // Check if position exists
+        $position = Position::find($position_id);
+        if (!$position) {
+            return $this->notFoundResponse('Position not found');
+        }
+
+        $data = RequirementPosisi::where('position_id', $position_id)
+            ->whereNull('deleted_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return $this->successResponse($data, 'Data retrieved successfully');
     }
 
     /**
@@ -795,52 +655,17 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function addRequirement(Request $request)
+    public function addRequirement(PositionRequirementAddRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'position_id' => 'required|integer|exists:mysqlhris.m_position,id',
-                'nama' => 'required|string|max:255|unique:mysqlhris.m_position,name',
-                'layanan_id' => 'required|integer|exists:m_kebutuhan,id'
-            ], [
-                'position_id.exists' => 'Selected position does not exist',
-                'layanan_id.exists' => 'Selected service does not exist',
-                'nama.max' => 'Requirement text cannot exceed 500 characters'
-            ]);
+        $requirement = RequirementPosisi::create([
+            'position_id' => $request->position_id,
+            'requirement' => trim($request->nama),
+            'kebutuhan_id' => $request->layanan_id,
+            'created_by' => Auth::id() ?? 0,
+            'updated_by' => Auth::id() ?? 0,
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            DB::beginTransaction();
-
-            $requirement = RequirementPosisi::create([
-                'position_id' => $request->position_id,
-                'requirement' => trim($request->nama),
-                'kebutuhan_id' => $request->layanan_id,
-                'created_by' => Auth::id() ?? 0,
-                'updated_by' => Auth::id() ?? 0,
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Requirement added successfully',
-                'data' => $requirement
-            ], 201);
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
-        }
+        return $this->successResponse($requirement, 'Requirement added successfully', 201);
     }
 
     /**
@@ -917,56 +742,20 @@ class PositionController extends Controller
      *     )
      * )
      */
-    public function requirementEdit(Request $request)
+    public function requirementEdit(PositionRequirementEditRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'id' => 'required|integer|exists:m_requirement_posisi,id',
-                'requirement' => 'required|string|max:500'
-            ], [
-                'id.exists' => 'Selected requirement does not exist',
-                'requirement.max' => 'Requirement text cannot exceed 500 characters'
-            ]);
+        $requirement = RequirementPosisi::whereNull('deleted_at')->find($request->id);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $requirement = RequirementPosisi::whereNull('deleted_at')->find($request->id);
-
-            if (!$requirement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Requirement not found'
-                ], 404);
-            }
-
-            DB::beginTransaction();
-
-            $requirement->update([
-                'requirement' => trim($request->requirement),
-                'updated_by' => Auth::user()->name ?? 'System',
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Requirement updated successfully',
-                'data' => $requirement->fresh()
-            ], 200);
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        if (!$requirement) {
+            return $this->notFoundResponse('Requirement not found');
         }
+
+        $requirement->update([
+            'requirement' => trim($request->requirement),
+            'updated_by' => Auth::user()->name ?? 'System',
+        ]);
+
+        return $this->successResponse($requirement->fresh(), 'Requirement updated successfully');
     }
 
     /**
@@ -1021,42 +810,25 @@ class PositionController extends Controller
      */
     public function requirementDelete(Request $request, $id)
     {
-        try {
-            if (!is_numeric($id) || $id <= 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid requirement ID'
-                ], 400);
-            }
-
-            // Ambil data yang tidak terhapus, trait SoftDeletes akan otomatis menambahkan whereNull('deleted_at')
-            $requirement = RequirementPosisi::find($id);
-
-            if (!$requirement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Requirement not found'
-                ], 404);
-            }
-
-            // Set kolom deleted_by sebelum melakukan soft delete
-            $requirement->deleted_by = Auth::user()->full_name ?? 'System';
-            $requirement->save(); // Simpan perubahan pada kolom deleted_by
-
-            // Laravel akan otomatis mengisi deleted_at saat metode delete() dipanggil
-            $requirement->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Requirement deleted successfully'
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => config('app.debug') ? $e->getMessage() : 'Something went wrong'
-            ], 500);
+        if (!is_numeric($id) || $id <= 0) {
+            return $this->errorResponse('Invalid requirement ID', 400);
         }
+
+        // Ambil data yang tidak terhapus, trait SoftDeletes akan otomatis menambahkan whereNull('deleted_at')
+        $requirement = RequirementPosisi::find($id);
+
+        if (!$requirement) {
+            return $this->notFoundResponse('Requirement not found');
+        }
+
+        // Set kolom deleted_by sebelum melakukan soft delete
+        $requirement->deleted_by = Auth::user()->full_name ?? 'System';
+        $requirement->save(); // Simpan perubahan pada kolom deleted_by
+
+        // Laravel akan otomatis mengisi deleted_at saat metode delete() dipanggil
+        $requirement->delete();
+
+        return $this->messageResponse('Requirement deleted successfully');
     }
 
 

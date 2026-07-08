@@ -3,12 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TrainingRequest;
 use App\Models\Training;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
-use Exception;
 
 /**
  * @OA\Tag(
@@ -83,28 +81,15 @@ class TrainingController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $search = $request->get('search');
+        $search = $request->get('search');
 
-            $query = Training::with(['creator', 'updater'])->get();
-            if ($search) {
-                $query->where('nama', 'LIKE', "%{$search}%")
-                    ->orWhere('jenis', 'LIKE', "%{$search}%");
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data retrieved successfully',
-                'data' => $query
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        $query = Training::with(['creator', 'updater'])->get();
+        if ($search) {
+            $query->where('nama', 'LIKE', "%{$search}%")
+                ->orWhere('jenis', 'LIKE', "%{$search}%");
         }
+
+        return $this->successResponse($query, 'Data retrieved successfully');
     }
 
     /**
@@ -164,29 +149,13 @@ class TrainingController extends Controller
      */
     public function view(int $id)
     {
-        try {
-            $training = Training::find($id);
+        $training = Training::find($id);
 
-            if (!$training) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Training not found'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data retrieved successfully',
-                'data' => $training
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$training) {
+            return $this->notFoundResponse('Training not found');
         }
+
+        return $this->successResponse($training, 'Data retrieved successfully');
     }
 
     /**
@@ -252,53 +221,19 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(TrainingRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'jenis' => 'required|string|max:255',
-                'jp' => 'required|integer|min:1',
-                'menit' => 'required|integer|min:1',
-            ], [
-                'required' => ':attribute harus diisi',
-                'string' => ':attribute harus berupa teks',
-                'integer' => ':attribute harus berupa angka',
-                'min' => ':attribute minimal :min',
-                'max' => ':attribute maksimal :max'
-            ]);
+        $training = Training::create([
+            'nama' => $request->nama,
+            'jenis' => $request->jenis,
+            'jp' => $request->jp,
+            'menit' => $request->menit,
+            'total' => $request->jp * $request->menit,
+            'created_by' => Auth::user()->full_name ?? Auth::user()->name,
+            'created_by_user_id' => Auth::id()
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $training = Training::create([
-                'nama' => $request->nama,
-                'jenis' => $request->jenis,
-                'jp' => $request->jp,
-                'menit' => $request->menit,
-                'total' => $request->jp * $request->menit,
-                'created_by' => Auth::user()->full_name ?? Auth::user()->name,
-                'created_by_user_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Training created successfully',
-                'data' => $training
-            ], 201);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($training, 'Training created successfully', 201);
     }
 
     /**
@@ -379,61 +314,24 @@ class TrainingController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, int $id)
+    public function update(TrainingRequest $request, int $id)
     {
-        try {
-            $training = Training::find($id);
+        $training = Training::find($id);
 
-            if (!$training) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Training not found'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'jenis' => 'required|string|max:255',
-                'jp' => 'required|integer|min:1',
-                'menit' => 'required|integer|min:1',
-            ], [
-                'required' => ':attribute harus diisi',
-                'string' => ':attribute harus berupa teks',
-                'integer' => ':attribute harus berupa angka',
-                'min' => ':attribute minimal :min',
-                'max' => ':attribute maksimal :max'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $training->update([
-                'nama' => $request->nama,
-                'jenis' => $request->jenis,
-                'jp' => $request->jp,
-                'menit' => $request->menit,
-                'total' => $request->jp * $request->menit,
-                'updated_by' => Auth::user()->full_name ?? Auth::user()->name
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Training updated successfully',
-                'data' => $training->fresh()
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$training) {
+            return $this->notFoundResponse('Training not found');
         }
+
+        $training->update([
+            'nama' => $request->nama,
+            'jenis' => $request->jenis,
+            'jp' => $request->jp,
+            'menit' => $request->menit,
+            'total' => $request->jp * $request->menit,
+            'updated_by' => Auth::user()->full_name ?? Auth::user()->name
+        ]);
+
+        return $this->successResponse($training->fresh(), 'Training updated successfully');
     }
 
     /**
@@ -479,33 +377,18 @@ class TrainingController extends Controller
      */
     public function delete(int $id)
     {
-        try {
-            $training = Training::find($id);
+        $training = Training::find($id);
 
-            if (!$training) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Training not found'
-                ], 404);
-            }
-
-            $training->update([
-                'deleted_by' => Auth::user()->full_name ?? Auth::user()->name
-            ]);
-
-            $training->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Training deleted successfully'
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$training) {
+            return $this->notFoundResponse('Training not found');
         }
+
+        $training->update([
+            'deleted_by' => Auth::user()->full_name ?? Auth::user()->name
+        ]);
+
+        $training->delete();
+
+        return $this->messageResponse('Training deleted successfully');
     }
 }

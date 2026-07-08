@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Validator;
+use App\Http\Requests\UserEmailConfigSaveRequest;
 use App\Models\UserEmailConfig;
 use App\Services\DynamicMailerService;
 
@@ -52,33 +51,22 @@ class UserEmailConfigController extends Controller
      */
     public function getConfig(): JsonResponse
     {
-        try {
-            $user = Auth::user();
-            $config = $user->emailConfig;
+        $user = Auth::user();
+        $config = $user->emailConfig;
 
-            if (!$config) {
-                return response()->json([
-                    'success' => true,
-                    'data' => null,
-                    'message' => 'No email configuration found'
-                ]);
-            }
-
-            // Hide encrypted password
-            $config->makeHidden(['email_password']);
-
+        if (!$config) {
+            // Preserve legacy shape: data key present and explicitly null.
             return response()->json([
                 'success' => true,
-                'data' => $config
+                'data' => null,
+                'message' => 'No email configuration found',
             ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error getting email config: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to get email configuration'
-            ], 500);
         }
+
+        // Hide encrypted password
+        $config->makeHidden(['email_password']);
+
+        return $this->successResponse($config);
     }
 
     /**
@@ -111,102 +99,62 @@ class UserEmailConfigController extends Controller
      *     )
      * )
      */
-    // app/Http/Controllers/UserEmailConfigController.php
-
-    public function saveConfig(Request $request): JsonResponse
+    public function saveConfig(UserEmailConfigSaveRequest $request): JsonResponse
     {
         $user = Auth::user();
 
-        $validator = Validator::make($request->all(), [
-            'email_host' => 'required|string',
-            'email_port' => 'required|integer|min:1|max:65535',
-            'email_username' => 'required|email',
-            'email_password' => 'required|string',
-            'email_encryption' => 'nullable|string|in:tls,ssl',
-            'email_from_address' => 'nullable|email',
-            'email_from_name' => 'nullable|string|max:255',
-            'is_active' => 'nullable|boolean'
-        ], [
-            'email_host.required' => 'SMTP host wajib diisi',
-            'email_port.required' => 'SMTP port wajib diisi',
-            'email_username.required' => 'Username/email wajib diisi',
-            'email_username.email' => 'Format username/email tidak valid',
-            'email_password.required' => 'Password SMTP wajib diisi'
+        $data = $request->only([
+            'email_host',
+            'email_port',
+            'email_username',
+            'email_password',
+            'email_encryption',
+            'email_from_address',
+            'email_from_name',
+            'is_active'
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validasi gagal',
-                'errors' => $validator->errors()
-            ], 422);
+        $data['user_id'] = $user->id;
+        $data['email_encryption'] = $data['email_encryption'] ?? 'tls';
+        $data['is_active'] = $data['is_active'] ?? true;
+
+        if (empty($data['email_from_address'])) {
+            $data['email_from_address'] = $data['email_username'];
         }
 
-        try {
-            $data = $request->only([
-                'email_host',
-                'email_port',
-                'email_username',
-                'email_password',
-                'email_encryption',
-                'email_from_address',
-                'email_from_name',
-                'is_active'
-            ]);
-
-            $data['user_id'] = $user->id;
-            $data['email_encryption'] = $data['email_encryption'] ?? 'tls';
-            $data['is_active'] = $data['is_active'] ?? true;
-
-            if (empty($data['email_from_address'])) {
-                $data['email_from_address'] = $data['email_username'];
-            }
-
-            if (empty($data['email_from_name'])) {
-                $data['email_from_name'] = $user->full_name ?? $user->name;
-            }
-
-            // Cek apakah sudah ada konfigurasi
-            $existingConfig = UserEmailConfig::where('user_id', $user->id)->first();
-
-            if ($existingConfig) {
-                // Set satu per satu agar mutator bekerja
-                $existingConfig->email_host = $data['email_host'];
-                $existingConfig->email_port = $data['email_port'];
-                $existingConfig->email_username = $data['email_username'];
-                $existingConfig->email_password = $data['email_password']; // mutator encrypt di sini
-                $existingConfig->email_encryption = $data['email_encryption'];
-                $existingConfig->email_from_address = $data['email_from_address'];
-                $existingConfig->email_from_name = $data['email_from_name'];
-                $existingConfig->is_active = $data['is_active'];
-                $existingConfig->save();
-                $config = $existingConfig;
-            } else {
-                $config = UserEmailConfig::create($data);
-            }
-
-            Log::info('Email configuration saved for user', [
-                'user_id' => $user->id,
-                'config_id' => $config->id
-            ]);
-
-            // Clear password dari response
-            $responseData = $config->toArray();
-            unset($responseData['email_password']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Email configuration saved successfully',
-                'data' => $responseData
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error saving email config: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to save email configuration: ' . $e->getMessage()
-            ], 500);
+        if (empty($data['email_from_name'])) {
+            $data['email_from_name'] = $user->full_name ?? $user->name;
         }
+
+        // Cek apakah sudah ada konfigurasi
+        $existingConfig = UserEmailConfig::where('user_id', $user->id)->first();
+
+        if ($existingConfig) {
+            // Set satu per satu agar mutator bekerja
+            $existingConfig->email_host = $data['email_host'];
+            $existingConfig->email_port = $data['email_port'];
+            $existingConfig->email_username = $data['email_username'];
+            $existingConfig->email_password = $data['email_password']; // mutator encrypt di sini
+            $existingConfig->email_encryption = $data['email_encryption'];
+            $existingConfig->email_from_address = $data['email_from_address'];
+            $existingConfig->email_from_name = $data['email_from_name'];
+            $existingConfig->is_active = $data['is_active'];
+            $existingConfig->save();
+            $config = $existingConfig;
+        } else {
+            $config = UserEmailConfig::create($data);
+        }
+
+        Log::info('Email configuration saved for user', [
+            'user_id' => $user->id,
+            'config_id' => $config->id
+        ]);
+
+        // Clear password dari response
+        $responseData = $config->toArray();
+        unset($responseData['email_password']);
+
+        return $this->successResponse($responseData, 'Email configuration saved successfully');
     }
 
     /**
@@ -227,28 +175,16 @@ class UserEmailConfigController extends Controller
      */
     public function testConnection(): JsonResponse
     {
-        try {
-            $user = Auth::user();
-            $config = $user->emailConfig;
+        $user = Auth::user();
+        $config = $user->emailConfig;
 
-            if (!$config || !$config->isComplete()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Email configuration not found or incomplete'
-                ], 400);
-            }
-
-            $result = $this->dynamicMailerService->testConnection($config);
-
-            return response()->json($result);
-
-        } catch (\Exception $e) {
-            Log::error('Error testing SMTP connection: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to test SMTP connection: ' . $e->getMessage()
-            ], 500);
+        if (!$config || !$config->isComplete()) {
+            return $this->errorResponse('Email configuration not found or incomplete', 400);
         }
+
+        $result = $this->dynamicMailerService->testConnection($config);
+
+        return response()->json($result);
     }
 
 

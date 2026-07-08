@@ -20,6 +20,7 @@ class Training extends Model
         'menit',
         'total',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by'
     ];

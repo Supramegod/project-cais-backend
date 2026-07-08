@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SalesActivityStoreRequest;
 use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
 use App\Models\SalesActivityFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -89,17 +89,13 @@ class SalesActivityController extends Controller
      */
     public function getAvailableLeads(Request $request)
     {
-        try {
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User tidak terautentikasi'
-                ], 401);
-            }
+        $user = Auth::user();
+        if (!$user) {
+            return $this->errorResponse('User tidak terautentikasi', 401);
+        }
 
-            // Query leads dengan filter berdasarkan role user
-            $query = Leads::filterByUserRole($user)
+        // Query leads dengan filter berdasarkan role user
+        $query = Leads::filterByUserRole($user)
                 ->whereNull('deleted_at')
                 ->select('id', 'nama_perusahaan', 'pic', 'telp_perusahaan', 'email')
                 ->withCount([
@@ -145,27 +141,15 @@ class SalesActivityController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'leads' => $formattedLeads,
-                    'pagination' => [
-                        'total' => $leads->total(),
-                        'per_page' => $leads->perPage(),
-                        'current_page' => $leads->currentPage(),
-                        'last_page' => $leads->lastPage(),
-                    ]
-                ],
-                'message' => 'Data leads berhasil diambil'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data leads',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse([
+            'leads' => $formattedLeads,
+            'pagination' => [
+                'total' => $leads->total(),
+                'per_page' => $leads->perPage(),
+                'current_page' => $leads->currentPage(),
+                'last_page' => $leads->lastPage(),
+            ],
+        ], 'Data leads berhasil diambil');
     }
 
     /**
@@ -204,9 +188,8 @@ class SalesActivityController extends Controller
      */
     public function index(Request $request)
     {
-        try {
-            // Ambil parameter filter
-            $leadsId = $request->input('leads_id');
+        // Ambil parameter filter
+        $leadsId = $request->input('leads_id');
             $leadsKebutuhanId = $request->input('leads_kebutuhan_id');
 
             // Query dasar
@@ -253,19 +236,7 @@ class SalesActivityController extends Controller
             $perPage = $request->input('per_page', 15);
             $activities = $query->paginate($perPage);
 
-            return response()->json([
-                'success' => true,
-                'data' => $activities,
-                'message' => 'Data sales activity berhasil diambil'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data sales activity',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($activities, 'Data sales activity berhasil diambil');
     }
 
     /**
@@ -348,69 +319,28 @@ class SalesActivityController extends Controller
      *     )
      * )
      */
-    public function store(Request $request)
+    public function store(SalesActivityStoreRequest $request)
     {
-        try {
-            DB::beginTransaction();
+        // Validasi: Pastikan leads_kebutuhan_id terkait dengan leads_id
+        $leadsKebutuhan = LeadsKebutuhan::where('id', $request->leads_kebutuhan_id)
+            ->where('leads_id', $request->leads_id)
+            ->first();
 
-            // Ekstrak file jika ada (untuk multipart/form-data)
-            $requestData = $request->all();
+        if (!$leadsKebutuhan) {
+            return $this->errorResponse('Leads Kebutuhan tidak terkait dengan Leads yang dipilih', 422);
+        }
 
-            // Validasi
-            $validator = Validator::make($requestData, [
-                'leads_id' => 'required|exists:sl_leads,id',
-                'leads_kebutuhan_id' => 'required|exists:sl_leads_kebutuhan,id',
-                'tgl_activity' => 'required|date',
-                'jenis_activity' => 'required|string|max:255',
-                'notulen' => 'required|string',
-                'files' => 'nullable|array',
-                'files.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
-            ], [
-                'leads_id.required' => 'Leads ID wajib diisi',
-                'leads_id.exists' => 'Leads tidak ditemukan',
-                'leads_kebutuhan_id.required' => 'Leads Kebutuhan ID wajib diisi',
-                'leads_kebutuhan_id.exists' => 'Leads Kebutuhan tidak ditemukan',
-                'tgl_activity.required' => 'Tanggal activity wajib diisi',
-                'tgl_activity.date' => 'Format tanggal tidak valid',
-                'jenis_activity.required' => 'Jenis activity wajib diisi',
-                'notulen.required' => 'Notulen wajib diisi',
-                'files.*.file' => 'File yang diupload harus berupa file',
-                'files.*.mimes' => 'File harus berformat: pdf, doc, docx, jpg, jpeg, atau png',
-                'files.*.max' => 'Ukuran file maksimal 10MB',
-            ]);
+        // Validasi hak akses user terhadap KEBUTUHAN ini
+        $user = Auth::user();
+        if ($user) {
+            $hasAccess = $this->checkUserAccessToKebutuhan($user, $leadsKebutuhan);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
+            if (!$hasAccess) {
+                return $this->errorResponse('Anda tidak memiliki akses untuk menambahkan activity pada kebutuhan ini', 403);
             }
+        }
 
-            // Validasi: Pastikan leads_kebutuhan_id terkait dengan leads_id
-            $leadsKebutuhan = LeadsKebutuhan::where('id', $request->leads_kebutuhan_id)
-                ->where('leads_id', $request->leads_id)
-                ->first();
-
-            if (!$leadsKebutuhan) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leads Kebutuhan tidak terkait dengan Leads yang dipilih'
-                ], 422);
-            }
-
-            // Validasi hak akses user terhadap KEBUTUHAN ini
-            $user = Auth::user();
-            if ($user) {
-                $hasAccess = $this->checkUserAccessToKebutuhan($user, $leadsKebutuhan);
-
-                if (!$hasAccess) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Anda tidak memiliki akses untuk menambahkan activity pada kebutuhan ini'
-                    ], 403);
-                }
-            }
-
+        $salesActivity = DB::transaction(function () use ($request, $user) {
             // Simpan data activity
             $salesActivity = SalesActivity::create([
                 'leads_id' => $request->leads_id,
@@ -442,33 +372,20 @@ class SalesActivityController extends Controller
                 }
             }
 
-            DB::commit();
+            return $salesActivity;
+        });
 
-            // Load relasi untuk response
-            $salesActivity->load([
-                'lead' => function ($q) {
-                    $q->select('id', 'nama_perusahaan', 'pic');
-                },
-                'leadsKebutuhan.kebutuhan',
-                'files',
-                'creator'
-            ]);
+        // Load relasi untuk response
+        $salesActivity->load([
+            'lead' => function ($q) {
+                $q->select('id', 'nama_perusahaan', 'pic');
+            },
+            'leadsKebutuhan.kebutuhan',
+            'files',
+            'creator'
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'data' => $salesActivity,
-                'message' => 'Sales activity berhasil ditambahkan'
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error in SalesActivityController@store: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menambahkan sales activity',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($salesActivity, 'Sales activity berhasil ditambahkan', 201);
     }
 
     /**
@@ -548,8 +465,7 @@ class SalesActivityController extends Controller
      */
     public function show($id)
     {
-        try {
-            $salesActivity = SalesActivity::with([
+        $salesActivity = SalesActivity::with([
                 'lead' => function ($q) {
                     $q->select('id', 'nama_perusahaan', 'pic', 'telp_perusahaan', 'email');
                 },
@@ -579,10 +495,7 @@ class SalesActivityController extends Controller
             ])->find($id);
 
             if (!$salesActivity) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Sales activity tidak ditemukan'
-                ], 404);
+                return $this->notFoundResponse('Sales activity tidak ditemukan');
             }
 
             // Validasi hak akses terhadap KEBUTUHAN
@@ -590,19 +503,13 @@ class SalesActivityController extends Controller
             if ($user) {
                 $leadsKebutuhan = LeadsKebutuhan::find($salesActivity->leads_kebutuhan_id);
                 if (!$leadsKebutuhan) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Data kebutuhan tidak ditemukan'
-                    ], 404);
+                    return $this->notFoundResponse('Data kebutuhan tidak ditemukan');
                 }
 
                 $hasAccess = $this->checkUserAccessToKebutuhan($user, $leadsKebutuhan);
 
                 if (!$hasAccess) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Anda tidak memiliki akses untuk melihat activity ini'
-                    ], 403);
+                    return $this->errorResponse('Anda tidak memiliki akses untuk melihat activity ini', 403);
                 }
             }
 
@@ -637,20 +544,7 @@ class SalesActivityController extends Controller
                     break;
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => $activityData,
-                'message' => 'Detail sales activity berhasil diambil'
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error in SalesActivityController@show: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil detail sales activity',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($activityData, 'Detail sales activity berhasil diambil');
     }
     /**
      * @OA\Get(
@@ -699,26 +593,19 @@ class SalesActivityController extends Controller
      */
     public function getKebutuhanByLeads($leadsId)
     {
-        try {
-            $user = Auth::user();
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User tidak terautentikasi'
-                ], 401);
-            }
+        $user = Auth::user();
+        if (!$user) {
+            return $this->errorResponse('User tidak terautentikasi', 401);
+        }
 
-            // Validasi apakah user memiliki akses ke leads ini
-            $hasAccessToLead = Leads::filterByUserRole($user)
-                ->where('id', $leadsId)
-                ->exists();
+        // Validasi apakah user memiliki akses ke leads ini
+        $hasAccessToLead = Leads::filterByUserRole($user)
+            ->where('id', $leadsId)
+            ->exists();
 
-            if (!$hasAccessToLead) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anda tidak memiliki akses untuk leads ini'
-                ], 403);
-            }
+        if (!$hasAccessToLead) {
+            return $this->errorResponse('Anda tidak memiliki akses untuk leads ini', 403);
+        }
 
             // Query kebutuhan dengan filter berdasarkan user yang login
             $query = LeadsKebutuhan::where('leads_id', $leadsId)
@@ -742,19 +629,7 @@ class SalesActivityController extends Controller
                     ];
                 });
 
-            return response()->json([
-                'success' => true,
-                'data' => $kebutuhanList,
-                'message' => 'Data kebutuhan berhasil diambil'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil data kebutuhan',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($kebutuhanList, 'Data kebutuhan berhasil diambil');
     }
 
     /**
@@ -813,11 +688,10 @@ class SalesActivityController extends Controller
      */
     public function getStats(Request $request)
     {
-        try {
-            $user = Auth::user();
+        $user = Auth::user();
 
-            // Dapatkan semua leads yang bisa diakses user
-            $leadsQuery = Leads::filterByUserRole($user);
+        // Dapatkan semua leads yang bisa diakses user
+        $leadsQuery = Leads::filterByUserRole($user);
 
             // Filter lebih lanjut berdasarkan kebutuhan yang di-assign ke user
             $leadsIds = $leadsQuery->pluck('id');
@@ -851,19 +725,7 @@ class SalesActivityController extends Controller
                     ->get(),
             ];
 
-            return response()->json([
-                'success' => true,
-                'data' => $stats,
-                'message' => 'Statistik sales activity berhasil diambil'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengambil statistik',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($stats, 'Statistik sales activity berhasil diambil');
     }
 
     /**

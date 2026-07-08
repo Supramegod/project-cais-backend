@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SubmissionV2IdsRequest;
 use App\Models\SubmissionV2;
 use App\Models\Leads;
 use App\Models\CustomerActivity;
@@ -10,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -50,11 +50,10 @@ class SubmissionV2Controller extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $tglDari = $request->get('tgl_dari', Carbon::now()->startOfMonth()->subMonths(3)->toDateString());
-            $tglSampai = $request->get('tgl_sampai', Carbon::now()->toDateString());
+        $tglDari = $request->get('tgl_dari', Carbon::now()->startOfMonth()->subMonths(3)->toDateString());
+        $tglSampai = $request->get('tgl_sampai', Carbon::now()->toDateString());
 
-            $query = SubmissionV2::query()
+        $query = SubmissionV2::query()
                 ->with([
                     'branch:id,name',
                     'platform:id,nama',
@@ -168,24 +167,22 @@ class SubmissionV2Controller extends Controller
                     'branch' => $request->branch,
                 ],
             ]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
     }
 
     public function view($id)
     {
-        try {
-            $item = SubmissionV2::with([
-                'branch:id,name',
-                'platform:id,nama',
-                'statusLeads:id,nama',
-                'kebutuhan:id,nama',
-            ])->findOrFail($id);
-            return response()->json(['success' => true, 'data' => $item]);
-        } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        $item = SubmissionV2::with([
+            'branch:id,name',
+            'platform:id,nama',
+            'statusLeads:id,nama',
+            'kebutuhan:id,nama',
+        ])->find($id);
+
+        if (! $item) {
+            return $this->notFoundResponse();
         }
+
+        return $this->successResponse($item);
     }
 
     /**
@@ -223,18 +220,9 @@ class SubmissionV2Controller extends Controller
    *     )
    * )
    */
-    public function convert(Request $request)
+    public function convert(SubmissionV2IdsRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|array|min:1',
-            'id.*' => 'integer|exists:sl_submission_v2,id',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
-        }
-
-        try {
-            DB::beginTransaction();
+        $createdLeads = DB::transaction(function () use ($request) {
             $now = Carbon::now()->toDateTimeString();
             $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
 
@@ -288,44 +276,26 @@ class SubmissionV2Controller extends Controller
                 $createdLeads[] = $lead->id;
             }
 
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Submission V2 berhasil dikonversi menjadi leads',
-                'data' => ['leads_ids' => $createdLeads],
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
+            return $createdLeads;
+        });
+
+        return $this->successResponse(
+            ['leads_ids' => $createdLeads],
+            'Submission V2 berhasil dikonversi menjadi leads'
+        );
     }
 
-    public function delete(Request $request)
+    public function delete(SubmissionV2IdsRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|array|min:1',
-            'id.*' => 'integer|exists:sl_submission_v2,id',
+        $now = Carbon::now()->toDateTimeString();
+        $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
+
+        SubmissionV2::whereIn('id', $request->id)->update([
+            'deleted_at' => $now,
+            'deleted_by' => $userName,
         ]);
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
-        }
 
-        try {
-            DB::beginTransaction();
-            $now = Carbon::now()->toDateTimeString();
-            $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
-
-            SubmissionV2::whereIn('id', $request->id)->update([
-                'deleted_at' => $now,
-                'deleted_by' => $userName,
-            ]);
-
-            DB::commit();
-            return response()->json(['success' => true, 'message' => 'Submission V2 berhasil dihapus']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
+        return $this->messageResponse('Submission V2 berhasil dihapus');
     }
 
     /**
@@ -340,35 +310,35 @@ class SubmissionV2Controller extends Controller
      */
     public function sync(Request $request)
     {
-        try {
-            $url = $request->get('url', $this->sheetCsvUrl());
-            $resp = Http::timeout(60)->get($url);
-            if (!$resp->successful()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Gagal mengambil data dari Google Sheet (HTTP ' . $resp->status() . ')',
-                ], 502);
-            }
+        $url = $request->get('url', $this->sheetCsvUrl());
+        $resp = Http::timeout(60)->get($url);
+        if (!$resp->successful()) {
+            return $this->errorResponse(
+                'Gagal mengambil data dari Google Sheet (HTTP ' . $resp->status() . ')',
+                502
+            );
+        }
 
-            $rows = $this->parseCsv($resp->body());
-            if (empty($rows)) {
-                return response()->json(['success' => false, 'message' => 'Sheet kosong'], 422);
-            }
+        $rows = $this->parseCsv($resp->body());
+        if (empty($rows)) {
+            return $this->errorResponse('Sheet kosong', 422);
+        }
 
-            // Header detection: first row contains headers
-            $header = array_map(fn($h) => $this->normalizeHeader($h), $rows[0]);
-            $dataRows = array_slice($rows, 1);
+        // Header detection: first row contains headers
+        $header = array_map(fn($h) => $this->normalizeHeader($h), $rows[0]);
+        $dataRows = array_slice($rows, 1);
 
-            // Cache lookups
-            $branches = DB::connection('mysqlhris')->table('m_branch')->where('is_active', 1)->get(['id', 'name']);
-            $platforms = DB::table('m_platform')->whereNull('deleted_at')->get(['id', 'nama']);
-            $kebutuhans = DB::table('m_kebutuhan')->whereNull('deleted_at')->get(['id', 'nama']);
-            $statuses = DB::table('m_status_leads')->get(['id', 'nama']);
+        // Cache lookups
+        $branches = DB::connection('mysqlhris')->table('m_branch')->where('is_active', 1)->get(['id', 'name']);
+        $platforms = DB::table('m_platform')->whereNull('deleted_at')->get(['id', 'nama']);
+        $kebutuhans = DB::table('m_kebutuhan')->whereNull('deleted_at')->get(['id', 'nama']);
+        $statuses = DB::table('m_status_leads')->get(['id', 'nama']);
 
-            // Selalu pakai 'sync' biar konsisten — siapa yang trigger di-track via synced_at
-            $userName = 'sync';
-            $now = Carbon::now()->toDateTimeString();
+        // Selalu pakai 'sync' biar konsisten — siapa yang trigger di-track via synced_at
+        $userName = 'sync';
+        $now = Carbon::now()->toDateTimeString();
 
+        $result = DB::transaction(function () use ($dataRows, $header, $branches, $platforms, $kebutuhans, $statuses, $userName, $now) {
             $inserted = 0;
             $updated = 0;
             $restored = 0;
@@ -377,7 +347,6 @@ class SubmissionV2Controller extends Controller
             $errors = [];
             $seenRowNos = [];
 
-            DB::beginTransaction();
             foreach ($dataRows as $idx => $cols) {
                 $row = $this->mapRowByHeader($header, $cols);
 
@@ -469,17 +438,15 @@ class SubmissionV2Controller extends Controller
                     ]);
             }
 
-            DB::commit();
+            return compact('inserted', 'updated', 'restored', 'softDeleted', 'skipped', 'errors');
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => "Sync selesai. inserted={$inserted}, updated={$updated}, restored={$restored}, soft_deleted={$softDeleted}, skipped={$skipped}",
-                'data' => compact('inserted', 'updated', 'restored', 'softDeleted', 'skipped', 'errors'),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
-        }
+        extract($result);
+
+        return $this->successResponse(
+            $result,
+            "Sync selesai. inserted={$inserted}, updated={$updated}, restored={$restored}, soft_deleted={$softDeleted}, skipped={$skipped}"
+        );
     }
 
     /* ---------- helpers ---------- */

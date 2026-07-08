@@ -8,10 +8,11 @@ use App\Models\KebutuhanDetail;
 use App\Models\KebutuhanDetailTunjangan;
 use App\Models\KebutuhanDetailRequirement;
 use App\Models\Position;
+use App\Http\Requests\KebutuhanDetailTunjanganRequest;
+use App\Http\Requests\KebutuhanDetailRequirementRequest;
+use App\Traits\ApiResponser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Log;
  */
 class KebutuhanController extends Controller
 {
+    use ApiResponser;
+
     /**
      * @OA\Get(
      *     path="/api/kebutuhan/list",
@@ -69,27 +72,9 @@ class KebutuhanController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $data = Kebutuhan::all();
+        $data = Kebutuhan::all();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar kebutuhan',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in kebutuhan list', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
-        }
+        return $this->successResponse($data, 'Daftar kebutuhan');
     }
 
     
@@ -150,28 +135,9 @@ class KebutuhanController extends Controller
      */
     public function listDetail(Request $request, $id)
     {
-        try {
-            $data = KebutuhanDetail::where('kebutuhan_id', $id)->get();
+        $data = KebutuhanDetail::where('kebutuhan_id', $id)->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar detail kebutuhan',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in kebutuhan list detail', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'kebutuhan_id' => $id
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
-        }
+        return $this->successResponse($data, 'Daftar detail kebutuhan');
     }
 
     /**
@@ -239,35 +205,15 @@ class KebutuhanController extends Controller
      */
     public function listDetailTunjangan(Request $request, $id)
     {
-        try {
-            $query = KebutuhanDetailTunjangan::where('kebutuhan_id', $id);
-            
-            if ($request->has('position_id') && $request->position_id != '') {
-                $query->where('position_id', $request->position_id);
-            }
-            
-            $data = $query->get();
+        $query = KebutuhanDetailTunjangan::where('kebutuhan_id', $id);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar detail tunjangan',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in kebutuhan list detail tunjangan', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'kebutuhan_id' => $id,
-                'position_id' => $request->position_id ?? null
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
+        if ($request->has('position_id') && $request->position_id != '') {
+            $query->where('position_id', $request->position_id);
         }
+
+        $data = $query->get();
+
+        return $this->successResponse($data, 'Daftar detail tunjangan');
     }
 
     /**
@@ -365,54 +311,20 @@ class KebutuhanController extends Controller
      *     )
      * )
      */
-    public function addDetailTunjangan(Request $request)
+    public function addDetailTunjangan(KebutuhanDetailTunjanganRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'kebutuhan_id' => 'required|integer',
-                'position_id' => 'sometimes|integer',
-                'nama' => 'required|string',
-                'nominal' => 'required|string'
-            ]);
+        $nominal = str_replace(",", "", $request->nominal);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+        $data = KebutuhanDetailTunjangan::create([
+            'kebutuhan_id' => $request->kebutuhan_id,
+            'position_id' => $request->position_id ?? 0,
+            'nama' => $request->nama,
+            'nominal' => $nominal,
+            'created_by' => Auth::user()->full_name ?? 'system',
+            'created_by_user_id' => Auth::id()
+        ]);
 
-            $nominal = str_replace(",", "", $request->nominal);
-
-            $data = KebutuhanDetailTunjangan::create([
-                'kebutuhan_id' => $request->kebutuhan_id,
-                'position_id' => $request->position_id ?? 0,
-                'nama' => $request->nama,
-                'nominal' => $nominal,
-                'created_by' => Auth::user()->full_name ?? 'system',
-                'created_by_user_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil ditambahkan',
-                'data' => $data
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Error in add detail tunjangan', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'request_data' => $request->all()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
-        }
+        return $this->createdResponse($data, 'Data berhasil ditambahkan');
     }
 
     /**
@@ -468,40 +380,18 @@ class KebutuhanController extends Controller
      */
     public function deleteDetailTunjangan(Request $request, $id)
     {
-        try {
-            $data = KebutuhanDetailTunjangan::find($id);
+        $data = KebutuhanDetailTunjangan::find($id);
 
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
-
-            $data->update([
-                'deleted_by' => Auth::user()->full_name ?? 'system'
-            ]);
-            $data->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghapus data',
-                'data' => []
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in delete detail tunjangan', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'tunjangan_id' => $id
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
+        if (!$data) {
+            return $this->notFoundResponse();
         }
+
+        $data->update([
+            'deleted_by' => Auth::user()->full_name ?? 'system'
+        ]);
+        $data->delete();
+
+        return $this->successResponse([], 'Berhasil menghapus data');
     }
 
     /**
@@ -568,35 +458,15 @@ class KebutuhanController extends Controller
      */
     public function listDetailRequirement(Request $request, $id)
     {
-        try {
-            $query = KebutuhanDetailRequirement::where('kebutuhan_id', $id);
-            
-            if ($request->has('position_id') && $request->position_id != '') {
-                $query->where('position_id', $request->position_id);
-            }
-            
-            $data = $query->get();
+        $query = KebutuhanDetailRequirement::where('kebutuhan_id', $id);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar detail requirement',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in list detail requirement', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'kebutuhan_id' => $id,
-                'position_id' => $request->position_id ?? null
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
+        if ($request->has('position_id') && $request->position_id != '') {
+            $query->where('position_id', $request->position_id);
         }
+
+        $data = $query->get();
+
+        return $this->successResponse($data, 'Daftar detail requirement');
     }
 
     /**
@@ -686,50 +556,17 @@ class KebutuhanController extends Controller
      *     )
      * )
      */
-    public function addDetailRequirement(Request $request)
+    public function addDetailRequirement(KebutuhanDetailRequirementRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'kebutuhan_id' => 'required|integer',
-                'position_id' => 'sometimes|integer',
-                'requirement' => 'required|string'
-            ]);
+        $data = KebutuhanDetailRequirement::create([
+            'kebutuhan_id' => $request->kebutuhan_id,
+            'position_id' => $request->position_id ?? 0,
+            'requirement' => $request->requirement,
+            'created_by' => Auth::user()->full_name ?? 'system',
+            'created_by_user_id' => Auth::id()
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $data = KebutuhanDetailRequirement::create([
-                'kebutuhan_id' => $request->kebutuhan_id,
-                'position_id' => $request->position_id ?? 0,
-                'requirement' => $request->requirement,
-                'created_by' => Auth::user()->full_name ?? 'system',
-                'created_by_user_id' => Auth::id()
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data berhasil ditambahkan',
-                'data' => $data
-            ], 201);
-        } catch (\Exception $e) {
-            Log::error('Error in add detail requirement', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'request_data' => $request->all()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
-        }
+        return $this->createdResponse($data, 'Data berhasil ditambahkan');
     }
 
     /**
@@ -785,39 +622,17 @@ class KebutuhanController extends Controller
      */
     public function deleteDetailRequirement(Request $request, $id)
     {
-        try {
-            $data = KebutuhanDetailRequirement::find($id);
+        $data = KebutuhanDetailRequirement::find($id);
 
-            if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data tidak ditemukan'
-                ], 404);
-            }
-
-            $data->update([
-                'deleted_by' => Auth::user()->full_name ?? 'system'
-            ]);
-            $data->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Berhasil menghapus data',
-                'data' => []
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in delete detail requirement', [
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'user' => Auth::user()->id ?? null,
-                'requirement_id' => $id
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem',
-                'data' => []
-            ], 500);
+        if (!$data) {
+            return $this->notFoundResponse();
         }
+
+        $data->update([
+            'deleted_by' => Auth::user()->full_name ?? 'system'
+        ]);
+        $data->delete();
+
+        return $this->successResponse([], 'Berhasil menghapus data');
     }
 }

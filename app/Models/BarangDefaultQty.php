@@ -18,6 +18,7 @@ class BarangDefaultQty extends Model
         'layanan',
         'qty_default',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by',
         'deleted_at'
