@@ -8495,92 +8495,10 @@
                 "operationId": "f4592cce19eff5ebc6aefbd469c94d3a",
                 "responses": {
                     "200": {
-                        "description": "Success - Data berhasil diambil",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "Elektronik"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "format": "date-time",
-                                                        "example": "2024-01-01T00:00:00.000000Z"
-                                                    },
-                                                    "updated_at": {
-                                                        "type": "string",
-                                                        "format": "date-time",
-                                                        "example": "2024-01-01T00:00:00.000000Z",
-                                                        "nullable": true
-                                                    },
-                                                    "created_by": {
-                                                        "type": "string",
-                                                        "example": "Admin"
-                                                    },
-                                                    "updated_by": {
-                                                        "type": "string",
-                                                        "example": "Admin",
-                                                        "nullable": true
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Data berhasil diambil"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     }
                 },
                 "security": [
@@ -8602,7 +8520,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "ID jenis barang",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -8613,109 +8530,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Success - Data berhasil ditemukan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Elektronik"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "example": "2024-01-01T00:00:00.000000Z"
-                                                },
-                                                "updated_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "example": "2024-01-01T00:00:00.000000Z",
-                                                    "nullable": true
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "Admin"
-                                                },
-                                                "updated_by": {
-                                                    "type": "string",
-                                                    "example": "Admin",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Data berhasil ditemukan"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     },
                     "404": {
-                        "description": "Data tidak ditemukan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data tidak ditemukan"
                     }
                 },
                 "security": [
@@ -8737,7 +8558,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "ID jenis barang",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -8748,89 +8568,10 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Success - Data berhasil diambil",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "jenis_barang": {
-                                                        "type": "string",
-                                                        "example": "Elektronik"
-                                                    },
-                                                    "nama_barang": {
-                                                        "type": "string",
-                                                        "example": "Laptop"
-                                                    },
-                                                    "harga": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 15000000
-                                                    },
-                                                    "satuan": {
-                                                        "type": "string",
-                                                        "example": "Unit"
-                                                    },
-                                                    "masa_pakai": {
-                                                        "type": "integer",
-                                                        "example": 5
-                                                    },
-                                                    "merk": {
-                                                        "type": "string",
-                                                        "example": "Dell"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Data berhasil diambil"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     }
                 },
                 "security": [
@@ -8849,7 +8590,6 @@
                 "description": "Menambahkan jenis barang baru ke dalam sistem",
                 "operationId": "7bff166784239c3dd7506c93554b8599",
                 "requestBody": {
-                    "description": "Data jenis barang yang akan ditambahkan",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -8859,7 +8599,6 @@
                                 ],
                                 "properties": {
                                     "nama": {
-                                        "description": "Nama jenis barang",
                                         "type": "string",
                                         "maxLength": 255,
                                         "example": "Elektronik"
@@ -8872,114 +8611,13 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Success - Jenis barang berhasil ditambahkan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Jenis Barang berhasil disimpan"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Elektronik"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "example": "2024-01-01T00:00:00.000000Z"
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "Admin"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Jenis barang berhasil ditambahkan"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     },
                     "422": {
-                        "description": "Validation error - Data tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "nama": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Nama jenis barang harus diisi"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error - Data tidak valid"
                     }
                 },
                 "security": [
@@ -9001,7 +8639,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "ID jenis barang yang akan diupdate",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -9011,7 +8648,6 @@
                     }
                 ],
                 "requestBody": {
-                    "description": "Data jenis barang yang akan diperbarui",
                     "required": true,
                     "content": {
                         "application/json": {
@@ -9021,7 +8657,6 @@
                                 ],
                                 "properties": {
                                     "nama": {
-                                        "description": "Nama jenis barang",
                                         "type": "string",
                                         "maxLength": 255,
                                         "example": "Elektronik Updated"
@@ -9034,143 +8669,16 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Success - Jenis barang berhasil diperbarui",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Jenis Barang berhasil diupdate"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Elektronik Updated"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "example": "2024-01-01T00:00:00.000000Z"
-                                                },
-                                                "updated_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "example": "2024-01-01T12:00:00.000000Z"
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "Admin"
-                                                },
-                                                "updated_by": {
-                                                    "type": "string",
-                                                    "example": "Admin"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Jenis barang berhasil diperbarui"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     },
                     "404": {
-                        "description": "Data tidak ditemukan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data tidak ditemukan"
                     },
                     "422": {
-                        "description": "Validation error - Data tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "nama": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "Nama jenis barang harus diisi"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error - Data tidak valid"
                     }
                 },
                 "security": [
@@ -9192,7 +8700,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "ID jenis barang yang akan dihapus",
                         "required": true,
                         "schema": {
                             "type": "integer",
@@ -9203,80 +8710,13 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Success - Jenis barang berhasil dihapus",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Jenis Barang berhasil dihapus"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Success - Jenis barang berhasil dihapus"
                     },
                     "401": {
-                        "description": "Unauthorized - Token tidak valid",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthenticated."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized - Token tidak valid"
                     },
                     "404": {
-                        "description": "Data tidak ditemukan",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "error"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Terjadi kesalahan server"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data tidak ditemukan"
                     }
                 },
                 "security": [
@@ -13635,105 +13075,13 @@
                 "operationId": "2bd5742dda157b312a8f9721709481f3",
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "nama": {
-                                                                "type": "string",
-                                                                "example": "Management Fee 1"
-                                                            },
-                                                            "created_by": {
-                                                                "type": "string",
-                                                                "example": "John Doe"
-                                                            },
-                                                            "created_at": {
-                                                                "type": "string",
-                                                                "format": "date-time"
-                                                            },
-                                                            "updated_at": {
-                                                                "type": "string",
-                                                                "format": "date-time"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                },
-                                                "current_page": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "per_page": {
-                                                    "type": "integer",
-                                                    "example": 10
-                                                },
-                                                "total": {
-                                                    "type": "integer",
-                                                    "example": 100
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "401": {
-                        "description": "Unauthorized",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Unauthorized"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Unauthorized"
                     },
                     "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Internal server error"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Internal server error"
                     }
                 },
                 "security": [
@@ -13750,104 +13098,12 @@
                 ],
                 "summary": "Create a new management fee",
                 "operationId": "bb3dbdc15aa1c18419a70437d039c6ac",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama"
-                                ],
-                                "properties": {
-                                    "nama": {
-                                        "description": "Nama management fee",
-                                        "type": "string",
-                                        "example": "Management Fee Baru"
-                                    },
-                                    "description": {
-                                        "description": "Deskripsi optional",
-                                        "type": "string",
-                                        "example": "Deskripsi management fee"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "201": {
-                        "description": "Management fee created successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee berhasil dibuat"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Management Fee Baru"
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "John Doe"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee created successfully"
                     },
                     "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validasi gagal"
-                                        },
-                                        "errors": {
-                                            "properties": {
-                                                "nama": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string",
-                                                        "example": "The nama field is required."
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation error"
                     }
                 },
                 "security": [
@@ -13868,7 +13124,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Management Fee ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -13877,65 +13132,10 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Management Fee 1"
-                                                },
-                                                "created_by": {
-                                                    "type": "string",
-                                                    "example": "John Doe"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "updated_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "404": {
-                        "description": "Management fee not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee not found"
                     }
                 },
                 "security": [
@@ -13956,94 +13156,18 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Management Fee ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
                         }
                     }
                 ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama"
-                                ],
-                                "properties": {
-                                    "nama": {
-                                        "description": "Nama management fee",
-                                        "type": "string",
-                                        "example": "Management Fee Updated"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
-                        "description": "Management fee updated successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee berhasil diupdate"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer",
-                                                    "example": 1
-                                                },
-                                                "nama": {
-                                                    "type": "string",
-                                                    "example": "Management Fee Updated"
-                                                },
-                                                "updated_by": {
-                                                    "type": "string",
-                                                    "example": "John Doe"
-                                                },
-                                                "updated_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee updated successfully"
                     },
                     "404": {
-                        "description": "Management fee not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee not found"
                     },
                     "422": {
                         "description": "Validation error"
@@ -14067,7 +13191,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Management Fee ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -14076,44 +13199,10 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Management fee deleted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee berhasil dihapus"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee deleted successfully"
                     },
                     "404": {
-                        "description": "Management fee not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Management Fee tidak ditemukan"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Management fee not found"
                     }
                 },
                 "security": [
@@ -14132,36 +13221,7 @@
                 "operationId": "ec018daba41764791eb56fb676d03541",
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer",
-                                                        "example": 1
-                                                    },
-                                                    "nama": {
-                                                        "type": "string",
-                                                        "example": "Management Fee 1"
-                                                    }
-                                                },
-                                                "type": "object"
-                                            }
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     }
                 },
                 "security": [
@@ -24326,113 +23386,7 @@
                 "operationId": "e6e6c1412e1404a3f6f69cf2fb309b2c",
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "nama_salary_rule": {
-                                                                "type": "string",
-                                                                "example": "Salary Rule January 2024"
-                                                            },
-                                                            "cutoff": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 1 - 15"
-                                                            },
-                                                            "cutoff_awal": {
-                                                                "type": "integer",
-                                                                "example": 1
-                                                            },
-                                                            "cutoff_akhir": {
-                                                                "type": "integer",
-                                                                "example": 15
-                                                            },
-                                                            "crosscheck_absen": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 16 - 20"
-                                                            },
-                                                            "crosscheck_absen_awal": {
-                                                                "type": "integer",
-                                                                "example": 16
-                                                            },
-                                                            "crosscheck_absen_akhir": {
-                                                                "type": "integer",
-                                                                "example": 20
-                                                            },
-                                                            "pengiriman_invoice": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 21 - 25"
-                                                            },
-                                                            "pengiriman_invoice_awal": {
-                                                                "type": "integer",
-                                                                "example": 21
-                                                            },
-                                                            "pengiriman_invoice_akhir": {
-                                                                "type": "integer",
-                                                                "example": 25
-                                                            },
-                                                            "perkiraan_invoice_diterima": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 26 - 30"
-                                                            },
-                                                            "perkiraan_invoice_diterima_awal": {
-                                                                "type": "integer",
-                                                                "example": 26
-                                                            },
-                                                            "perkiraan_invoice_diterima_akhir": {
-                                                                "type": "integer",
-                                                                "example": 30
-                                                            },
-                                                            "pembayaran_invoice": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 5 bulan berikutnya"
-                                                            },
-                                                            "tgl_pembayaran_invoice": {
-                                                                "type": "integer",
-                                                                "example": 5
-                                                            },
-                                                            "rilis_payroll": {
-                                                                "type": "string",
-                                                                "example": "Tanggal 10 bulan berikutnya"
-                                                            },
-                                                            "tgl_rilis_payroll": {
-                                                                "type": "integer",
-                                                                "example": 10
-                                                            },
-                                                            "created_by": {
-                                                                "type": "string",
-                                                                "example": "John Doe"
-                                                            },
-                                                            "created_at": {
-                                                                "type": "string",
-                                                                "format": "date-time"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "401": {
                         "description": "Unauthorized"
@@ -24455,108 +23409,9 @@
                 ],
                 "summary": "Create a new salary rule",
                 "operationId": "828dc84c026db8dc8721ee99b46a952c",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_salary_rule",
-                                    "cutoff_awal",
-                                    "cutoff_akhir",
-                                    "crosscheck_absen_awal",
-                                    "crosscheck_absen_akhir",
-                                    "pengiriman_invoice_awal",
-                                    "pengiriman_invoice_akhir",
-                                    "perkiraan_invoice_diterima_awal",
-                                    "perkiraan_invoice_diterima_akhir",
-                                    "pembayaran_invoice",
-                                    "rilis_payroll"
-                                ],
-                                "properties": {
-                                    "nama_salary_rule": {
-                                        "type": "string",
-                                        "example": "Salary Rule January 2024"
-                                    },
-                                    "cutoff_awal": {
-                                        "description": "Tanggal awal cutoff",
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "cutoff_akhir": {
-                                        "description": "Tanggal akhir cutoff",
-                                        "type": "integer",
-                                        "example": 15
-                                    },
-                                    "crosscheck_absen_awal": {
-                                        "description": "Tanggal awal crosscheck absen",
-                                        "type": "integer",
-                                        "example": 16
-                                    },
-                                    "crosscheck_absen_akhir": {
-                                        "description": "Tanggal akhir crosscheck absen",
-                                        "type": "integer",
-                                        "example": 20
-                                    },
-                                    "pengiriman_invoice_awal": {
-                                        "description": "Tanggal awal pengiriman invoice",
-                                        "type": "integer",
-                                        "example": 21
-                                    },
-                                    "pengiriman_invoice_akhir": {
-                                        "description": "Tanggal akhir pengiriman invoice",
-                                        "type": "integer",
-                                        "example": 25
-                                    },
-                                    "perkiraan_invoice_diterima_awal": {
-                                        "description": "Tanggal awal perkiraan invoice diterima",
-                                        "type": "integer",
-                                        "example": 26
-                                    },
-                                    "perkiraan_invoice_diterima_akhir": {
-                                        "description": "Tanggal akhir perkiraan invoice diterima",
-                                        "type": "integer",
-                                        "example": 30
-                                    },
-                                    "pembayaran_invoice": {
-                                        "description": "Tanggal pembayaran invoice bulan berikutnya",
-                                        "type": "integer",
-                                        "example": 5
-                                    },
-                                    "rilis_payroll": {
-                                        "description": "Tanggal rilis payroll bulan berikutnya",
-                                        "type": "integer",
-                                        "example": 10
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "201": {
-                        "description": "Salary rule created successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Salary Rule berhasil dibuat"
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Salary rule created successfully"
                     },
                     "422": {
                         "description": "Validation error"
@@ -24580,7 +23435,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Salary Rule ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -24589,23 +23443,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "404": {
                         "description": "Salary rule not found"
@@ -24629,105 +23467,15 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Salary Rule ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
                         }
                     }
                 ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nama_salary_rule",
-                                    "cutoff_awal",
-                                    "cutoff_akhir",
-                                    "crosscheck_absen_awal",
-                                    "crosscheck_absen_akhir",
-                                    "pengiriman_invoice_awal",
-                                    "pengiriman_invoice_akhir",
-                                    "perkiraan_invoice_diterima_awal",
-                                    "perkiraan_invoice_diterima_akhir",
-                                    "pembayaran_invoice",
-                                    "rilis_payroll"
-                                ],
-                                "properties": {
-                                    "nama_salary_rule": {
-                                        "type": "string",
-                                        "example": "Salary Rule Updated"
-                                    },
-                                    "cutoff_awal": {
-                                        "type": "integer",
-                                        "example": 1
-                                    },
-                                    "cutoff_akhir": {
-                                        "type": "integer",
-                                        "example": 15
-                                    },
-                                    "crosscheck_absen_awal": {
-                                        "type": "integer",
-                                        "example": 16
-                                    },
-                                    "crosscheck_absen_akhir": {
-                                        "type": "integer",
-                                        "example": 20
-                                    },
-                                    "pengiriman_invoice_awal": {
-                                        "type": "integer",
-                                        "example": 21
-                                    },
-                                    "pengiriman_invoice_akhir": {
-                                        "type": "integer",
-                                        "example": 25
-                                    },
-                                    "perkiraan_invoice_diterima_awal": {
-                                        "type": "integer",
-                                        "example": 26
-                                    },
-                                    "perkiraan_invoice_diterima_akhir": {
-                                        "type": "integer",
-                                        "example": 30
-                                    },
-                                    "pembayaran_invoice": {
-                                        "type": "integer",
-                                        "example": 5
-                                    },
-                                    "rilis_payroll": {
-                                        "type": "integer",
-                                        "example": 10
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
                 "responses": {
                     "200": {
-                        "description": "Salary rule updated successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Salary Rule berhasil diupdate"
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Salary rule updated successfully"
                     },
                     "404": {
                         "description": "Salary rule not found"
@@ -24754,7 +23502,6 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Salary Rule ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -24763,24 +23510,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Salary rule deleted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Salary Rule berhasil dihapus"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Salary rule deleted successfully"
                     },
                     "404": {
                         "description": "Salary rule not found"
@@ -32246,7 +30976,7 @@
                     "Tunjangan Posisi"
                 ],
                 "summary": "Get list of tunjangan posisi",
-                "description": "Retrieve paginated list of position allowances with related data",
+                "description": "Retrieve list of position allowances with related data",
                 "operationId": "getTunjanganList",
                 "parameters": [
                     {
@@ -32261,71 +30991,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data retrieved successfully"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer"
-                                                },
-                                                "per_page": {
-                                                    "type": "integer"
-                                                },
-                                                "total": {
-                                                    "type": "integer"
-                                                },
-                                                "last_page": {
-                                                    "type": "integer"
-                                                },
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "integer"
-                                                            },
-                                                            "nama": {
-                                                                "type": "string"
-                                                            },
-                                                            "nominal": {
-                                                                "type": "number",
-                                                                "format": "float"
-                                                            },
-                                                            "nama_kebutuhan": {
-                                                                "type": "string"
-                                                            },
-                                                            "nama_jabatan": {
-                                                                "type": "string"
-                                                            },
-                                                            "created_at": {
-                                                                "type": "string"
-                                                            },
-                                                            "created_by": {
-                                                                "type": "string"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "401": {
                         "description": "Unauthenticated"
@@ -32347,13 +31013,11 @@
                     "Tunjangan Posisi"
                 ],
                 "summary": "Get specific tunjangan posisi",
-                "description": "Retrieve specific position allowance by ID",
                 "operationId": "getTunjangan",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Tunjangan ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -32362,51 +31026,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful operation",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Data retrieved successfully"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "integer"
-                                                },
-                                                "kebutuhan_id": {
-                                                    "type": "integer"
-                                                },
-                                                "position_id": {
-                                                    "type": "integer"
-                                                },
-                                                "nama": {
-                                                    "type": "string"
-                                                },
-                                                "nominal": {
-                                                    "type": "number",
-                                                    "format": "float"
-                                                },
-                                                "kebutuhan": {
-                                                    "type": "object"
-                                                },
-                                                "position": {
-                                                    "type": "object"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Successful operation"
                     },
                     "404": {
                         "description": "Data not found"
@@ -32428,7 +31048,6 @@
                     "Tunjangan Posisi"
                 ],
                 "summary": "Create new tunjangan posisi",
-                "description": "Create a new position allowance",
                 "operationId": "createTunjangan",
                 "requestBody": {
                     "required": true,
@@ -32467,27 +31086,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Data created successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Tunjangan created successfully"
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data created successfully"
                     },
                     "422": {
                         "description": "Validation errors"
@@ -32509,13 +31108,11 @@
                     "Tunjangan Posisi"
                 ],
                 "summary": "Update tunjangan posisi",
-                "description": "Update existing position allowance",
                 "operationId": "updateTunjangan",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Tunjangan ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -32559,27 +31156,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Data updated successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Tunjangan updated successfully"
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data updated successfully"
                     },
                     "404": {
                         "description": "Data not found"
@@ -32604,13 +31181,11 @@
                     "Tunjangan Posisi"
                 ],
                 "summary": "Delete tunjangan posisi",
-                "description": "Soft delete position allowance",
                 "operationId": "deleteTunjangan",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Tunjangan ID",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -32619,24 +31194,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Data deleted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Berhasil menghapus data"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Data deleted successfully"
                     },
                     "404": {
                         "description": "Data not found"

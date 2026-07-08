@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SubmissionIdRequest;
 use App\Models\Submission;
 use App\Models\Leads;
 use App\Models\CustomerActivity;
@@ -9,7 +10,6 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -35,11 +35,10 @@ class SubmissionController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $tglDari = $request->get('tgl_dari', Carbon::now()->startOfMonth()->subMonths(3)->toDateString());
-            $tglSampai = $request->get('tgl_sampai', Carbon::now()->toDateString());
+        $tglDari = $request->get('tgl_dari', Carbon::now()->startOfMonth()->subMonths(3)->toDateString());
+        $tglSampai = $request->get('tgl_sampai', Carbon::now()->toDateString());
 
-            $query = Submission::query()
+        $query = Submission::query()
                 ->with([
                     'branch:id,name',
                     'platform:id,nama',
@@ -130,12 +129,6 @@ class SubmissionController extends Controller
                     'branch' => $request->branch,
                 ],
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
     }
 
     /**
@@ -150,24 +143,18 @@ class SubmissionController extends Controller
      */
     public function view($id)
     {
-        try {
-            $item = Submission::with([
-                'branch:id,name',
-                'platform:id,nama',
-                'statusLeads:id,nama',
-                'timSalesD:id,nama',
-            ])->findOrFail($id);
+        $item = Submission::with([
+            'branch:id,name',
+            'platform:id,nama',
+            'statusLeads:id,nama',
+            'timSalesD:id,nama',
+        ])->find($id);
 
-            return response()->json([
-                'success' => true,
-                'data' => $item,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
+        if (! $item) {
+            return $this->notFoundResponse();
         }
+
+        return $this->successResponse($item);
     }
 
     /**
@@ -186,21 +173,9 @@ class SubmissionController extends Controller
      *     @OA\Response(response=200, description="OK")
      * )
      */
-    public function convert(Request $request)
+    public function convert(SubmissionIdRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|array|min:1',
-            'id.*' => 'integer|exists:sl_submission,id',
-        ]);
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
-
-        try {
-            DB::beginTransaction();
+        $createdLeads = DB::transaction(function () use ($request) {
             $now = Carbon::now()->toDateTimeString();
             $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
 
@@ -255,19 +230,13 @@ class SubmissionController extends Controller
                 $createdLeads[] = $lead->id;
             }
 
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Submission berhasil dikonversi menjadi leads',
-                'data' => ['leads_ids' => $createdLeads],
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+            return $createdLeads;
+        });
+
+        return $this->successResponse(
+            ['leads_ids' => $createdLeads],
+            'Submission berhasil dikonversi menjadi leads'
+        );
     }
 
     /**
@@ -286,41 +255,17 @@ class SubmissionController extends Controller
      *     @OA\Response(response=200, description="OK")
      * )
      */
-    public function delete(Request $request)
+    public function delete(SubmissionIdRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'id' => 'required|array|min:1',
-            'id.*' => 'integer|exists:sl_submission,id',
+        $now = Carbon::now()->toDateTimeString();
+        $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
+
+        Submission::whereIn('id', $request->id)->update([
+            'deleted_at' => $now,
+            'deleted_by' => $userName,
         ]);
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => $validator->errors()->first(),
-            ], 422);
-        }
 
-        try {
-            DB::beginTransaction();
-            $now = Carbon::now()->toDateTimeString();
-            $userName = Auth::user()->full_name ?? Auth::user()->name ?? 'system';
-
-            Submission::whereIn('id', $request->id)->update([
-                'deleted_at' => $now,
-                'deleted_by' => $userName,
-            ]);
-
-            DB::commit();
-            return response()->json([
-                'success' => true,
-                'message' => 'Submission berhasil dihapus',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-            ], 500);
-        }
+        return $this->messageResponse('Submission berhasil dihapus');
     }
 
     private function generateNomor()

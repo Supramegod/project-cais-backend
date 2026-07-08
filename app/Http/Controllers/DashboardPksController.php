@@ -77,10 +77,7 @@ class DashboardPksController extends Controller
             ];
         });
 
-        return response()->json([
-            'success' => true,
-            'data'    => $data,
-        ]);
+        return $this->successResponse($data);
     }
 
     /**
