@@ -946,10 +946,29 @@ class ReportController extends Controller
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
             ->whereIn('sa.user_id', $userIds)
-            // Hanya ambil baris yang relevan dengan alur Leads→Assignment→Appointment
+            // Leads & Assignment dari sl_customer_activity (w*_appt di sini diabaikan;
+            // appointment telesales diambil dari sl_activity_sales di bawah).
             ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
             ->groupBy('sa.user_id')
             ->get();
+
+        // Appointment telesales per minggu dari sl_activity_sales (kolom
+        // `jenis_activity`, filter `created_by_user_id`) — sumber yang benar,
+        // konsisten dengan activityDetail & monthlyRole30.
+        $apptWeekly = DB::table('sl_activity_sales as sa')
+            ->select(
+                'sa.created_by_user_id as user_id',
+                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
+                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
+                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
+                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt")
+            )
+            ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+            ->whereIn('sa.created_by_user_id', $userIds)
+            ->where('sa.jenis_activity', 'Appointment')
+            ->groupBy('sa.created_by_user_id')
+            ->get()
+            ->keyBy('user_id');
         // ── Query agregasi mingguan untuk 3 metrik (Leads, Assignment, Appointment) ──
         //
         // Strategi per metrik:
@@ -1060,41 +1079,35 @@ class ReportController extends Controller
         //     ->groupBy('sa.created_by')
         //     ->get();
 
-        $emptyWeek = ['leads' => 0, 'appt' => 0, 'assignment' => 0];
-
         $data = [];
         $no = 1;
         foreach ($salesData as $sales) {
             $nama = $sales->nama_sales;
             $act = $weeklyActivity->firstWhere('user_id', $sales->user_id);
 
-            $w1 = $emptyWeek;
-            $w2 = $emptyWeek;
-            $w3 = $emptyWeek;
-            $w4 = $emptyWeek;
+            // Appointment dari sl_activity_sales; leads/assignment dari customer_activity.
+            $appt = $apptWeekly->get($sales->user_id);
 
-            if ($act) {
-                $w1 = [
-                    'leads' => (int) $act->w1_leads,
-                    'appt' => (int) $act->w1_appt,
-                    'assignment' => (int) $act->w1_assignment
-                ];
-                $w2 = [
-                    'leads' => (int) $act->w2_leads,
-                    'appt' => (int) $act->w2_appt,
-                    'assignment' => (int) $act->w2_assignment
-                ];
-                $w3 = [
-                    'leads' => (int) $act->w3_leads,
-                    'appt' => (int) $act->w3_appt,
-                    'assignment' => (int) $act->w3_assignment
-                ];
-                $w4 = [
-                    'leads' => (int) $act->w4_leads,
-                    'appt' => (int) $act->w4_appt,
-                    'assignment' => (int) $act->w4_assignment
-                ];
-            }
+            $w1 = [
+                'leads' => (int) ($act->w1_leads ?? 0),
+                'appt' => (int) ($appt->w1_appt ?? 0),
+                'assignment' => (int) ($act->w1_assignment ?? 0),
+            ];
+            $w2 = [
+                'leads' => (int) ($act->w2_leads ?? 0),
+                'appt' => (int) ($appt->w2_appt ?? 0),
+                'assignment' => (int) ($act->w2_assignment ?? 0),
+            ];
+            $w3 = [
+                'leads' => (int) ($act->w3_leads ?? 0),
+                'appt' => (int) ($appt->w3_appt ?? 0),
+                'assignment' => (int) ($act->w3_assignment ?? 0),
+            ];
+            $w4 = [
+                'leads' => (int) ($act->w4_leads ?? 0),
+                'appt' => (int) ($appt->w4_appt ?? 0),
+                'assignment' => (int) ($act->w4_assignment ?? 0),
+            ];
 
             $data[] = [
                 'no' => $no++,
@@ -1481,16 +1494,18 @@ class ReportController extends Controller
         $salesName = $matched->nama_sales;
         $cabang = $matched->cabang;
 
-        // ── 4. Query aktivitas (hanya Leads, Assignment, Appointment) ─────────
-
-        $activities = DB::table('sl_customer_activity as sa')
+        // ── 4. Query aktivitas ────────────────────────────────────────────────
+        // Leads & Assignment tercatat di sl_customer_activity (kolom `tipe`,
+        // difilter `user_id`). Sedangkan Appointment telesales tercatat di
+        // sl_activity_sales (kolom `jenis_activity`, difilter `created_by_user_id`,
+        // sama seperti activityDetail biasa). Gabungkan kedua sumber lalu urutkan.
+        $customerActivities = DB::table('sl_customer_activity as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
             ->select(
                 'sa.id',
                 'sa.leads_id',
                 'sa.tgl_activity',
-                'sa.tipe',
-                'sa.tipe',
+                DB::raw('sa.tipe as tipe'),
                 DB::raw("COALESCE(sa.notulen, '') AS notulen"),
                 'sa.created_by',
                 'sa.created_at',
@@ -1498,10 +1513,30 @@ class ReportController extends Controller
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.user_id', $userId)
-            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
-            ->orderBy('sa.tgl_activity', 'asc')
-            ->orderBy('sa.created_at', 'asc')
+            ->whereIn('sa.tipe', ['Leads', 'Assignment'])
             ->get();
+
+        $appointmentActivities = DB::table('sl_activity_sales as sa')
+            ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+            ->select(
+                'sa.id',
+                'sa.leads_id',
+                'sa.tgl_activity',
+                DB::raw('sa.jenis_activity as tipe'),
+                DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                'sa.created_by',
+                'sa.created_at',
+                'l.nama_perusahaan'
+            )
+            ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+            ->where('sa.created_by_user_id', $userId)
+            ->where('sa.jenis_activity', 'Appointment')
+            ->get();
+
+        $activities = $customerActivities
+            ->concat($appointmentActivities)
+            ->sortBy([['tgl_activity', 'asc'], ['created_at', 'asc']])
+            ->values();
 
         // ── 5. Map hasil ke response format ───────────────────────────────────
         // aksi: Leads & Assignment → leads_id (untuk navigasi ke detail leads)
@@ -1558,6 +1593,7 @@ class ReportController extends Controller
         $query = DB::connection('mysqlhris')
             ->table('m_user as u')
             ->where('u.cais_role_id', '!=', 30) // Exclude admin/tele
+            ->where('u.is_active', 1)           // hanya user aktif
             ->leftJoin('m_branch as b', 'b.id', '=', 'u.branch_id')
             ->whereIn('u.id', $userIds)
             ->select('u.full_name as nama_sales', 'b.name as cabang', 'u.id as user_id')
@@ -1578,6 +1614,7 @@ class ReportController extends Controller
         $query = DB::connection('mysqlhris')
             ->table('m_user as u')
             ->where('u.cais_role_id', '=', 30)
+            ->where('u.is_active', 1)               // hanya telesales aktif
             ->whereNotIn('u.id', [101182, 123994]) // ✅ gunakan whereNotIn untuk array
             ->leftJoin('m_branch as b', 'b.id', '=', 'u.branch_id')
             ->select('u.full_name as nama_sales', 'b.name as cabang', 'u.id as user_id')
@@ -1693,31 +1730,50 @@ class ReportController extends Controller
     //mentah
     private function getRole30MonthlyAggregation($start, $end, array $userIds)
     {
-        return DB::table('sl_customer_activity as sa')
+        // Leads & Assignment dari sl_customer_activity (kolom `tipe`, filter `user_id`).
+        $base = DB::table('sl_customer_activity as sa')
             ->select(
-                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
                 'sa.user_id',
-
-                // Leads: semua activity 'Leads' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.tipe = 'Leads'
                 THEN sa.leads_id END) as jumlah_leads"),
-
-                // Assignment: semua activity 'Assignment' langsung dihitung (distinct per leads_id)
                 DB::raw("COUNT(DISTINCT CASE
                 WHEN sa.tipe = 'Assignment'
-                THEN sa.leads_id END) as jumlah_assignment"),
-
-                // Appointment: semua activity 'Appointment' langsung dihitung
-                DB::raw("COUNT(CASE
-                WHEN sa.tipe = 'Appointment'
-                THEN 1 END) as jumlah_appointment")
+                THEN sa.leads_id END) as jumlah_assignment")
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
             ->whereIn('sa.user_id', $userIds)
-            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
+            ->whereIn('sa.tipe', ['Leads', 'Assignment'])
             ->groupBy('sa.user_id')
-            ->get();
+            ->get()
+            ->keyBy('user_id');
+
+        // Appointment telesales tercatat di sl_activity_sales (kolom `jenis_activity`,
+        // filter `created_by_user_id`) — sama seperti activityDetail biasa.
+        $appointment = DB::table('sl_activity_sales as sa')
+            ->select(
+                'sa.created_by_user_id as user_id',
+                DB::raw("COUNT(*) as jumlah_appointment")
+            )
+            ->whereBetween('sa.tgl_activity', [$start, $end])
+            ->whereIn('sa.created_by_user_id', $userIds)
+            ->where('sa.jenis_activity', 'Appointment')
+            ->groupBy('sa.created_by_user_id')
+            ->get()
+            ->keyBy('user_id');
+
+        // Gabung per user_id (satu baris per user, termasuk yang nol).
+        return collect($userIds)->unique()->map(function ($uid) use ($base, $appointment) {
+            $b = $base->get($uid);
+            $a = $appointment->get($uid);
+
+            return (object) [
+                'user_id' => $uid,
+                'jumlah_leads' => (int) ($b->jumlah_leads ?? 0),
+                'jumlah_assignment' => (int) ($b->jumlah_assignment ?? 0),
+                'jumlah_appointment' => (int) ($a->jumlah_appointment ?? 0),
+            ];
+        })->values();
     }
     // private function getRole30MonthlyAggregation($start, $end, array $salesNames)
     // {
