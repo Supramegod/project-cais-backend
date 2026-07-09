@@ -4,6 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
+use App\Http\Requests\AssignCrmRequest;
+use App\Http\Requests\AssignRoRequest;
+use App\Http\Requests\StoreContractActivityRequest;
+use App\Http\Requests\StoreCustomerActivityRequest;
+use App\Http\Requests\UpdateContractStatusRequest;
+use App\Http\Requests\UpdateCustomerActivityRequest;
 use App\Mail\CustomerActivityEmail;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
@@ -32,10 +38,12 @@ use Illuminate\Support\Str;
 class CustomerActivityController extends Controller
 {
     private $dynamicMailerService;
+    private $activityService;
 
-    public function __construct(DynamicMailerService $dynamicMailerService)
+    public function __construct(DynamicMailerService $dynamicMailerService, \App\Services\CustomerActivityService $activityService)
     {
         $this->dynamicMailerService = $dynamicMailerService;
+        $this->activityService = $activityService;
     }
     /**
      * @OA\Get(
@@ -185,15 +193,14 @@ class CustomerActivityController extends Controller
      */
     public function list(Request $request): JsonResponse
     {
-        try {
-            // 1. Inisialisasi Tanggal
-            $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
-            $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
+        // 1. Inisialisasi Tanggal
+        $tglDari = $request->tgl_dari ?: Carbon::now()->subMonths(3)->startOfMonth()->toDateString();
+        $tglSampai = $request->tgl_sampai ?: Carbon::now()->toDateString();
 
-            // Validasi Tanggal
-            if ($request->tgl_dari && $request->tgl_sampai && Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
-                return response()->json(['success' => false, 'message' => 'Tanggal dari tidak boleh melebihi tanggal sampai.'], 422);
-            }
+        // Validasi Tanggal
+        if ($request->tgl_dari && $request->tgl_sampai && Carbon::parse($tglDari)->gt(Carbon::parse($tglSampai))) {
+            return $this->errorResponse('Tanggal dari tidak boleh melebihi tanggal sampai.', 422);
+        }
 
             // 2. Base Query dengan Eager Loading (tanpa grouping per leads_id)
             $query = CustomerActivity::with([
@@ -287,33 +294,25 @@ class CustomerActivityController extends Controller
                 return $base;
             });
 
-            // 8. Response
-            return response()->json([
-                'success' => true,
-                'message' => 'Data aktivitas berhasil diambil',
-                'data' => $activities->items(),
-                'pagination' => [
-                    'current_page' => $activities->currentPage(),
-                    'last_page' => $activities->lastPage(),
-                    'total' => $activities->total(),
-                    'per_page' => $activities->perPage(),
-                ],
-                'meta' => [
-                    'tgl_dari' => $tglDari,
-                    'tgl_sampai' => $tglSampai,
-                    'search_applied' => $request->search,
-                    'search_by' => $request->get('search_by', 'nama_perusahaan'),
-                    'filtered_types' => $allowedTypes
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error in CustomerActivityController@list: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage()
-            ], 500);
-        }
+        // 8. Response (bespoke envelope: pagination + meta top-level keys)
+        return response()->json([
+            'success' => true,
+            'message' => 'Data aktivitas berhasil diambil',
+            'data' => $activities->items(),
+            'pagination' => [
+                'current_page' => $activities->currentPage(),
+                'last_page' => $activities->lastPage(),
+                'total' => $activities->total(),
+                'per_page' => $activities->perPage(),
+            ],
+            'meta' => [
+                'tgl_dari' => $tglDari,
+                'tgl_sampai' => $tglSampai,
+                'search_applied' => $request->search,
+                'search_by' => $request->get('search_by', 'nama_perusahaan'),
+                'filtered_types' => $allowedTypes
+            ]
+        ]);
     }
 
     /**
@@ -406,17 +405,13 @@ class CustomerActivityController extends Controller
      */
     public function view($id): JsonResponse
     {
-        try {
-            $activity = CustomerActivity::with(['files'])
-                ->whereNull('deleted_at')
-                ->find($id);
+        $activity = CustomerActivity::with(['files'])
+            ->whereNull('deleted_at')
+            ->find($id);
 
-            if (!$activity) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data tidak ditemukan.'
-                ], 404);
-            }
+        if (!$activity) {
+            return $this->notFoundResponse('Data tidak ditemukan.');
+        }
 
             // Get current activity data only
             $activityData = [
@@ -453,18 +448,7 @@ class CustomerActivityController extends Controller
                 $activityData['jenis_visit'] = $activity->jenis_visit;
             }
 
-            return response()->json([
-                'success' => true,
-                'data' => $activityData
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error in CustomerActivityController@view: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($activityData);
     }
     /**
      * @OA\Post(
@@ -582,93 +566,20 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function add(Request $request): JsonResponse
+    public function add(StoreCustomerActivityRequest $request): JsonResponse
     {
-        try {
-            DB::beginTransaction();
-
-            // Ekstrak file jika ada (untuk multipart/form-data)
-            $requestData = $request->all();
-
-            // Validate request menggunakan rules untuk ADD
-            $validator = Validator::make(
-                $requestData,
-                array_merge(
-                    $this->getValidationRules(false), // isUpdate = false
-                    [
-                        'files' => 'nullable|array',
-                        'files.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:1024' // 10MB
-                    ]
-                ),
-                $this->getValidationMessages()
-            );
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
-            }
-
-            // Check if leads exists and not deleted
-            $leads = Leads::find($request->leads_id);
-            if (!$leads || $leads->deleted_at) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leads tidak ditemukan atau sudah dihapus.'
-                ], 404);
-            }
-
-            $nomor = $this->generateNomor($request->leads_id);
-            $current_date_time = Carbon::now();
-
-            // Prepare activity data using allowed fields
-            $activityData = $request->only($this->getAllowedFields());
-            $activityData['nomor'] = $nomor;
-            $activityData['branch_id'] = $leads->branch_id;
-            $activityData['user_id'] = Auth::id();
-            $activityData['created_by'] = Auth::user()->full_name;
-            $activityData['created_at'] = $current_date_time;
-
-            $activity = CustomerActivity::create($activityData);
-
-            // Handle file uploads dari multipart/form-data
-            if ($request->hasFile('files')) {
-                $uploadedFiles = $request->file('files');
-
-                foreach ($uploadedFiles as $file) {
-                    $this->storeActivityFile($activity->id, $file);
-                }
-            }
-
-            // Update status leads jika ada
-            if ($request->status_leads_id) {
-                $leads->update([
-                    'status_leads_id' => $request->status_leads_id,
-                    'updated_by' => Auth::user()->full_name,
-                    'updated_at' => $current_date_time
-                ]);
-            }
-
-            DB::commit();
-
-            // Return with complete data
-            $activity->load(['leads', 'files', 'statusLeads']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Customer Activity berhasil dibuat dengan nomor: ' . $nomor,
-                'data' => $activity
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error in CustomerActivityController@add: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
-            ], 500);
+        // Check if leads exists and not deleted (guard di luar transaksi)
+        $leads = Leads::find($request->leads_id);
+        if (!$leads || $leads->deleted_at) {
+            return $this->notFoundResponse('Leads tidak ditemukan atau sudah dihapus.');
         }
+
+        $activity = $this->activityService->createActivity($request, $leads, $this->getAllowedFields());
+
+        // Return with complete data
+        $activity->load(['leads', 'files', 'statusLeads']);
+
+        return $this->createdResponse($activity, 'Customer Activity berhasil dibuat dengan nomor: ' . $activity->nomor);
     }
 
     /**
@@ -773,75 +684,20 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id): JsonResponse
+    public function update(UpdateCustomerActivityRequest $request, $id): JsonResponse
     {
-        try {
-            DB::beginTransaction();
-
-            $activity = CustomerActivity::whereNull('deleted_at')->find($id);
-            if (!$activity) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data tidak ditemukan.'
-                ], 404);
-            }
-
-            // Validate request menggunakan rules untuk UPDATE
-            $validator = Validator::make(
-                $request->all(),
-                $this->getValidationRules(true), // isUpdate = true
-                $this->getValidationMessages()
-            );
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 422);
-            }
-
-            // Get allowed fields (exclude leads_id untuk update)
-            $allowedUpdateFields = array_diff($this->getAllowedFields(), ['leads_id']);
-            $updateData = $request->only($allowedUpdateFields);
-
-            // Only update if there's actual data
-            if (!empty($updateData)) {
-                $current_time = Carbon::now();
-                $updateData['updated_by'] = Auth::user()->full_name;
-                $updateData['updated_at'] = $current_time;
-
-                $activity->update($updateData);
-
-                // Update status leads jika ada dan berubah
-                if ($request->has('status_leads_id') && $request->status_leads_id != $activity->leads->status_leads_id) {
-                    $activity->leads->update([
-                        'status_leads_id' => $request->status_leads_id,
-                        'updated_by' => Auth::user()->full_name,
-                        'updated_at' => $current_time
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            // Reload relationships
-            $activity->refresh();
-            $activity->load(['leads', 'files', 'statusLeads']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Customer Activity berhasil diupdate',
-                'data' => $activity
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Error in CustomerActivityController@update: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server: ' . $e->getMessage()
-            ], 500);
+        $activity = CustomerActivity::whereNull('deleted_at')->find($id);
+        if (!$activity) {
+            return $this->notFoundResponse('Data tidak ditemukan.');
         }
+
+        $this->activityService->updateActivity($request, $activity, $this->getAllowedFields());
+
+        // Reload relationships
+        $activity->refresh();
+        $activity->load(['leads', 'files', 'statusLeads']);
+
+        return $this->successResponse($activity, 'Customer Activity berhasil diupdate');
     }
 
     /**
@@ -893,36 +749,14 @@ class CustomerActivityController extends Controller
      */
     public function delete($id): JsonResponse
     {
-        try {
-            DB::beginTransaction();
-
-            $activity = CustomerActivity::whereNull('deleted_at')->find($id);
-            if (!$activity) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Data tidak ditemukan.'
-                ], 404);
-            }
-
-            $activity->update([
-                'deleted_at' => Carbon::now(),
-                'deleted_by' => Auth::user()->full_name
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Customer Activity berhasil dihapus'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
+        $activity = CustomerActivity::whereNull('deleted_at')->find($id);
+        if (!$activity) {
+            return $this->notFoundResponse('Data tidak ditemukan.');
         }
+
+        $this->activityService->deleteActivity($activity);
+
+        return $this->messageResponse('Customer Activity berhasil dihapus');
     }
 
     /**
@@ -1038,36 +872,22 @@ class CustomerActivityController extends Controller
      */
     public function trackActivity($leadsId): JsonResponse
     {
-        try {
-            $activities = CustomerActivity::with(['files', 'statusLeads'])
-                ->where('leads_id', $leadsId)
-                ->whereNull('deleted_at')
-                ->orderBy('created_at', 'desc')
-                ->get();
+        $activities = CustomerActivity::with(['files', 'statusLeads'])
+            ->where('leads_id', $leadsId)
+            ->whereNull('deleted_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-            $leads = Leads::with(['kebutuhan', 'branch'])->find($leadsId);
+        $leads = Leads::with(['kebutuhan', 'branch'])->find($leadsId);
 
-            if (!$leads) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leads tidak ditemukan.'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'leads' => $leads,
-                    'activities' => $activities
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
+        if (!$leads) {
+            return $this->notFoundResponse('Leads tidak ditemukan.');
         }
+
+        return $this->successResponse([
+            'leads' => $leads,
+            'activities' => $activities
+        ]);
     }
 
 
@@ -1394,7 +1214,7 @@ class CustomerActivityController extends Controller
 
             // === BUAT ACTIVITY BARU (TIPE EMAIL) ===
             $leads = Leads::find($request->leads_id);
-            $nomor = $this->generateNomor($request->leads_id);
+            $nomor = $this->activityService->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
             // Gabungkan recipients (sudah terfilter) untuk disimpan di notes
@@ -1429,7 +1249,7 @@ class CustomerActivityController extends Controller
             ];
             if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
                 // Untuk Sales, buat SalesActivity
-                $activity = $this->createSalesActivity($request->leads_id, $notes);
+                $activity = $this->activityService->createSalesActivity($request->leads_id, $notes);
             } else {
                 // Untuk non-Sales, buat CustomerActivity
                 $activity = CustomerActivity::create($activityData);
@@ -1443,7 +1263,7 @@ class CustomerActivityController extends Controller
                 foreach ($request->file('attachments') as $file) {
                     try {
                         // Simpan file ke storage
-                        $fileName = $this->storeActivityFile($activity->id, $file);
+                        $fileName = $this->activityService->storeActivityFile($activity->id, $file);
 
                         // Simpan file object untuk dikirim via email
                         $attachmentFiles[] = $file;
@@ -1663,23 +1483,12 @@ class CustomerActivityController extends Controller
      */
     public function getTimSalesMembers($timSalesId): JsonResponse
     {
-        try {
-            $members = DB::table('m_tim_sales_d')
-                ->whereNull('deleted_at')
-                ->where('tim_sales_id', $timSalesId)
-                ->get();
+        $members = DB::table('m_tim_sales_d')
+            ->whereNull('deleted_at')
+            ->where('tim_sales_id', $timSalesId)
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $members
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->successResponse($members);
     }
 
     /**
@@ -1714,78 +1523,11 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function addContractActivity(Request $request): JsonResponse
+    public function addContractActivity(StoreContractActivityRequest $request): JsonResponse
     {
-        try {
-            DB::beginTransaction();
+        $activity = $this->activityService->addContractActivity($request);
 
-            $validator = Validator::make($request->all(), [
-                'pks_id' => 'required|exists:sl_pks,id',
-                'tgl_activity' => 'required|date',
-                'tipe' => 'required|string',
-                'tgl_realisasi' => 'nullable|date'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $pks = Pks::find($request->pks_id);
-            $leads = Leads::find($pks->leads_id);
-            $nomor = $this->generateNomor($pks->leads_id);
-            $current_date_time = Carbon::now();
-
-            $activityData = $request->only([
-                'tgl_activity',
-                'tipe',
-                'notes',
-                'start',
-                'end',
-                'durasi',
-                'tgl_realisasi',
-                'jam_realisasi',
-                'jenis_visit_id',
-                'notulen',
-                'email'
-            ]);
-
-            $activityData['nomor'] = $nomor;
-            $activityData['pks_id'] = $request->pks_id;
-            $activityData['leads_id'] = $leads->id;
-            $activityData['branch_id'] = $leads->branch_id;
-            $activityData['is_activity'] = 1;
-            $activityData['user_id'] = Auth::id();
-            $activityData['created_by'] = Auth::user()->full_name;
-            $activityData['created_at'] = $current_date_time;
-
-            $activity = CustomerActivity::create($activityData);
-
-            // Handle file uploads jika ada
-            if ($request->has('files')) {
-                foreach ($request->files as $file) {
-                    $this->storeActivityFile($activity->id, $file);
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Contract Activity berhasil dibuat dengan nomor: ' . $nomor,
-                'data' => $activity
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->createdResponse($activity, 'Contract Activity berhasil dibuat dengan nomor: ' . $activity->nomor);
     }
 
     /**
@@ -1835,25 +1577,14 @@ class CustomerActivityController extends Controller
      */
     public function getContractActivities($pksId): JsonResponse
     {
-        try {
-            $activities = CustomerActivity::with(['files'])
-                ->where('pks_id', $pksId)
-                ->where('is_activity', 1)
-                ->whereNull('deleted_at')
-                ->orderBy('tgl_activity', 'desc')
-                ->get();
+        $activities = CustomerActivity::with(['files'])
+            ->where('pks_id', $pksId)
+            ->where('is_activity', 1)
+            ->whereNull('deleted_at')
+            ->orderBy('tgl_activity', 'desc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $activities
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->successResponse($activities);
     }
 
     /**
@@ -1884,90 +1615,11 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function assignRO(Request $request): JsonResponse
+    public function assignRO(AssignRoRequest $request): JsonResponse
     {
-        try {
-            DB::beginTransaction();
+        $nomor = $this->activityService->assignRO($request);
 
-            $validator = Validator::make($request->all(), [
-                'leads_id' => 'required|exists:sl_leads,id',
-                'ro_id' => 'required|integer',
-                'ro_team' => 'nullable|array',
-                'ro_team.*' => 'integer',
-                'notes' => 'required|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $leads = Leads::find($request->leads_id);
-            $nomor = $this->generateNomor($request->leads_id);
-            $current_date_time = Carbon::now();
-
-            // Get RO name
-            $roUser = DB::connection('mysqlhris')
-                ->table('m_user')
-                ->where('id', $request->ro_id)
-                ->first();
-
-            // Create activity
-            $activityData = [
-                'nomor' => $nomor,
-                'tgl_activity' => $current_date_time->toDateString(),
-                'leads_id' => $request->leads_id,
-                'branch_id' => $leads->branch_id,
-                'tipe' => 'Pilih RO',
-                'notes' => $request->notes,
-                'ro_id' => $request->ro_id,
-                'ro' => $roUser ? $roUser->full_name : null,
-                'is_activity' => 1,
-                'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::id(),
-                'created_at' => $current_date_time
-            ];
-
-            if ($request->pks_id) {
-                $activityData['pks_id'] = $request->pks_id;
-            }
-
-            CustomerActivity::create($activityData);
-
-            // Update leads
-            $updateData = [
-                'ro_id' => $request->ro_id,
-                'ro' => $roUser ? $roUser->full_name : null,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
-            ];
-
-            if ($request->ro_team) {
-                $updateData['ro_id_1'] = $request->ro_team[0] ?? null;
-                $updateData['ro_id_2'] = $request->ro_team[1] ?? null;
-                $updateData['ro_id_3'] = $request->ro_team[2] ?? null;
-            }
-
-            Leads::where('id', $request->leads_id)->update($updateData);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'RO berhasil ditugaskan dengan nomor: ' . $nomor
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->messageResponse('RO berhasil ditugaskan dengan nomor: ' . $nomor, 201);
     }
 
     /**
@@ -1998,89 +1650,11 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function assignCRM(Request $request): JsonResponse
+    public function assignCRM(AssignCrmRequest $request): JsonResponse
     {
-        try {
-            DB::beginTransaction();
+        $nomor = $this->activityService->assignCRM($request);
 
-            $validator = Validator::make($request->all(), [
-                'leads_id' => 'required|exists:sl_leads,id',
-                'crm_id' => 'required|integer',
-                'crm_team' => 'nullable|array',
-                'crm_team.*' => 'integer',
-                'notes' => 'required|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $leads = Leads::find($request->leads_id);
-            $nomor = $this->generateNomor($request->leads_id);
-            $current_date_time = Carbon::now();
-
-            // Get CRM name
-            $crmUser = DB::connection('mysqlhris')
-                ->table('m_user')
-                ->where('id', $request->crm_id)
-                ->first();
-
-            // Create activity
-            $activityData = [
-                'nomor' => $nomor,
-                'tgl_activity' => $current_date_time->toDateString(),
-                'leads_id' => $request->leads_id,
-                'branch_id' => $leads->branch_id,
-                'tipe' => 'Pilih CRM',
-                'notes' => $request->notes,
-                'crm_id' => $request->crm_id,
-                'crm' => $crmUser ? $crmUser->full_name : null,
-                'is_activity' => 1,
-                'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::id(),
-                'created_at' => $current_date_time
-            ];
-
-            if ($request->pks_id) {
-                $activityData['pks_id'] = $request->pks_id;
-            }
-
-            CustomerActivity::create($activityData);
-
-            // Update leads
-            $updateData = [
-                'crm_id' => $request->crm_id,
-                'crm' => $crmUser ? $crmUser->full_name : null,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
-            ];
-
-            if ($request->crm_team) {
-                $updateData['crm_id_1'] = $request->crm_team[0] ?? null;
-                $updateData['crm_id_2'] = $request->crm_team[1] ?? null;
-            }
-
-            Leads::where('id', $request->leads_id)->update($updateData);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'CRM berhasil ditugaskan dengan nomor: ' . $nomor
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->messageResponse('CRM berhasil ditugaskan dengan nomor: ' . $nomor, 201);
     }
 
     /**
@@ -2109,67 +1683,11 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function updateContractStatus(Request $request): JsonResponse
+    public function updateContractStatus(UpdateContractStatusRequest $request): JsonResponse
     {
-        try {
-            DB::beginTransaction();
+        $nomor = $this->activityService->updateContractStatus($request);
 
-            $validator = Validator::make($request->all(), [
-                'pks_id' => 'required|exists:sl_pks,id',
-                'status_pks_id' => 'required|exists:m_status_pks,id',
-                'notes' => 'required|string'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $pks = Pks::find($request->pks_id);
-            $leads = Leads::find($pks->leads_id);
-            $nomor = $this->generateNomor($pks->leads_id);
-            $current_date_time = Carbon::now();
-
-            // Create activity
-            CustomerActivity::create([
-                'nomor' => $nomor,
-                'pks_id' => $request->pks_id,
-                'tgl_activity' => $current_date_time->toDateString(),
-                'leads_id' => $leads->id,
-                'branch_id' => $leads->branch_id,
-                'tipe' => 'Update Status',
-                'notes' => $request->notes,
-                'is_activity' => 1,
-                'user_id' => Auth::id(),
-                'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::id(),
-                'created_at' => $current_date_time
-            ]);
-
-            // Update PKS status
-            Pks::where('id', $request->pks_id)->update([
-                'status_pks_id' => $request->status_pks_id,
-                'updated_at' => $current_date_time,
-                'updated_by' => Auth::user()->full_name
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Status kontrak berhasil diupdate dengan nomor: ' . $nomor
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->messageResponse('Status kontrak berhasil diupdate dengan nomor: ' . $nomor, 201);
     }
 
     /**
@@ -2214,37 +1732,26 @@ class CustomerActivityController extends Controller
      */
     public function getContractIssues($pksId): JsonResponse
     {
-        try {
-            $issues = DB::table('sl_issue')
-                ->select([
-                    'id',
-                    'judul',
-                    'jenis_keluhan',
-                    'kolaborator',
-                    'deskripsi',
-                    'url_lampiran',
-                    'status',
-                    'created_at',
-                    'created_by',
-                    'updated_at',
-                    'updated_by'
-                ])
-                ->whereNull('deleted_at')
-                ->where('pks_id', $pksId)
-                ->orderBy('created_at', 'desc')
-                ->get();
+        $issues = DB::table('sl_issue')
+            ->select([
+                'id',
+                'judul',
+                'jenis_keluhan',
+                'kolaborator',
+                'deskripsi',
+                'url_lampiran',
+                'status',
+                'created_at',
+                'created_by',
+                'updated_at',
+                'updated_by'
+            ])
+            ->whereNull('deleted_at')
+            ->where('pks_id', $pksId)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => $issues
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan server.'
-            ], 500);
-        }
+        return $this->successResponse($issues);
     }
 
 
@@ -2315,155 +1822,43 @@ class CustomerActivityController extends Controller
      *     )
      * )
      */
-    public function availableLeads()
+    public function availableLeads(): JsonResponse
     {
-        try {
-            $user = Auth::user();
+        $user = Auth::user();
 
-            // Gunakan scope dari model dengan select hanya kolom yang diperlukan
-            $query = Leads::select([
-                'id',
-                'nama_perusahaan',
-                'branch_id',
-                'tgl_leads',
-                'pic',
-                'no_telp'
+        // Gunakan scope dari model dengan select hanya kolom yang diperlukan
+        $query = Leads::select([
+            'id',
+            'nama_perusahaan',
+            'branch_id',
+            'tgl_leads',
+            'pic',
+            'no_telp'
+        ])
+            ->with([
+                'branch:id,name' // Hanya ambil id dan name dari branch
             ])
-                ->with([
-                    'branch:id,name' // Hanya ambil id dan name dari branch
-                ])
-                ->availableForActivity($user);
+            ->availableForActivity($user);
 
-            $data = $query->get();
+        $data = $query->get();
 
-            // Transformasi data
-            $transformed = $data->map(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'nama_perusahaan' => $item->nama_perusahaan,
-                    'nama_branch' => $item->branch ? $item->branch->name : null,
-                    'tanggal_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
-                    'pic' => $item->pic,
-                    'no_telp_pic' => $item->no_telp
-                ];
-            });
+        // Transformasi data
+        $transformed = $data->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama_perusahaan' => $item->nama_perusahaan,
+                'nama_branch' => $item->branch ? $item->branch->name : null,
+                'tanggal_leads' => Carbon::parse($item->tgl_leads)->isoFormat('D MMMM Y'),
+                'pic' => $item->pic,
+                'no_telp_pic' => $item->no_telp
+            ];
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data leads tersedia berhasil diambil',
-                'data' => $transformed
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($transformed, 'Data leads tersedia berhasil diambil');
     }
 
 
     //=====halper functions=====//
-    /**
-     * Menggabungkan dan mengelola validation rules untuk Add (Create) dan Update.
-     *
-     * @param bool $isUpdate True jika rules untuk update, false untuk add (create).
-     * @return array
-     */
-    private function getValidationRules(bool $isUpdate = false): array
-    {
-        // Default rules
-        $rules = [
-            'tgl_activity' => 'required|date',
-            'tipe' => 'required|string|in:Telepon,Email,Meeting,Visit,Online Meeting',
-            'notes' => 'nullable|string',
-            'notes_tipe' => 'nullable|string',
-            'tim_sales_id' => 'nullable|exists:m_tim_sales,id',
-            'tim_sales_d_id' => 'nullable|exists:m_tim_sales_d,id',
-            'status_leads_id' => 'nullable|exists:m_status_leads,id',
-            'start' => 'nullable|date_format:H:i',
-            'end' => 'nullable|date_format:H:i|after:start',
-            'durasi' => 'nullable|integer|min:0',
-            'tgl_realisasi' => 'nullable|date',
-            'jam_realisasi' => 'nullable|date_format:H:i',
-            'jenis_visit_id' => 'nullable|integer',
-            'jenis_visit' => 'nullable|string',
-            'notulen' => 'nullable|string',
-            'email' => 'nullable|email',
-            'penerima' => 'nullable|string',
-            'link_bukti_foto' => 'nullable|url',
-        ];
-
-        if (!$isUpdate) {
-            // Rules khusus untuk ADD (Create)
-            $rules['leads_id'] = 'required|exists:sl_leads,id';
-            $rules['tgl_realisasi'] .= '|after_or_equal:tgl_activity'; // Tambahkan rule ini hanya untuk ADD
-            $rules['files'] = 'nullable|array';
-            $rules['files.*.nama_file'] = 'required_with:files|string|max:255';
-            $rules['files.*.file_content'] = 'required_with:files|string';
-        } else {
-            // Rules khusus untuk UPDATE
-            // Ubah rule 'required' di tgl_activity dan tipe menjadi 'sometimes|required'
-            $rules['tgl_activity'] = 'sometimes|' . $rules['tgl_activity'];
-            $rules['tipe'] = 'sometimes|' . $rules['tipe'];
-            // Hapus rule files untuk update jika tidak diperlukan
-            unset($rules['files'], $rules['files.*.nama_file'], $rules['files.*.file_content']);
-        }
-
-        return $rules;
-    }
-
-    /**
-     * Custom validation messages.
-     *
-     * @return array
-     */
-    private function getValidationMessages(): array
-    {
-        return [
-            // Required messages
-            'leads_id.required' => 'Leads wajib dipilih.',
-            'leads_id.exists' => 'Leads yang dipilih tidak valid.',
-            'tgl_activity.required' => 'Tanggal activity wajib diisi.',
-            'tgl_activity.date' => 'Format tanggal activity tidak valid.',
-            'tipe.required' => 'Tipe activity wajib dipilih.',
-            'tipe.in' => 'Tipe activity harus salah satu dari: Telepon, Email, Meeting, Visit, atau Online Meeting.',
-
-            // Tim Sales validation
-            'tim_sales_id.exists' => 'Tim Sales yang dipilih tidak valid.',
-            'tim_sales_d_id.exists' => 'Sales yang dipilih tidak valid.',
-
-            // Status leads validation
-            'status_leads_id.exists' => 'Status leads yang dipilih tidak valid.',
-
-            // Time validation
-            'start.date_format' => 'Format jam mulai harus HH:MM (contoh: 09:00).',
-            'end.date_format' => 'Format jam selesai harus HH:MM (contoh: 10:00).',
-            'end.after' => 'Jam selesai harus lebih besar dari jam mulai.',
-            'jam_realisasi.date_format' => 'Format jam realisasi harus HH:MM (contoh: 09:00).',
-
-            // Duration validation
-            'durasi.integer' => 'Durasi harus berupa angka.',
-            'durasi.min' => 'Durasi tidak boleh kurang dari 0.',
-
-            // Date validation
-            'tgl_realisasi.date' => 'Format tanggal realisasi tidak valid.',
-            'tgl_realisasi.after_or_equal' => 'Tanggal realisasi tidak boleh sebelum tanggal activity.',
-
-            // Email validation
-            'email.email' => 'Format email tidak valid.',
-
-            // URL validation
-            'link_bukti_foto.url' => 'Format link bukti foto tidak valid.',
-
-            // File validation
-            'files.array' => 'Format files harus berupa array.',
-            'files.*.file' => 'File yang diupload harus berupa file.',
-            'files.*.mimes' => 'File harus berformat: pdf, doc, docx, jpg, jpeg, atau png.',
-            'files.*.max' => 'Ukuran file maksimal 1MB.',
-
-        ];
-    }
-
     /**
      * Fields yang diizinkan untuk create/update.
      *
@@ -2494,114 +1889,4 @@ class CustomerActivityController extends Controller
         ];
     }
 
-    /**
-     * Generate nomor customer activity
-     */
-    private function generateNomor($leadsId): string
-    {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-
-        $prefix = "CAT/";
-        if ($leads) {
-            switch ($leads->kebutuhan_id) {
-                case 2:
-                    $prefix .= "LS/";
-                    break;
-                case 1:
-                    $prefix .= "SG/";
-                    break;
-                case 3:
-                    $prefix .= "CS/";
-                    break;
-                case 4:
-                    $prefix .= "LL/";
-                    break;
-                default:
-                    $prefix .= "NN/";
-                    break;
-            }
-            $prefix .= $leads->nomor . "-";
-        } else {
-            $prefix .= "NN/NNNNN-";
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $year = $now->year;
-
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
-        $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-
-        return $prefix . $month . $year . "-" . $sequence;
-    }
-    /**
-     * Store activity file - Konsisten dengan storeSpkFile di SpkController
-     * 
-     * @param int $activityId
-     * @param \Illuminate\Http\UploadedFile $file
-     * @return string
-     */
-    private function storeActivityFile($activityId, $file)
-    {
-        try {
-            $fileExtension = $file->getClientOriginalExtension();
-            $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-            $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
-
-            // ✅ Simpan file ke disk 'customer-activity' yang sudah dikonfigurasi
-            Storage::disk('customer-activity')->put($fileName, file_get_contents($file));
-
-            // ✅ Generate URL manual (konsisten dengan uploadSpk)
-            $fileUrl = url('document/customer-activity/' . $fileName);
-
-            \Log::info('Customer Activity File Generated URL: ' . $fileUrl);
-            \Log::info('Filename: ' . $fileName);
-            \Log::info('File path: ' . Storage::disk('customer-activity')->path($fileName));
-            \Log::info('File exists: ' . (Storage::disk('customer-activity')->exists($fileName) ? 'Yes' : 'No'));
-
-            // Simpan ke database
-            CustomerActivityFile::create([
-                'customer_activity_id' => $activityId,
-                'nama_file' => $file->getClientOriginalName(),
-                'url_file' => $fileUrl,
-                'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::id(),
-                'created_at' => Carbon::now()
-            ]);
-
-            return $fileName;
-
-        } catch (\Exception $e) {
-            Log::error('Error storing activity file: ' . $e->getMessage());
-            throw new \Exception('Gagal menyimpan file: ' . $e->getMessage());
-        }
-    }
-    private function createSalesActivity($leadsId, $notulen) // Hapus :void
-    {
-        $user = Auth::user();
-        $leadsKebutuhanList = LeadsKebutuhan::where('leads_id', $leadsId)
-            ->whereNotNull('tim_sales_d_id')
-            ->get();
-
-        $firstActivity = null;
-
-        foreach ($leadsKebutuhanList as $leadsKebutuhan) {
-            $activity = SalesActivity::create([
-                'leads_id' => $leadsId,
-                'leads_kebutuhan_id' => $leadsKebutuhan->id,
-                'tgl_activity' => Carbon::now(),
-                'jenis_activity' => 'Email',
-                'notulen' => $notulen,
-                'created_by' => $user->full_name,
-                'created_by_user_id' => $user->id
-            ]);
-
-            // Simpan activity pertama sebagai referensi lampiran
-            if (!$firstActivity) {
-                $firstActivity = $activity;
-            }
-        }
-
-        return $firstActivity;
-    }
 }
