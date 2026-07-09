@@ -272,6 +272,14 @@ class QuotationCalculationCharacterizationTest extends TestCase
         // NOTE (characterization): coss_data.total_tunjangan is populated from the HPP
         // total_tunjangan (200000), NOT the per-row nominal_coss (150000). Locking as-is.
         $this->assertEqualsWithDelta(200000.0, (float) $coss1->total_tunjangan, 0.01);
+
+        // generateKerjasama() runs as part of the same Step 11 execute() call and must
+        // still produce the boilerplate "perjanjian kerjasama" rows (locks behavior ahead
+        // of moving this call outside the DB transaction — audit #10).
+        $this->assertSame(
+            8,
+            DB::table('sl_quotation_kerjasama')->where('quotation_id', self::QUOTATION_ID)->whereNull('deleted_at')->count()
+        );
     }
 
     public function test_sync_barang_data_creates_kaporlap_rows(): void

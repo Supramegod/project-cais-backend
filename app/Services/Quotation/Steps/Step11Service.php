@@ -162,7 +162,6 @@ class Step11Service
             $this->helper->cleanQuotationAttributes($quotation);
 
             DB::table('sl_quotation')->where('id', $quotation->id)->update($quotationData);
-            $this->generateKerjasama($quotation);
 
             DB::commit();
             $quotation->refresh();
@@ -172,6 +171,16 @@ class Step11Service
             throw $e;
         } finally {
             $this->clearStep11Maps();
+        }
+
+        // Generates the boilerplate "perjanjian kerjasama" text from quotation fields
+        // already committed above (kebutuhan/top/salary_rule_id, not calculation output).
+        // Kept outside the pricing transaction (audit #10) — idempotent (guarded by an
+        // existing-rows check) and a failure here shouldn't roll back the priced quotation.
+        try {
+            $this->generateKerjasama($quotation);
+        } catch (\Exception $e) {
+            Log::error('Error in generateKerjasama: '.$e->getMessage());
         }
     }
 
