@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\JenisPerusahaanRequest;
+use App\Http\Requests\Master\JenisPerusahaanRequest;
 use App\Models\JenisPerusahaan;
 /**
  * @OA\Tag(

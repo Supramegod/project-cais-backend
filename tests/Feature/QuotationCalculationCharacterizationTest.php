@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Quotation;
 use App\Models\User;
-use App\Services\QuotationBarangService;
-use App\Services\QuotationService;
-use App\Services\Steps\Step11Service;
+use App\Services\Quotation\QuotationBarangService;
+use App\Services\Quotation\QuotationService;
+use App\Services\Quotation\Steps\Step11Service;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;

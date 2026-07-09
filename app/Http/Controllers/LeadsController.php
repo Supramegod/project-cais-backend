@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreLeadRequest;
-use App\Http\Requests\UpdateLeadRequest;
-use App\Http\Requests\ImportLeadRequest;
-use App\Http\Requests\AssignSalesRequest;
-use App\Http\Requests\RemoveSalesRequest;
+use App\Http\Requests\Leads\StoreLeadRequest;
+use App\Http\Requests\Leads\UpdateLeadRequest;
+use App\Http\Requests\Leads\ImportLeadRequest;
+use App\Http\Requests\Leads\AssignSalesRequest;
+use App\Http\Requests\Leads\RemoveSalesRequest;
 use App\Models\Benua;
 use App\Models\BidangPerusahaan;
 use App\Models\City;
@@ -44,7 +44,13 @@ use Illuminate\Support\Facades\DB;
 
 class LeadsController extends Controller
 {
-    public function __construct(private \App\Services\LeadsService $leadsService) {}
+    public function __construct(
+        private \App\Services\Leads\LeadsQueryService $leadsQueryService,
+        private \App\Services\Leads\LeadsCommandService $leadsCommandService,
+        private \App\Services\Leads\LeadsLifecycleService $leadsLifecycleService,
+        private \App\Services\Leads\LeadsAssignService $leadsAssignService,
+        private \App\Services\Leads\LeadsRelationService $leadsRelationService,
+    ) {}
 
     /**
      * @OA\Get(
@@ -496,7 +502,7 @@ class LeadsController extends Controller
      */
     public function add(StoreLeadRequest $request)
     {
-        $data = $this->leadsService->createLead($request);
+        $data = $this->leadsCommandService->createLead($request);
 
         return $this->successResponse($data, 'Leads ' . $request->nama_perusahaan . ' berhasil disimpan');
     }
@@ -649,7 +655,7 @@ class LeadsController extends Controller
             return $this->notFoundResponse('Lead tidak ditemukan');
         }
 
-        $data = $this->leadsService->updateLead($request, $lead);
+        $data = $this->leadsCommandService->updateLead($request, $lead);
 
         return $this->successResponse($data, 'Leads ' . $request->nama_perusahaan . ' berhasil diupdate');
     }
@@ -708,7 +714,7 @@ class LeadsController extends Controller
             return $this->notFoundResponse('Lead tidak ditemukan');
         }
 
-        $this->leadsService->deleteLead($lead);
+        $this->leadsLifecycleService->deleteLead($lead);
 
         return $this->messageResponse('Leads ' . $lead->nama_perusahaan . ' berhasil dihapus beserta kebutuhan terkait');
     }
@@ -768,7 +774,7 @@ class LeadsController extends Controller
             return $this->notFoundResponse('Lead tidak ditemukan');
         }
 
-        $this->leadsService->restoreLead($lead);
+        $this->leadsLifecycleService->restoreLead($lead);
 
         return $this->messageResponse('Leads ' . $lead->nama_perusahaan . ' berhasil direstore beserta kebutuhan terkait');
     }
@@ -1001,7 +1007,7 @@ class LeadsController extends Controller
             return $this->errorResponse('Nama perusahaan harus diisi', 400);
         }
 
-        $newLead = $this->leadsService->saveChildLeads($request, $leadsParent);
+        $newLead = $this->leadsRelationService->saveChildLeads($request, $leadsParent);
 
         return $this->successResponse($newLead, 'Leads ' . $request->nama_perusahaan . ' berhasil disimpan');
     }
@@ -1220,7 +1226,7 @@ class LeadsController extends Controller
             return $this->notFoundResponse('Lead tidak ditemukan');
         }
 
-        $this->leadsService->activateLead($lead);
+        $this->leadsLifecycleService->activateLead($lead);
 
         return $this->messageResponse('Lead ' . $lead->nama_perusahaan . ' berhasil diaktifkan');
     }
@@ -1411,7 +1417,7 @@ class LeadsController extends Controller
      */
     public function generateNullKode()
     {
-        $this->leadsService->generateNullKode();
+        $this->leadsLifecycleService->generateNullKode();
 
         return $this->messageResponse('Nomor berhasil digenerate untuk semua leads yang belum memiliki nomor.');
     }
@@ -1769,7 +1775,7 @@ class LeadsController extends Controller
             return $this->errorResponse('Anda tidak memiliki akses untuk mengassign sales', 403);
         }
 
-        $data = $this->leadsService->assignSales($request, $lead, $user);
+        $data = $this->leadsAssignService->assignSales($request, $lead, $user);
 
         return $this->successResponse($data, 'Sales berhasil diassign ke kebutuhan lead');
     }
@@ -1817,7 +1823,7 @@ class LeadsController extends Controller
             return $this->notFoundResponse('Lead tidak ditemukan');
         }
 
-        $data = $this->leadsService->removeSales($request, $lead);
+        $data = $this->leadsAssignService->removeSales($request, $lead);
 
         return $this->successResponse($data, 'Assignment sales berhasil dihapus dari ' . $data['removed_count'] . ' kebutuhan');
     }
@@ -1918,7 +1924,7 @@ class LeadsController extends Controller
                 $data['nama_status'] = $item->nama_status;
 
                 // Hitung sisa kontrak menggunakan method di class ini
-                $data['sisa_kontrak'] = $this->leadsService->hitungBerakhirKontrak($item->kontrak_akhir);
+                $data['sisa_kontrak'] = $this->leadsRelationService->hitungBerakhirKontrak($item->kontrak_akhir);
 
                 unset($data['leads']);
 

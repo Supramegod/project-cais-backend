@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SubmissionV2IdsRequest;
+use App\Http\Requests\Submission\SubmissionV2IdsRequest;
 use App\Models\SubmissionV2;
 use App\Models\Leads;
 use App\Models\CustomerActivity;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreUmpRequest;
+use App\Http\Requests\Upah\StoreUmpRequest;
 use App\Models\Ump;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

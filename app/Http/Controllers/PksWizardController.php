@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\PksWizardInitializeRequest;
-use App\Http\Requests\PksWizardFinalizeRequest;
-use App\Http\Requests\PksWizardPasalPreviewRequest;
-use App\Http\Requests\PksWizardPasalPreviewUpdateRequest;
-use App\Http\Requests\PksWizardStepRequest;
+use App\Http\Requests\Pks\PksWizardInitializeRequest;
+use App\Http\Requests\Pks\PksWizardFinalizeRequest;
+use App\Http\Requests\Pks\PksWizardPasalPreviewRequest;
+use App\Http\Requests\Pks\PksWizardPasalPreviewUpdateRequest;
+use App\Http\Requests\Pks\PksWizardStepRequest;
 use App\Models\Pks;
-use App\Services\PksPasalPreviewService;
-use App\Services\PksWizardFinalizeService;
-use App\Services\PksWizardService;
+use App\Services\Pks\PksPasalPreviewService;
+use App\Services\Pks\Wizard\PksWizardFinalizeService;
+use App\Services\Pks\Wizard\PksWizardService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

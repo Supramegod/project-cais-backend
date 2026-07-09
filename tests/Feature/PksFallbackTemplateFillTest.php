@@ -8,7 +8,7 @@ use App\Models\Leads;
 use App\Models\Pks;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
-use App\Services\PksPerjanjianTemplateService;
+use App\Services\Pks\Template\PksPerjanjianTemplateService;
 use Tests\TestCase;
 
 /**

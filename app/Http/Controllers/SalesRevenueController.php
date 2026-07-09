@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use App\Http\Requests\SalesRevenueByMonthRequest;
-use App\Http\Requests\SalesRevenueKpiRequest;
-use App\Http\Requests\SalesRevenueListRequest;
-use App\Services\SalesRevenueService;
+use App\Http\Requests\Sales\SalesRevenueByMonthRequest;
+use App\Http\Requests\Sales\SalesRevenueKpiRequest;
+use App\Http\Requests\Sales\SalesRevenueListRequest;
+use App\Services\SalesRevenue\SalesRevenueCalculationService;
+use App\Services\SalesRevenue\SalesRevenueKpiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +19,8 @@ use Illuminate\Http\Request;
 class SalesRevenueController extends Controller
 {
     public function __construct(
-        protected SalesRevenueService $revenueService
+        protected SalesRevenueCalculationService $revenueService,
+        protected SalesRevenueKpiService $kpiService
     ) {
     }
 
@@ -174,7 +175,7 @@ class SalesRevenueController extends Controller
         // period_type dibutuhkan service untuk query target yang tepat
         $filters['period_type'] = $request->get('period_type', 'monthly');
 
-        $kpiResult = $this->revenueService->getKpiComparison($filters);
+        $kpiResult = $this->kpiService->getKpiComparison($filters);
 
         // Bespoke report envelope (message + summary + metadata) — kept as raw JSON.
         return response()->json([

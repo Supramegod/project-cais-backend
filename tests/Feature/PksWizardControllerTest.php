@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\Pks;
 use App\Models\User;
-use App\Services\PksWizardService;
+use App\Services\Pks\Wizard\PksWizardService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

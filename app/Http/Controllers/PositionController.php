@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\PositionSaveRequest;
-use App\Http\Requests\PositionEditRequest;
-use App\Http\Requests\PositionRequirementAddRequest;
-use App\Http\Requests\PositionRequirementEditRequest;
+use App\Http\Requests\Position\PositionSaveRequest;
+use App\Http\Requests\Position\PositionEditRequest;
+use App\Http\Requests\Position\PositionRequirementAddRequest;
+use App\Http\Requests\Position\PositionRequirementEditRequest;
 use App\Models\Position;
 use App\Models\RequirementPosisi;
 use Illuminate\Http\Request;

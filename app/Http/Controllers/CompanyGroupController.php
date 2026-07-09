@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\CompanyGroupStoreRequest;
-use App\Http\Requests\CompanyGroupUpdateRequest;
+use App\Http\Requests\Master\CompanyGroupStoreRequest;
+use App\Http\Requests\Master\CompanyGroupUpdateRequest;
 use App\Models\PerusahaanGroup;
 use App\Models\PerusahaanGroupDetail;
 use App\Models\Leads;

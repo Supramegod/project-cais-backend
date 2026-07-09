@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\DashboardApprovalListRequest;
-use App\Http\Requests\NotificationIndexRequest;
+use App\Http\Requests\Dashboard\DashboardApprovalListRequest;
+use App\Http\Requests\Dashboard\NotificationIndexRequest;
 use App\Models\Quotation;
 use App\Models\LogNotification;
 use Illuminate\Http\JsonResponse;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreUmkRequest;
+use App\Http\Requests\Upah\StoreUmkRequest;
 use App\Models\Umk;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

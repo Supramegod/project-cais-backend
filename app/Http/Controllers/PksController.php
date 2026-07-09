@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ComparePerjanjianRequest;
-use App\Http\Requests\PksStoreRequest;
-use App\Http\Requests\PksUpdateRequest;
-use App\Http\Requests\StorePasalRequest;
-use App\Http\Requests\UpdatePerjanjianRequest;
-use App\Http\Requests\UploadPksRequest;
+use App\Http\Requests\Pks\ComparePerjanjianRequest;
+use App\Http\Requests\Pks\PksStoreRequest;
+use App\Http\Requests\Pks\PksUpdateRequest;
+use App\Http\Requests\Pks\StorePasalRequest;
+use App\Http\Requests\Pks\UpdatePerjanjianRequest;
+use App\Http\Requests\Pks\UploadPksRequest;
 use App\Http\Resources\QuotationResource;
 use App\Models\Client;
 use App\Models\Company;
@@ -37,8 +37,8 @@ use App\Models\SalesActivity;
 use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
-use App\Services\PksPerjanjianTemplateService;
-use App\Services\PksTemplate\PksTemplateFactory;
+use App\Services\Pks\Template\PksPerjanjianTemplateService;
+use App\Services\Pks\Template\PksTemplateFactory;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -58,7 +58,7 @@ use SebastianBergmann\Diff\Output\UnifiedDiffOutputBuilder;
  */
 class PksController extends Controller
 {
-    public function __construct(private \App\Services\PksService $pksService)
+    public function __construct(private \App\Services\Pks\PksService $pksService)
     {
     }
 

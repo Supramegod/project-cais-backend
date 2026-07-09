@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use App\Http\Requests\UserEmailConfigSaveRequest;
+use App\Http\Requests\UserEmailConfig\UserEmailConfigSaveRequest;
 use App\Models\UserEmailConfig;
 use App\Services\DynamicMailerService;
 

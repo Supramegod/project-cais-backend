@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SalesActivityStoreRequest;
+use App\Http\Requests\Sales\SalesActivityStoreRequest;
 use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;

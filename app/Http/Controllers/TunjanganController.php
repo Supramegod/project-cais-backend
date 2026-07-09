@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\TunjanganRequest;
+use App\Http\Requests\Master\TunjanganRequest;
 use App\Models\TunjanganPosisi;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;

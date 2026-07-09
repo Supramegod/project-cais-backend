@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\BarangRequest;
-use App\Http\Requests\BarangDefaultQtyRequest;
-use App\Http\Requests\BarangDefaultQtyBulkRequest;
+use App\Http\Requests\Barang\BarangRequest;
+use App\Http\Requests\Barang\BarangDefaultQtyRequest;
+use App\Http\Requests\Barang\BarangDefaultQtyBulkRequest;
 use App\Models\Barang;
 use App\Models\JenisBarang;
 use App\Models\Kebutuhan;

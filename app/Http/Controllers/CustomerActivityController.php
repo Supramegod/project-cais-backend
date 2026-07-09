@@ -4,15 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 
-use App\Http\Requests\AssignCrmRequest;
-use App\Http\Requests\AssignRoRequest;
-use App\Http\Requests\StoreContractActivityRequest;
-use App\Http\Requests\StoreCustomerActivityRequest;
-use App\Http\Requests\UpdateContractStatusRequest;
-use App\Http\Requests\UpdateCustomerActivityRequest;
+use App\Http\Requests\CustomerActivity\AssignCrmRequest;
+use App\Http\Requests\CustomerActivity\AssignRoRequest;
+use App\Http\Requests\CustomerActivity\StoreContractActivityRequest;
+use App\Http\Requests\CustomerActivity\StoreCustomerActivityRequest;
+use App\Http\Requests\CustomerActivity\UpdateContractStatusRequest;
+use App\Http\Requests\CustomerActivity\UpdateCustomerActivityRequest;
 use App\Mail\CustomerActivityEmail;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
+use App\Services\CustomerActivity\ActivityCommandService;
+use App\Services\CustomerActivity\ActivityContractService;
+use App\Services\CustomerActivity\ActivityEmailService;
+use App\Services\CustomerActivity\ActivityQueryService;
 use App\Services\DynamicMailerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -38,12 +42,23 @@ use Illuminate\Support\Str;
 class CustomerActivityController extends Controller
 {
     private $dynamicMailerService;
-    private $activityService;
+    private $activityQueryService;
+    private $activityCommandService;
+    private $activityEmailService;
+    private $activityContractService;
 
-    public function __construct(DynamicMailerService $dynamicMailerService, \App\Services\CustomerActivityService $activityService)
-    {
+    public function __construct(
+        DynamicMailerService $dynamicMailerService,
+        ActivityQueryService $activityQueryService,
+        ActivityCommandService $activityCommandService,
+        ActivityEmailService $activityEmailService,
+        ActivityContractService $activityContractService
+    ) {
         $this->dynamicMailerService = $dynamicMailerService;
-        $this->activityService = $activityService;
+        $this->activityQueryService = $activityQueryService;
+        $this->activityCommandService = $activityCommandService;
+        $this->activityEmailService = $activityEmailService;
+        $this->activityContractService = $activityContractService;
     }
     /**
      * @OA\Get(
@@ -574,7 +589,7 @@ class CustomerActivityController extends Controller
             return $this->notFoundResponse('Leads tidak ditemukan atau sudah dihapus.');
         }
 
-        $activity = $this->activityService->createActivity($request, $leads, $this->getAllowedFields());
+        $activity = $this->activityCommandService->createActivity($request, $leads, $this->getAllowedFields());
 
         // Return with complete data
         $activity->load(['leads', 'files', 'statusLeads']);
@@ -691,7 +706,7 @@ class CustomerActivityController extends Controller
             return $this->notFoundResponse('Data tidak ditemukan.');
         }
 
-        $this->activityService->updateActivity($request, $activity, $this->getAllowedFields());
+        $this->activityCommandService->updateActivity($request, $activity, $this->getAllowedFields());
 
         // Reload relationships
         $activity->refresh();
@@ -754,7 +769,7 @@ class CustomerActivityController extends Controller
             return $this->notFoundResponse('Data tidak ditemukan.');
         }
 
-        $this->activityService->deleteActivity($activity);
+        $this->activityCommandService->deleteActivity($activity);
 
         return $this->messageResponse('Customer Activity berhasil dihapus');
     }
@@ -1214,7 +1229,7 @@ class CustomerActivityController extends Controller
 
             // === BUAT ACTIVITY BARU (TIPE EMAIL) ===
             $leads = Leads::find($request->leads_id);
-            $nomor = $this->activityService->generateNomor($request->leads_id);
+            $nomor = $this->activityEmailService->generateNomor($request->leads_id);
             $current_date_time = Carbon::now();
 
             // Gabungkan recipients (sudah terfilter) untuk disimpan di notes
@@ -1249,7 +1264,7 @@ class CustomerActivityController extends Controller
             ];
             if ($user && in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
                 // Untuk Sales, buat SalesActivity
-                $activity = $this->activityService->createSalesActivity($request->leads_id, $notes);
+                $activity = $this->activityEmailService->createSalesActivity($request->leads_id, $notes);
             } else {
                 // Untuk non-Sales, buat CustomerActivity
                 $activity = CustomerActivity::create($activityData);
@@ -1263,7 +1278,7 @@ class CustomerActivityController extends Controller
                 foreach ($request->file('attachments') as $file) {
                     try {
                         // Simpan file ke storage
-                        $fileName = $this->activityService->storeActivityFile($activity->id, $file);
+                        $fileName = $this->activityEmailService->storeActivityFile($activity->id, $file);
 
                         // Simpan file object untuk dikirim via email
                         $attachmentFiles[] = $file;
@@ -1525,7 +1540,7 @@ class CustomerActivityController extends Controller
      */
     public function addContractActivity(StoreContractActivityRequest $request): JsonResponse
     {
-        $activity = $this->activityService->addContractActivity($request);
+        $activity = $this->activityContractService->addContractActivity($request);
 
         return $this->createdResponse($activity, 'Contract Activity berhasil dibuat dengan nomor: ' . $activity->nomor);
     }
@@ -1617,7 +1632,7 @@ class CustomerActivityController extends Controller
      */
     public function assignRO(AssignRoRequest $request): JsonResponse
     {
-        $nomor = $this->activityService->assignRO($request);
+        $nomor = $this->activityContractService->assignRO($request);
 
         return $this->messageResponse('RO berhasil ditugaskan dengan nomor: ' . $nomor, 201);
     }
@@ -1652,7 +1667,7 @@ class CustomerActivityController extends Controller
      */
     public function assignCRM(AssignCrmRequest $request): JsonResponse
     {
-        $nomor = $this->activityService->assignCRM($request);
+        $nomor = $this->activityContractService->assignCRM($request);
 
         return $this->messageResponse('CRM berhasil ditugaskan dengan nomor: ' . $nomor, 201);
     }
@@ -1685,7 +1700,7 @@ class CustomerActivityController extends Controller
      */
     public function updateContractStatus(UpdateContractStatusRequest $request): JsonResponse
     {
-        $nomor = $this->activityService->updateContractStatus($request);
+        $nomor = $this->activityContractService->updateContractStatus($request);
 
         return $this->messageResponse('Status kontrak berhasil diupdate dengan nomor: ' . $nomor, 201);
     }
