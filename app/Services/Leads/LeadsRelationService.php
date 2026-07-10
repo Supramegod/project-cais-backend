@@ -248,7 +248,7 @@ class LeadsRelationService
     // UTILITIES
     // ======================================================================
 
-    private function hitungBerakhirKontrak($tanggalBerakhir)
+    public function hitungBerakhirKontrak($tanggalBerakhir)
     {
         if (is_null($tanggalBerakhir)) {
             return "-";
