@@ -8,11 +8,11 @@ use App\Models\Leads;
 use App\Models\Pks;
 use App\Models\RuleThr;
 use App\Models\SalaryRule;
-use App\Services\PksTemplate\PksGsuTemplateService;
-use App\Services\PksTemplate\PksIonTemplateService;
-use App\Services\PksTemplate\PksRciTemplateService;
-use App\Services\PksTemplate\PksSigTemplateService;
-use App\Services\PksTemplate\PksTemplateFactory;
+use App\Services\Pks\Template\PksGsuTemplateService;
+use App\Services\Pks\Template\PksIonTemplateService;
+use App\Services\Pks\Template\PksRciTemplateService;
+use App\Services\Pks\Template\PksSigTemplateService;
+use App\Services\Pks\Template\PksTemplateFactory;
 use Tests\TestCase;
 
 /**

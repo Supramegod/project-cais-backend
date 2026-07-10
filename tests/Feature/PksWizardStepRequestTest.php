@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Http\Requests\PksWizardStepRequest;
+use App\Http\Requests\Pks\PksWizardStepRequest;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

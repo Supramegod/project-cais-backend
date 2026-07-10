@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Master\CompanyGroupStoreRequest;
+use App\Http\Requests\Master\CompanyGroupUpdateRequest;
 use App\Models\PerusahaanGroup;
 use App\Models\PerusahaanGroupDetail;
 use App\Models\Leads;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -55,6 +56,7 @@ class CompanyGroupController extends Controller
     {
         return [
             'name' => Auth::user()->full_name ?? 'System',
+            'id' => Auth::id(),
             'time' => Carbon::now()
         ];
     }
@@ -104,29 +106,23 @@ class CompanyGroupController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $search = $request->input('search');
-            $query = PerusahaanGroup::select('id', 'nama_grup', 'jumlah_perusahaan', 'created_by', 'created_at')
-                ->orderBy('created_at', 'desc');
+        $search = $request->input('search');
+        $query = PerusahaanGroup::select('id', 'nama_grup', 'jumlah_perusahaan', 'created_by', 'created_at')
+            ->orderBy('created_at', 'desc');
 
-            if ($search) {
-                $query->search($search);
-            }
-
-            $groups = $query->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data grup perusahaan berhasil diambil',
-                'data' => $groups,
-                'total' => $groups->count()
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+        if ($search) {
+            $query->search($search);
         }
+
+        $groups = $query->get();
+
+        // Bespoke `total` shape — kept raw (trait envelope tak punya field ini).
+        return response()->json([
+            'success' => true,
+            'message' => 'Data grup perusahaan berhasil diambil',
+            'data' => $groups,
+            'total' => $groups->count()
+        ]);
     }
 
     /**
@@ -194,36 +190,25 @@ class CompanyGroupController extends Controller
      */
     public function view($id)
     {
-        try {
-            $group = PerusahaanGroup::find($id);
-            if (!$group) {
-                return response()->json(['success' => false, 'message' => 'Grup tidak ditemukan'], 404);
-            }
-
-            $perusahaanDetails = PerusahaanGroupDetail::with([
-                'lead.jenisPerusahaan:id,nama',
-                'lead.statusLeads:id,nama,warna_background,warna_font'
-            ])->where('group_id', $id)->get();
-
-            $perusahaan = $perusahaanDetails->map(function ($detail) {
-                return $detail->lead ? $this->mapLeadToResponse($detail->lead) : null;
-            })->filter()->sortBy('nama_perusahaan')->values();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Detail grup berhasil diambil',
-                'data' => [
-                    'group' => $group,
-                    'total_perusahaan' => $perusahaan->count(),
-                    'perusahaan' => $perusahaan
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+        $group = PerusahaanGroup::find($id);
+        if (!$group) {
+            return $this->notFoundResponse('Grup tidak ditemukan');
         }
+
+        $perusahaanDetails = PerusahaanGroupDetail::with([
+            'lead.jenisPerusahaan:id,nama',
+            'lead.statusLeads:id,nama,warna_background,warna_font'
+        ])->where('group_id', $id)->get();
+
+        $perusahaan = $perusahaanDetails->map(function ($detail) {
+            return $detail->lead ? $this->mapLeadToResponse($detail->lead) : null;
+        })->filter()->sortBy('nama_perusahaan')->values();
+
+        return $this->successResponse([
+            'group' => $group,
+            'total_perusahaan' => $perusahaan->count(),
+            'perusahaan' => $perusahaan
+        ], 'Detail grup berhasil diambil');
     }
 
     /**
@@ -274,36 +259,13 @@ class CompanyGroupController extends Controller
      *     )
      * )
      */
-    public function create(Request $request)
+    public function create(CompanyGroupStoreRequest $request)
     {
-        try {
-            DB::beginTransaction();
+        $userInfo = $this->getCurrentUserInfo();
+        $perusahaanIds = $request->input('perusahaan_ids', []);
+        $namaGrup = $request->input('nama_grup');
 
-            // Validasi input
-            $validator = Validator::make($request->all(), [
-                'nama_grup' => 'required|string|min:3|max:100|unique:sl_perusahaan_groups,nama_grup',
-                'perusahaan_ids' => 'sometimes|array',
-                'perusahaan_ids.*' => 'integer|exists:sl_leads,id'
-            ], [
-                'nama_grup.required' => 'Nama grup wajib diisi',
-                'nama_grup.unique' => 'Nama grup sudah digunakan',
-                'nama_grup.min' => 'Nama grup minimal 3 karakter',
-                'nama_grup.max' => 'Nama grup maksimal 100 karakter',
-                'perusahaan_ids.array' => 'Format perusahaan_ids harus berupa array',
-                'perusahaan_ids.*.exists' => 'Salah satu perusahaan tidak ditemukan'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            $userInfo = $this->getCurrentUserInfo();
-            $perusahaanIds = $request->input('perusahaan_ids', []);
-            $namaGrup = $request->input('nama_grup');
-
+        [$group, $stats] = DB::transaction(function () use ($namaGrup, $perusahaanIds, $userInfo) {
             // Buat grup baru
             $group = PerusahaanGroup::create([
                 'nama_grup' => $namaGrup,
@@ -332,30 +294,19 @@ class CompanyGroupController extends Controller
                 $group->refresh();
             }
 
-            DB::commit();
+            return [$group, $stats];
+        });
 
-            // Build response message
-            $message = $this->buildCreateSuccessMessage($group->nama_grup, $stats);
+        // Build response message
+        $message = $this->buildCreateSuccessMessage($group->nama_grup, $stats);
 
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'data' => [
-                    'group' => $group,
-                    'added_companies' => $stats['added'],
-                    'already_in_group' => $stats['already_in_group'],
-                    'not_found' => $stats['not_found'],
-                    'companies_with_group' => $stats['companies_with_group']
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse([
+            'group' => $group,
+            'added_companies' => $stats['added'],
+            'already_in_group' => $stats['already_in_group'],
+            'not_found' => $stats['not_found'],
+            'companies_with_group' => $stats['companies_with_group']
+        ], $message);
     }
 
     /**
@@ -549,49 +500,25 @@ class CompanyGroupController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(CompanyGroupUpdateRequest $request, $id)
     {
-        try {
-            DB::beginTransaction();
-
-            $validator = Validator::make($request->all(), [
-                'nama_grup' => 'required|max:100|min:3|unique:sl_perusahaan_groups,nama_grup,' . $id,
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $validator->errors()
-                ], 400);
-            }
-
-            $group = PerusahaanGroup::find($id);
-            if (!$group) {
-                return response()->json(['success' => false, 'message' => 'Grup tidak ditemukan'], 404);
-            }
-
-            $userInfo = $this->getCurrentUserInfo();
-
-            $group->update([
-                'nama_grup' => $request->nama_grup,
-                'update_at' => $userInfo['time'],
-                'update_by' => $userInfo['name']
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Grup "' . $request->nama_grup . '" berhasil diperbarui',
-                'data' => $group->refresh()
-            ]);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+        $group = PerusahaanGroup::find($id);
+        if (!$group) {
+            return $this->notFoundResponse('Grup tidak ditemukan');
         }
+
+        $userInfo = $this->getCurrentUserInfo();
+
+        $group->update([
+            'nama_grup' => $request->nama_grup,
+            'update_at' => $userInfo['time'],
+            'update_by' => $userInfo['name']
+        ]);
+
+        return $this->successResponse(
+            $group->refresh(),
+            'Grup "' . $request->nama_grup . '" berhasil diperbarui'
+        );
     }
 
     /**
@@ -635,30 +562,17 @@ class CompanyGroupController extends Controller
      */
     public function delete($id)
     {
-        try {
-            DB::beginTransaction();
+        $group = PerusahaanGroup::find($id);
+        if (!$group) {
+            return $this->notFoundResponse('Grup tidak ditemukan');
+        }
 
-            $group = PerusahaanGroup::find($id);
-            if (!$group) {
-                return response()->json(['success' => false, 'message' => 'Grup tidak ditemukan'], 404);
-            }
-
+        DB::transaction(function () use ($id, $group) {
             PerusahaanGroupDetail::where('group_id', $id)->delete();
             $group->delete();
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Grup perusahaan berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->messageResponse('Grup perusahaan berhasil dihapus');
     }
 
     // ==================== ANGGOTA MANAGEMENT ====================
@@ -710,27 +624,16 @@ class CompanyGroupController extends Controller
      */
     public function getCompaniesInGroup($groupId)
     {
-        try {
-            $perusahaanDetails = PerusahaanGroupDetail::with([
-                'lead.jenisPerusahaan:id,nama',
-                'lead.statusLeads:id,nama,warna_background,warna_font'
-            ])->where('group_id', $groupId)->get();
+        $perusahaanDetails = PerusahaanGroupDetail::with([
+            'lead.jenisPerusahaan:id,nama',
+            'lead.statusLeads:id,nama,warna_background,warna_font'
+        ])->where('group_id', $groupId)->get();
 
-            $perusahaan = $perusahaanDetails->map(function ($detail) {
-                return $detail->lead ? $this->mapLeadToResponse($detail->lead) : null;
-            })->filter()->sortBy('nama_perusahaan')->values();
+        $perusahaan = $perusahaanDetails->map(function ($detail) {
+            return $detail->lead ? $this->mapLeadToResponse($detail->lead) : null;
+        })->filter()->sortBy('nama_perusahaan')->values();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data perusahaan dalam grup berhasil diambil',
-                'data' => $perusahaan
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($perusahaan, 'Data perusahaan dalam grup berhasil diambil');
     }
 
     /**
@@ -796,43 +699,37 @@ class CompanyGroupController extends Controller
      */
     public function getAvailableCompanies(Request $request, $groupId)
     {
-        try {
-            $keyword = trim($request->input('keyword', ''));
+        $keyword = trim($request->input('keyword', ''));
 
-            $group = PerusahaanGroup::find($groupId);
-            if (!$group) {
-                return response()->json(['success' => false, 'message' => 'Grup tidak ditemukan'], 404);
-            }
-
-            $query = Leads::query()
-                ->select('id', 'nama_perusahaan', 'kota', 'pic', 'no_telp', 'email', 'jenis_perusahaan_id', 'status_leads_id')
-                ->with(['jenisPerusahaan:id,nama', 'statusLeads:id,nama,warna_background,warna_font'])
-                ->whereDoesntHave('groupDetails')
-                ->whereNull('deleted_at');
-
-            if (!empty($keyword) && strlen($keyword) >= 2) {
-                $query->where(function ($q) use ($keyword) {
-                    $q->where('nama_perusahaan', 'like', "%{$keyword}%")
-                        ->orWhere('kota', 'like', "%{$keyword}%");
-                });
-            }
-
-            $companies = $query->orderBy('nama_perusahaan')
-                ->get()
-                ->map(fn($lead) => $this->mapLeadToResponse($lead));
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data perusahaan tersedia berhasil diambil',
-                'data' => $companies,
-                'total' => $companies->count()
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+        $group = PerusahaanGroup::find($groupId);
+        if (!$group) {
+            return $this->notFoundResponse('Grup tidak ditemukan');
         }
+
+        $query = Leads::query()
+            ->select('id', 'nama_perusahaan', 'kota', 'pic', 'no_telp', 'email', 'jenis_perusahaan_id', 'status_leads_id')
+            ->with(['jenisPerusahaan:id,nama', 'statusLeads:id,nama,warna_background,warna_font'])
+            ->whereDoesntHave('groupDetails')
+            ->whereNull('deleted_at');
+
+        if (!empty($keyword) && strlen($keyword) >= 2) {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('nama_perusahaan', 'like', "%{$keyword}%")
+                    ->orWhere('kota', 'like', "%{$keyword}%");
+            });
+        }
+
+        $companies = $query->orderBy('nama_perusahaan')
+            ->get()
+            ->map(fn($lead) => $this->mapLeadToResponse($lead));
+
+        // Bespoke `total` shape — kept raw.
+        return response()->json([
+            'success' => true,
+            'message' => 'Data perusahaan tersedia berhasil diambil',
+            'data' => $companies,
+            'total' => $companies->count()
+        ]);
     }
 
     /**
@@ -883,33 +780,20 @@ class CompanyGroupController extends Controller
      */
     public function removeCompany($groupId, $companyId)
     {
-        try {
-            DB::beginTransaction();
+        $groupDetail = PerusahaanGroupDetail::where('group_id', $groupId)
+            ->where('leads_id', $companyId)
+            ->first();
 
-            $groupDetail = PerusahaanGroupDetail::where('group_id', $groupId)
-                ->where('leads_id', $companyId)
-                ->first();
+        if (!$groupDetail) {
+            return $this->notFoundResponse('Data tidak ditemukan');
+        }
 
-            if (!$groupDetail) {
-                return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
-            }
-
+        DB::transaction(function () use ($groupDetail, $groupId) {
             $groupDetail->delete();
             $this->updateGroupCompanyCount($groupId);
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Perusahaan berhasil dihapus dari grup'
-            ]);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->messageResponse('Perusahaan berhasil dihapus dari grup');
     }
 
     // ==================== BULK OPERATIONS ====================
@@ -966,15 +850,14 @@ class CompanyGroupController extends Controller
      */
     public function bulkAssign(Request $request)
     {
-        try {
-            DB::beginTransaction();
+        $assignments = $request->input('assignments', []);
+        if (empty($assignments) || !is_array($assignments)) {
+            return $this->errorResponse('Data assignments tidak valid', 400);
+        }
 
-            $assignments = $request->input('assignments', []);
-            if (empty($assignments) || !is_array($assignments)) {
-                return response()->json(['success' => false, 'message' => 'Data assignments tidak valid'], 400);
-            }
+        $userInfo = $this->getCurrentUserInfo();
 
-            $userInfo = $this->getCurrentUserInfo();
+        [$totalProcessed, $totalSkipped] = DB::transaction(function () use ($assignments, $userInfo) {
             $totalProcessed = 0;
             $totalSkipped = 0;
 
@@ -1022,24 +905,17 @@ class CompanyGroupController extends Controller
                 }
             }
 
-            DB::commit();
+            return [$totalProcessed, $totalSkipped];
+        });
 
-            $message = "Berhasil memproses {$totalProcessed} perusahaan";
-            if ($totalSkipped > 0)
-                $message .= ", {$totalSkipped} dilewati karena sudah ada di grup";
+        $message = "Berhasil memproses {$totalProcessed} perusahaan";
+        if ($totalSkipped > 0)
+            $message .= ", {$totalSkipped} dilewati karena sudah ada di grup";
 
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'data' => ['processed' => $totalProcessed, 'skipped' => $totalSkipped]
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse(
+            ['processed' => $totalProcessed, 'skipped' => $totalSkipped],
+            $message
+        );
     }
 
     /**
@@ -1094,14 +970,12 @@ class CompanyGroupController extends Controller
      */
     public function bulkRemoveCompanies(Request $request)
     {
-        try {
-            DB::beginTransaction();
+        $removals = $request->input('removals', []);
+        if (empty($removals) || !is_array($removals)) {
+            return $this->errorResponse('Data removals tidak valid', 400);
+        }
 
-            $removals = $request->input('removals', []);
-            if (empty($removals) || !is_array($removals)) {
-                return response()->json(['success' => false, 'message' => 'Data removals tidak valid'], 400);
-            }
-
+        [$totalRemoved, $totalNotFound] = DB::transaction(function () use ($removals) {
             $totalRemoved = 0;
             $totalNotFound = 0;
 
@@ -1124,24 +998,17 @@ class CompanyGroupController extends Controller
                 }
             }
 
-            DB::commit();
+            return [$totalRemoved, $totalNotFound];
+        });
 
-            $message = "Berhasil menghapus {$totalRemoved} perusahaan dari grup";
-            if ($totalNotFound > 0)
-                $message .= ", {$totalNotFound} tidak ditemukan";
+        $message = "Berhasil menghapus {$totalRemoved} perusahaan dari grup";
+        if ($totalNotFound > 0)
+            $message .= ", {$totalNotFound} tidak ditemukan";
 
-            return response()->json([
-                'success' => true,
-                'message' => $message,
-                'data' => ['removed' => $totalRemoved, 'not_found' => $totalNotFound]
-            ]);
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse(
+            ['removed' => $totalRemoved, 'not_found' => $totalNotFound],
+            $message
+        );
     }
 
     // ==================== DASHBOARD & UTILITIES ====================
@@ -1193,35 +1060,24 @@ class CompanyGroupController extends Controller
      */
     public function getStatistics()
     {
-        try {
-            $totalGroups = PerusahaanGroup::count();
-            $totalCompaniesInGroups = PerusahaanGroupDetail::count();
+        $totalGroups = PerusahaanGroup::count();
+        $totalCompaniesInGroups = PerusahaanGroupDetail::count();
 
-            $companiesInGroups = PerusahaanGroupDetail::pluck('leads_id');
-            $companiesWithoutGroup = Leads::whereNull('deleted_at')
-                ->whereNotIn('id', $companiesInGroups)
-                ->count();
+        $companiesInGroups = PerusahaanGroupDetail::pluck('leads_id');
+        $companiesWithoutGroup = Leads::whereNull('deleted_at')
+            ->whereNotIn('id', $companiesInGroups)
+            ->count();
 
-            $largestGroup = PerusahaanGroup::orderBy('jumlah_perusahaan', 'desc')->first();
-            $recentGroups = PerusahaanGroup::orderBy('created_at', 'desc')->limit(5)->get();
+        $largestGroup = PerusahaanGroup::orderBy('jumlah_perusahaan', 'desc')->first();
+        $recentGroups = PerusahaanGroup::orderBy('created_at', 'desc')->limit(5)->get();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Statistik grup perusahaan berhasil diambil',
-                'data' => [
-                    'total_groups' => $totalGroups,
-                    'total_companies_in_groups' => $totalCompaniesInGroups,
-                    'companies_without_group' => $companiesWithoutGroup,
-                    'largest_group' => $largestGroup,
-                    'recent_groups' => $recentGroups
-                ]
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse([
+            'total_groups' => $totalGroups,
+            'total_companies_in_groups' => $totalCompaniesInGroups,
+            'companies_without_group' => $companiesWithoutGroup,
+            'largest_group' => $largestGroup,
+            'recent_groups' => $recentGroups
+        ], 'Statistik grup perusahaan berhasil diambil');
     }
 
     /**
@@ -1265,38 +1121,27 @@ class CompanyGroupController extends Controller
      */
     public function getRecommendations(Request $request)
     {
-        try {
-            $keyword = $request->input('keyword');
+        $keyword = $request->input('keyword');
 
-            $companies = Leads::query()
-                ->select('id', 'nama_perusahaan', 'kota', 'jenis_perusahaan_id')
-                ->whereDoesntHave('groupDetails')
-                ->whereNull('deleted_at')
-                ->with('jenisPerusahaan:id,nama')
-                ->when($keyword, function ($query, $keyword) {
-                    $query->where('nama_perusahaan', 'like', '%' . $keyword . '%');
-                })
-                ->orderBy('nama_perusahaan')
-                ->get()
-                ->map(function ($lead) {
-                    return [
-                        'id' => $lead->id,
-                        'nama_perusahaan' => $lead->nama_perusahaan,
-                        'kota' => $lead->kota,
-                        'jenis_perusahaan' => optional($lead->jenisPerusahaan)->nama,
-                    ];
-                });
+        $companies = Leads::query()
+            ->select('id', 'nama_perusahaan', 'kota', 'jenis_perusahaan_id')
+            ->whereDoesntHave('groupDetails')
+            ->whereNull('deleted_at')
+            ->with('jenisPerusahaan:id,nama')
+            ->when($keyword, function ($query, $keyword) {
+                $query->where('nama_perusahaan', 'like', '%' . $keyword . '%');
+            })
+            ->orderBy('nama_perusahaan')
+            ->get()
+            ->map(function ($lead) {
+                return [
+                    'id' => $lead->id,
+                    'nama_perusahaan' => $lead->nama_perusahaan,
+                    'kota' => $lead->kota,
+                    'jenis_perusahaan' => optional($lead->jenisPerusahaan)->nama,
+                ];
+            });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Rekomendasi perusahaan berhasil diambil',
-                'data' => $companies
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat memfilter perusahaan: ' . $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($companies, 'Rekomendasi perusahaan berhasil diambil');
     }
 }

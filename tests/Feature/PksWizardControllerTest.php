@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\Pks;
 use App\Models\User;
-use App\Services\PksWizardService;
+use App\Services\Pks\Wizard\PksWizardService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +73,7 @@ class PksWizardControllerTest extends TestCase
             ->assertJsonPath('data.wizard_current_step', 1);
 
         $this->assertNotNull($response->json('data.pks_id'));
-        $this->assertStringStartsWith('draft/PKS/SIG/LDS001-', $response->json('data.nomor'));
+        $this->assertStringStartsWith('draft/PKS/ORG/SIG/LDS001-', $response->json('data.nomor'));
     }
 
     public function test_update_step_endpoint_returns_success_envelope(): void

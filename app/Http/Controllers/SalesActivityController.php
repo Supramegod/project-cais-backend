@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SalesActivityStoreRequest;
+use App\Http\Requests\Sales\SalesActivityStoreRequest;
 use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
@@ -230,8 +230,8 @@ class SalesActivityController extends Controller
             }
 
             // Sorting dan pagination
-            $query->orderBy('tgl_activity', 'desc')
-                ->orderBy('created_at', 'desc');
+            $query->orderBy('tgl_activity', 'desc');
+                // ->orderBy('created_at', 'desc');
 
             $perPage = $request->input('per_page', 15);
             $activities = $query->paginate($perPage);

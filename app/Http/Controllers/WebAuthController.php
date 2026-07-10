@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\LoginWebRequest;
+use App\Http\Requests\Auth\LoginWebRequest;
 use App\Models\RefreshTokens;
 use App\Models\User;
 use App\Models\HrisPersonalAccessToken;

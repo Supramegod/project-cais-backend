@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\DashboardApprovalListRequest;
-use App\Http\Requests\NotificationIndexRequest;
+use App\Http\Requests\Dashboard\DashboardApprovalListRequest;
+use App\Http\Requests\Dashboard\NotificationIndexRequest;
 use App\Models\Quotation;
 use App\Models\LogNotification;
 use Illuminate\Http\JsonResponse;
@@ -115,8 +115,7 @@ class DashboardApprovalController extends Controller
         // query COUNT() ringan — tanpa fetch record ke PHP.
         // Frontend cukup panggil 1x API dan baca key yang dibutuhkan.
         // ---------------------------------------------------------------
-        $counts = $this->getAllCaseCounts($baseQuery, $user);
-        $pendingSummary = $this->getPendingApprovalSummary($baseQuery);
+        ['counts' => $counts, 'summary' => $pendingSummary] = $this->getCaseCountsAndPendingSummary($baseQuery, $user);
 
         // Query list data (dengan select & eager load)
         $query = $baseQuery()
@@ -438,7 +437,12 @@ class DashboardApprovalController extends Controller
     // PRIVATE HELPERS
     // ============================================================
 
-    private function getAllCaseCounts(\Closure $baseQuery, $user): array
+    /**
+     * Computes the case-count buckets and the pending-approval-per-role summary in one pass.
+     * dir_sales/dir_keu were previously counted twice (once per method) with identical
+     * conditions — merged here so each COUNT query runs only once.
+     */
+    private function getCaseCountsAndPendingSummary(\Closure $baseQuery, $user): array
     {
         // semua → base query tanpa filter tambahan
         $countSemua = $baseQuery()->count();
@@ -470,8 +474,6 @@ class DashboardApprovalController extends Controller
             })
             ->count();
 
-        $countMenungguApproval = $countDirSales + $countDirKeu;
-
         // quotation-belum-lengkap
         $countBelumLengkap = $baseQuery()
             ->where('step', '!=', 100)
@@ -479,35 +481,16 @@ class DashboardApprovalController extends Controller
             ->count();
 
         return [
-            'semua' => $countSemua,
-            'menunggu_anda' => $countMenungguAnda,
-            'menunggu_approval' => $countMenungguApproval,
-            'quotation_belum_lengkap' => $countBelumLengkap,
-        ];
-    }
-
-    private function getPendingApprovalSummary(\Closure $baseQuery): array
-    {
-        $baseConditions = fn() => $baseQuery()
-            ->where('is_aktif', 0)
-            ->where('status_quotation_id', 2)
-            ->where('step', 100);
-
-        return [
-            'dir_sales' => (clone $baseConditions())
-                ->whereNull('ot1')
-                ->count(),
-
-            'dir_keu' => (clone $baseConditions())
-                ->whereNotNull('ot1')
-                ->whereNull('ot2')
-                ->where('top', 'Lebih Dari 7 Hari')
-                ->whereHas('quotationDetails', function ($wageQ) {
-                    $wageQ->whereHas('wage', function ($q) {
-                        $q->where('thr', '!=', 'diprovisikan');
-                    });
-                })
-                ->count(),
+            'counts' => [
+                'semua' => $countSemua,
+                'menunggu_anda' => $countMenungguAnda,
+                'menunggu_approval' => $countDirSales + $countDirKeu,
+                'quotation_belum_lengkap' => $countBelumLengkap,
+            ],
+            'summary' => [
+                'dir_sales' => $countDirSales,
+                'dir_keu' => $countDirKeu,
+            ],
         ];
     }
 

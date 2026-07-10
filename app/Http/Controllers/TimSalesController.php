@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\TimSalesRequest;
-use App\Http\Requests\TimSalesAddMemberRequest;
-use App\Http\Requests\TimSalesSetLeaderRequest;
+use App\Http\Requests\TimSales\TimSalesRequest;
+use App\Http\Requests\TimSales\TimSalesAddMemberRequest;
+use App\Http\Requests\TimSales\TimSalesSetLeaderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\SalaryRuleRequest;
+use App\Http\Requests\Master\SalaryRuleRequest;
 use App\Models\SalaryRule;
 use Illuminate\Support\Facades\Auth;
 

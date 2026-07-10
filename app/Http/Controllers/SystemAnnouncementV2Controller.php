@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SystemAnnouncementImageRequest;
-use App\Http\Requests\SystemAnnouncementV2Request;
+use App\Http\Requests\SystemAnnouncement\SystemAnnouncementImageRequest;
+use App\Http\Requests\SystemAnnouncement\SystemAnnouncementV2Request;
 use App\Models\SystemAnnouncement;
 use App\Models\SystemAnnouncementFile;
 use Illuminate\Http\Request;

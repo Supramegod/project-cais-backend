@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\LoginRequest;
-use App\Http\Requests\RefreshTokenRequest;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Models\RefreshTokens;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -110,10 +110,7 @@ class AuthController extends Controller
             $user = User::checkLogin($request->username, $request->password)->first();
 
             if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Username atau password salah',
-                ], 401);
+                return $this->errorResponse('Username atau password salah', 401);
             }
 
             $this->revokeAllUserTokens($user);
@@ -125,31 +122,27 @@ class AuthController extends Controller
                 'timestamp' => now()
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Login berhasil',
-                'data' => [
-                    'user' => [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'name' => $user->full_name ?? $user->name,
-                        'email' => $user->email,
-                        'cais_role_id' => $user->cais_role_id,
-                        'user_role' => $user->role->name ?? null,
-                        'branch_id' => $user->branch_id,
-                        'branch_name' => $user->branch->name ?? null,
-                    ],
-                    'access_token' => $tokenPair['access_token']->plainTextToken,
-                    'refresh_token' => $tokenPair['refresh_token'],
-                    'token_type' => 'Bearer',
-                    'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
-                        ->timezone('Asia/Jakarta')
-                        ->format('Y-m-d H:i:s'),
-                    'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
-                        ->timezone('Asia/Jakarta')
-                        ->format('Y-m-d H:i:s'),
-                ]
-            ], 200);
+            return $this->successResponse([
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'name' => $user->full_name ?? $user->name,
+                    'email' => $user->email,
+                    'cais_role_id' => $user->cais_role_id,
+                    'user_role' => $user->role->name ?? null,
+                    'branch_id' => $user->branch_id,
+                    'branch_name' => $user->branch->name ?? null,
+                ],
+                'access_token' => $tokenPair['access_token']->plainTextToken,
+                'refresh_token' => $tokenPair['refresh_token'],
+                'token_type' => 'Bearer',
+                'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
+                    ->timezone('Asia/Jakarta')
+                    ->format('Y-m-d H:i:s'),
+                'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
+                    ->timezone('Asia/Jakarta')
+                    ->format('Y-m-d H:i:s'),
+            ], 'Login berhasil');
 
         } catch (Exception $e) {
             Log::error('Login error', [
@@ -158,10 +151,7 @@ class AuthController extends Controller
                 'username_attempt' => $request->username ?? 'unknown'
             ]);
 
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan pada server: ' . $e->getMessage()
-            ], 500);
+            return $this->serverErrorResponse('Terjadi kesalahan pada server: ' . $e->getMessage());
         }
     }
     // Method verifyMD5Password tetap ada tapi tidak dipanggil untuk sementara
@@ -199,10 +189,7 @@ class AuthController extends Controller
     {
         $user = Auth::user();
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated'
-            ], 401);
+            return $this->errorResponse('Unauthenticated', 401);
         }
 
         // 🔥 HAPUS SEMUA TOKEN USER
@@ -214,10 +201,7 @@ class AuthController extends Controller
             'timestamp' => now()
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Logout berhasil'
-        ], 200);
+        return $this->messageResponse('Logout berhasil');
     }
     /**
      * @OA\Get(
@@ -263,34 +247,25 @@ class AuthController extends Controller
             $user = Auth::user();
             // Cek apakah user terautentikasi
             if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthenticated'
-                ], 401);
+                return $this->errorResponse('Unauthenticated', 401);
             }
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'employee' => [
-                        'id' => $user->id,
-                        'username' => $user->username,
-                        'name' => $user->full_name,
-                        'email' => $user->email,
-                        'created_at' => $user->created_at,
-                        'updated_at' => $user->updated_at,
-                    ]
+            return $this->successResponse([
+                'employee' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'name' => $user->full_name,
+                    'email' => $user->email,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
                 ]
-            ], 200);
+            ]);
         } catch (Exception $e) {
             Log::error('User endpoint error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'user_id' => Auth::id() ?? 'unknown'
             ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan pada server'
-            ], 500);
+            return $this->serverErrorResponse('Terjadi kesalahan pada server');
         }
     }
     /**
@@ -354,27 +329,18 @@ class AuthController extends Controller
             $refreshTokenModel = RefreshTokens::where('token', $hashedToken)->first();
 
             if (!$refreshTokenModel) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Refresh token tidak valid'
-                ], 401);
+                return $this->errorResponse('Refresh token tidak valid', 401);
             }
 
             if ($refreshTokenModel->isExpired()) {
                 $refreshTokenModel->delete();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Refresh token telah kadaluarsa'
-                ], 401);
+                return $this->errorResponse('Refresh token telah kadaluarsa', 401);
             }
 
             $user = $refreshTokenModel->tokenableUser();
 
             if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User tidak ditemukan'
-                ], 401);
+                return $this->errorResponse('User tidak ditemukan', 401);
             }
 
             // Ambil ID token saat ini agar tidak ikut terhapus (mengenali device)
@@ -391,34 +357,23 @@ class AuthController extends Controller
                 'timestamp' => now()
             ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Access token berhasil direfresh',
-                'data' => [
-                    'access_token' => $tokenPair['access_token']->plainTextToken,
-                    'refresh_token' => $tokenPair['refresh_token'],
-                    'token_type' => 'Bearer',
-                    'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
-                        ->timezone('Asia/Jakarta')
-                        ->format('Y-m-d H:i:s'),
-                    'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
-                        ->timezone('Asia/Jakarta')
-                        ->format('Y-m-d H:i:s'),
-                ]
-            ], 200);
+            return $this->successResponse([
+                'access_token' => $tokenPair['access_token']->plainTextToken,
+                'refresh_token' => $tokenPair['refresh_token'],
+                'token_type' => 'Bearer',
+                'access_token_expires_at' => $tokenPair['access_token']->accessToken->expires_at
+                    ->timezone('Asia/Jakarta')
+                    ->format('Y-m-d H:i:s'),
+                'refresh_token_expires_at' => $tokenPair['refresh_token_model']->expires_at
+                    ->timezone('Asia/Jakarta')
+                    ->format('Y-m-d H:i:s'),
+            ], 'Access token berhasil direfresh');
 
         } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data tidak valid',
-                'errors' => $e->errors()
-            ], 422);
+            return $this->errorResponse('Data tidak valid', 422, $e->errors());
         } catch (Exception $e) {
             Log::error('Refresh token error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan pada server'
-            ], 500);
+            return $this->serverErrorResponse('Terjadi kesalahan pada server');
         }
     }
 
