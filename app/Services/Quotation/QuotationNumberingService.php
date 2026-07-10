@@ -10,7 +10,7 @@ use Carbon\Carbon;
 /**
  * Standard numbering system untuk Quotation.
  *
- * Format: {PREFIX}/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{YYYYMM}-{SEQ}{VERSION}
+ * Format: {PREFIX}/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{YYYYMMDD}-{SEQ}{VERSION}
  *
  * TIPE:
  *   ORG = Original (baru)
@@ -26,11 +26,11 @@ use Carbon\Carbon;
  *   -R{01} = untuk SPK atau dokumen lain
  *
  * Contoh:
- *   QUOT/ORG/ION/LS001-202612-00001         ← Original
- *   QUOT/RVS/ION/LS001-202612-00001-V01     ← Revisi 1
- *   QUOT/RKT/ION/LS001-202612-00001-K01     ← Rekontrak 1
- *   QUOT/ADD/ION/LS001-202612-00001-A01     ← Addendum 1
- *   QUOT/RVS/ION/LS001-202612-00001-K01-V01 ← Revisi 1 dari Rekontrak 1
+ *   QUOT/ORG/ION/LS001-20261225-00001         ← Original
+ *   QUOT/RVS/ION/LS001-20261225-00001-V01     ← Revisi 1
+ *   QUOT/RKT/ION/LS001-20261225-00001-K01     ← Rekontrak 1
+ *   QUOT/ADD/ION/LS001-20261225-00001-A01     ← Addendum 1
+ *   QUOT/RVS/ION/LS001-20261225-00001-K01-V01 ← Revisi 1 dari Rekontrak 1
  */
 class QuotationNumberingService
 {
@@ -65,7 +65,7 @@ class QuotationNumberingService
         ?int $referensiId = null
     ): string {
         $now = Carbon::now();
-        $yearMonth = $now->format('Ymd'); // 202612
+        $yearMonthDay = $now->format('Ymd'); // 20261225
 
         $leads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
@@ -80,8 +80,8 @@ class QuotationNumberingService
 
         // Original (baru): SEQ counter per bulan
         if ($tipeQuotation === 'baru') {
-            $seq = $this->getNextSequence($base, $yearMonth);
-            return $base . $yearMonth . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
+            $seq = $this->getNextSequence($base, $yearMonthDay);
+            return $base . $yearMonthDay . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
         }
 
         // Turunan (revisi/rekontrak/addendum) — perlu referensi
@@ -95,13 +95,13 @@ class QuotationNumberingService
         $nomorReferensi = $referensi->nomor;
 
         // Ekstrak SEQ dari nomor referensi
-        // Contoh: QUOT/ORG/ION/LS001-202612-00001 → SEQ = 00001
+        // Contoh: QUOT/ORG/ION/LS001-20261225-00001 → SEQ = 00001
         preg_match('/-(\d{5})(?:-\w+)?$/', $nomorReferensi, $matches);
         $seq = $matches[1] ?? '00001';
 
         // Ekstrak existing version suffix dari referensi
-        // Contoh: QUOT/ORG/ION/LS001-202612-00001-K01 → K01
-        //         QUOT/ORG/ION/LS001-202612-00001-K01-V01 → K01-V01
+        // Contoh: QUOT/ORG/ION/LS001-20261225-00001-K01 → K01
+        //         QUOT/ORG/ION/LS001-20261225-00001-K01-V01 → K01-V01
         $existingVersion = '';
         if (preg_match('/-((?:[VKA]\d{2}(?:-[VKA]\d{2})*))$/', $nomorReferensi, $vMatches)) {
             $existingVersion = $vMatches[1];
@@ -116,7 +116,7 @@ class QuotationNumberingService
             : $versionCode;
 
         // Hitung urutan untuk version ini
-        $counter = $this->getVersionCounter($referensiId, $tipeQuotation, $fullVersion, $yearMonth);
+        $counter = $this->getVersionCounter($referensiId, $tipeQuotation, $fullVersion, $yearMonthDay);
 
         // Base untuk nomor turunan: gunakan nomor referensi tanpa version suffix
         $baseNomor = preg_replace('/-(?:[VKA]\d{2}(?:-[VKA]\d{2})*)$/', '', $nomorReferensi);
@@ -141,9 +141,9 @@ class QuotationNumberingService
     /**
      * Dapatkan sequence number untuk original document per bulan.
      */
-    private function getNextSequence(string $base, string $yearMonth): int
+    private function getNextSequence(string $base, string $yearMonthDay): int
     {
-        return Quotation::where('nomor', 'like', $base . $yearMonth . '-%')
+        return Quotation::where('nomor', 'like', $base . $yearMonthDay . '-%')
             ->count() + 1;
     }
 
@@ -154,7 +154,7 @@ class QuotationNumberingService
         int $referensiId,
         string $tipeQuotation,
         string $fullVersion,
-        string $yearMonth
+        string $yearMonthDay
     ): int {
         // Cari berdasarkan parent + tipe
         return Quotation::where(function ($q) use ($referensiId) {
@@ -162,7 +162,7 @@ class QuotationNumberingService
                   ->orWhere('id', $referensiId);
             })
             ->where('tipe_quotation', $tipeQuotation)
-            ->whereYear('created_at', substr($yearMonth, 0, 4))
+            ->whereYear('created_at', substr($yearMonthDay, 0, 4))
             ->count() + 1;
     }
 }

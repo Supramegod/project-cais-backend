@@ -10,7 +10,7 @@ use Carbon\Carbon;
 /**
  * Standard numbering untuk PKS.
  *
- * Format: {PREFIX}/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{YYYYMM}-{SEQ}{VERSION}
+ * Format: {PREFIX}/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{YYYYMMDD}-{SEQ}{VERSION}
  *
  * TIPE:
  *   ORG = Original (baru)
@@ -22,9 +22,9 @@ use Carbon\Carbon;
  *   -A{NN} = Addendum ke-N
  *
  * Contoh:
- *   PKS/ORG/ION/LS001-202612-00001         ← Original
- *   PKS/RKT/ION/LS001-202612-00001-K01     ← Rekontrak 1
- *   PKS/ADD/ION/LS001-202612-00001-A01     ← Addendum 1
+ *   PKS/ORG/ION/LS001-20261225-00001         ← Original
+ *   PKS/RKT/ION/LS001-20261225-00001-K01     ← Rekontrak 1
+ *   PKS/ADD/ION/LS001-20261225-00001-A01     ← Addendum 1
  */
 class PksNumberingService
 {
@@ -50,7 +50,7 @@ class PksNumberingService
     public function generate(int $leadsId, int $companyId, string $tipePks = 'baru', ?int $pksIndukId = null): string
     {
         $now = Carbon::now();
-        $yearMonth = $now->format('Ymd');
+        $yearMonthDay = $now->format('Ymd');
 
         $leads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
@@ -63,9 +63,9 @@ class PksNumberingService
 
         // --- ORIGINAL (baru) & REKONTRAK (own SEQ) ---
         if ($tipePks === 'baru' || $tipePks === 'rekontrak') {
-            $seq = Pks::where('nomor', 'like', $base . $yearMonth . '-%')
+            $seq = Pks::where('nomor', 'like', $base . $yearMonthDay . '-%')
                 ->count() + 1;
-            return $base . $yearMonth . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
+            return $base . $yearMonthDay . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
         }
 
         // --- ADDENDUM (tied to parent SEQ) ---
@@ -78,7 +78,7 @@ class PksNumberingService
 
         // Ekstrak segmen tanggal-SEQ dari nomor induk (mis. 20260710-00001)
         preg_match('/-(\d+-\d{5})(?:-[KA]\d{2}(?:-[KA]\d{2})*)?$/', $nomorInduk, $matches);
-        $dateSeq = $matches[1] ?? ($yearMonth . '-00001');
+        $dateSeq = $matches[1] ?? ($yearMonthDay . '-00001');
 
         // Ekstrak existing version suffix
         $existingVersion = '';
@@ -101,7 +101,7 @@ class PksNumberingService
                   ->orWhere('id', $pksIndukId);
             })
             ->where('tipe_pks', $tipePks)
-            ->whereYear('created_at', (int) substr($yearMonth, 0, 4))
+            ->whereYear('created_at', (int) substr($yearMonthDay, 0, 4))
             ->count() + 1;
 
         return $base . $dateSeq . '-' . $fullVersion . '-' . str_pad($counter, 2, '0', STR_PAD_LEFT);
