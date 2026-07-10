@@ -92,10 +92,6 @@ class PksNumberingService
             default     => throw new \InvalidArgumentException("Tipe '{$tipePks}' tidak memiliki version code"),
         };
 
-        $fullVersion = $existingVersion
-            ? $existingVersion . '-' . $versionCode
-            : $versionCode;
-
         $counter = Pks::where(function ($q) use ($pksIndukId) {
                 $q->where('pks_induk_id', $pksIndukId)
                   ->orWhere('id', $pksIndukId);
@@ -104,6 +100,11 @@ class PksNumberingService
             ->whereYear('created_at', $now->year)
             ->count() + 1;
 
-        return $base . $dateSeq . '-' . $fullVersion . '-' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        $versionSegment = $versionCode . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        $fullVersion = $existingVersion
+            ? $existingVersion . '-' . $versionSegment
+            : $versionSegment;
+
+        return $base . $dateSeq . '-' . $fullVersion;
     }
 }

@@ -110,19 +110,19 @@ class QuotationNumberingService
         // Tentukan version code baru
         $versionCode = $this->getVersionCode($tipeQuotation);
 
-        // Gabungkan: existingVersion + versionCode baru
-        $fullVersion = $existingVersion
-            ? $existingVersion . '-' . $versionCode
-            : $versionCode;
-
         // Hitung urutan untuk version ini
         $counter = $this->getVersionCounter($referensiId, $tipeQuotation, $now->year);
 
+        // Gabungkan: existingVersion + versionCode+counter baru (mis. K01-V01, bukan K-01-V-01)
+        $versionSegment = $versionCode . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        $fullVersion = $existingVersion
+            ? $existingVersion . '-' . $versionSegment
+            : $versionSegment;
+
         // Base untuk nomor turunan: gunakan nomor referensi tanpa version suffix
         $baseNomor = preg_replace('/-(?:[VKA]\d{2}(?:-[VKA]\d{2})*)$/', '', $nomorReferensi);
-        $baseNomor = $baseNomor . '-' . $fullVersion;
 
-        return $baseNomor . '-' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        return $baseNomor . '-' . $fullVersion;
     }
 
     /**
