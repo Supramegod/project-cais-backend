@@ -67,9 +67,13 @@ class QuotationNumberingService
         $now = Carbon::now();
         $monthYear = $now->format('mY'); // 072026
 
+        if (!array_key_exists($tipeQuotation, self::TIPE_MAP)) {
+            throw new \InvalidArgumentException("Tipe Quotation '{$tipeQuotation}' tidak dikenal");
+        }
+
         $leads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
-        $tipeCode = self::TIPE_MAP[$tipeQuotation] ?? self::TIPE_ORG;
+        $tipeCode = self::TIPE_MAP[$tipeQuotation];
 
         // Base: QUOT/{TIPE}/{COMPANY}/{LEADS_NOMOR}-
         $base = 'QUOT/' . $tipeCode . '/';
@@ -110,19 +114,19 @@ class QuotationNumberingService
         // Tentukan version code baru
         $versionCode = $this->getVersionCode($tipeQuotation);
 
-        // Gabungkan: existingVersion + versionCode baru
-        $fullVersion = $existingVersion
-            ? $existingVersion . '-' . $versionCode
-            : $versionCode;
-
         // Hitung urutan untuk version ini
         $counter = $this->getVersionCounter($referensiId, $tipeQuotation, $now->year);
 
+        // Gabungkan: existingVersion + versionCode+counter baru (mis. K01-V01, bukan K-01-V-01)
+        $versionSegment = $versionCode . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        $fullVersion = $existingVersion
+            ? $existingVersion . '-' . $versionSegment
+            : $versionSegment;
+
         // Base untuk nomor turunan: gunakan nomor referensi tanpa version suffix
         $baseNomor = preg_replace('/-(?:[VKA]\d{2}(?:-[VKA]\d{2})*)$/', '', $nomorReferensi);
-        $baseNomor = $baseNomor . '-' . $fullVersion;
 
-        return $baseNomor . '-' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+        return $baseNomor . '-' . $fullVersion;
     }
 
     /**

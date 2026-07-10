@@ -188,14 +188,6 @@ class PksWizardFinalizeTest extends TestCase
         $this->assertSame(1, (int) $baru->wizard_status_id);
         $this->assertSame('baru', $baru->tipe_pks);
 
-        $rekontrak = $service->initialize('rekontrak', [
-            'leads_id' => 10,
-            'company_id' => 13,
-            'quotation_id' => 20,
-        ], $user);
-        $this->assertSame('rekontrak', $rekontrak->tipe_pks);
-        $this->assertStringStartsWith('draft/PKS/RKT/SIG/LDS001-', $rekontrak->nomor);
-
         $pksInduk = Pks::query()->create([
             'leads_id' => 10,
             'quotation_id' => 20,
@@ -206,6 +198,15 @@ class PksWizardFinalizeTest extends TestCase
             'created_by' => 'Initializer',
             'created_by_user_id' => 3,
         ]);
+
+        $rekontrak = $service->initialize('rekontrak', [
+            'leads_id' => 10,
+            'pks_induk_id' => $pksInduk->id,
+            'company_id' => 13,
+            'quotation_id' => 20,
+        ], $user);
+        $this->assertSame('rekontrak', $rekontrak->tipe_pks);
+        $this->assertStringStartsWith('draft/PKS/RKT/SIG/LDS001-', $rekontrak->nomor);
 
         $addendum = $service->initialize('addendum', [
             'leads_id' => 10,
