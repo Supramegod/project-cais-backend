@@ -22,10 +22,14 @@ use Illuminate\Support\Facades\Log;
 class QuotationStoreService
 {
     protected QuotationSiteService $siteService;
+    protected QuotationNumberingService $numberingService;
 
-    public function __construct(QuotationSiteService $siteService)
-    {
+    public function __construct(
+        QuotationSiteService $siteService,
+        QuotationNumberingService $numberingService
+    ) {
         $this->siteService = $siteService;
+        $this->numberingService = $numberingService;
     }
     public function createQuotation(Request $request, string $tipe_quotation, User $user): array
     {
@@ -47,11 +51,11 @@ class QuotationStoreService
             $quotationData['quotation_referensi_id'] = $quotationReferensi->id;
         }
 
-        $quotationData['nomor'] = $this->generateNomorByType(
+        $quotationData['nomor'] = $this->numberingService->generate(
             $request->perusahaan_id,
             $request->entitas,
             $tipe_quotation,
-            $quotationReferensi
+            $quotationReferensi?->id
         );
 
         $quotationData['created_by'] = $user->full_name;
@@ -240,53 +244,20 @@ class QuotationStoreService
 
     public function generateNomorByType(int $leadsId, int $companyId, string $tipeQuotation, ?Quotation $quotationReferensi = null): string
     {
-        $now = Carbon::now();
-        $year = $now->year;
-        $month = $now->format('m');
-
-        if ($tipeQuotation === 'addendum' && $quotationReferensi) {
-            $nomorRef = $quotationReferensi->nomor;
-            $counter = Quotation::where('tipe_quotation', 'addendum')
-                ->where('nomor', 'like', "ADD/{$nomorRef}/%")
-                ->count() + 1;
-
-            return 'ADD/' . $nomorRef . '/' . str_pad($counter, 5, '0', STR_PAD_LEFT);
-        }
-
-        $dataLeads = Leads::findOrFail($leadsId);
-        $company = Company::find($companyId);
-
-        $base = 'QUOT/';
-        $base .= $company
-            ? $company->code . '/' . $dataLeads->nomor . '-' . $month . $year . '-'
-            : 'NN/NNNNN-' . $month . $year . '-';
-
-        $counter = Quotation::where('tipe_quotation', $tipeQuotation)
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $now->month)
-            ->count() + 1;
-
-        return $base . str_pad($counter, 5, '0', STR_PAD_LEFT);
+        return $this->numberingService->generate(
+            $leadsId,
+            $companyId,
+            $tipeQuotation,
+            $quotationReferensi?->id
+        );
     }
 
+    /**
+     * Legacy — delegasi ke QuotationNumberingService.
+     */
     public function generateNomor(int $leadsId, int $companyId): string
     {
-        $now = Carbon::now();
-        $dataLeads = Leads::findOrFail($leadsId);
-        $company = Company::find($companyId);
-
-        $nomor = 'QUOT/';
-        if ($company) {
-            $nomor .= $company->code . '/' . $dataLeads->nomor . '-';
-        } else {
-            $nomor .= 'NN/NNNNN-';
-        }
-
-        $month = $now->format('m');
-        $jumlah = Quotation::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
-        $urutan = str_pad($jumlah + 1, 5, '0', STR_PAD_LEFT);
-
-        return $nomor . $month . $now->year . '-' . $urutan;
+        return $this->numberingService->generate($leadsId, $companyId, 'baru');
     }
 
     public function generateActivityNomor(int $leadsId): string

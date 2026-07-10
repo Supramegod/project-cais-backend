@@ -81,18 +81,8 @@ class SpkResubmissionService
 
     private function generateNomorQuotation(int $leadsId, ?int $companyId): string
     {
-        $now = now();
-        $leads = Leads::find($leadsId);
-        $company = $companyId ? Company::find($companyId) : null;
-        $nomor = 'QUOT/';
-        if ($company) {
-            $nomor .= $company->code . '/' . $leads->nomor . '-';
-        } else {
-            $nomor .= 'NN/NNNNN-';
-        }
-        $month = $now->month < 10 ? '0' . $now->month : $now->month;
-        $count = Quotation::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
-        return $nomor . $month . $now->year . '-' . sprintf('%05d', $count + 1);
+        return app(\App\Services\Quotation\QuotationNumberingService::class)
+            ->generate($leadsId, $companyId ?? 0, 'baru');
     }
 
     private function createNewQuotation($quotationAsal, string $nomorQuotationBaru, string $alasan)

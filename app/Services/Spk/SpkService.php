@@ -1027,25 +1027,8 @@ class SpkService
 
     private function generateNomorQuotation(int $leadsId, ?int $companyId): string
     {
-        $now = Carbon::now();
-        $leads = Leads::find($leadsId);
-        $company = $companyId ? Company::find($companyId) : null;
-
-        $nomor = "QUOT/";
-
-        if ($company) {
-            $nomor .= $company->code . "/";
-            $nomor .= $leads->nomor . "-";
-        } else {
-            $nomor .= "NN/NNNNN-";
-        }
-
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-
-        $count = Quotation::where('nomor', 'like', $nomor . $month . $now->year . "-%")->count();
-        $sequence = sprintf("%05d", $count + 1);
-
-        return $nomor . $month . $now->year . "-" . $sequence;
+        return app(\App\Services\Quotation\QuotationNumberingService::class)
+            ->generate($leadsId, $companyId ?? 0, 'baru');
     }
 
     private function createNewQuotation($quotationAsal, string $nomorQuotationBaru, string $alasan)
