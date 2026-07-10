@@ -76,7 +76,7 @@ class PksWizardService
 
             $nomorAsli = $tipe === 'addendum'
                 ? $this->generateNomorAddendum($pksInduk)
-                : $this->generateNomor($leads, $company);
+                : $this->generateNomor($leads, $company, $tipe);
 
             $primaryQuotation = $candidateQuotations->first();
             $primarySpk = $candidateSpks->first();
@@ -837,26 +837,15 @@ class PksWizardService
         }
     }
 
-    private function generateNomor(Leads $leads, Company $company): string
+    private function generateNomor(Leads $leads, Company $company, string $tipePks = 'baru'): string
     {
-        $now = Carbon::now();
-        $prefix = 'PKS/' . $company->code . '/' . $leads->nomor . '-';
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $count = Pks::where('nomor', 'like', $prefix . $month . $now->year . '-%')->withTrashed()->count();
-        $sequence = sprintf('%05d', $count + 1);
-
-        return $prefix . $month . $now->year . '-' . $sequence;
+        return app(\App\Services\Pks\PksNumberingService::class)
+            ->generate($leads->id, $company->id, $tipePks);
     }
 
     private function generateNomorAddendum(Pks $pksInduk): string
     {
-        $nomorPksInduk = preg_replace('/^draft\//', '', $pksInduk->nomor);
-
-        $count = Pks::where('pks_induk_id', $pksInduk->id)
-            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
-            ->withTrashed()
-            ->count();
-
-        return 'ADD/' . $nomorPksInduk . '/' . sprintf('%04d', $count + 1);
+        return app(\App\Services\Pks\PksNumberingService::class)
+            ->generate($pksInduk->leads_id, $pksInduk->company_id ?? 0, 'addendum', $pksInduk->id);
     }
 }

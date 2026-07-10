@@ -11,40 +11,20 @@ use Illuminate\Support\Facades\Auth;
 
 class PksHelperService
 {
-    public function generateNomor($leadsId, $companyId): string
+    public function generateNomor($leadsId, $companyId, string $tipePks = 'baru', ?int $pksIndukId = null): string
     {
-        $now = Carbon::now();
-        $dataLeads = Leads::find($leadsId);
-        $company = \App\Models\Company::where('id', $companyId)->first();
-
-        $nomor = 'PKS/';
-        if ($company) {
-            $nomor .= $company->code . '/';
-            $nomor .= $dataLeads->nomor . '-';
-        } else {
-            $nomor .= 'NN/NNNNN-';
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $jumlahData = Pks::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
-        $urutan = sprintf('%05d', $jumlahData + 1);
-
-        return $nomor . $month . $now->year . '-' . $urutan;
+        return app(PksNumberingService::class)->generate($leadsId, $companyId, $tipePks, $pksIndukId);
     }
 
     public function generateNomorAddendum($pksIndukId): string
     {
         $pksInduk = Pks::findOrFail($pksIndukId);
-        $nomorPksInduk = $pksInduk->nomor;
-
-        $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
-            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
-            ->withTrashed()
-            ->count();
-
-        $urutan = sprintf('%04d', $jumlahAddendum + 1);
-
-        return 'ADD/' . $nomorPksInduk . '/' . $urutan;
+        return app(PksNumberingService::class)->generate(
+            $pksInduk->leads_id,
+            $pksInduk->company_id ?? 0,
+            'addendum',
+            $pksIndukId
+        );
     }
 
     public function generateNomorActivity(Leads $leads): string

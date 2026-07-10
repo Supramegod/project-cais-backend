@@ -184,7 +184,7 @@ class PksWizardFinalizeTest extends TestCase
             'quotation_id' => 20,
             'spk_id' => 30,
         ], $user);
-        $this->assertStringStartsWith('draft/PKS/SIG/LDS001-', $baru->nomor);
+        $this->assertStringStartsWith('draft/PKS/ORG/SIG/LDS001-', $baru->nomor);
         $this->assertSame(1, (int) $baru->wizard_status_id);
         $this->assertSame('baru', $baru->tipe_pks);
 
@@ -194,7 +194,7 @@ class PksWizardFinalizeTest extends TestCase
             'quotation_id' => 20,
         ], $user);
         $this->assertSame('rekontrak', $rekontrak->tipe_pks);
-        $this->assertStringStartsWith('draft/PKS/SIG/LDS001-', $rekontrak->nomor);
+        $this->assertStringStartsWith('draft/PKS/RKT/SIG/LDS001-', $rekontrak->nomor);
 
         $pksInduk = Pks::query()->create([
             'leads_id' => 10,
@@ -213,7 +213,7 @@ class PksWizardFinalizeTest extends TestCase
             'quotation_id' => 20,
         ], $user);
         $this->assertSame('addendum', $addendum->tipe_pks);
-        $this->assertStringStartsWith('draft/ADD/PKS/SIG/LDS001-062026-00001/', $addendum->nomor);
+        $this->assertStringStartsWith('draft/PKS/ADD/SIG/LDS001-', $addendum->nomor);
     }
 
     public function test_addendum_preview_can_be_generated_and_edited(): void

@@ -33,7 +33,11 @@ class SpkCommandService
             }
             $firstSite = QuotationSite::find($siteIds[0]);
             $quotationId = $firstSite?->quotation_id;
-            $spkNomor = $this->generateNomorNew($leads->id);
+
+            // Ambil company_id dari quotation
+            $quotation = $quotationId ? Quotation::find($quotationId) : null;
+            $companyId = $quotation?->company_id ?? 0;
+            $spkNomor = $this->generateNomorNew($leads->id, $companyId);
             $spk = Spk::create([
                 'leads_id' => $leads->id, 'nomor' => $spkNomor, 'tgl_spk' => $tanggalSpk,
                 'nama_perusahaan' => $leads->nama_perusahaan, 'tim_sales_id' => $leads->tim_sales_id,
@@ -155,14 +159,8 @@ class SpkCommandService
         }
     }
 
-    private function generateNomorNew(int $leadsId): string
+    private function generateNomorNew(int $leadsId, int $companyId = 0): string
     {
-        $now = Carbon::now();
-        $leads = Leads::whereNull('deleted_at')->find($leadsId);
-        if (!$leads) throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan");
-        $baseNumber = 'SPK/' . $leads->nomor . '-';
-        $month = $now->month < 10 ? '0' . $now->month : $now->month;
-        $count = Spk::where('nomor', 'like', $baseNumber . $month . $now->year . '-%')->count();
-        return $baseNumber . $month . $now->year . '-' . sprintf('%05d', $count + 1);
+        return app(\App\Services\Spk\SpkNumberingService::class)->generate($leadsId, $companyId);
     }
-}
+  }

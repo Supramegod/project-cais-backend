@@ -223,7 +223,9 @@ class SpkService
             $firstSite = QuotationSite::find($siteIds[0]);
             $quotationId = $firstSite ? $firstSite->quotation_id : null;
 
-            $spkNomor = $this->generateNomorNew($leads->id);
+            $quotation = $quotationId ? Quotation::find($quotationId) : null;
+            $companyId = $quotation?->company_id ?? 0;
+            $spkNomor = $this->generateNomorNew($leads->id, $companyId);
 
             // Buat SPK
             $spk = Spk::create([
@@ -979,22 +981,9 @@ class SpkService
         return $fileName;
     }
 
-    private function generateNomorNew(int $leadsId): string
+    private function generateNomorNew(int $leadsId, int $companyId = 0): string
     {
-        $now = Carbon::now();
-        $leads = Leads::whereNull('deleted_at')->find($leadsId);
-
-        if (!$leads) {
-            throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan");
-        }
-
-        $baseNumber = "SPK/" . $leads->nomor . "-";
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-
-        $count = Spk::where('nomor', 'like', $baseNumber . $month . $now->year . "-%")->count();
-        $sequence = sprintf("%05d", $count + 1);
-
-        return $baseNumber . $month . $now->year . "-" . $sequence;
+        return app(\App\Services\Spk\SpkNumberingService::class)->generate($leadsId, $companyId);
     }
 
     private function generateActivityNomor(int $leadsId): string
