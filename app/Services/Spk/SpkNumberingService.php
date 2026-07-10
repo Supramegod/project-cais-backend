@@ -10,16 +10,16 @@ use Carbon\Carbon;
 /**
  * Standard numbering untuk SPK.
  *
- * Format: SPK/{COMPANY_CODE}/{LEADS_NOMOR}-{YYYYMM}-{SEQ}
+ * Format: SPK/{COMPANY_CODE}/{LEADS_NOMOR}-{MMYYYY}-{SEQ}
  *
- * Contoh: SPK/ION/LS001-202612-00001
+ * Contoh: SPK/ION/LS001-072026-00001
  */
 class SpkNumberingService
 {
     public function generate(int $leadsId, int $companyId): string
     {
         $now = Carbon::now();
-        $yearMonth = $now->format('Ymd'); // 202612
+        $monthYear = $now->format('mY'); // 072026
 
         $leads = Leads::whereNull('deleted_at')->findOrFail($leadsId);
         $company = Company::find($companyId);
@@ -28,9 +28,9 @@ class SpkNumberingService
         $base .= $company ? $company->code . '/' : 'NN/';
         $base .= ($leads->nomor ?? 'NNNNN') . '-';
 
-        $seq = Spk::where('nomor', 'like', $base . $yearMonth . '-%')
+        $seq = Spk::where('nomor', 'like', $base . $monthYear . '-%')
             ->count() + 1;
 
-        return $base . $yearMonth . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
+        return $base . $monthYear . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
     }
 }
