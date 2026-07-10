@@ -36,9 +36,7 @@ class PksStoreRequest extends BaseRequest
             $rules['quotation_site_ids'] = FluentRule::array(label: 'Quotation Site')->required();
             $rules['quotation_site_ids.*'] = FluentRule::integer()->exists('sl_quotation_site', 'id');
 
-            if ($tipe === 'addendum') {
-                $rules['pks_id'] = FluentRule::field('PKS')->required()->exists('sl_pks', 'id');
-            }
+            $rules['pks_id'] = FluentRule::field('PKS')->required()->exists('sl_pks', 'id');
         }
 
         return $rules;

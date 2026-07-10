@@ -31,7 +31,7 @@ class PksWizardInitializeRequest extends BaseRequest
             ]),
         ];
 
-        if ($tipe === 'addendum') {
+        if (in_array($tipe, ['addendum', 'rekontrak'], true)) {
             $rules['pks_induk_id'] = FluentRule::integer()->required()->exists('sl_pks', 'id');
             $rules['company_id'] = FluentRule::integer()->nullable()->exists('mysqlhris.m_company', 'id');
         } else {
@@ -145,7 +145,7 @@ class PksWizardInitializeRequest extends BaseRequest
                 }
             }
 
-            if ($tipe === 'addendum' && $pksIndukId) {
+            if (in_array($tipe, ['addendum', 'rekontrak'], true) && $pksIndukId) {
                 $pksInduk = Pks::query()->select(['id', 'leads_id'])->find($pksIndukId);
                 if ($pksInduk && (int) $pksInduk->leads_id !== $leadsId) {
                     $validator->errors()->add('pks_induk_id', 'PKS induk tidak terhubung dengan leads yang dipilih');

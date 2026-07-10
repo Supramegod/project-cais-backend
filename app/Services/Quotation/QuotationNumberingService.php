@@ -67,9 +67,13 @@ class QuotationNumberingService
         $now = Carbon::now();
         $monthYear = $now->format('mY'); // 072026
 
+        if (!array_key_exists($tipeQuotation, self::TIPE_MAP)) {
+            throw new \InvalidArgumentException("Tipe Quotation '{$tipeQuotation}' tidak dikenal");
+        }
+
         $leads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
-        $tipeCode = self::TIPE_MAP[$tipeQuotation] ?? self::TIPE_ORG;
+        $tipeCode = self::TIPE_MAP[$tipeQuotation];
 
         // Base: QUOT/{TIPE}/{COMPANY}/{LEADS_NOMOR}-
         $base = 'QUOT/' . $tipeCode . '/';

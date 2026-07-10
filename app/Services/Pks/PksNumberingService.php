@@ -18,13 +18,14 @@ use Carbon\Carbon;
  *   ADD = Addendum
  *
  * VERSION:
- *   -K{NN} = Rekontrak ke-N
- *   -A{NN} = Addendum ke-N
+ *   -K{NN} = Rekontrak ke-N dari PKS induk (pks_induk_id wajib)
+ *   -A{NN} = Addendum ke-N dari PKS induk (pks_induk_id wajib)
  *
  * Contoh:
  *   PKS/ORG/ION/LS001-072026-00001         ← Original
- *   PKS/RKT/ION/LS001-072026-00001-K01     ← Rekontrak 1
- *   PKS/ADD/ION/LS001-072026-00001-A01     ← Addendum 1
+ *   PKS/RKT/ION/LS001-072026-00001-K01     ← Rekontrak 1 dari Original
+ *   PKS/ADD/ION/LS001-072026-00001-A01     ← Addendum 1 dari Original
+ *   PKS/ADD/ION/LS001-072026-00001-K01-A01 ← Addendum 1 dari Rekontrak 1
  */
 class PksNumberingService
 {
@@ -52,23 +53,27 @@ class PksNumberingService
         $now = Carbon::now();
         $monthYear = $now->format('mY');
 
+        if (!array_key_exists($tipePks, self::TIPE_MAP)) {
+            throw new \InvalidArgumentException("Tipe PKS '{$tipePks}' tidak dikenal");
+        }
+
         $leads = Leads::findOrFail($leadsId);
         $company = Company::find($companyId);
-        $tipeCode = self::TIPE_MAP[$tipePks] ?? self::TIPE_ORG;
+        $tipeCode = self::TIPE_MAP[$tipePks];
 
         // Base: PKS/{TIPE}/{COMPANY}/{LEADS}-
         $base = 'PKS/' . $tipeCode . '/';
         $base .= $company ? $company->code . '/' : 'NN/';
         $base .= ($leads->nomor ?? 'NNNNN') . '-';
 
-        // --- ORIGINAL (baru) & REKONTRAK (own SEQ) ---
-        if ($tipePks === 'baru' || $tipePks === 'rekontrak') {
+        // --- ORIGINAL (baru): SEQ sendiri ---
+        if ($tipePks === 'baru') {
             $seq = Pks::where('nomor', 'like', $base . $monthYear . '-%')
                 ->count() + 1;
             return $base . $monthYear . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
         }
 
-        // --- ADDENDUM (tied to parent SEQ) ---
+        // --- REKONTRAK & ADDENDUM (tied to parent SEQ) ---
         if (!$pksIndukId) {
             throw new \InvalidArgumentException("PKS induk wajib untuk tipe '{$tipePks}'");
         }

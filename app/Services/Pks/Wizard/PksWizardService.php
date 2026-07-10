@@ -58,8 +58,9 @@ class PksWizardService
 
             $pksInduk = null;
             $companyId = $data['company_id'] ?? null;
+            $tipeTurunanInduk = ['addendum', 'rekontrak'];
 
-            if ($tipe === 'addendum') {
+            if (in_array($tipe, $tipeTurunanInduk, true)) {
                 $pksInduk = Pks::with('quotations')->findOrFail($data['pks_induk_id']);
                 $companyId ??= $pksInduk->company_id;
                 if ($candidateQuotations->isEmpty() && $pksInduk->quotation_id) {
@@ -70,13 +71,13 @@ class PksWizardService
 
             $company = $companyId ? Company::find($companyId) : null;
 
-            if (!$company && $tipe !== 'addendum') {
+            if (!$company && !in_array($tipe, $tipeTurunanInduk, true)) {
                 throw new \InvalidArgumentException('Company tidak ditemukan');
             }
 
-            $nomorAsli = $tipe === 'addendum'
-                ? $this->generateNomorAddendum($pksInduk)
-                : $this->generateNomor($leads, $company, $tipe);
+            $nomorAsli = in_array($tipe, $tipeTurunanInduk, true)
+                ? $this->generateNomorTurunan($pksInduk, $tipe)
+                : $this->generateNomor($leads, $company);
 
             $primaryQuotation = $candidateQuotations->first();
             $primarySpk = $candidateSpks->first();
@@ -837,15 +838,15 @@ class PksWizardService
         }
     }
 
-    private function generateNomor(Leads $leads, Company $company, string $tipePks = 'baru'): string
+    private function generateNomor(Leads $leads, Company $company): string
     {
         return app(\App\Services\Pks\PksNumberingService::class)
-            ->generate($leads->id, $company->id, $tipePks);
+            ->generate($leads->id, $company->id, 'baru');
     }
 
-    private function generateNomorAddendum(Pks $pksInduk): string
+    private function generateNomorTurunan(Pks $pksInduk, string $tipePks): string
     {
         return app(\App\Services\Pks\PksNumberingService::class)
-            ->generate($pksInduk->leads_id, $pksInduk->company_id ?? 0, 'addendum', $pksInduk->id);
+            ->generate($pksInduk->leads_id, $pksInduk->company_id ?? 0, $tipePks, $pksInduk->id);
     }
 }

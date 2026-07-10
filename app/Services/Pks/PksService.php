@@ -27,6 +27,7 @@ use App\Models\Site;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use App\Services\Pks\Template\PksTemplateFactory;
+use App\Services\Pks\PksNumberingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,28 +55,32 @@ class PksService
 
         $pksInduk = null;
         $quotationId = null;
+        $pksIndukId = null;
 
         // 2. Tentukan nomor PKS & ID terkait berdasarkan tipe
-        if ($tipe === 'addendum') {
-            $pksNomor = $this->generateNomorAddendum($request->pks_id);
+        // rekontrak & addendum sama-sama terikat ke pks_induk_id, konsisten
+        // dengan PksNumberingService/QuotationNumberingService.
+        if (in_array($tipe, ['addendum', 'rekontrak'], true)) {
             $pksInduk = Pks::findOrFail($request->pks_id);
-
-            $quotationId = $pksInduk->quotation_id;
+            $pksIndukId = $pksInduk->id;
             $companyId = $pksInduk->company_id ?? $request->entitas;
-        } else {
-            $pksNomor = $this->generateNomor($leads->id, $request->entitas);
-            $companyId = $request->entitas;
 
             if ($tipe === 'rekontrak') {
                 // Gunakan select('quotation_id') agar query lebih ringan
                 $firstSite = QuotationSite::select('quotation_id')->findOrFail($request->quotation_site_ids[0]);
                 $quotationId = $firstSite->quotation_id;
             } else {
-                // Gunakan select('id', 'kebutuhan_id') untuk optimasi memori
-                $quotation = Quotation::select('id', 'kebutuhan_id', 'persentase')->where('leads_id', $leads->id)->first();
-                $quotationId = $quotation->id ?? null;
+                $quotationId = $pksInduk->quotation_id;
             }
+        } else {
+            $companyId = $request->entitas;
+
+            // Gunakan select('id', 'kebutuhan_id') untuk optimasi memori
+            $quotation = Quotation::select('id', 'kebutuhan_id', 'persentase')->where('leads_id', $leads->id)->first();
+            $quotationId = $quotation->id ?? null;
         }
+
+        $pksNomor = app(PksNumberingService::class)->generate($leads->id, $companyId, $tipe, $pksIndukId);
 
         // 3. Tentukan Layanan/Kebutuhan ID secara presisi
         if ($tipe !== 'addendum' && isset($quotation)) {
@@ -127,7 +132,7 @@ class PksService
             'kota_id' => $leads->kota_id,
             'kota' => $leads->kota,
             'pma' => $leads->pma,
-            'pks_induk_id' => ($tipe === 'addendum') ? $request->pks_id : null,
+            'pks_induk_id' => $pksIndukId,
             'tipe_pks' => $tipe,
             'created_by' => Auth::user()->full_name,
             'created_by_user_id' => Auth::id(),
@@ -502,27 +507,6 @@ class PksService
         }
 
         return $tanggalSekarang->diffInDays($tanggalBerakhir);
-    }
-
-    private function generateNomor($leadsId, $companyId)
-    {
-        $now = Carbon::now();
-        $dataLeads = Leads::find($leadsId);
-        $company = Company::where('id', $companyId)->first();
-
-        $nomor = 'PKS/';
-        if ($company) {
-            $nomor .= $company->code . '/';
-            $nomor .= $dataLeads->nomor . '-';
-        } else {
-            $nomor .= 'NN/NNNNN-';
-        }
-
-        $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
-        $jumlahData = Pks::where('nomor', 'like', $nomor . $month . $now->year . '-%')->count();
-        $urutan = sprintf('%05d', $jumlahData + 1);
-
-        return $nomor . $month . $now->year . '-' . $urutan;
     }
 
     public function generateNomorActivity(Leads $leads)
@@ -1128,28 +1112,6 @@ class PksService
             $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
             $leads->save();
         }
-    }
-
-    /**
-     * Generate nomor untuk addendum PKS
-     * Format: ADD/{nomor PKS induk}/{urutan 4 digit}
-     *
-     * @param  int  $pksIndukId
-     */
-    private function generateNomorAddendum($pksIndukId): string
-    {
-        $pksInduk = Pks::findOrFail($pksIndukId);
-        $nomorPksInduk = $pksInduk->nomor;
-
-        // Hitung sudah berapa addendum untuk PKS induk ini
-        $jumlahAddendum = Pks::where('pks_induk_id', $pksIndukId)
-            ->orWhere('nomor', 'like', 'ADD/' . $nomorPksInduk . '/%')
-            ->withTrashed()
-            ->count();
-
-        $urutan = sprintf('%04d', $jumlahAddendum + 1);
-
-        return 'ADD/' . $nomorPksInduk . '/' . $urutan;
     }
 
     public function logPerjanjianChange($perjanjian, Leads $leads)
