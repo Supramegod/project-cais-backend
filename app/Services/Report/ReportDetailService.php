@@ -148,22 +148,17 @@ class ReportDetailService
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.created_by_user_id', $userId)
-            ->whereIn('sa.jenis_activity', ['Appointment', 'Quotation'])
+            ->where('sa.jenis_activity', 'Appointment')
             ->get();
 
         $activities = $customerActivities
             ->concat($appointmentActivities)
-            ->sortBy([['tgl_activity', 'asc'], ['created_at', 'asc']])
+            ->sortBy(['tgl_activity', 'desc'])
             ->values();
 
-        $quotationMap = $this->latestQuotationBaruMap(
-            $appointmentActivities->where('tipe', 'Quotation')->pluck('leads_id')->filter()->unique()->values()->toArray()
-        );
-
-        $data = $activities->map(function ($row, $index) use ($quotationMap) {
+        $data = $activities->map(function ($row, $index) {
             $aksi = match ($row->tipe) {
                 'Leads', 'Assignment' => $row->leads_id,
-                'Quotation' => $quotationMap->get($row->leads_id),
                 default => null,
             };
 
