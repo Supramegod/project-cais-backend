@@ -98,10 +98,12 @@ class QuotationNumberingService
         $referensi = Quotation::findOrFail($referensiId);
         $nomorReferensi = $referensi->nomor;
 
-        // Ekstrak SEQ dari nomor referensi
-        // Contoh: QUOT/ORG/ION/LS001-072026-00001 → SEQ = 00001
-        preg_match('/-(\d{5})(?:-\w+)?$/', $nomorReferensi, $matches);
-        $seq = $matches[1] ?? '00001';
+        // Ekstrak {MMYYYY}-{SEQ} dari nomor referensi (bagian numerik saja, TIPE
+        // code TIDAK diikutkan karena nomor turunan harus pakai TIPE code-nya
+        // sendiri, bukan warisan dari referensi — lih. $base di atas).
+        // Contoh: QUOT/ORG/ION/LS001-072026-00001 → dateSeq = 072026-00001
+        preg_match('/-(\d{6}-\d{5})(?:-[VKA]\d{2}(?:-[VKA]\d{2})*)?$/', $nomorReferensi, $matches);
+        $dateSeq = $matches[1] ?? ($monthYear . '-00001');
 
         // Ekstrak existing version suffix dari referensi
         // Contoh: QUOT/ORG/ION/LS001-072026-00001-K01 → K01
@@ -123,10 +125,7 @@ class QuotationNumberingService
             ? $existingVersion . '-' . $versionSegment
             : $versionSegment;
 
-        // Base untuk nomor turunan: gunakan nomor referensi tanpa version suffix
-        $baseNomor = preg_replace('/-(?:[VKA]\d{2}(?:-[VKA]\d{2})*)$/', '', $nomorReferensi);
-
-        return $baseNomor . '-' . $fullVersion;
+        return $base . $dateSeq . '-' . $fullVersion;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Requests\Sales;
 
 use App\Http\Requests\BaseRequest;
 
+use Carbon\Carbon;
 use SanderMuller\FluentValidation\FluentRule;
 
 class SalesActivityStoreRequest extends BaseRequest
@@ -18,7 +19,8 @@ class SalesActivityStoreRequest extends BaseRequest
         return [
             'leads_id'           => FluentRule::integer('Leads ID')->required()->exists('sl_leads', 'id'),
             'leads_kebutuhan_id' => FluentRule::integer('Leads Kebutuhan ID')->required()->exists('sl_leads_kebutuhan', 'id'),
-            'tgl_activity'       => FluentRule::date('Tanggal activity')->required(),
+            'tgl_activity'       => FluentRule::date('Tanggal activity')->required()
+                ->afterOrEqual(Carbon::now()->subDays(3)->startOfDay()),
             'jenis_activity'     => FluentRule::string('Jenis activity')->required()->max(255),
             'notulen'            => FluentRule::string('Notulen')->required(),
             'files'              => FluentRule::array(label: 'Files')->nullable()->each(
@@ -36,6 +38,7 @@ class SalesActivityStoreRequest extends BaseRequest
             'leads_kebutuhan_id.exists'   => 'Leads Kebutuhan tidak ditemukan',
             'tgl_activity.required'       => 'Tanggal activity wajib diisi',
             'tgl_activity.date'           => 'Format tanggal tidak valid',
+            'tgl_activity.after_or_equal' => 'Tanggal activity tidak boleh backdate lebih dari 3 hari',
             'jenis_activity.required'     => 'Jenis activity wajib diisi',
             'notulen.required'            => 'Notulen wajib diisi',
             'files.*.file'                => 'File yang diupload harus berupa file',
