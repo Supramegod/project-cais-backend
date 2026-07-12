@@ -42,8 +42,7 @@ class ReportDetailService
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.created_by_user_id', $userId)
-            ->orderBy('sa.tgl_activity', 'asc')
-            ->orderBy('sa.created_at', 'asc')
+            ->orderBy('sa.tgl_activity', 'desc')
             ->get();
 
         $leadsIdsNeedLookup = $activities
@@ -54,12 +53,7 @@ class ReportDetailService
             ->values()
             ->toArray();
 
-        $quotationMap = DB::table('sl_quotation')
-            ->selectRaw('leads_id, MAX(id) as doc_id')
-            ->whereIn('leads_id', $leadsIdsNeedLookup)
-            ->whereNull('deleted_at')
-            ->groupBy('leads_id')
-            ->pluck('doc_id', 'leads_id');
+        $quotationMap = $this->latestQuotationBaruMap($leadsIdsNeedLookup);
 
         $spkMap = DB::table('sl_spk')
             ->selectRaw('leads_id, MAX(id) as doc_id')
@@ -158,7 +152,7 @@ class ReportDetailService
 
         $activities = $customerActivities
             ->concat($appointmentActivities)
-            ->sortBy([['tgl_activity', 'asc'], ['created_at', 'asc']])
+            ->sortBy(['tgl_activity', 'desc'])
             ->values();
 
         $data = $activities->map(function ($row, $index) {
@@ -187,5 +181,26 @@ class ReportDetailService
             'periode' => $periode,
             'data' => $data,
         ];
+    }
+
+    /**
+     * Map leads_id => id quotation tipe 'baru' terbaru (berdasarkan tgl_quotation),
+     * dipakai untuk resolusi kolom 'aksi' pada activity bertipe Quotation.
+     */
+    private function latestQuotationBaruMap(array $leadsIds)
+    {
+        if (empty($leadsIds)) {
+            return collect();
+        }
+
+        return DB::table('sl_quotation')
+            ->select('leads_id', 'id')
+            ->whereIn('leads_id', $leadsIds)
+            ->whereNull('deleted_at')
+            ->where('tipe_quotation', 'baru')
+            ->orderBy('tgl_quotation', 'desc')
+            ->get()
+            ->groupBy('leads_id')
+            ->map(fn ($rows) => $rows->first()->id);
     }
 }

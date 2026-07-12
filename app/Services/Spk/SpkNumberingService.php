@@ -10,12 +10,22 @@ use Carbon\Carbon;
 /**
  * Standard numbering untuk SPK.
  *
- * Format: SPK/{COMPANY_CODE}/{LEADS_NOMOR}-{MMYYYY}-{SEQ}
+ * Format: SPK/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{MMYYYY}-{SEQ}
  *
- * Contoh: SPK/ION/LS001-072026-00001
+ * TIPE:
+ *   ORG = Original (baru) — satu-satunya tipe SPK saat ini.
+ *
+ * Segmen TIPE disiapkan agar konsisten dengan PksNumberingService &
+ * QuotationNumberingService — jaga-jaga apabila SPK ke depannya juga
+ * punya turunan (mis. rekontrak/addendum) seperti PKS & Quotation.
+ * Belum ada tipe turunan untuk SPK saat ini, jadi hanya ORG yang dipakai.
+ *
+ * Contoh: SPK/ORG/ION/LS001-072026-00001
  */
 class SpkNumberingService
 {
+    const TIPE_ORG = 'ORG';
+
     public function generate(int $leadsId, int $companyId): string
     {
         $now = Carbon::now();
@@ -24,7 +34,7 @@ class SpkNumberingService
         $leads = Leads::whereNull('deleted_at')->findOrFail($leadsId);
         $company = Company::find($companyId);
 
-        $base = 'SPK/';
+        $base = 'SPK/' . self::TIPE_ORG . '/';
         $base .= $company ? $company->code . '/' : 'NN/';
         $base .= ($leads->nomor ?? 'NNNNN') . '-';
 
