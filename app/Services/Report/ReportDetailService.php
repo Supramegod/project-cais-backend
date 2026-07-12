@@ -42,8 +42,7 @@ class ReportDetailService
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.created_by_user_id', $userId)
-            ->orderBy('sa.tgl_activity', 'asc')
-            ->orderBy('sa.created_at', 'asc')
+            ->orderBy('sa.tgl_activity', 'desc')
             ->get();
 
         $leadsIdsNeedLookup = $activities
