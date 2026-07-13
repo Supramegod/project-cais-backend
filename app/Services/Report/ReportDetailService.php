@@ -37,6 +37,7 @@ class ReportDetailService
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
             ->select(
                 'sa.id', 'sa.leads_id', 'sa.tgl_activity', 'sa.jenis_activity',
+                'sa.quotation_id', 'sa.spk_id', 'sa.pks_id',
                 DB::raw("COALESCE(sa.notulen, '') AS notulen"),
                 'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
             )
@@ -45,36 +46,30 @@ class ReportDetailService
             ->orderBy('sa.tgl_activity', 'desc')
             ->get();
 
-        $leadsIdsNeedLookup = $activities
-            ->whereIn('jenis_activity', ['Leads', 'Quotation', 'SPK', 'PKS'])
-            ->pluck('leads_id')
+        $quotationIdsNeedLookup = $activities
+            ->where('jenis_activity', 'Quotation')
+            ->pluck('quotation_id')
             ->filter()
             ->unique()
             ->values()
             ->toArray();
 
-        $quotationMap = $this->latestQuotationBaruMap($leadsIdsNeedLookup);
+        $validBaruQuotationIds = empty($quotationIdsNeedLookup)
+            ? collect()
+            : DB::table('sl_quotation')
+                ->whereIn('id', $quotationIdsNeedLookup)
+                ->whereNull('deleted_at')
+                ->where('tipe_quotation', 'baru')
+                ->pluck('id');
 
-        $spkMap = DB::table('sl_spk')
-            ->selectRaw('leads_id, MAX(id) as doc_id')
-            ->whereIn('leads_id', $leadsIdsNeedLookup)
-            ->whereNull('deleted_at')
-            ->groupBy('leads_id')
-            ->pluck('doc_id', 'leads_id');
-
-        $pksMap = DB::table('sl_pks')
-            ->selectRaw('leads_id, MAX(id) as doc_id')
-            ->whereIn('leads_id', $leadsIdsNeedLookup)
-            ->whereNull('deleted_at')
-            ->groupBy('leads_id')
-            ->pluck('doc_id', 'leads_id');
-
-        $data = $activities->map(function ($row, $index) use ($quotationMap, $spkMap, $pksMap) {
+        $data = $activities->map(function ($row, $index) use ($validBaruQuotationIds) {
             $aksi = match ($row->jenis_activity) {
                 'Leads' => $row->leads_id,
-                'Quotation' => $quotationMap->get($row->leads_id),
-                'SPK' => $spkMap->get($row->leads_id),
-                'PKS' => $pksMap->get($row->leads_id),
+                'Quotation' => ($row->quotation_id && $validBaruQuotationIds->contains($row->quotation_id))
+                    ? $row->quotation_id
+                    : null,
+                'SPK' => $row->spk_id,
+                'PKS' => $row->pks_id,
                 default => null,
             };
 
@@ -181,26 +176,5 @@ class ReportDetailService
             'periode' => $periode,
             'data' => $data,
         ];
-    }
-
-    /**
-     * Map leads_id => id quotation tipe 'baru' terbaru (berdasarkan tgl_quotation),
-     * dipakai untuk resolusi kolom 'aksi' pada activity bertipe Quotation.
-     */
-    private function latestQuotationBaruMap(array $leadsIds)
-    {
-        if (empty($leadsIds)) {
-            return collect();
-        }
-
-        return DB::table('sl_quotation')
-            ->select('leads_id', 'id')
-            ->whereIn('leads_id', $leadsIds)
-            ->whereNull('deleted_at')
-            ->where('tipe_quotation', 'baru')
-            ->orderBy('tgl_quotation', 'desc')
-            ->get()
-            ->groupBy('leads_id')
-            ->map(fn ($rows) => $rows->first()->id);
     }
 }

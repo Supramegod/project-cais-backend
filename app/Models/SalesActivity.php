@@ -17,6 +17,9 @@ class SalesActivity extends Model
     protected $fillable = [
         'leads_id',
         'leads_kebutuhan_id',
+        'quotation_id',
+        'spk_id',
+        'pks_id',
         'tgl_activity',
         'start',
         'end',
@@ -51,6 +54,21 @@ class SalesActivity extends Model
     public function files()
     {
         return $this->hasMany(SalesActivityFile::class, 'activity_sales_id');
+    }
+
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
+
+    public function spk()
+    {
+        return $this->belongsTo(Spk::class, 'spk_id');
+    }
+
+    public function pks()
+    {
+        return $this->belongsTo(Pks::class, 'pks_id');
     }
 
     /**
