@@ -16,22 +16,14 @@ class ReportDetailService
      */
     public function activityDetail(int $userId, int $month, int $year, ?int $branchId): ?array
     {
-        $startDate = Carbon::createFromDate($year, $month, 1)->startOfDay();
-        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
+        [$startDate, $endDate] = $this->monthRange($month, $year);
+        $periode = $this->buildPeriode($month, $year);
 
-        $periode = strtoupper(
-            Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
-
-        $salesCollection = $this->getSalesNames($branchId);
-        $matched = $salesCollection->firstWhere('user_id', $userId);
+        $matched = $this->getSalesNames($branchId)->firstWhere('user_id', $userId);
 
         if (!$matched) {
             return null;
         }
-
-        $salesName = $matched->nama_sales;
-        $cabang = $matched->cabang;
 
         $activities = DB::table('sl_activity_sales as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
@@ -43,7 +35,8 @@ class ReportDetailService
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
             ->where('sa.created_by_user_id', $userId)
-            ->orderBy('sa.tgl_activity', 'desc')
+            ->orderBy('sa.tgl_activity', 'asc')
+            ->orderBy('sa.created_at', 'asc')
             ->get();
 
         $quotationIdsNeedLookup = $activities
@@ -73,26 +66,10 @@ class ReportDetailService
                 default => null,
             };
 
-            return [
-                'id' => $row->id,
-                'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
-                'nomor' => $index + 1,
-                'nama_perusahaan' => $row->nama_perusahaan,
-                'tipe' => $row->jenis_activity ?? '',
-                'notes' => $row->notulen,
-                'created_by' => $row->created_by,
-                'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
-                'aksi' => $aksi,
-            ];
+            return $this->formatActivityRow($row, $index, $row->jenis_activity, $aksi);
         })->values()->all();
 
-        return [
-            'user_id' => $userId,
-            'sales_name' => $salesName,
-            'cabang' => $cabang,
-            'periode' => $periode,
-            'data' => $data,
-        ];
+        return $this->buildActivityDetailResult($userId, $matched, $periode, $data);
     }
 
     /**
@@ -102,22 +79,14 @@ class ReportDetailService
      */
     public function activityDetailTele(int $userId, int $month, int $year, ?int $branchId): ?array
     {
-        $startDate = Carbon::createFromDate($year, $month, 1)->startOfDay();
-        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
+        [$startDate, $endDate] = $this->monthRange($month, $year);
+        $periode = $this->buildPeriode($month, $year);
 
-        $periode = strtoupper(
-            Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
-
-        $salesCollection = $this->getSalesNamesRole30($branchId);
-        $matched = $salesCollection->firstWhere('user_id', $userId);
+        $matched = $this->getSalesNamesRole30($branchId)->firstWhere('user_id', $userId);
 
         if (!$matched) {
             return null;
         }
-
-        $salesName = $matched->nama_sales;
-        $cabang = $matched->cabang;
 
         $customerActivities = DB::table('sl_customer_activity as sa')
             ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
@@ -156,23 +125,50 @@ class ReportDetailService
                 default => null,
             };
 
-            return [
-                'id' => $row->id,
-                'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
-                'nomor' => $index + 1,
-                'nama_perusahaan' => $row->nama_perusahaan,
-                'tipe' => $row->tipe ?? '',
-                'notes' => $row->notulen,
-                'created_by' => $row->created_by,
-                'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
-                'aksi' => $aksi,
-            ];
+            return $this->formatActivityRow($row, $index, $row->tipe, $aksi);
         })->values()->all();
 
+        return $this->buildActivityDetailResult($userId, $matched, $periode, $data);
+    }
+
+    // ======================== PRIVATE HELPERS ================================
+
+    private function monthRange(int $month, int $year): array
+    {
+        $start = Carbon::createFromDate($year, $month, 1)->startOfDay();
+        $end = Carbon::createFromDate($year, $month, 1)->endOfMonth()->endOfDay();
+
+        return [$start, $end];
+    }
+
+    private function buildPeriode(int $month, int $year): string
+    {
+        return strtoupper(
+            Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
+        ) . ' - ' . $year;
+    }
+
+    private function formatActivityRow($row, int $index, ?string $tipe, $aksi): array
+    {
+        return [
+            'id' => $row->id,
+            'tgl_activity' => Carbon::parse($row->tgl_activity)->locale('id')->isoFormat('D MMMM Y'),
+            'nomor' => $index + 1,
+            'nama_perusahaan' => $row->nama_perusahaan,
+            'tipe' => $tipe ?? '',
+            'notes' => $row->notulen,
+            'created_by' => $row->created_by,
+            'created_at' => Carbon::parse($row->created_at)->format('d-m-Y H:i:s'),
+            'aksi' => $aksi,
+        ];
+    }
+
+    private function buildActivityDetailResult(int $userId, $matched, string $periode, array $data): array
+    {
         return [
             'user_id' => $userId,
-            'sales_name' => $salesName,
-            'cabang' => $cabang,
+            'sales_name' => $matched->nama_sales,
+            'cabang' => $matched->cabang,
             'periode' => $periode,
             'data' => $data,
         ];
