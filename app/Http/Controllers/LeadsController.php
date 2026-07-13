@@ -2014,9 +2014,15 @@ class LeadsController extends Controller
             // Gabungkan kedua collection
             $allActivities = $customerActivities->merge($salesActivities);
 
-            // Urutkan berdasarkan created_at (datetime) secara descending
+            // Urutkan berdasarkan tanggal secara descending
             $allActivities = $allActivities->sortByDesc(function ($activity) {
-                return Carbon::parse($activity['tgl_activity'] );
+                // Customer Activity pakai tgl_realisasi (kalau ada, mis. telepon/online
+                // meeting/visit); Sales Activity selalu pakai tgl_activity.
+                $tanggal = $activity['source'] === 'Customer Activity'
+                    ? ($activity['tgl_realisasi'] ?? $activity['tgl_activity'])
+                    : $activity['tgl_activity'];
+
+                return Carbon::parse($tanggal);
             })->values(); // Reset array keys
 
             return $this->successResponse($allActivities, 'Data aktivitas berhasil diambil');
