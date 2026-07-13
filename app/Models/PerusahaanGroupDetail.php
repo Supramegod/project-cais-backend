@@ -21,6 +21,7 @@ class PerusahaanGroupDetail extends Model
         'leads_id',
         'nama_perusahaan',
         'created_by',
+        'created_by_user_id',
         'update_by',
         'deleted_by'
     ];

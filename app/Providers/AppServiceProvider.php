@@ -6,7 +6,7 @@ use App\Models\HrisPersonalAccessToken;
 use App\Models\SysmenuRole;
 use App\Services\DocumentCompressionService;
 use App\Services\DynamicMailerService;
-use App\Services\QuotationNotificationService;
+use App\Services\Quotation\QuotationNotificationService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;

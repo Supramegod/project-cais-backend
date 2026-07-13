@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreConsultationRequest;
+use App\Http\Requests\Consultation\StoreConsultationRequest;
 use App\Models\Consultation;
 use App\Models\Quotation;
-use App\Services\QuotationStepService;
+use App\Services\Quotation\Steps\QuotationStepService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;

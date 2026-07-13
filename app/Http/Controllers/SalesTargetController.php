@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SalesTarget;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\SalesTargetRequest;
+use App\Http\Requests\Sales\SalesTargetRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

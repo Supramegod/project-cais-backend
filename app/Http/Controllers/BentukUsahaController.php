@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\BentukUsahaRequest;
+use App\Http\Requests\Master\BentukUsahaRequest;
 use App\Models\BentukUsaha;
 
 class BentukUsahaController extends Controller

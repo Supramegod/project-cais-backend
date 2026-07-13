@@ -5,12 +5,12 @@ namespace App\Http\Controllers;
 
 use App\Enums\ProvinceDetailType;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreUmkRequest;
-use App\Http\Requests\StoreUmpRequest;
-use App\Http\Requests\StoreUmskRequest;
-use App\Http\Requests\StoreUmspRequest;
+use App\Http\Requests\Upah\StoreUmkRequest;
+use App\Http\Requests\Upah\StoreUmpRequest;
+use App\Http\Requests\Upah\StoreUmskRequest;
+use App\Http\Requests\Upah\StoreUmspRequest;
 use App\Models\Province;
-use App\Services\UpahService;
+use App\Services\Upah\UpahService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

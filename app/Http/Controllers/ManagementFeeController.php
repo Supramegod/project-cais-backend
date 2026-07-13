@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ManagementFeeRequest;
+use App\Http\Requests\Master\ManagementFeeRequest;
 use App\Models\ManagementFee;
 use Illuminate\Support\Facades\Auth;
 

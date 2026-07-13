@@ -5,9 +5,9 @@ namespace Tests\Feature;
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\Pks;
 use App\Models\User;
-use App\Services\PksPasalPreviewService;
-use App\Services\PksWizardFinalizeService;
-use App\Services\PksWizardService;
+use App\Services\Pks\PksPasalPreviewService;
+use App\Services\Pks\Wizard\PksWizardFinalizeService;
+use App\Services\Pks\Wizard\PksWizardService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -184,17 +184,9 @@ class PksWizardFinalizeTest extends TestCase
             'quotation_id' => 20,
             'spk_id' => 30,
         ], $user);
-        $this->assertStringStartsWith('draft/PKS/SIG/LDS001-', $baru->nomor);
+        $this->assertStringStartsWith('draft/PKS/ORG/SIG/LDS001-', $baru->nomor);
         $this->assertSame(1, (int) $baru->wizard_status_id);
         $this->assertSame('baru', $baru->tipe_pks);
-
-        $rekontrak = $service->initialize('rekontrak', [
-            'leads_id' => 10,
-            'company_id' => 13,
-            'quotation_id' => 20,
-        ], $user);
-        $this->assertSame('rekontrak', $rekontrak->tipe_pks);
-        $this->assertStringStartsWith('draft/PKS/SIG/LDS001-', $rekontrak->nomor);
 
         $pksInduk = Pks::query()->create([
             'leads_id' => 10,
@@ -207,13 +199,22 @@ class PksWizardFinalizeTest extends TestCase
             'created_by_user_id' => 3,
         ]);
 
+        $rekontrak = $service->initialize('rekontrak', [
+            'leads_id' => 10,
+            'pks_induk_id' => $pksInduk->id,
+            'company_id' => 13,
+            'quotation_id' => 20,
+        ], $user);
+        $this->assertSame('rekontrak', $rekontrak->tipe_pks);
+        $this->assertStringStartsWith('draft/PKS/RKT/SIG/LDS001-', $rekontrak->nomor);
+
         $addendum = $service->initialize('addendum', [
             'leads_id' => 10,
             'pks_induk_id' => $pksInduk->id,
             'quotation_id' => 20,
         ], $user);
         $this->assertSame('addendum', $addendum->tipe_pks);
-        $this->assertStringStartsWith('draft/ADD/PKS/SIG/LDS001-062026-00001/', $addendum->nomor);
+        $this->assertStringStartsWith('draft/PKS/ADD/SIG/LDS001-', $addendum->nomor);
     }
 
     public function test_addendum_preview_can_be_generated_and_edited(): void

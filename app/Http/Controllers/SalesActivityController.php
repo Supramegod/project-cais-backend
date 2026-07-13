@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SalesActivityStoreRequest;
+use App\Http\Requests\Sales\SalesActivityStoreRequest;
 use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
 use App\Models\SalesActivity;
@@ -94,18 +94,21 @@ class SalesActivityController extends Controller
             return $this->errorResponse('User tidak terautentikasi', 401);
         }
 
+        // Bangun sekali filter kebutuhan berdasarkan role (hindari query
+        // TimSalesDetail berulang saat dipakai di withCount() & whereHas() di bawah).
+        $kebutuhanFilter = $this->buildKebutuhanFilterByUser($user);
+
         // Query leads dengan filter berdasarkan role user
         $query = Leads::filterByUserRole($user)
                 ->whereNull('deleted_at')
                 ->select('id', 'nama_perusahaan', 'pic', 'telp_perusahaan', 'email')
                 ->withCount([
-                    'leadsKebutuhan' => function ($q) use ($user) {
+                    'leadsKebutuhan' => function ($q) use ($kebutuhanFilter) {
                         // Hitung jumlah kebutuhan yang di-assign ke user ini
                         $q->whereNull('deleted_at');
-                        $this->applyKebutuhanFilterByUser($q, $user);
+                        $kebutuhanFilter($q);
                     }
                 ])
-                ->has('leadsKebutuhan', '>', 0) // Hanya leads yang memiliki kebutuhan
                 ->orderBy('nama_perusahaan');
 
             // Filter pencarian
@@ -118,12 +121,15 @@ class SalesActivityController extends Controller
                 });
             }
 
-            // Filter hanya leads yang memiliki kebutuhan aktif
+            // Filter hanya leads yang memiliki kebutuhan aktif (sesuai role user);
+            // jika dimatikan, cukup syaratkan ada kebutuhan apapun (tanpa filter role).
             if ($request->boolean('has_active_kebutuhan', true)) {
-                $query->whereHas('leadsKebutuhan', function ($q) use ($user) {
+                $query->whereHas('leadsKebutuhan', function ($q) use ($kebutuhanFilter) {
                     $q->whereNull('deleted_at');
-                    $this->applyKebutuhanFilterByUser($q, $user);
+                    $kebutuhanFilter($q);
                 });
+            } else {
+                $query->has('leadsKebutuhan', '>', 0);
             }
 
             $perPage = $request->input('per_page', 20);
@@ -230,8 +236,8 @@ class SalesActivityController extends Controller
             }
 
             // Sorting dan pagination
-            $query->orderBy('tgl_activity', 'desc')
-                ->orderBy('created_at', 'desc');
+            $query->orderBy('tgl_activity', 'desc');
+                // ->orderBy('created_at', 'desc');
 
             $perPage = $request->input('per_page', 15);
             $activities = $query->paginate($perPage);
@@ -778,35 +784,55 @@ class SalesActivityController extends Controller
      */
     private function applyKebutuhanFilterByUser($query, $user)
     {
+        ($this->buildKebutuhanFilterByUser($user))($query);
+    }
+
+    /**
+     * Resolve sekali data akses (mis. anggota tim untuk Sales Leader) lalu kembalikan
+     * closure yang tinggal diterapkan ke query. Dipisah dari applyKebutuhanFilterByUser()
+     * agar caller yang butuh filter yang sama di beberapa klausa (withCount + whereHas)
+     * bisa reuse satu closure tanpa query TimSalesDetail berulang kali.
+     */
+    private function buildKebutuhanFilterByUser($user): \Closure
+    {
         // Superadmin bisa melihat semua
         if ($user->cais_role_id == 2) {
-            return;
+            return function ($query) {};
         }
 
         // Sales division
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
             if ($user->cais_role_id == 29) {
                 // Sales - hanya melihat kebutuhan yang diassign ke mereka
-                $query->whereHas('timSalesD', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                });
-            } elseif ($user->cais_role_id == 31) {
+                return function ($query) use ($user) {
+                    $query->whereHas('timSalesD', function ($q) use ($user) {
+                        $q->where('user_id', $user->id);
+                    });
+                };
+            }
+
+            if ($user->cais_role_id == 31) {
                 // Sales Leader - melihat kebutuhan seluruh anggota tim
                 $tim = \App\Models\TimSalesDetail::where('user_id', $user->id)->first();
-                if ($tim) {
-                    $memberSales = \App\Models\TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
+                $memberSales = $tim
+                    ? \App\Models\TimSalesDetail::where('tim_sales_id', $tim->tim_sales_id)
                         ->pluck('user_id')
-                        ->toArray();
+                        ->toArray()
+                    : [];
 
+                return function ($query) use ($memberSales) {
                     $query->whereHas('timSalesD', function ($q) use ($memberSales) {
                         $q->whereIn('user_id', $memberSales);
                     });
-                }
+                };
             }
+
             // Untuk role 30, 32, 33 (Sales lainnya) - tanpa filter khusus
         }
+
         // RO division - tanpa filter khusus
         // CRM division - tanpa filter khusus
+        return function ($query) {};
     }
 
     /**

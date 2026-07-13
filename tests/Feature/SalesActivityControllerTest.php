@@ -153,10 +153,12 @@ class SalesActivityControllerTest extends TestCase
     {
         $ids = $this->seedLeadWithKebutuhan();
 
+        $tglActivity = now()->toDateString();
+
         $response = $this->postJson('/api/sales-activity/add', [
             'leads_id' => $ids['lead'],
             'leads_kebutuhan_id' => $ids['leads_kebutuhan'],
-            'tgl_activity' => '2024-02-01',
+            'tgl_activity' => $tglActivity,
             'jenis_activity' => 'Meeting',
             'notulen' => 'Diskusi kebutuhan',
         ]);
@@ -177,8 +179,24 @@ class SalesActivityControllerTest extends TestCase
         // tgl_leads side-effect update on the parent lead
         $this->assertDatabaseHas('sl_leads', [
             'id' => $ids['lead'],
-            'tgl_leads' => '2024-02-01',
+            'tgl_leads' => $tglActivity,
         ]);
+    }
+
+    public function test_store_backdated_more_than_3_days_returns_422(): void
+    {
+        $ids = $this->seedLeadWithKebutuhan();
+
+        $response = $this->postJson('/api/sales-activity/add', [
+            'leads_id' => $ids['lead'],
+            'leads_kebutuhan_id' => $ids['leads_kebutuhan'],
+            'tgl_activity' => now()->subDays(4)->toDateString(),
+            'jenis_activity' => 'Meeting',
+            'notulen' => 'Diskusi kebutuhan',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['message' => ['tgl_activity']]);
     }
 
     public function test_store_validation_error_returns_422_baserequest_shape(): void
@@ -200,7 +218,7 @@ class SalesActivityControllerTest extends TestCase
         $response = $this->postJson('/api/sales-activity/add', [
             'leads_id' => $a['lead'],
             'leads_kebutuhan_id' => $b['leads_kebutuhan'],
-            'tgl_activity' => '2024-02-01',
+            'tgl_activity' => now()->toDateString(),
             'jenis_activity' => 'Meeting',
             'notulen' => 'x',
         ]);

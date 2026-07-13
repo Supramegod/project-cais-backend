@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\TopRequest;
+use App\Http\Requests\Master\TopRequest;
 use App\Models\Top;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

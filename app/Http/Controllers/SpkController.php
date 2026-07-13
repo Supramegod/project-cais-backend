@@ -18,7 +18,7 @@ use App\Models\QuotationOhc;
 use App\Models\QuotationPic;
 use App\Models\QuotationTraining;
 use App\Models\SalesActivity;
-use App\Services\QuotationService;
+use App\Services\Quotation\QuotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;

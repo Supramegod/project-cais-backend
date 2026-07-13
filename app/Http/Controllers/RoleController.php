@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\RoleUpdatePermissionsRequest;
+use App\Http\Requests\Role\RoleUpdatePermissionsRequest;
 use App\Models\Role;
 use App\Models\Sysmenu;
 use App\Models\SysmenuRole;

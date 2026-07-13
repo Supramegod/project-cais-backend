@@ -6,7 +6,7 @@ use App\Models\JabatanPic;
 use App\Models\QuotationManagementFee;
 use App\Models\SalaryRule;
 use App\Models\Umk;
-use App\Services\QuotationService;
+use App\Services\Quotation\QuotationService;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
 

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\JenisBarangRequest;
+use App\Http\Requests\Master\JenisBarangRequest;
 use App\Models\JenisBarang;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;

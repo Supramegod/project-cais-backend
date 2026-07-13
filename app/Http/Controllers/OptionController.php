@@ -23,7 +23,7 @@ use App\Models\StatusQuotation;
 use App\Models\StatusSpk;
 use App\Models\User;
 use App\Models\Village;
-use App\Http\Requests\GetUsersOptionRequest;
+use App\Http\Requests\Option\GetUsersOptionRequest;
 use Illuminate\Http\Request;
 /**
  * @OA\Tag(
