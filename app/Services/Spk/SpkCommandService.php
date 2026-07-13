@@ -135,7 +135,7 @@ class SpkCommandService
         foreach ($kebutuhanList as $lk) {
             if (SpkSite::where('spk_id', $spk->id)->where('kebutuhan_id', $lk->kebutuhan_id)->exists()) {
                 SalesActivity::create([
-                    'leads_id' => $spk->leads_id, 'leads_kebutuhan_id' => $lk->id, 'tgl_activity' => Carbon::now(),
+                    'leads_id' => $spk->leads_id, 'leads_kebutuhan_id' => $lk->id, 'spk_id' => $spk->id, 'tgl_activity' => Carbon::now(),
                     'jenis_activity' => 'spk', 'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$lk->kebutuhan->nama}",
                     'created_by' => $user->full_name, 'created_by_user_id' => $user->id,
                 ]);

@@ -82,34 +82,35 @@ class ReportSalesService
 
         $userIds = $salesData->pluck('user_id')->filter()->values()->toArray();
 
-        $weeklyActivity = DB::table('sl_activity_sales')
+        $weeklyActivity = DB::table('sl_activity_sales as sa')
+            ->leftJoin('sl_quotation as q', 'q.id', '=', 'sa.quotation_id')
             ->select(
-                DB::raw('ANY_VALUE(created_by) as created_by'),
-                'created_by_user_id',
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_quot"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_spk"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_pks"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_visit"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_quot"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_spk"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_pks"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_visit"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_quot"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_spk"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_pks"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Appointment' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Visit' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_visit"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'Quotation' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_quot"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'SPK' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_spk"),
-                DB::raw("SUM(CASE WHEN jenis_activity = 'PKS' AND DAY(tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_pks")
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
+                'sa.created_by_user_id',
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Visit' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_visit"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Quotation' AND q.tipe_quotation = 'baru' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_quot"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'SPK' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_spk"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'PKS' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_pks"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Visit' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_visit"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Quotation' AND q.tipe_quotation = 'baru' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_quot"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'SPK' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_spk"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'PKS' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_pks"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Visit' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_visit"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Quotation' AND q.tipe_quotation = 'baru' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_quot"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'SPK' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_spk"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'PKS' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_pks"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Appointment' AND DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Visit' AND DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_visit"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'Quotation' AND q.tipe_quotation = 'baru' AND DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_quot"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'SPK' AND DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_spk"),
+                DB::raw("SUM(CASE WHEN sa.jenis_activity = 'PKS' AND DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_pks")
             )
-            ->whereBetween('tgl_activity', [$startMonth, $endMonth])
-            ->whereIn('created_by_user_id', $userIds)
-            ->groupBy('created_by_user_id')
+            ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+            ->whereIn('sa.created_by_user_id', $userIds)
+            ->groupBy('sa.created_by_user_id')
             ->get();
 
         $data = [];
@@ -152,21 +153,22 @@ class ReportSalesService
 
     private function getMonthlyAggregation($start, $end, array $userIds)
     {
-        return DB::table('sl_activity_sales')
+        return DB::table('sl_activity_sales as sa')
+            ->leftJoin('sl_quotation as q', 'q.id', '=', 'sa.quotation_id')
             ->select(
-                DB::raw('ANY_VALUE(created_by) as created_by'),
-                'created_by_user_id',
-                DB::raw("COUNT(CASE WHEN jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
-                DB::raw("COUNT(CASE WHEN jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
-                DB::raw("COUNT(CASE WHEN jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon') THEN 1 END) as jumlah_visit"),
-                DB::raw("COUNT(CASE WHEN jenis_activity = 'Quotation' THEN 1 END) as jumlah_quotation"),
-                DB::raw("COUNT(CASE WHEN jenis_activity = 'SPK' THEN 1 END) as jumlah_spk"),
-                DB::raw("COUNT(CASE WHEN jenis_activity = 'PKS' THEN 1 END) as jumlah_pks"),
-                DB::raw("COUNT(CASE WHEN jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
+                DB::raw('ANY_VALUE(sa.created_by) as created_by'),
+                'sa.created_by_user_id',
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity IN ('Kirim Berkas', 'Email') THEN 1 END) as jumlah_kirim_proposal"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'Appointment' THEN 1 END) as jumlah_appointment"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity IN ('Visit', 'Online Meeting', 'Email', 'Telepon') THEN 1 END) as jumlah_visit"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'Quotation' AND q.tipe_quotation = 'baru' THEN 1 END) as jumlah_quotation"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'SPK' THEN 1 END) as jumlah_spk"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'PKS' THEN 1 END) as jumlah_pks"),
+                DB::raw("COUNT(CASE WHEN sa.jenis_activity = 'Follow Up' THEN 1 END) as jumlah_follow_up")
             )
-            ->whereBetween('tgl_activity', [$start, $end])
-            ->whereIn('created_by_user_id', $userIds)
-            ->groupBy('created_by_user_id')
+            ->whereBetween('sa.tgl_activity', [$start, $end])
+            ->whereIn('sa.created_by_user_id', $userIds)
+            ->groupBy('sa.created_by_user_id')
             ->get();
     }
 

@@ -114,6 +114,7 @@ class PksHelperService
         SalesActivity::create([
             'leads_id' => $pks->leads_id,
             'leads_kebutuhan_id' => $leadsKebutuhan?->id,
+            'pks_id' => $pks->id,
             'tgl_activity' => Carbon::now(),
             'jenis_activity' => 'PKS',
             'notulen' => "pks baru {$pks->nomor} dibuat untuk kebutuhan {$kebutuhanNama}",

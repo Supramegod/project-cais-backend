@@ -176,7 +176,7 @@ class QuotationBusinessService
 
         // Sales role IDs: 29, 30, 31, 32, 33
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-            $this->createSalesActivity($quotation, $createdBy, $user);
+            $this->createSalesActivity($quotation, $createdBy, $user, $notes);
         } else {
             CustomerActivity::create([
                 'leads_id' => $quotation->leads_id,
@@ -201,7 +201,7 @@ class QuotationBusinessService
     /**
      * ✅ FIX: Menerima $user object eksplisit — tidak lagi bergantung pada Auth::user().
      */
-    private function createSalesActivity(Quotation $quotation, string $createdBy, $user): void
+    private function createSalesActivity(Quotation $quotation, string $createdBy, $user, ?string $notes = null): void
     {
         $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
@@ -211,9 +211,10 @@ class QuotationBusinessService
         SalesActivity::create([
             'leads_id' => $quotation->leads_id,
             'leads_kebutuhan_id' => $leadsKebutuhan?->id,
+            'quotation_id' => $quotation->id,
             'tgl_activity' => Carbon::now(),
             'jenis_activity' => 'Quotation',
-            'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
+            'notulen' => $notes ?? "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
             'created_by' => $createdBy,
             'created_by_user_id' => Auth::id(),
         ]);

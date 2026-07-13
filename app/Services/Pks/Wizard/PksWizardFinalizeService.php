@@ -300,6 +300,7 @@ class PksWizardFinalizeService
 
             SalesActivity::create([
                 'leads_id' => $pks->leads_id,
+                'pks_id' => $pks->id,
                 'tgl_activity' => $now,
                 'jenis_activity' => 'PKS',
                 'notulen' => "pks {$pks->nomor} finalized untuk kebutuhan {$kebutuhanNama}",

@@ -6,10 +6,8 @@ use App\Models\Company;
 use App\Models\CustomerActivity;
 use App\Models\Kebutuhan;
 use App\Models\Leads;
-use App\Models\LeadsKebutuhan;
 use App\Models\Quotation;
 use App\Models\QuotationSite;
-use App\Models\SalesActivity;
 use App\Models\Pks;
 use App\Models\Spk;
 use App\Models\User;
@@ -197,49 +195,6 @@ class QuotationStoreService
         }
     }
 
-    public function createInitialActivity(
-        Quotation $quotation,
-        string $createdBy,
-        int $userId,
-        string $tipe = 'baru',
-        ?Quotation $quotationReferensi = null,
-        $user = null
-    ): void {
-        $user = $user ?? Auth::user() ?? User::find($userId);
-
-        if (!$user) {
-            \Log::error('createInitialActivity: user tidak ditemukan', ['user_id' => $userId]);
-            return;
-        }
-
-        $leads = $quotation->leads;
-        $nomorActivity = $this->generateActivityNomor($quotation->leads_id);
-        $notes = $this->generateActivityNotes($quotation, $tipe, $quotationReferensi);
-
-        if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-            $this->createSalesActivity($quotation, $createdBy, $user);
-        } else {
-            CustomerActivity::create([
-                'leads_id' => $quotation->leads_id,
-                'quotation_id' => $quotation->id,
-                'branch_id' => $leads->branch_id,
-                'tgl_activity' => Carbon::now(),
-                'nomor' => $nomorActivity,
-                'tipe' => $this->getActivityType($tipe),
-                'notes' => $notes,
-                'is_activity' => 0,
-                'user_id' => $userId,
-                'created_by' => $createdBy,
-                'created_by_user_id' => Auth::id(),
-            ]);
-        }
-
-        if ($leads) {
-            $leads->tgl_leads = Carbon::now()->toDateString();
-            $leads->save();
-        }
-    }
-
     // ======================== NUMBER GENERATION ==============================
 
     public function generateNomorByType(int $leadsId, int $companyId, string $tipeQuotation, ?Quotation $quotationReferensi = null): string
@@ -285,45 +240,6 @@ class QuotationStoreService
     }
 
     // ======================== PRIVATE HELPERS ================================
-
-    private function createSalesActivity(Quotation $quotation, string $createdBy, $user): void
-    {
-        $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
-            ->where('kebutuhan_id', $quotation->kebutuhan_id)
-            ->where('tim_sales_d_id', $user->id)
-            ->first();
-
-        SalesActivity::create([
-            'leads_id' => $quotation->leads_id,
-            'leads_kebutuhan_id' => $leadsKebutuhan?->id,
-            'tgl_activity' => Carbon::now(),
-            'jenis_activity' => 'Quotation',
-            'notulen' => "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
-            'created_by' => $createdBy,
-            'created_by_user_id' => Auth::id(),
-        ]);
-    }
-
-    private function generateActivityNotes(Quotation $quotation, string $tipe, ?Quotation $quotationReferensi): string
-    {
-        if (!$quotationReferensi) return "Quotation baru {$quotation->nomor} dibuat dari awal";
-        return match ($tipe) {
-            'revisi' => "Quotation revisi {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}",
-            'rekontrak' => "Quotation rekontrak {$quotation->nomor} dibuat dari kontrak sebelumnya {$quotationReferensi->nomor}",
-            'addendum' => "Quotation addendum {$quotation->nomor} dibuat dari referensi {$quotationReferensi->nomor}",
-            'baru_dengan_referensi' => "Quotation baru {$quotation->nomor} dibuat menggunakan data dari Quotation {$quotationReferensi->nomor}",
-            default => "Quotation baru {$quotation->nomor} dibuat dari awal",
-        };
-    }
-
-    private function getActivityType(string $tipe): string
-    {
-        return match ($tipe) {
-            'revisi' => 'Quotation Revisi', 'rekontrak' => 'Quotation Rekontrak',
-            'addendum' => 'Quotation addendum', 'baru_dengan_referensi' => 'Quotation copy',
-            default => 'Quotation',
-        };
-    }
 
     public function validateMultiSiteData(Request $request): void
     {
