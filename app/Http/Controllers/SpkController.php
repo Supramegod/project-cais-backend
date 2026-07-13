@@ -34,6 +34,7 @@ use App\Models\QuotationSite;
 use App\Models\CustomerActivity;
 use App\Models\JabatanPic;
 use App\Models\Company;
+use App\Services\Spk\SpkNumberingService;
 /**
  * @OA\Tag(
  *     name="SPK",
@@ -486,7 +487,9 @@ class SpkController extends Controller
             $firstSite = QuotationSite::find($siteIds[0]);
             $quotationId = $firstSite ? $firstSite->quotation_id : null;
 
-            $spkNomor = $this->generateNomorNew($leads->id);
+            $quotation = $quotationId ? Quotation::find($quotationId) : null;
+            $companyId = $quotation?->company_id ?? 0;
+            $spkNomor = app(SpkNumberingService::class)->generate($leads->id, $companyId);
 
             // Buat SPK
             $spk = Spk::create([
@@ -1936,24 +1939,6 @@ class SpkController extends Controller
         Storage::disk('spk')->put($fileName, file_get_contents($file));
 
         return $fileName;
-    }
-
-    private function generateNomorNew($leadsId)
-    {
-        $now = Carbon::now();
-        // Tambahkan pengecekan null untuk leads
-        $leads = Leads::whereNull('deleted_at')->find($leadsId);
-        if (!$leads) {
-            return $this->errorResponse("Leads dengan ID {$leadsId} tidak ditemukan", 500);
-        }
-
-        $baseNumber = "SPK/" . $leads->nomor . "-";
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
-
-        $count = Spk::where('nomor', 'like', $baseNumber . $month . $now->year . "-%")->count();
-        $sequence = sprintf("%05d", $count + 1);
-
-        return $baseNumber . $month . $now->year . "-" . $sequence;
     }
 
     private function generateActivityNomor($leadsId)
