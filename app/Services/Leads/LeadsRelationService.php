@@ -118,8 +118,14 @@ class LeadsRelationService
 
         $allActivities = $customerActivities->merge($salesActivities);
         $allActivities = $allActivities->sortByDesc(function ($activity) {
-            return Carbon::parse($activity['tgl_activity']);
-        })->values();
+            // Customer Activity pakai tgl_realisasi (kalau ada, mis. telepon/online
+            // meeting/visit); Sales Activity selalu pakai tgl_activity.
+            $tanggal = $activity['source'] === 'Customer Activity'
+                ? ($activity['tgl_realisasi'] ?? $activity['tgl_activity'])
+                : $activity['tgl_activity'];
+
+            return Carbon::parse($tanggal);
+        })->values(); // Reset array keys
 
         return $allActivities;
     }
