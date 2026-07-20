@@ -497,7 +497,8 @@ class QuotationController extends Controller
                 $this->quotationBusinessService->createQuotationSites(
                     $quotation,
                     $request,
-                    $user->full_name
+                    $user->full_name,
+                    $user->id
                 );
 
                 Log::info('Sites created synchronously', [
@@ -1040,58 +1041,60 @@ class QuotationController extends Controller
     /**
      * Create only new sites (skip existing ones)
      */
-    private function createNewSitesOnly(Quotation $quotation, Request $request, string $createdBy): void
-    {
-        if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) {
-                // Cek apakah site sudah existing
-                $isExisting = $this->checkSiteExists(
-                    $request->perusahaan_id,
-                    $value,
-                    $request->provinsi_multi[$key],
-                    $request->kota_multi[$key]
-                );
+    // private function createNewSitesOnly(Quotation $quotation, Request $request, string $createdBy): void
+    // {
+    //     if ($request->jumlah_site == "Multi Site") {
+    //         foreach ($request->multisite as $key => $value) {
+    //             // Cek apakah site sudah existing
+    //             $isExisting = $this->checkSiteExists(
+    //                 $request->perusahaan_id,
+    //                 $value,
+    //                 $request->provinsi_multi[$key],
+    //                 $request->kota_multi[$key]
+    //             );
 
-                if (!$isExisting) {
-                    $this->quotationBusinessService->createQuotationSite(
-                        $quotation,
-                        $request,
-                        $key,
-                        true,
-                        $createdBy
-                    );
-                } else {
-                    \Log::info('Skip creating existing site', [
-                        'nama_site' => $value,
-                        'leads_id' => $request->perusahaan_id
-                    ]);
-                }
-            }
-        } else {
-            // Cek apakah site sudah existing
-            $isExisting = $this->checkSiteExists(
-                $request->perusahaan_id,
-                $request->nama_site,
-                $request->provinsi,
-                $request->kota
-            );
+    //             if (!$isExisting) {
+    //                 $this->quotationBusinessService->createQuotationSite(
+    //                     $quotation,
+    //                     $request,
+    //                     $key,
+    //                     true,
+    //                     $createdBy,
+    //                     $user->id
+    //                 );
+    //             } else {
+    //                 \Log::info('Skip creating existing site', [
+    //                     'nama_site' => $value,
+    //                     'leads_id' => $request->perusahaan_id
+    //                 ]);
+    //             }
+    //         }
+    //     } else {
+    //         // Cek apakah site sudah existing
+    //         $isExisting = $this->checkSiteExists(
+    //             $request->perusahaan_id,
+    //             $request->nama_site,
+    //             $request->provinsi,
+    //             $request->kota
+    //         );
 
-            if (!$isExisting) {
-                $this->quotationBusinessService->createQuotationSite(
-                    $quotation,
-                    $request,
-                    null,
-                    false,
-                    $createdBy
-                );
-            } else {
-                \Log::info('Skip creating existing site', [
-                    'nama_site' => $request->nama_site,
-                    'leads_id' => $request->perusahaan_id
-                ]);
-            }
-        }
-    }
+    //         if (!$isExisting) {
+    //             $this->quotationBusinessService->createQuotationSite(
+    //                 $quotation,
+    //                 $request,
+    //                 null,
+    //                 false,
+    //                 $createdBy,
+    //                 $user->id
+    //             );
+    //         } else {
+    //             \Log::info('Skip creating existing site', [
+    //                 'nama_site' => $request->nama_site,
+    //                 'leads_id' => $request->perusahaan_id
+    //             ]);
+    //         }
+    //     }
+    // }
 
     /**
      * Link quotation to existing sites

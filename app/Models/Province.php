@@ -17,7 +17,7 @@ class Province extends Model
     protected $connection = 'mysqlhris';
     protected $table = 'm_province';
     protected $primaryKey = 'id';
-    protected $fillable = ['name', 'is_active'];
+    protected $fillable = ['name', 'branch_id','is_active'];
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

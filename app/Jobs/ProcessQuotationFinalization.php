@@ -21,7 +21,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class ProcessQuotationFinalization implements ShouldQueue
@@ -121,7 +120,7 @@ class ProcessQuotationFinalization implements ShouldQueue
                     'requirement' => $req->requirement,
                     'created_at' => $now,
                     'created_by' => $this->user,
-                    'created_by_user_id' => $this->user,
+                    'created_by_user_id' => $this->userId,
                 ];
             }
         }
@@ -153,7 +152,7 @@ class ProcessQuotationFinalization implements ShouldQueue
                 'is_read' => 0,
                 'created_at' => $now,
                 'created_by' => $creatorName,
-                'created_by_user_id' => Auth::id(),
+                'created_by_user_id' => $this->userId,
             ]);
         }
 

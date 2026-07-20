@@ -1,0 +1,1082 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\Pks\ItemFulfillmentEditRequest;
+use App\Http\Requests\Pks\ItemFulfillmentStoreRequest;
+use App\Http\Requests\Pks\VisitRecordStoreRequest;
+use App\Http\Requests\Pks\VisitRescheduleRequest;
+use App\Http\Requests\Pks\VisitScheduleManualStoreRequest;
+use App\Models\Pks;
+use App\Models\PksItemFulfillment;
+use App\Models\PksVisitSchedule;
+use App\Services\Pks\HcFulfillmentService;
+use App\Services\Pks\ItemFulfillmentService;
+use App\Services\Pks\PksFulfillmentDashboardService;
+use App\Services\Pks\PksFulfillmentSummaryService;
+use App\Services\Pks\VisitFulfillmentService;
+use App\Services\Pks\VisitSchedulingService;
+use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * @OA\Tag(
+ *     name="PKS Fulfillment",
+ *     description="API untuk PKS Item Fulfillment, Visit Scheduling, dan Visit Record"
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksFulfillmentItem",
+ *     type="object",
+ *
+ *     @OA\Property(property="item_type_id", type="integer", enum={1,2,3}, description="1=kaporlap, 2=device, 3=chemical"),
+ *     @OA\Property(property="item_type", type="string"),
+ *     @OA\Property(property="item_id", type="integer"),
+ *     @OA\Property(property="nama", type="string"),
+ *     @OA\Property(property="qty_diminta", type="integer"),
+ *     @OA\Property(property="qty_terpenuhi", type="integer"),
+ *     @OA\Property(property="remaining", type="integer"),
+ *     @OA\Property(property="status", type="string")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksVisitSchedule",
+ *     type="object",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="pks_id", type="integer"),
+ *     @OA\Property(property="site_id", type="integer"),
+ *     @OA\Property(property="role", type="string"),
+ *     @OA\Property(property="tgl_jadwal", type="string", format="date"),
+ *     @OA\Property(property="tgl_jadwal_asli", type="string", format="date", nullable=true),
+ *     @OA\Property(property="status", type="string", enum={"scheduled","rescheduled","done","missed"})
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksVisitRecord",
+ *     type="object",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="pks_id", type="integer"),
+ *     @OA\Property(property="schedule_id", type="integer", nullable=true),
+ *     @OA\Property(property="role", type="string"),
+ *     @OA\Property(property="tgl_visit_aktual", type="string", format="date"),
+ *     @OA\Property(property="hasil_visit", type="string", enum={"selesai","ada_kendala","ditunda"}),
+ *     @OA\Property(property="catatan", type="string"),
+ *     @OA\Property(property="fotos", type="array", @OA\Items(ref="#/components/schemas/PksVisitRecordFoto"))
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksVisitRecordFoto",
+ *     type="object",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="visit_record_id", type="integer"),
+ *     @OA\Property(property="url_file", type="string"),
+ *     @OA\Property(property="nama_file", type="string")
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksVisitTarget",
+ *     type="object",
+ *
+ *     @OA\Property(property="role", type="string"),
+ *     @OA\Property(property="target_total", type="integer"),
+ *     @OA\Property(property="target_terpakai", type="integer"),
+ *     @OA\Property(property="sisa", type="integer")
+ * )
+ */
+class PksFulfillmentController extends Controller
+{
+    /**
+     * Role (cais_role_id) yang boleh melakukan aksi tulis (create/edit) fulfillment.
+     * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
+     * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
+     */
+    private const MANAGE_ROLES = [8, 10, 98];
+
+    public function __construct(
+        private ItemFulfillmentService $itemFulfillmentService,
+        private VisitSchedulingService $visitSchedulingService,
+        private VisitFulfillmentService $visitFulfillmentService,
+    ) {}
+
+    /**
+     * Gate aksi tulis fulfillment. Return JsonResponse 403 bila tidak berhak,
+     * atau null bila boleh lanjut.
+     */
+    private function ensureCanManage(): ?JsonResponse
+    {
+        $user = Auth::user();
+
+        if (! $user || ! in_array($user->cais_role_id, self::MANAGE_ROLES, true)) {
+            return $this->errorResponse('Anda tidak memiliki akses untuk aksi fulfillment ini.', 403);
+        }
+
+        return null;
+    }
+
+    // ==================== DASHBOARD (SEMUA PKS) ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/dashboard",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Dashboard rekap pemenuhan PKS",
+     *     description="Daftar PKS dengan rekap ringkas pemenuhan Item & Visit per PKS. Search & pagination mengikuti pola PKS list (search_by nama_perusahaan fulltext / nomor / created_by LIKE; default rentang tanggal). Response memakai blok pagination + meta yang sama.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string")),
+     *     @OA\Parameter(name="search_by", in="query", required=false, description="nama_perusahaan | nomor | created_by", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="status", in="query", required=false, description="Filter status_pks_id", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="branch", in="query", required=false, description="Filter branch (sl_leads.branch_id)", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="tgl_dari", in="query", required=false, @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="tgl_sampai", in="query", required=false, @OA\Schema(type="string", format="date")),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="PKS fulfillment dashboard retrieved successfully"),
+     *             @OA\Property(property="summary", type="object", description="Rekap fulfillment agregat seluruh PKS yang cocok filter",
+     *                 @OA\Property(property="item", type="object",
+     *                     @OA\Property(property="total", type="integer"),
+     *                     @OA\Property(property="fully_fulfilled", type="integer"),
+     *                     @OA\Property(property="qty_diminta", type="integer"),
+     *                     @OA\Property(property="qty_terpenuhi", type="integer"),
+     *                     @OA\Property(property="persen", type="number", format="float")
+     *                 ),
+     *                 @OA\Property(property="visit", type="object",
+     *                     @OA\Property(property="target_total", type="integer"),
+     *                     @OA\Property(property="target_terpakai", type="integer"),
+     *                     @OA\Property(property="persen", type="number", format="float"),
+     *                     @OA\Property(property="missed", type="integer")
+     *                 ),
+     *                 @OA\Property(property="hc", type="object",
+     *                     @OA\Property(property="total_vacancy", type="integer"),
+     *                     @OA\Property(property="target_kebutuhan", type="integer"),
+     *                     @OA\Property(property="akumulasi_pengiriman", type="integer"),
+     *                     @OA\Property(property="sisa_outstanding", type="integer"),
+     *                     @OA\Property(property="persen", type="number", format="float")
+     *                 )
+     *             ),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="pagination", type="object",
+     *                 @OA\Property(property="current_page", type="integer"),
+     *                 @OA\Property(property="last_page", type="integer"),
+     *                 @OA\Property(property="total", type="integer"),
+     *                 @OA\Property(property="total_per_page", type="integer")
+     *             ),
+     *             @OA\Property(property="meta", type="object",
+     *                 @OA\Property(property="tgl_dari", type="string"),
+     *                 @OA\Property(property="tgl_sampai", type="string")
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function dashboard(Request $request, PksFulfillmentDashboardService $dashboardService): JsonResponse
+    {
+        try {
+            $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(6)->toDateString();
+            $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
+
+            // Base query + filter (dipakai untuk summary keseluruhan & list paginated).
+            $base = Pks::query()
+                ->leftJoin('sl_leads', 'sl_pks.leads_id', '=', 'sl_leads.id')
+                ->where('sl_pks.status_pks_id', 7); // hanya PKS aktif
+
+            // Search — pola yang sama dengan PksController@index.
+            if ($request->filled('search')) {
+                $searchTerm = $request->search;
+                $searchBy = $request->get('search_by', 'nama_perusahaan');
+
+                if ($searchBy === 'nama_perusahaan') {
+                    $searchTerm = str_contains($searchTerm, ' ')
+                        ? '"'.$searchTerm.'"'
+                        : $searchTerm.'*';
+                    $base->whereRaw('MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
+                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
+                    $base->where("sl_pks.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
+                }
+            } else {
+                $base->whereBetween(
+                    DB::raw('DATE(COALESCE(sl_pks.tgl_pks, sl_pks.initialized_at, sl_pks.created_at))'),
+                    [$tglDari, $tglSampai]
+                );
+            }
+
+            if ($request->filled('branch')) {
+                $base->where('sl_leads.branch_id', $request->branch);
+            }
+
+            // Rekap atas SELURUH PKS yang cocok filter — dihitung sekali,
+            // dipakai untuk summary fulfillment agregat & enrich list.
+            $allRows = (clone $base)->get(['sl_pks.id', 'sl_pks.quotation_id']);
+            $recap = $dashboardService->recapForPage($allRows);
+
+            // Summary = rekap fulfillment agregat (item + visit) lintas semua PKS.
+            $summary = $dashboardService->aggregateSummary($recap);
+
+            // List paginated.
+            $pksList = (clone $base)
+                ->select([
+                    'sl_pks.id',
+                    'sl_pks.leads_id',
+                    'sl_pks.nomor',
+                    'sl_pks.nama_perusahaan',
+                    'sl_pks.quotation_id',
+                    'sl_pks.status_pks_id',
+                    'sl_pks.kontrak_awal',
+                    'sl_pks.kontrak_akhir',
+                    'sl_pks.tgl_pks',
+                    'sl_pks.initialized_at',
+                    'sl_pks.created_at',
+                ])
+                ->with([
+                    'statusPks:id,nama',
+                    'sites:id,pks_id,nama_site',
+                ])
+                ->orderBy('sl_pks.created_at', 'desc')
+                ->paginate($request->get('per_page', 15));
+
+            $pksList->getCollection()->transform(function ($pks) use ($recap) {
+                $r = $recap[$pks->id] ?? null;
+
+                return [
+                    'id' => $pks->id,
+                    'nomor' => $pks->nomor,
+                    'nama_perusahaan' => $pks->nama_perusahaan,
+                    'status' => $pks->statusPks->nama ?? '-',
+                    'status_pks_id' => $pks->status_pks_id,
+                    'nama_site' => $pks->sites->pluck('nama_site')->toArray(),
+                    'kontrak_awal' => $pks->getRawOriginal('kontrak_awal'),
+                    'kontrak_akhir' => $pks->getRawOriginal('kontrak_akhir'),
+                    'item' => $r['item'] ?? null,
+                    'visit' => $r['visit'] ?? null,
+                    'hc' => $r['hc'] ?? null,
+                    'is_complete' => $r['is_complete'] ?? false,
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'PKS fulfillment dashboard retrieved successfully',
+                'summary' => $summary,
+                'data' => $pksList->items(),
+                'pagination' => [
+                    'current_page' => $pksList->currentPage(),
+                    'last_page' => $pksList->lastPage(),
+                    'total' => $pksList->total(),
+                    'total_per_page' => $pksList->count(),
+                ],
+                'meta' => ['tgl_dari' => $tglDari, 'tgl_sampai' => $tglSampai],
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Error in PksFulfillmentController@dashboard: '.$e->getMessage());
+
+            return $this->serverErrorResponse($e->getMessage());
+        }
+    }
+
+    // ==================== SUMMARY ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/summary",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Ringkasan pemenuhan per PKS (detail)",
+     *     description="Rekap pemenuhan Item (overall + per site) dan Visit (target per role, jumlah jadwal per status, jadwal terdekat) untuk satu PKS. Slot training & hc menyusul.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks",
+     *         in="path",
+     *         required=true,
+     *         description="PKS ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Fulfillment summary retrieved successfully."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="pks", type="object"),
+     *                 @OA\Property(property="item", type="object",
+     *                     @OA\Property(property="overall", type="object"),
+     *                     @OA\Property(property="per_site", type="array", @OA\Items(type="object"))
+     *                 ),
+     *                 @OA\Property(property="visit", type="object",
+     *                     @OA\Property(property="per_role", type="array", @OA\Items(type="object")),
+     *                     @OA\Property(property="schedule_counts", type="object"),
+     *                     @OA\Property(property="upcoming", type="object", nullable=true)
+     *                 ),
+     *                 @OA\Property(property="training", type="object", nullable=true),
+     *                 @OA\Property(property="hc", type="object", nullable=true)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS not found"
+     *     )
+     * )
+     */
+    public function getFulfillmentSummary(Pks $pks, PksFulfillmentSummaryService $summaryService): JsonResponse
+    {
+        $summary = $summaryService->build($pks);
+
+        return $this->successResponse($summary, 'Fulfillment summary retrieved successfully.');
+    }
+
+    // ==================== HC FULFILLMENT (READ-ONLY, HRIS) ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/hc",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Pemenuhan HC per PKS (read-only, dari HRIS)",
+     *     description="Rekap pemenuhan HC/rekrutmen per lowongan (vacancy) untuk PKS: target kebutuhan vs pemanggilan/pengiriman/akumulasi & sisa outstanding. Data ditarik dari HRIS (mysqlhris), tanpa aksi tulis.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="pks", in="path", required=true, description="PKS ID", @OA\Schema(type="integer")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="HC fulfillment retrieved successfully."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="overall", type="object",
+     *                     @OA\Property(property="total_vacancy", type="integer"),
+     *                     @OA\Property(property="target_kebutuhan", type="integer"),
+     *                     @OA\Property(property="jumlah_pemanggilan_only", type="integer"),
+     *                     @OA\Property(property="jumlah_pengiriman_only", type="integer"),
+     *                     @OA\Property(property="akumulasi_pengiriman", type="integer"),
+     *                     @OA\Property(property="sisa_outstanding", type="integer"),
+     *                     @OA\Property(property="persen", type="number", format="float")
+     *                 ),
+     *                 @OA\Property(property="per_vacancy", type="array", @OA\Items(type="object"))
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="PKS not found")
+     * )
+     */
+    public function getHcFulfillment(Pks $pks, HcFulfillmentService $hcFulfillmentService): JsonResponse
+    {
+        $hc = $hcFulfillmentService->forPks($pks);
+
+        return $this->successResponse($hc, 'HC fulfillment retrieved successfully.');
+    }
+
+    // ==================== ITEM FULFILLMENT ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/items",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get requested items and fulfillment status",
+     *     description="Mengambil daftar item yang diminta beserta status pemenuhannya per site.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks",
+     *         in="path",
+     *         required=true,
+     *         description="PKS ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="site_id",
+     *         in="query",
+     *         required=true,
+     *         description="Site ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Item list retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(ref="#/components/schemas/PksFulfillmentItem")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS not found"
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Parameter site_id wajib diisi.")
+     *         )
+     *     )
+     * )
+     */
+    public function getRequestedItems(Pks $pks, Request $request): JsonResponse
+    {
+        $siteId = (int) $request->query('site_id');
+        if (! $siteId) {
+            return $this->errorResponse('Parameter site_id wajib diisi.', 422);
+        }
+
+        $items = $this->itemFulfillmentService->getRequestedItems($pks, $siteId);
+
+        return $this->successResponse($items, 'Item list retrieved successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-fulfillment/item-fulfillment",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Create item fulfillment session",
+     *     description="Membuat sesi pemenuhan item dan mencatat log awal.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"pks_id","site_id","item_type_id","item_id","qty","catatan"},
+     *
+     *             @OA\Property(property="pks_id", type="integer", example=99),
+     *             @OA\Property(property="site_id", type="integer", example=5),
+     *             @OA\Property(property="item_type_id", type="integer", enum={1,2,3}, example=1, description="1=kaporlap, 2=device, 3=chemical"),
+     *             @OA\Property(property="item_id", type="integer", example=10),
+     *             @OA\Property(property="qty", type="integer", minimum=1, example=5),
+     *             @OA\Property(property="catatan", type="string", minLength=10, example="Pengiriman batch pertama")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Fulfillment berhasil disimpan."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="pks_id", type="integer", example=99),
+     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=5),
+     *                 @OA\Property(property="status", type="string", example="partially_fulfilled")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Quantity melebihi sisa yang belum terpenuhi.")
+     *         )
+     *     )
+     * )
+     */
+    public function storeFulfillment(ItemFulfillmentStoreRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        try {
+            $user = Auth::user();
+            $fulfillment = $this->itemFulfillmentService->createFulfillment(
+                $request->validated(),
+                $user
+            );
+
+            return $this->createdResponse($fulfillment, 'Fulfillment berhasil disimpan.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * @OA\Patch(
+     *     path="/api/pks-fulfillment/item-fulfillment/{fulfillment}",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Edit item fulfillment",
+     *     description="Mengedit quantity dan catatan fulfillment. Hanya untuk role tertentu (cais_role_id 8/10/98).",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="fulfillment",
+     *         in="path",
+     *         required=true,
+     *         description="PksItemFulfillment ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"new_qty","catatan"},
+     *
+     *             @OA\Property(property="new_qty", type="integer", minimum=1, example=10),
+     *             @OA\Property(property="catatan", type="string", minLength=10, example="Revisi quantity menjadi 10 unit")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Fulfillment berhasil diupdate."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=10),
+     *                 @OA\Property(property="status", type="string", example="fully_fulfilled")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=403,
+     *         description="Forbidden - user tidak memiliki akses",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Anda tidak memiliki akses untuk mengedit fulfillment.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Quantity melebihi sisa yang belum terpenuhi.")
+     *         )
+     *     )
+     * )
+     */
+    public function editFulfillment(PksItemFulfillment $fulfillment, ItemFulfillmentEditRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        $user = Auth::user();
+
+        try {
+            $updated = $this->itemFulfillmentService->editFulfillment(
+                $fulfillment,
+                (int) $request->validated('new_qty'),
+                $request->validated('catatan'),
+                $user
+            );
+
+            return $this->successResponse($updated, 'Fulfillment berhasil diupdate.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/item-fulfillment/{fulfillment}/log",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get fulfillment change log",
+     *     description="Mengambil riwayat perubahan (log) dari sebuah item fulfillment.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="fulfillment",
+     *         in="path",
+     *         required=true,
+     *         description="PksItemFulfillment ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Fulfillment log retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(type="object")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Fulfillment not found"
+     *     )
+     * )
+     */
+    public function getFulfillmentLog(PksItemFulfillment $fulfillment): JsonResponse
+    {
+        $logs = $this->itemFulfillmentService->getFulfillmentLog($fulfillment->id);
+
+        return $this->successResponse($logs, 'Fulfillment log retrieved successfully.');
+    }
+
+    // ==================== VISIT SCHEDULING ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/visit-schedule",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get visit schedule list",
+     *     description="Mengambil daftar jadwal visit untuk sebuah PKS, dapat difilter berdasarkan role.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks",
+     *         in="path",
+     *         required=true,
+     *         description="PKS ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="query",
+     *         required=false,
+     *         description="Filter jadwal berdasarkan role",
+     *
+     *         @OA\Schema(type="string", enum={"operasional","crm"})
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Visit schedule retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(ref="#/components/schemas/PksVisitSchedule")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS not found"
+     *     )
+     * )
+     */
+    public function getVisitSchedule(Pks $pks, Request $request): JsonResponse
+    {
+        $role = $request->query('role');
+        $schedules = $this->visitFulfillmentService->getScheduleByPks($pks, $role);
+
+        return $this->successResponse($schedules, 'Visit schedule retrieved successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-fulfillment/visit-schedule",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Create manual visit schedule",
+     *     description="Membuat jadwal visit secara manual. Hanya untuk Admin / CRM Supervisor.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"pks_id","site_id","leads_id","role","pic_user_id","tgl_jadwal"},
+     *
+     *             @OA\Property(property="pks_id", type="integer", example=99),
+     *             @OA\Property(property="site_id", type="integer", example=5),
+     *             @OA\Property(property="leads_id", type="integer", example=123),
+     *             @OA\Property(property="role", type="string", enum={"operasional","crm"}, example="operasional"),
+     *             @OA\Property(property="pic_user_id", type="integer", example=42),
+     *             @OA\Property(property="tgl_jadwal", type="string", format="date", example="2026-07-20")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Jadwal manual berhasil dibuat."),
+     *             @OA\Property(property="data", ref="#/components/schemas/PksVisitSchedule")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="PIC tidak sesuai dengan role yang dipilih.")
+     *         )
+     *     )
+     * )
+     */
+    public function storeManualSchedule(VisitScheduleManualStoreRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        try {
+            $user = Auth::user();
+            $schedule = $this->visitSchedulingService->createManualSchedule(
+                $request->validated(),
+                $user
+            );
+
+            return $this->createdResponse($schedule, 'Jadwal manual berhasil dibuat.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * @OA\Patch(
+     *     path="/api/pks-fulfillment/visit-schedule/{schedule}/reschedule",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Reschedule visit",
+     *     description="Mengubah jadwal visit yang sudah ada (reschedule). PIC atau Admin.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="schedule",
+     *         in="path",
+     *         required=true,
+     *         description="PksVisitSchedule ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"tgl_jadwal","alasan"},
+     *
+     *             @OA\Property(property="tgl_jadwal", type="string", format="date", example="2026-08-01"),
+     *             @OA\Property(property="alasan", type="string", example="Klien meminta perubahan jadwal")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Jadwal berhasil di-reschedule."),
+     *             @OA\Property(property="data", ref="#/components/schemas/PksVisitSchedule")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Jadwal sudah dilakukan / terlewat.")
+     *         )
+     *     )
+     * )
+     */
+    public function reschedule(PksVisitSchedule $schedule, VisitRescheduleRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        try {
+            $user = Auth::user();
+            $newDate = Carbon::parse($request->validated('tgl_jadwal'));
+
+            $updated = $this->visitSchedulingService->reschedule(
+                $schedule,
+                $newDate,
+                $request->validated('alasan'),
+                $user
+            );
+
+            return $this->successResponse($updated, 'Jadwal berhasil di-reschedule.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    // ==================== VISIT FULFILLMENT ====================
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/visit-target",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get visit target summary",
+     *     description="Mengambil ringkasan target visit PKS (total target, terpakai, dan sisa).",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks",
+     *         in="path",
+     *         required=true,
+     *         description="PKS ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="role",
+     *         in="query",
+     *         required=false,
+     *         description="Filter target berdasarkan role",
+     *
+     *         @OA\Schema(type="string", enum={"operasional","crm"})
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Visit target retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(ref="#/components/schemas/PksVisitTarget")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS not found"
+     *     )
+     * )
+     */
+    public function getVisitTarget(Pks $pks, Request $request): JsonResponse
+    {
+        $role = $request->query('role');
+        $targets = $this->visitFulfillmentService->getVisitTarget($pks, $role);
+
+        return $this->successResponse($targets, 'Visit target retrieved successfully.');
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-fulfillment/visit-record",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Store visit record with photos",
+     *     description="Mencatat hasil visit beserta foto dokumentasi (multipart/form-data).",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *
+     *             @OA\Schema(
+     *                 required={"pks_id","site_id","leads_id","role","tgl_visit_aktual","hasil_visit"},
+     *
+     *                 @OA\Property(property="schedule_id", type="integer", nullable=true, example=10),
+     *                 @OA\Property(property="pks_id", type="integer", example=99),
+     *                 @OA\Property(property="site_id", type="integer", example=5),
+     *                 @OA\Property(property="leads_id", type="integer", example=123),
+     *                 @OA\Property(property="role", type="string", enum={"operasional","crm"}, example="operasional"),
+     *                 @OA\Property(property="tgl_visit_aktual", type="string", format="date", example="2026-07-14"),
+     *                 @OA\Property(property="hasil_visit", type="string", enum={"selesai","ada_kendala","ditunda"}, example="selesai"),
+     *                 @OA\Property(property="catatan", type="string", example="Semua item sudah terpenuhi dengan baik"),
+     *                 @OA\Property(
+     *                     property="fotos[]",
+     *                     type="array",
+     *                     description="Array file foto dokumentasi",
+     *
+     *                     @OA\Items(type="string", format="binary")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Hasil visit berhasil disimpan."),
+     *             @OA\Property(property="data", ref="#/components/schemas/PksVisitRecord")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Schedule sudah memiliki record visit.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Server error",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Terjadi kesalahan: ...")
+     *         )
+     *     )
+     * )
+     */
+    public function storeVisitRecord(VisitRecordStoreRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        set_time_limit(300); // 5 menit untuk upload foto
+        try {
+
+            $user = Auth::user();
+            $data = $request->validated();
+            $fotos = $request->file('fotos', []);
+
+            $record = $this->visitFulfillmentService->createVisitRecord($data, $fotos, $user);
+
+            return $this->createdResponse($record, 'Hasil visit berhasil disimpan.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            return $this->errorResponse('Terjadi kesalahan: '.$e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/visit-record",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get visit history",
+     *     description="Mengambil riwayat visit lintas role untuk sebuah PKS.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="pks",
+     *         in="path",
+     *         required=true,
+     *         description="PKS ID",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="Visit history retrieved successfully."),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(ref="#/components/schemas/PksVisitRecord")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="PKS not found"
+     *     )
+     * )
+     */
+    public function getVisitHistory(Pks $pks): JsonResponse
+    {
+        $records = $this->visitFulfillmentService->getVisitHistory($pks);
+
+        return $this->successResponse($records, 'Visit history retrieved successfully.');
+    }
+
+    /**
+     * GET /pks-fulfillment/visit-photo/{foto}
+     * Generate fresh signed URL untuk foto visit (valid 1 jam).
+     * Dipakai client setiap kali mau render foto.
+     */
+    public function getPhotoUrl(int $foto): JsonResponse
+    {
+        $fotoModel = \App\Models\PksVisitRecordFoto::find($foto);
+
+        if (! $fotoModel) {
+            return $this->notFoundResponse('Foto tidak ditemukan.');
+        }
+
+        $url = \Illuminate\Support\Facades\Storage::disk('visit-photo')
+            ->temporaryUrl($fotoModel->nama_file, now()->addHour());
+
+        return $this->successResponse(['url' => $url], 'Photo URL generated.');
+    }
+}

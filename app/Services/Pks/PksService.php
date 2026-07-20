@@ -767,7 +767,6 @@ class PksService
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
-            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);
@@ -832,7 +831,6 @@ class PksService
             'is_active' => 1,
             'created_at' => $current_date_time,
             'created_by' => Auth::user()->id,
-            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $current_date_time,
             'updated_by' => Auth::user()->id,
         ]);

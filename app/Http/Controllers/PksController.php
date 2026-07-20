@@ -1021,6 +1021,22 @@ class PksController extends Controller
                 throw $e;
             }
 
+            // HOOK: Visit scheduling — masih di dalam transaksi default,
+            // sehingga snapshot + jadwal commit atomik bersama aktivasi.
+            // Try-catch terpisah agar kegagalan hook tidak membatalkan aktivasi.
+            if ((int) $pks->status_pks_id === 7) {
+                try {
+                    $visitSchedulingService = app(\App\Services\Pks\VisitSchedulingService::class);
+                    $visitSchedulingService->snapshotTargets($pks);
+                    $visitSchedulingService->generateSchedules($pks);
+
+                    // afterCommit: job baru dikirim setelah transaksi commit
+                    \App\Jobs\SendVisitScheduleEmail::dispatch($pks)->afterCommit();
+                } catch (\Throwable $e) {
+                    \Log::error('VisitScheduling: Gagal snapshot/generate untuk PKS ' . $pks->id . ': ' . $e->getMessage());
+                }
+            }
+
             return $this->messageResponse('PKS sites activated successfully with HRIS synchronization');
         });
     }

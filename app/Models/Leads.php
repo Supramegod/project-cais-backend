@@ -132,6 +132,11 @@ class Leads extends Model
     {
         return $this->hasMany(Pks::class, 'leads_id');
     }
+
+    public function pksVisitRecords()
+    {
+        return $this->hasMany(PksVisitRecord::class, 'leads_id');
+    }
     /**
      * Relasi ke SPK (Surat Perintah Kerja)
      */

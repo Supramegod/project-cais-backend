@@ -18,7 +18,7 @@ class City extends Model
     protected $connection = 'mysqlhris';
     protected $table = 'm_city';
     protected $primaryKey = 'id';
-    protected $fillable = ['province_id', 'name', 'kode', 'is_active'];
+    protected $fillable = ['province_id', 'name', 'kode', 'branch_id','is_active'];
 
     // ── Relationships ─────────────────────────────────────────────────────────
 

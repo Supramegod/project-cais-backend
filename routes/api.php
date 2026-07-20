@@ -10,6 +10,7 @@ use App\Http\Controllers\LeadsController;
 use App\Http\Controllers\MenuController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
+use App\Http\Controllers\PksFulfillmentController;
 use App\Http\Controllers\PksWizardController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
@@ -583,6 +584,35 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/weekly/tele', 'weeklyRole30');
         Route::get('/activity-detail/tele/{user_id}', 'activityDetailTele');
 
+    });
+
+    // PKS Fulfillment
+    Route::prefix('pks-fulfillment')->controller(PksFulfillmentController::class)->group(function () {
+        // Dashboard rekap seluruh PKS aktif
+        Route::get('/dashboard', 'dashboard');
+
+        // Ringkasan pemenuhan per PKS (detail)
+        Route::get('/{pks}/summary', 'getFulfillmentSummary');
+
+        // Pemenuhan HC per PKS (read-only, dari HRIS)
+        Route::get('/{pks}/hc', 'getHcFulfillment');
+
+        // Item Fulfillment
+        Route::get('/{pks}/items', 'getRequestedItems');
+        Route::post('/item-fulfillment', 'storeFulfillment');
+        Route::patch('/item-fulfillment/{fulfillment}', 'editFulfillment');
+        Route::get('/item-fulfillment/{fulfillment}/log', 'getFulfillmentLog');
+
+        // Visit Scheduling
+        Route::get('/{pks}/visit-schedule', 'getVisitSchedule');
+        Route::post('/visit-schedule', 'storeManualSchedule');
+        Route::patch('/visit-schedule/{schedule}/reschedule', 'reschedule');
+
+        // Visit Fulfillment
+        Route::get('/{pks}/visit-target', 'getVisitTarget');
+        Route::post('/visit-record', 'storeVisitRecord');
+        Route::get('/{pks}/visit-record', 'getVisitHistory');
+        Route::get('/visit-photo/{foto}', 'getPhotoUrl'); // fresh signed URL
     });
 
 });
