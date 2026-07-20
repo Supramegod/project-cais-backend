@@ -28,7 +28,7 @@ class BranchResolutionServiceTest extends TestCase
     {
         parent::setUp();
 
-        $databasePath = storage_path('framework/testing-' . Str::random(8) . '.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-' . Str::random(8) . '.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -261,5 +261,24 @@ class BranchResolutionServiceTest extends TestCase
         $anchor = $this->service->resolveSiteAnchor($pks);
 
         $this->assertNull($anchor);
+    }
+
+    protected ?string $tempDbPath = null;
+
+    protected function tearDown(): void
+    {
+        foreach (['sqlite', 'mysql', 'mysqlhris'] as $connection) {
+            try {
+                DB::purge($connection);
+            } catch (\Throwable $e) {
+                // koneksi mungkin tidak terdaftar — abaikan
+            }
+        }
+
+        if ($this->tempDbPath && file_exists($this->tempDbPath)) {
+            @unlink($this->tempDbPath);
+        }
+
+        parent::tearDown();
     }
 }

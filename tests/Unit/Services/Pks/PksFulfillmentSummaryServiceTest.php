@@ -28,7 +28,7 @@ class PksFulfillmentSummaryServiceTest extends TestCase
     {
         parent::setUp();
 
-        $databasePath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -283,5 +283,24 @@ class PksFulfillmentSummaryServiceTest extends TestCase
         // upcoming = jadwal operasional masa depan
         $this->assertNotNull($summary['visit']['upcoming']);
         $this->assertSame('operasional', $summary['visit']['upcoming']['role']);
+    }
+
+    protected ?string $tempDbPath = null;
+
+    protected function tearDown(): void
+    {
+        foreach (['sqlite', 'mysql', 'mysqlhris'] as $connection) {
+            try {
+                DB::purge($connection);
+            } catch (\Throwable $e) {
+                // koneksi mungkin tidak terdaftar — abaikan
+            }
+        }
+
+        if ($this->tempDbPath && file_exists($this->tempDbPath)) {
+            @unlink($this->tempDbPath);
+        }
+
+        parent::tearDown();
     }
 }
