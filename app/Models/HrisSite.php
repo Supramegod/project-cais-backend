@@ -72,5 +72,10 @@ class HrisSite extends Model
         return $this->belongsTo(Client::class, 'client_id');
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class, 'branch_id');
+    }
+
     // ... relasi lainnya (pic, supervisor, dll)
 }

@@ -43,6 +43,24 @@ class Vacancy extends Model
         return $this->belongsTo(Site::class, 'site_id');
     }
 
+    // Relasi ke m_site HRIS (site_id → m_site.id) — dipakai pemenuhan HC.
+    public function hrisSite()
+    {
+        return $this->belongsTo(HrisSite::class, 'site_id');
+    }
+
+    // Relasi ke posisi HRIS
+    public function position()
+    {
+        return $this->belongsTo(Position::class, 'position_id');
+    }
+
+    // Pelamar untuk lowongan ini (t_applicant.vacancy_id)
+    public function applicants()
+    {
+        return $this->hasMany(Applicant::class, 'vacancy_id');
+    }
+
     // Relasi ke Company HRIS
     public function company()
     {

@@ -110,6 +110,7 @@ class Pks extends Model
         'pasal_preview_payload',
         'initialized_at',
         'finalized_at',
+        'item_fulfillment_reminded_at',
         'created_by',
         'updated_by',
         'created_by_user_id'
@@ -124,12 +125,33 @@ class Pks extends Model
         'pasal_preview_payload' => 'array',
         'initialized_at' => 'datetime',
         'finalized_at' => 'datetime',
+        'item_fulfillment_reminded_at' => 'datetime',
     ];
 
     // Relationships
     public function leads(): BelongsTo
     {
         return $this->belongsTo(Leads::class, 'leads_id');
+    }
+
+    public function itemFulfillments(): HasMany
+    {
+        return $this->hasMany(PksItemFulfillment::class, 'pks_id');
+    }
+
+    public function visitTargets(): HasMany
+    {
+        return $this->hasMany(PksVisitTarget::class, 'pks_id');
+    }
+
+    public function visitSchedules(): HasMany
+    {
+        return $this->hasMany(PksVisitSchedule::class, 'pks_id');
+    }
+
+    public function visitRecords(): HasMany
+    {
+        return $this->hasMany(PksVisitRecord::class, 'pks_id');
     }
 
     public function statusPks(): BelongsTo

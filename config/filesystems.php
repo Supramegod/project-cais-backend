@@ -74,6 +74,27 @@ return [
             'throw' => false,
             'report' => false,
         ],
+
+        // Foto visit PKS — S3/MinIO. File disimpan di dalam bucket dengan prefix
+        // "pks/visit-photo/". URL publik di-generate via Storage::disk(...)->url().
+        'visit-photo' => [
+            'driver' => 's3',
+            'key' => env('AWS_ACCESS_KEY_ID'),
+            'secret' => env('AWS_SECRET_ACCESS_KEY'),
+            'region' => env('AWS_DEFAULT_REGION'),
+            'bucket' => env('AWS_VISIT_PHOTO_BUCKET', env('AWS_BUCKET')),
+            'url' => env('AWS_URL'),
+            'endpoint' => env('AWS_ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'root' => 'pks/visit-photo',
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => true,
+            'http' => [
+                'connect_timeout' => 10,
+                'verify' => env('AWS_SSL_VERIFY', true),
+            ],
+        ],
         // ✅ TAMBAHKAN INI
         'customer-activity' => [
             'driver' => 'local',
