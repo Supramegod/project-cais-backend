@@ -149,7 +149,6 @@ class PksApprovalService
             'is_active' => 1,
             'created_at' => $currentDateTime,
             'created_by' => Auth::user()->id,
-            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $currentDateTime,
             'updated_by' => Auth::user()->id,
         ]);
@@ -205,7 +204,6 @@ class PksApprovalService
             'is_active' => 1,
             'created_at' => $currentDateTime,
             'created_by' => Auth::user()->id,
-            'created_by_user_id' => Auth::user()->id,
             'updated_at' => $currentDateTime,
             'updated_by' => Auth::user()->id,
         ]);

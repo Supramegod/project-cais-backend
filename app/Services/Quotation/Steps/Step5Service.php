@@ -33,12 +33,14 @@ class Step5Service
                 $penjamin = 'BPJS';
             }
 
+            $isBpu = ($penjamin === 'BPU');
+
             $detail->update([
                 'penjamin_kesehatan' => $penjamin,
-                'is_bpjs_jkk' => $this->helper->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0,
-                'is_bpjs_jkm' => $this->helper->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0,
-                'is_bpjs_jht' => $this->helper->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0,
-                'is_bpjs_jp' => $this->helper->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0,
+                'is_bpjs_jkk' => $isBpu ? 0 : ($this->helper->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0),
+                'is_bpjs_jkm' => $isBpu ? 0 : ($this->helper->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0),
+                'is_bpjs_jht' => $isBpu ? 0 : ($this->helper->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0),
+                'is_bpjs_jp'  => $isBpu ? 0 : ($this->helper->toBoolean($request->jp[$detailId]  ?? false) ? 1 : 0),
                 'is_bpjs_kes' => $this->helper->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0,
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name,

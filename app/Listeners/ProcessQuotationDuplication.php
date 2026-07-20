@@ -50,7 +50,7 @@ class ProcessQuotationDuplication implements ShouldQueue
 
             // Jika belum ada site, buat dari request
             if ($existingSitesCount === 0) {
-                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
+                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name, $user->id);
 
                 Log::info('Sites created from request', [
                     'created_count' => $quotation->quotationSites()->count(),
@@ -131,7 +131,7 @@ class ProcessQuotationDuplication implements ShouldQueue
         ]);
 
         try {
-            $this->quotationBusinessService->createInitialPic($quotation, $user->full_name);
+            $this->quotationBusinessService->createInitialPic($quotation, $user->full_name, $user->id);
             Log::info('Created initial PIC for new quotation');
         } catch (\Exception $e) {
             Log::warning('Failed to create initial PIC, continuing', ['error' => $e->getMessage()]);

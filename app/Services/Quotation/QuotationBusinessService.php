@@ -56,21 +56,21 @@ class QuotationBusinessService
     /**
      * Create quotation sites based on request
      */
-    public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy): void
+    public function createQuotationSites(Quotation $quotation, Request $request, string $createdBy, int $userId): void
     {
         if ($request->jumlah_site == 'Multi Site') {
             foreach ($request->multisite as $key => $value) {
-                $this->createQuotationSite($quotation, $request, $key, true, $createdBy);
+                $this->createQuotationSite($quotation, $request, $key, true, $createdBy, $userId);
             }
         } else {
-            $this->createQuotationSite($quotation, $request, null, false, $createdBy);
+            $this->createQuotationSite($quotation, $request, null, false, $createdBy, $userId);
         }
     }
 
     /**
      * Create single quotation site
      */
-    public function createQuotationSite(Quotation $quotation, Request $request, ?int $index, bool $isMulti, string $createdBy): void
+    public function createQuotationSite(Quotation $quotation, Request $request, ?int $index, bool $isMulti, string $createdBy, int $userId): void
     {
         $provinceId = $isMulti ? $request->provinsi_multi[$index] : $request->provinsi;
         $cityId = $isMulti ? $request->kota_multi[$index] : $request->kota;
@@ -95,14 +95,14 @@ class QuotationBusinessService
             'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $isMulti ? $request->penempatan_multi[$index] : $request->penempatan,
             'created_by' => $createdBy,
-            'created_by_user_id' => Auth::id(),
+            'created_by_user_id' => $userId,
         ]);
     }
 
     /**
      * Create quotation site from a reference site (copy nilai UMP/UMK terbaru)
      */
-    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy): QuotationSite
+    public function createQuotationSiteFromReference(Quotation $quotation, QuotationSite $refSite, string $createdBy, int $userId): QuotationSite
     {
         $province = Province::findOrFail($refSite->provinsi_id);
         $city = City::findOrFail($refSite->kota_id);
@@ -124,14 +124,14 @@ class QuotationBusinessService
             'umsk' => $umsk ? $umsk->umsk : 0,
             'penempatan' => $refSite->penempatan,
             'created_by' => $createdBy,
-            'created_by_user_id' => Auth::id(),
+            'created_by_user_id' => $userId,
         ]);
     }
 
     /**
      * Create initial PIC dari data leads
      */
-    public function createInitialPic(Quotation $quotation, string $createdBy): void
+    public function createInitialPic(Quotation $quotation, string $createdBy, int $userId): void
     {
         $leads = $quotation->leads;
 
@@ -148,7 +148,7 @@ class QuotationBusinessService
                 'email' => $leads->email ?? '',
                 'no_hp' => $leads->telp_perusahaan ?? '',
                 'created_by' => $createdBy,
-                'created_by_user_id' => Auth::id(),
+                'created_by_user_id' => $userId,
             ]);
         }
     }
@@ -176,7 +176,7 @@ class QuotationBusinessService
 
         // Sales role IDs: 29, 30, 31, 32, 33
         if (in_array($user->cais_role_id, [29, 30, 31, 32, 33])) {
-            $this->createSalesActivity($quotation, $createdBy, $user, $notes);
+            $this->createSalesActivity($quotation, $createdBy, $user, $notes, $userId);
         } else {
             CustomerActivity::create([
                 'leads_id' => $quotation->leads_id,
@@ -189,7 +189,7 @@ class QuotationBusinessService
                 'is_activity' => 0,
                 'user_id' => $userId,
                 'created_by' => $createdBy,
-                'created_by_user_id' => Auth::id(),
+                'created_by_user_id' => $userId,
             ]);
         }
         if ($leads) {
@@ -201,7 +201,7 @@ class QuotationBusinessService
     /**
      * ✅ FIX: Menerima $user object eksplisit — tidak lagi bergantung pada Auth::user().
      */
-    private function createSalesActivity(Quotation $quotation, string $createdBy, $user, ?string $notes = null): void
+    private function createSalesActivity(Quotation $quotation, string $createdBy, $user, ?string $notes = null, int $userId): void
     {
         $leadsKebutuhan = LeadsKebutuhan::where('leads_id', $quotation->leads_id)
             ->where('kebutuhan_id', $quotation->kebutuhan_id)
@@ -216,7 +216,7 @@ class QuotationBusinessService
             'jenis_activity' => 'Quotation',
             'notulen' => $notes ?? "Quotation baru {$quotation->nomor} dibuat untuk kebutuhan {$quotation->kebutuhan}",
             'created_by' => $createdBy,
-            'created_by_user_id' => Auth::id(),
+            'created_by_user_id' => $userId,
         ]);
     }
 

@@ -37,7 +37,23 @@ class QuotationComponentCalculationService
     public function calculateBpjs($detail, $quotation, $hpp): void
     {
         $isBpu = ($detail->penjamin_kesehatan === 'BPU');
-        if ($isBpu) { $detail->bpjs_kes = 0; $detail->persen_bpjs_kes = 0; }
+        if ($isBpu) {
+            $detail->bpjs_kes = 0;
+            $detail->persen_bpjs_kes = 0;
+            $detail->bpjs_jkk = 0;
+            $detail->persen_bpjs_jkk = 0;
+            $detail->bpjs_jkm = 0;
+            $detail->persen_bpjs_jkm = 0;
+            $detail->bpjs_jht = 0;
+            $detail->persen_bpjs_jht = 0;
+            $detail->bpjs_jp = 0;
+            $detail->persen_bpjs_jp = 0;
+            $detail->bpjs_ketenagakerjaan = 0;
+            $detail->persen_bpjs_ketenagakerjaan = 0;
+            $detail->bpjs_kesehatan = 0;
+            $detail->persen_bpjs_kesehatan = 0;
+            return;
+        }
 
         $nominalUpah = $detail->nominal_upah_bulanan ?? $detail->nominal_upah;
         $umk = $detail->umk ?? 0;
