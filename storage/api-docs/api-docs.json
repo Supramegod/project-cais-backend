@@ -17041,6 +17041,1327 @@
                 ]
             }
         },
+        "/api/pks-fulfillment/dashboard": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Dashboard rekap pemenuhan PKS",
+                "description": "Daftar PKS dengan rekap ringkas pemenuhan Item & Visit per PKS. Search & pagination mengikuti pola PKS list (search_by nama_perusahaan fulltext / nomor / created_by LIKE; default rentang tanggal). Response memakai blok pagination + meta yang sama.",
+                "operationId": "ebceb5dfbe1892e0f19d5253702e4ff4",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "nama_perusahaan | nomor | created_by",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter status_pks_id",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter branch (sl_leads.branch_id)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS fulfillment dashboard retrieved successfully"
+                                        },
+                                        "summary": {
+                                            "description": "Rekap fulfillment agregat seluruh PKS yang cocok filter",
+                                            "properties": {
+                                                "item": {
+                                                    "properties": {
+                                                        "total": {
+                                                            "type": "integer"
+                                                        },
+                                                        "fully_fulfilled": {
+                                                            "type": "integer"
+                                                        },
+                                                        "qty_diminta": {
+                                                            "type": "integer"
+                                                        },
+                                                        "qty_terpenuhi": {
+                                                            "type": "integer"
+                                                        },
+                                                        "persen": {
+                                                            "type": "number",
+                                                            "format": "float"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "visit": {
+                                                    "properties": {
+                                                        "target_total": {
+                                                            "type": "integer"
+                                                        },
+                                                        "target_terpakai": {
+                                                            "type": "integer"
+                                                        },
+                                                        "persen": {
+                                                            "type": "number",
+                                                            "format": "float"
+                                                        },
+                                                        "missed": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "hc": {
+                                                    "properties": {
+                                                        "total_vacancy": {
+                                                            "type": "integer"
+                                                        },
+                                                        "target_kebutuhan": {
+                                                            "type": "integer"
+                                                        },
+                                                        "akumulasi_pengiriman": {
+                                                            "type": "integer"
+                                                        },
+                                                        "sisa_outstanding": {
+                                                            "type": "integer"
+                                                        },
+                                                        "persen": {
+                                                            "type": "number",
+                                                            "format": "float"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "total_per_page": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "tgl_dari": {
+                                                    "type": "string"
+                                                },
+                                                "tgl_sampai": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/summary": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Ringkasan pemenuhan per PKS (detail)",
+                "description": "Rekap pemenuhan Item (overall + per site) dan Visit (target per role, jumlah jadwal per status, jadwal terdekat) untuk satu PKS. Slot training & hc menyusul.",
+                "operationId": "5572a8db269f7d22e119d76d5e46810b",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Fulfillment summary retrieved successfully."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "pks": {
+                                                    "type": "object"
+                                                },
+                                                "item": {
+                                                    "properties": {
+                                                        "overall": {
+                                                            "type": "object"
+                                                        },
+                                                        "per_site": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "visit": {
+                                                    "properties": {
+                                                        "per_role": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "schedule_counts": {
+                                                            "type": "object"
+                                                        },
+                                                        "upcoming": {
+                                                            "type": "object",
+                                                            "nullable": true
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "training": {
+                                                    "type": "object",
+                                                    "nullable": true
+                                                },
+                                                "hc": {
+                                                    "type": "object",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/hc": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Pemenuhan HC per PKS (read-only, dari HRIS)",
+                "description": "Rekap pemenuhan HC/rekrutmen per lowongan (vacancy) untuk PKS: target kebutuhan vs pemanggilan/pengiriman/akumulasi & sisa outstanding. Data ditarik dari HRIS (mysqlhris), tanpa aksi tulis.",
+                "operationId": "89e8fb150f531f8237e9ac2dbc7b73d2",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "HC fulfillment retrieved successfully."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "overall": {
+                                                    "properties": {
+                                                        "total_vacancy": {
+                                                            "type": "integer"
+                                                        },
+                                                        "target_kebutuhan": {
+                                                            "type": "integer"
+                                                        },
+                                                        "jumlah_pemanggilan_only": {
+                                                            "type": "integer"
+                                                        },
+                                                        "jumlah_pengiriman_only": {
+                                                            "type": "integer"
+                                                        },
+                                                        "akumulasi_pengiriman": {
+                                                            "type": "integer"
+                                                        },
+                                                        "sisa_outstanding": {
+                                                            "type": "integer"
+                                                        },
+                                                        "persen": {
+                                                            "type": "number",
+                                                            "format": "float"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "per_vacancy": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/items": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get requested items and fulfillment status",
+                "description": "Mengambil daftar item yang diminta beserta status pemenuhannya per site.",
+                "operationId": "767901a9d8fa7c3e4ae7008eddd21ad0",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "site_id",
+                        "in": "query",
+                        "description": "Site ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Item list retrieved successfully."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PksFulfillmentItem"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Parameter site_id wajib diisi."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/item-fulfillment": {
+            "post": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Create item fulfillment session",
+                "description": "Membuat sesi pemenuhan item dan mencatat log awal.",
+                "operationId": "548cc73b669be4b443bd5da20c1719c6",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pks_id",
+                                    "site_id",
+                                    "item_type_id",
+                                    "item_id",
+                                    "qty",
+                                    "catatan"
+                                ],
+                                "properties": {
+                                    "pks_id": {
+                                        "type": "integer",
+                                        "example": 99
+                                    },
+                                    "site_id": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "item_type_id": {
+                                        "description": "1=kaporlap, 2=device, 3=chemical",
+                                        "type": "integer",
+                                        "enum": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "example": 1
+                                    },
+                                    "item_id": {
+                                        "type": "integer",
+                                        "example": 10
+                                    },
+                                    "qty": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 5
+                                    },
+                                    "catatan": {
+                                        "type": "string",
+                                        "minLength": 10,
+                                        "example": "Pengiriman batch pertama"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Fulfillment berhasil disimpan."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 99
+                                                },
+                                                "qty_terpenuhi": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "partially_fulfilled"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quantity melebihi sisa yang belum terpenuhi."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/item-fulfillment/{fulfillment}": {
+            "patch": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Edit item fulfillment",
+                "description": "Mengedit quantity dan catatan fulfillment. Hanya untuk role tertentu (cais_role_id 8/10/98).",
+                "operationId": "a156d10ea255c5e8655b54d9cf81024d",
+                "parameters": [
+                    {
+                        "name": "fulfillment",
+                        "in": "path",
+                        "description": "PksItemFulfillment ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "new_qty",
+                                    "catatan"
+                                ],
+                                "properties": {
+                                    "new_qty": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "example": 10
+                                    },
+                                    "catatan": {
+                                        "type": "string",
+                                        "minLength": 10,
+                                        "example": "Revisi quantity menjadi 10 unit"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Fulfillment berhasil diupdate."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "qty_terpenuhi": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "fully_fulfilled"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - user tidak memiliki akses",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Anda tidak memiliki akses untuk mengedit fulfillment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quantity melebihi sisa yang belum terpenuhi."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/item-fulfillment/{fulfillment}/log": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get fulfillment change log",
+                "description": "Mengambil riwayat perubahan (log) dari sebuah item fulfillment.",
+                "operationId": "28e97c30a29a9d38b9afaf240fa0aeb0",
+                "parameters": [
+                    {
+                        "name": "fulfillment",
+                        "in": "path",
+                        "description": "PksItemFulfillment ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Fulfillment log retrieved successfully."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Fulfillment not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/visit-schedule": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get visit schedule list",
+                "description": "Mengambil daftar jadwal visit untuk sebuah PKS, dapat difilter berdasarkan role.",
+                "operationId": "02b20901c470f6fc609b50632f143a84",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "description": "Filter jadwal berdasarkan role",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "operasional",
+                                "crm"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Visit schedule retrieved successfully."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PksVisitSchedule"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/visit-schedule": {
+            "post": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Create manual visit schedule",
+                "description": "Membuat jadwal visit secara manual. Hanya untuk Admin / CRM Supervisor.",
+                "operationId": "96c8e85550bec6362246bba990393681",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "pks_id",
+                                    "site_id",
+                                    "leads_id",
+                                    "role",
+                                    "pic_user_id",
+                                    "tgl_jadwal"
+                                ],
+                                "properties": {
+                                    "pks_id": {
+                                        "type": "integer",
+                                        "example": 99
+                                    },
+                                    "site_id": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "leads_id": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "operasional",
+                                            "crm"
+                                        ],
+                                        "example": "operasional"
+                                    },
+                                    "pic_user_id": {
+                                        "type": "integer",
+                                        "example": 42
+                                    },
+                                    "tgl_jadwal": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-07-20"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jadwal manual berhasil dibuat."
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PksVisitSchedule"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PIC tidak sesuai dengan role yang dipilih."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/visit-schedule/{schedule}/reschedule": {
+            "patch": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Reschedule visit",
+                "description": "Mengubah jadwal visit yang sudah ada (reschedule). PIC atau Admin.",
+                "operationId": "55c363aa346e348f1d8cc309da0e5fe7",
+                "parameters": [
+                    {
+                        "name": "schedule",
+                        "in": "path",
+                        "description": "PksVisitSchedule ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "tgl_jadwal",
+                                    "alasan"
+                                ],
+                                "properties": {
+                                    "tgl_jadwal": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-08-01"
+                                    },
+                                    "alasan": {
+                                        "type": "string",
+                                        "example": "Klien meminta perubahan jadwal"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jadwal berhasil di-reschedule."
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PksVisitSchedule"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Jadwal sudah dilakukan / terlewat."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/visit-target": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get visit target summary",
+                "description": "Mengambil ringkasan target visit PKS (total target, terpakai, dan sisa).",
+                "operationId": "d39c7a83091c049ff2add4ac3bd3daf3",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "query",
+                        "description": "Filter target berdasarkan role",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "operasional",
+                                "crm"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Visit target retrieved successfully."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PksVisitTarget"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/visit-record": {
+            "post": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Store visit record with photos",
+                "description": "Mencatat hasil visit beserta foto dokumentasi (multipart/form-data).",
+                "operationId": "afb120aeafe75c65b5a55292acfefcb9",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "pks_id",
+                                    "site_id",
+                                    "leads_id",
+                                    "role",
+                                    "tgl_visit_aktual",
+                                    "hasil_visit"
+                                ],
+                                "properties": {
+                                    "schedule_id": {
+                                        "type": "integer",
+                                        "example": 10,
+                                        "nullable": true
+                                    },
+                                    "pks_id": {
+                                        "type": "integer",
+                                        "example": 99
+                                    },
+                                    "site_id": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "leads_id": {
+                                        "type": "integer",
+                                        "example": 123
+                                    },
+                                    "role": {
+                                        "type": "string",
+                                        "enum": [
+                                            "operasional",
+                                            "crm"
+                                        ],
+                                        "example": "operasional"
+                                    },
+                                    "tgl_visit_aktual": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-07-14"
+                                    },
+                                    "hasil_visit": {
+                                        "type": "string",
+                                        "enum": [
+                                            "selesai",
+                                            "ada_kendala",
+                                            "ditunda"
+                                        ],
+                                        "example": "selesai"
+                                    },
+                                    "catatan": {
+                                        "type": "string",
+                                        "example": "Semua item sudah terpenuhi dengan baik"
+                                    },
+                                    "fotos[]": {
+                                        "description": "Array file foto dokumentasi",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Hasil visit berhasil disimpan."
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/PksVisitRecord"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Schedule sudah memiliki record visit."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Terjadi kesalahan: ..."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/visit-record": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get visit history",
+                "description": "Mengambil riwayat visit lintas role untuk sebuah PKS.",
+                "operationId": "d6edc8b58560f242426e8d3b884c1c41",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "description": "PKS ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Visit history retrieved successfully."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/PksVisitRecord"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "PKS not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks-wizard/initialize/{tipe}": {
             "post": {
                 "tags": [
@@ -31650,6 +32971,151 @@
         }
     },
     "components": {
+        "schemas": {
+            "PksFulfillmentItem": {
+                "properties": {
+                    "item_type_id": {
+                        "description": "1=kaporlap, 2=device, 3=chemical",
+                        "type": "integer",
+                        "enum": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "item_type": {
+                        "type": "string"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "nama": {
+                        "type": "string"
+                    },
+                    "qty_diminta": {
+                        "type": "integer"
+                    },
+                    "qty_terpenuhi": {
+                        "type": "integer"
+                    },
+                    "remaining": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "PksVisitSchedule": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "pks_id": {
+                        "type": "integer"
+                    },
+                    "site_id": {
+                        "type": "integer"
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "tgl_jadwal": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "tgl_jadwal_asli": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "scheduled",
+                            "rescheduled",
+                            "done",
+                            "missed"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "PksVisitRecord": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "pks_id": {
+                        "type": "integer"
+                    },
+                    "schedule_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "tgl_visit_aktual": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "hasil_visit": {
+                        "type": "string",
+                        "enum": [
+                            "selesai",
+                            "ada_kendala",
+                            "ditunda"
+                        ]
+                    },
+                    "catatan": {
+                        "type": "string"
+                    },
+                    "fotos": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PksVisitRecordFoto"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "PksVisitRecordFoto": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "visit_record_id": {
+                        "type": "integer"
+                    },
+                    "url_file": {
+                        "type": "string"
+                    },
+                    "nama_file": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "PksVisitTarget": {
+                "properties": {
+                    "role": {
+                        "type": "string"
+                    },
+                    "target_total": {
+                        "type": "integer"
+                    },
+                    "target_terpakai": {
+                        "type": "integer"
+                    },
+                    "sisa": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
@@ -31728,6 +33194,10 @@
         {
             "name": "PKS",
             "description": "API untuk manajemen PKS (Perjanjian Kerja Sama)"
+        },
+        {
+            "name": "PKS Fulfillment",
+            "description": "API untuk PKS Item Fulfillment, Visit Scheduling, dan Visit Record"
         },
         {
             "name": "PKS Wizard",
