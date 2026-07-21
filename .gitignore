@@ -2,6 +2,7 @@
 
 # OpenCode / AI tooling
 /.opencode
+/.claude
 
 # Documentation / design assets
 /docs

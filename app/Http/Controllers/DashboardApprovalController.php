@@ -160,15 +160,18 @@ class DashboardApprovalController extends Controller
                         $q->where(function ($subQ) {
                             $subQ->whereNull('ot1');
                         })
-                            // Menunggu Dir Keu
+                            // Menunggu Dir Keu — konsisten dengan requiresLevel2Approval (OR):
+                            // butuh Dir Keu bila TOP > 7 hari ATAU ada THR non-diprovisikan
                             ->orWhere(function ($subQ) {
                             $subQ->whereNotNull('ot1')
                                 ->whereNull('ot2')
-                                ->where('top', 'Lebih Dari 7 Hari')
-                                ->whereHas('quotationDetails', function ($wageQ) {
-                                    $wageQ->whereHas('wage', function ($q) {
-                                        $q->where('thr', '!=', 'diprovisikan');
-                                    });
+                                ->where(function ($cond) {
+                                    $cond->where('top', 'Lebih Dari 7 Hari')
+                                        ->orWhereHas('quotationDetails', function ($wageQ) {
+                                            $wageQ->whereHas('wage', function ($q) {
+                                                $q->where('thr', '!=', 'diprovisikan');
+                                            });
+                                        });
                                 });
                         });
                     });
@@ -462,15 +465,18 @@ class DashboardApprovalController extends Controller
             ->whereNull('ot1')
             ->count();
 
-        // Dir Keu — tetap sama
+        // Dir Keu — konsisten dengan requiresLevel2Approval (OR):
+        // TOP > 7 hari ATAU ada THR non-diprovisikan
         $countDirKeu = (clone $baseConditions)
             ->whereNotNull('ot1')
             ->whereNull('ot2')
-            ->where('top', 'Lebih Dari 7 Hari')
-            ->whereHas('quotationDetails', function ($wageQ) {
-                $wageQ->whereHas('wage', function ($q) {
-                    $q->where('thr', '!=', 'diprovisikan');
-                });
+            ->where(function ($cond) {
+                $cond->where('top', 'Lebih Dari 7 Hari')
+                    ->orWhereHas('quotationDetails', function ($wageQ) {
+                        $wageQ->whereHas('wage', function ($q) {
+                            $q->where('thr', '!=', 'diprovisikan');
+                        });
+                    });
             })
             ->count();
 
@@ -512,16 +518,19 @@ class DashboardApprovalController extends Controller
             };
         }
 
-        // Dir Keuangan (role 97 & 40) — tetap sama
+        // Dir Keuangan (role 97 & 40) — konsisten dengan requiresLevel2Approval (OR):
+        // TOP > 7 hari ATAU ada THR non-diprovisikan
         if (in_array($user->cais_role_id, [97, 40])) {
             $conditions[] = function ($q) {
                 $q->whereNotNull('ot1')
                     ->whereNull('ot2')
-                    ->where('top', 'Lebih Dari 7 Hari')
-                    ->whereHas('quotationDetails', function ($wageQ) {
-                        $wageQ->whereHas('wage', function ($q) {
-                            $q->where('thr', '!=', 'diprovisikan');
-                        });
+                    ->where(function ($cond) {
+                        $cond->where('top', 'Lebih Dari 7 Hari')
+                            ->orWhereHas('quotationDetails', function ($wageQ) {
+                                $wageQ->whereHas('wage', function ($q) {
+                                    $q->where('thr', '!=', 'diprovisikan');
+                                });
+                            });
                     });
             };
         }

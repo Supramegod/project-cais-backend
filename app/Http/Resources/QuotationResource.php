@@ -253,6 +253,7 @@ class QuotationResource extends JsonResource
             'tgl_quotation' => $this->tgl_quotation,
             'tgl_quotation_formatted' => $this->tgl_quotation ? Carbon::parse($this->tgl_quotation)->isoFormat('D MMMM Y') : null,
             'nama_perusahaan' => $this->nama_perusahaan,
+            'tipe_quotation'=> $this->tipe_quotation,
             'kebutuhan' => $this->kebutuhan,
             'kebutuhan_id' => $this->kebutuhan_id,
             'company' => $this->company,
