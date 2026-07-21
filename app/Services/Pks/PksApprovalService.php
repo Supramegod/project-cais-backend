@@ -181,7 +181,7 @@ class PksApprovalService
             'contract_number' => $pks->nomor,
             'name' => $site->nama_site,
             'address' => $site->penempatan,
-            'layanan_id' => $site->kebutuhan_id,
+            'layanan_id' => $site->kebutuhan_id ?? $quotation->kebutuhan_id ?? $pks->layanan_id,
             'client_id' => $clientId,
             'city_id' => $site->kota_id,
             'branch_id' => $leads->branch_id,

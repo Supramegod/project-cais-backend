@@ -184,7 +184,7 @@ class PksCommandService
                 'kota' => $sourceSite->kota,
                 'nominal_upah' => $sourceSite->nominal_upah,
                 'penempatan' => $sourceSite->penempatan,
-                'kebutuhan_id' => $leads->kebutuhan_id,
+                'kebutuhan_id' => $kebutuhan->id,
                 'kebutuhan' => $kebutuhan->nama ?? null,
                 'created_by' => Auth::user()->full_name,
                 'created_by_user_id' => Auth::id(),
