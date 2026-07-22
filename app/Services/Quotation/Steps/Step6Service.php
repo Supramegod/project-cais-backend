@@ -63,8 +63,11 @@ class Step6Service
                     $qaAplikasiMap[$qa->id] = $aplikasiId;
                 }
 
+                // Sapu device aplikasi pendukung lama sebelum insert ulang.
+                // Harus memakai jenis_barang_id yang SAMA dengan yang di-insert di bawah (8),
+                // termasuk baris warisan hasil duplikasi revisi yang quotation_aplikasi_id-nya null.
                 QuotationDevices::where('quotation_id', $quotation->id)
-                    ->where('jenis_barang_id', 17)
+                    ->where('jenis_barang_id', 8)
                     ->update([
                         'deleted_at' => $currentDateTime,
                         'deleted_by' => $user,

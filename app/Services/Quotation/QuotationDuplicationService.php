@@ -23,6 +23,9 @@ class QuotationDuplicationService
     /** Mapping site_id referensi → site_id baru */
     private $siteIdMapping = [];
 
+    /** Mapping quotation_aplikasi_id referensi → quotation_aplikasi_id baru */
+    private $aplikasiIdMapping = [];
+
     // =========================================================================
     // PUBLIC ENTRY POINTS
     // =========================================================================
@@ -120,6 +123,7 @@ class QuotationDuplicationService
     {
         $this->detailIdMapping = [];
         $this->siteIdMapping = [];
+        $this->aplikasiIdMapping = [];
     }
 
     /**
@@ -343,8 +347,9 @@ class QuotationDuplicationService
             throw new \Exception('Tidak ada site pada quotation baru.');
         }
 
-        // Bangun local site mapping: oldSiteId → newSiteId
-        $localSiteMapping = [];
+        // Bangun site mapping: oldSiteId → newSiteId.
+        // Ditulis ke $this->siteIdMapping (bukan variabel lokal) karena
+        // duplicateBarangDataWithMapping() membacanya untuk device/chemical/ohc.
         $newSitesList = $newSites->values();
 
         foreach ($quotationReferensi->quotationSites->values() as $index => $oldSite) {
@@ -352,14 +357,14 @@ class QuotationDuplicationService
                 ?? ($newSitesList[$index] ?? null);
 
             if ($matched) {
-                $localSiteMapping[$oldSite->id] = $matched->id;
+                $this->siteIdMapping[$oldSite->id] = $matched->id;
             }
         }
 
         $newSitesById = $newSites->keyBy('id');
 
         foreach ($quotationReferensi->quotationDetails as $detailRef) {
-            $newSiteId = $localSiteMapping[$detailRef->quotation_site_id] ?? null;
+            $newSiteId = $this->siteIdMapping[$detailRef->quotation_site_id] ?? null;
 
             if (!$newSiteId) {
                 \Log::warning('duplicateQuotationDetailsForNewSite: tidak ada site match', [
@@ -444,10 +449,12 @@ class QuotationDuplicationService
             ]);
         }
 
-        // HPP
-        if ($detailRef->quotationDetailHpp) {
-            $hpp = $detailRef->quotationDetailHpp;
-            $newDetail->quotationDetailHpp()->create([
+        // HPP — relasi di QuotationDetail bernama jamak (quotationDetailHpps);
+        // bentuk tunggal selalu null sehingga HPP dulu tidak pernah ikut tersalin.
+        $hpp = $detailRef->quotationDetailHpps->first();
+
+        if ($hpp) {
+            $newDetail->quotationDetailHpps()->create([
                 'quotation_id' => $newQuotation->id,
                 'jumlah_hc' => $hpp->jumlah_hc,
                 'gaji_pokok' => $hpp->gaji_pokok,
@@ -473,10 +480,11 @@ class QuotationDuplicationService
             ]);
         }
 
-        // COSS
-        if ($detailRef->quotationDetailCoss) {
-            $coss = $detailRef->quotationDetailCoss;
-            $newDetail->quotationDetailCoss()->create([
+        // COSS — sama seperti HPP, relasinya jamak.
+        $coss = $detailRef->quotationDetailCosses->first();
+
+        if ($coss) {
+            $newDetail->quotationDetailCosses()->create([
                 'quotation_id' => $newQuotation->id,
                 'jumlah_hc' => $coss->jumlah_hc,
                 'gaji_pokok' => $coss->gaji_pokok,
@@ -647,6 +655,9 @@ class QuotationDuplicationService
     private function buildDevicePayload($device, Quotation $newQuotation): array
     {
         return [
+            'quotation_aplikasi_id' => $device->quotation_aplikasi_id
+                ? ($this->aplikasiIdMapping[$device->quotation_aplikasi_id] ?? null)
+                : null,
             'barang_id' => $device->barang_id,
             'nama' => $device->nama,
             'jenis_barang_id' => $device->jenis_barang_id,
@@ -721,13 +732,17 @@ class QuotationDuplicationService
     private function duplicateAplikasiPendukung(Quotation $newQuotation, Quotation $quotationReferensi): void
     {
         foreach ($quotationReferensi->quotationAplikasis as $app) {
-            $newQuotation->quotationAplikasis()->create([
+            $newApp = $newQuotation->quotationAplikasis()->create([
                 'aplikasi_pendukung_id' => $app->aplikasi_pendukung_id,
                 'aplikasi_pendukung' => $app->aplikasi_pendukung,
                 'harga' => $app->harga,
                 'created_by' => $newQuotation->created_by,
                 'created_by_user_id' => $newQuotation->created_by_user_id,
             ]);
+
+            // Dipakai buildDevicePayload() agar device aplikasi pendukung hasil copy
+            // tetap terikat ke QuotationAplikasi milik quotation baru, bukan yatim.
+            $this->aplikasiIdMapping[$app->id] = $newApp->id;
         }
     }
 
