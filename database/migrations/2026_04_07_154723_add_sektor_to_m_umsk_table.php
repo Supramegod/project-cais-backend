@@ -10,20 +10,35 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (! Schema::connection($this->connection)->hasTable('m_umsk')) {
+            return;
+        }
+
         Schema::connection($this->connection)->table('m_umsk', function (Blueprint $table) {
-            // Add sektor column after city_name
-            $table->string('sektor', 100)->after('city_name');
+            if (! Schema::connection($this->connection)->hasColumn('m_umsk', 'sektor')) {
+                $table->string('sektor', 100)->after('city_name');
+            }
 
             // Composite index: deactivation queries filter by (city_id + sektor + is_aktif)
-            $table->index(['city_id', 'sektor', 'is_aktif'], 'idx_umsk_city_sektor_aktif');
+            if (! Schema::connection($this->connection)->hasIndex('m_umsk', 'idx_umsk_city_sektor_aktif')) {
+                $table->index(['city_id', 'sektor', 'is_aktif'], 'idx_umsk_city_sektor_aktif');
+            }
         });
     }
 
     public function down(): void
     {
+        if (! Schema::connection($this->connection)->hasTable('m_umsk')) {
+            return;
+        }
+
         Schema::connection($this->connection)->table('m_umsk', function (Blueprint $table) {
-            $table->dropIndex('idx_umsk_city_sektor_aktif');
-            $table->dropColumn('sektor');
+            if (Schema::connection($this->connection)->hasIndex('m_umsk', 'idx_umsk_city_sektor_aktif')) {
+                $table->dropIndex('idx_umsk_city_sektor_aktif');
+            }
+            if (Schema::connection($this->connection)->hasColumn('m_umsk', 'sektor')) {
+                $table->dropColumn('sektor');
+            }
         });
     }
 };
