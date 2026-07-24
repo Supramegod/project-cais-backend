@@ -306,4 +306,30 @@ class ItemFulfillmentService
                 ];
             });
     }
+
+    /**
+     * Log seluruh modul fulfillment untuk satu PKS (item + visit), terbaru dulu.
+     * Filter opsional per jenis (PksFulfillmentLog::JENIS_ITEM / JENIS_VISIT).
+     * meta dikembalikan apa adanya karena isinya beda per jenis.
+     */
+    public function getPksLog(int $pksId, ?string $jenis = null): Collection
+    {
+        return PksFulfillmentLog::forPks($pksId)
+            ->when($jenis !== null, fn ($q) => $q->where('jenis', $jenis))
+            ->select('id', 'pks_id', 'jenis', 'reference_id', 'aksi', 'catatan', 'meta', 'created_by', 'created_at')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(function (PksFulfillmentLog $log) {
+                return [
+                    'id' => $log->id,
+                    'jenis' => $log->jenis,
+                    'reference_id' => $log->reference_id,
+                    'aksi' => $log->aksi,
+                    'catatan' => $log->catatan,
+                    'meta' => $log->meta,
+                    'created_by' => $log->created_by,
+                    'created_at' => $log->created_at,
+                ];
+            });
+    }
 }

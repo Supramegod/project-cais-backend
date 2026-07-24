@@ -531,6 +531,40 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->assertSame(3, $log->meta['qty_sesi_ini']);
     }
 
+    // ─── TEST 3b: GET log fulfillment per PKS ────────────────────────
+    /** @test */
+    public function test_get_pks_fulfillment_log_returns_entries(): void
+    {
+        $this->clearFulfillments();
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => $this->kaporlapId,
+            'qty_diminta' => 10,
+            'qty' => 3,
+            'catatan' => 'Mengisi sebagian kaporlap untuk log',
+        ])->assertStatus(201);
+
+        $response = $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log");
+        $response->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('data.0.jenis', 'item')
+            ->assertJsonPath('data.0.catatan', 'Mengisi sebagian kaporlap untuk log')
+            ->assertJsonPath('data.0.meta.qty_sesi_ini', 3);
+
+        // Filter jenis tidak valid → 422
+        $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=ngawur")
+            ->assertStatus(422);
+
+        // Filter jenis=visit → kosong (belum ada visit)
+        $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=visit")
+            ->assertStatus(200)
+            ->assertJsonCount(0, 'data');
+    }
+
     // ─── TEST 4: POST fulfillment qty > remaining ────────────────────
     /** @test */
     public function test_store_fulfillment_rejects_qty_exceeding_remaining(): void

@@ -8,6 +8,7 @@ use App\Http\Requests\Pks\VisitRecordStoreRequest;
 use App\Http\Requests\Pks\VisitRescheduleRequest;
 use App\Http\Requests\Pks\VisitScheduleManualStoreRequest;
 use App\Models\Pks;
+use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
 use App\Models\PksVisitSchedule;
 use App\Services\Pks\Fulfillment\HcFulfillmentService;
@@ -96,7 +97,7 @@ class PksFulfillmentController extends Controller
      * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
      * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
      */
-    private const MANAGE_ROLES = [2, 8, 10, 98 , 54, 55, 56];
+    private const MANAGE_ROLES = [8, 10, 98];
 
     public function __construct(
         private ItemFulfillmentService $itemFulfillmentService,
@@ -661,6 +662,33 @@ class PksFulfillmentController extends Controller
     public function getFulfillmentLog(PksItemFulfillment $fulfillment): JsonResponse
     {
         $logs = $this->itemFulfillmentService->getFulfillmentLog($fulfillment->id);
+
+        return $this->successResponse($logs, 'Fulfillment log retrieved successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/fulfillment-log",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Get fulfillment log per PKS (item + visit)",
+     *     description="Log seluruh aktivitas fulfillment satu PKS, terbaru dulu. Filter opsional ?jenis=item|visit.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="pks", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="jenis", in="query", required=false, @OA\Schema(type="string", enum={"item","visit"})),
+     *
+     *     @OA\Response(response=200, description="Success"),
+     *     @OA\Response(response=422, description="Parameter jenis tidak valid")
+     * )
+     */
+    public function getPksLog(Pks $pks, Request $request): JsonResponse
+    {
+        $jenis = $request->query('jenis');
+        if ($jenis !== null && ! in_array($jenis, [PksFulfillmentLog::JENIS_ITEM, PksFulfillmentLog::JENIS_VISIT], true)) {
+            return $this->errorResponse('Parameter jenis tidak valid (item / visit).', 422);
+        }
+
+        $logs = $this->itemFulfillmentService->getPksLog($pks->id, $jenis);
 
         return $this->successResponse($logs, 'Fulfillment log retrieved successfully.');
     }
