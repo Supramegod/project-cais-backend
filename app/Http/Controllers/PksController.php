@@ -1026,7 +1026,7 @@ class PksController extends Controller
             // Try-catch terpisah agar kegagalan hook tidak membatalkan aktivasi.
             if ((int) $pks->status_pks_id === 7) {
                 try {
-                    $visitSchedulingService = app(\App\Services\Pks\VisitSchedulingService::class);
+                    $visitSchedulingService = app(\App\Services\Pks\Fulfillment\VisitSchedulingService::class);
                     $visitSchedulingService->snapshotTargets($pks);
                     $visitSchedulingService->generateSchedules($pks);
 

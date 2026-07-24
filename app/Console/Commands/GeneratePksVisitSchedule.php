@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Pks;
-use App\Services\Pks\VisitSchedulingService;
+use App\Services\Pks\Fulfillment\VisitSchedulingService;
 use Illuminate\Console\Command;
 
 class GeneratePksVisitSchedule extends Command

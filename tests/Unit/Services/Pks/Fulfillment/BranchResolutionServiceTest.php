@@ -1,11 +1,11 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
 use App\Models\Branch;
 use App\Models\Pks;
 use App\Models\Site;
-use App\Services\Pks\BranchResolutionService;
+use App\Services\Pks\Fulfillment\BranchResolutionService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

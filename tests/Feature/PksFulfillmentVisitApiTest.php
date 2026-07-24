@@ -174,6 +174,7 @@ class PksFulfillmentVisitApiTest extends TestCase
     private function rebuildSchema(): void
     {
         foreach ([
+            'sl_pks_fulfillment_log',
             'sl_pks_visit_record_foto',
             'sl_pks_visit_record',
             'sl_pks_visit_schedule',
@@ -334,6 +335,19 @@ class PksFulfillmentVisitApiTest extends TestCase
             $table->unsignedBigInteger('visit_record_id');
             $table->string('url_file', 500);
             $table->string('nama_file', 255);
+            $table->string('created_by')->nullable();
+            $table->unsignedInteger('created_by_user_id')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedBigInteger('pks_id');
+            $table->string('jenis', 32);
+            $table->unsignedBigInteger('reference_id');
+            $table->string('aksi', 32);
+            $table->text('catatan')->nullable();
+            $table->json('meta')->nullable();
             $table->string('created_by')->nullable();
             $table->unsignedInteger('created_by_user_id')->nullable();
             $table->timestamp('created_at')->nullable();

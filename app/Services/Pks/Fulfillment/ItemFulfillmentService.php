@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
+use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
-use App\Models\PksItemFulfillmentLog;
+use App\Models\QuotationDetail;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -44,14 +46,18 @@ class ItemFulfillmentService
 
         $results = [];
 
-        // 1. Kaporlap — scope via quotation_detail_id
-        $kaporlaps = $quotation->quotationKaporlaps()->select('id', 'jumlah', 'nama')
+        // 1. Kaporlap — scope via quotation_detail_id.
+        // jumlah pada sl_quotation_kaporlap = kebutuhan PER PERSONIL, jadi qty riil
+        // yang harus dipenuhi = jumlah x jumlah_hc pada detail-nya.
+        $kaporlaps = $quotation->quotationKaporlaps()->select('id', 'jumlah', 'nama', 'quotation_detail_id')
             ->when($detailIds !== null, fn ($q) => $q->whereIn('quotation_detail_id', $detailIds))
             ->get();
+        $hcMap = $kaporlaps->isEmpty() ? [] : self::detailHcMap($quotation->id);
         foreach ($kaporlaps as $item) {
             $key = 'kaporlap_'.$item->id;
             $f = $fulfillments->get($key);
-            $results[] = $this->formatItem(1, 'kaporlap', $item->id, $item->nama ?? 'Kaporlap #'.$item->id, (int) $item->jumlah, $f);
+            $qty = self::kaporlapQty((int) $item->jumlah, $item->quotation_detail_id, $hcMap);
+            $results[] = $this->formatItem(1, 'kaporlap', $item->id, $item->nama ?? 'Kaporlap #'.$item->id, $qty, $f);
         }
 
         // 2. Device — scope via quotation_site_id
@@ -87,19 +93,58 @@ class ItemFulfillmentService
      */
     public static function resolveSiteScope(int $quotationId, int $siteId): array
     {
-        $quotationSiteId = DB::table('sl_site')->where('id', $siteId)->value('quotation_site_id');
+        $quotationSiteId = Site::whereKey($siteId)->value('quotation_site_id');
         if (! $quotationSiteId) {
             return ['quotation_site_id' => null, 'detail_ids' => null];
         }
 
-        $detailIds = DB::table('sl_quotation_detail')
-            ->where('quotation_id', $quotationId)
+        $detailIds = QuotationDetail::where('quotation_id', $quotationId)
             ->where('quotation_site_id', $quotationSiteId)
-            ->whereNull('deleted_at')
             ->pluck('id')
             ->all();
 
         return ['quotation_site_id' => (int) $quotationSiteId, 'detail_ids' => $detailIds];
+    }
+
+    /**
+     * Map quotation_detail_id => jumlah_hc untuk 1 quotation.
+     *
+     * @return array<int, int|null>
+     */
+    public static function detailHcMap(int $quotationId): array
+    {
+        return self::detailHcMapMany([$quotationId]);
+    }
+
+    /**
+     * Versi batch detailHcMap() — 1 query untuk banyak quotation sekaligus.
+     * Aman digabung karena id detail unik lintas quotation.
+     *
+     * @param  array<int>  $quotationIds
+     * @return array<int, int|null>
+     */
+    public static function detailHcMapMany(array $quotationIds): array
+    {
+        if (empty($quotationIds)) {
+            return [];
+        }
+
+        return QuotationDetail::whereIn('quotation_id', $quotationIds)
+            ->pluck('jumlah_hc', 'id')
+            ->all();
+    }
+
+    /**
+     * Qty kaporlap riil = jumlah (per personil) x jumlah_hc detail.
+     * Detail tidak diketahui / jumlah_hc null (data legacy) → pengali 1.
+     *
+     * @param  array<int, int|null>  $hcMap
+     */
+    public static function kaporlapQty(int $jumlah, ?int $detailId, array $hcMap): int
+    {
+        $hc = $detailId !== null ? ($hcMap[$detailId] ?? null) : null;
+
+        return $jumlah * (int) ($hc ?? 1);
     }
 
     private function formatItem(int $typeId, string $type, int $itemId, string $nama, int $qtyDiminta, $fulfillment): array
@@ -115,6 +160,7 @@ class ItemFulfillmentService
             'qty_terpenuhi' => $terpenuhi,
             'remaining' => $qtyDiminta - $terpenuhi,
             'status' => $fulfillment?->status ?? 'not_yet_fulfilled',
+            // Catatan tidak di sini — hanya tampil di list log (getFulfillmentLog).
         ];
     }
 
@@ -173,14 +219,18 @@ class ItemFulfillmentService
             $fulfillment->status = $remaining === 0 ? 'fully_fulfilled' : 'partially_fulfilled';
             $fulfillment->save();
 
-            // Insert log
-            PksItemFulfillmentLog::create([
-                'fulfillment_id' => $fulfillment->id,
+            // Insert log fulfillment. Catatan hidup di sini per sesi, bukan di row.
+            PksFulfillmentLog::create([
+                'pks_id' => $fulfillment->pks_id,
+                'jenis' => PksFulfillmentLog::JENIS_ITEM,
+                'reference_id' => $fulfillment->id,
                 'aksi' => 'create',
-                'qty_sesi_ini' => $qty,
-                'remaining_sebelum' => $remainingBefore,
-                'remaining_sesudah' => $remaining,
                 'catatan' => $data['catatan'] ?? null,
+                'meta' => [
+                    'qty_sesi_ini' => $qty,
+                    'remaining_sebelum' => $remainingBefore,
+                    'remaining_sesudah' => $remaining,
+                ],
                 'created_by' => $user->full_name,
                 'created_by_user_id' => $user->id,
             ]);
@@ -212,14 +262,18 @@ class ItemFulfillmentService
             $fulfillment->updated_by = $user->full_name;
             $fulfillment->save();
 
-            // Insert audit log
-            PksItemFulfillmentLog::create([
-                'fulfillment_id' => $fulfillment->id,
+            // Insert audit log fulfillment
+            PksFulfillmentLog::create([
+                'pks_id' => $fulfillment->pks_id,
+                'jenis' => PksFulfillmentLog::JENIS_ITEM,
+                'reference_id' => $fulfillment->id,
                 'aksi' => 'edit',
-                'qty_sesi_ini' => $newQty - $oldQty, // delta
-                'remaining_sebelum' => $remainingBefore,
-                'remaining_sesudah' => $remainingAfter,
                 'catatan' => $catatan,
+                'meta' => [
+                    'qty_sesi_ini' => $newQty - $oldQty, // delta
+                    'remaining_sebelum' => $remainingBefore,
+                    'remaining_sesudah' => $remainingAfter,
+                ],
                 'created_by' => $user->full_name,
                 'created_by_user_id' => $user->id,
             ]);
@@ -230,9 +284,26 @@ class ItemFulfillmentService
 
     public function getFulfillmentLog(int $fulfillmentId): Collection
     {
-        return PksItemFulfillmentLog::where('fulfillment_id', $fulfillmentId)
-            ->select('id', 'fulfillment_id', 'aksi', 'qty_sesi_ini', 'remaining_sebelum', 'remaining_sesudah', 'catatan', 'created_by', 'created_at')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Flatten meta JSON balik ke top-level supaya bentuk response endpoint
+        // tetap sama seperti sebelum log dipindah ke tabel fulfillment.
+        return PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillmentId)
+            ->select('id', 'reference_id', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(function (PksFulfillmentLog $log) {
+                $meta = $log->meta ?? [];
+
+                return [
+                    'id' => $log->id,
+                    'fulfillment_id' => $log->reference_id,
+                    'aksi' => $log->aksi,
+                    'qty_sesi_ini' => $meta['qty_sesi_ini'] ?? 0,
+                    'remaining_sebelum' => $meta['remaining_sebelum'] ?? 0,
+                    'remaining_sesudah' => $meta['remaining_sesudah'] ?? 0,
+                    'catatan' => $log->catatan,
+                    'created_by' => $log->created_by,
+                    'created_at' => $log->created_at,
+                ];
+            });
     }
 }

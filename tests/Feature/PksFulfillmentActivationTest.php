@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\User;
-use App\Services\Pks\VisitSchedulingService;
+use App\Services\Pks\Fulfillment\VisitSchedulingService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

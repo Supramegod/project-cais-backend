@@ -1,8 +1,13 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
-use Illuminate\Support\Facades\DB;
+use App\Models\PksItemFulfillment;
+use App\Models\PksVisitSchedule;
+use App\Models\PksVisitTarget;
+use App\Models\QuotationChemical;
+use App\Models\QuotationDevices;
+use App\Models\QuotationKaporlap;
 
 /**
  * Rekap pemenuhan (Item + Visit) untuk sekumpulan PKS pada satu halaman
@@ -38,25 +43,21 @@ class PksFulfillmentDashboardService
         $itemReq = $this->aggregateRequestedItems($quotationIds);
 
         // Fulfillment per PKS: total terpenuhi qty + jumlah baris fully_fulfilled.
-        $fulfillAgg = DB::table('sl_pks_item_fulfillment')
-            ->whereIn('pks_id', $pksIds)
-            ->whereNull('deleted_at')
+        $fulfillAgg = PksItemFulfillment::whereIn('pks_id', $pksIds)
             ->selectRaw('pks_id, SUM(qty_terpenuhi) as qty_terpenuhi, SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as fully', ['fully_fulfilled'])
             ->groupBy('pks_id')
             ->get()
             ->keyBy('pks_id');
 
         // Visit target per PKS.
-        $visitAgg = DB::table('sl_pks_visit_target')
-            ->whereIn('pks_id', $pksIds)
+        $visitAgg = PksVisitTarget::whereIn('pks_id', $pksIds)
             ->selectRaw('pks_id, SUM(target_total) as target_total, SUM(target_terpakai) as target_terpakai')
             ->groupBy('pks_id')
             ->get()
             ->keyBy('pks_id');
 
         // Visit missed per PKS.
-        $missedAgg = DB::table('sl_pks_visit_schedule')
-            ->whereIn('pks_id', $pksIds)
+        $missedAgg = PksVisitSchedule::whereIn('pks_id', $pksIds)
             ->where('status', 'missed')
             ->selectRaw('pks_id, COUNT(*) as missed')
             ->groupBy('pks_id')
@@ -166,23 +167,42 @@ class PksFulfillmentDashboardService
             return $result;
         }
 
-        foreach (['sl_quotation_kaporlap', 'sl_quotation_devices', 'sl_quotation_chemical'] as $table) {
-            $rows = DB::table($table)
-                ->whereIn('quotation_id', $quotationIds)
-                ->whereNull('deleted_at')
+        $add = function (int $qid, int $jml, int $qty) use (&$result) {
+            if (! isset($result[$qid])) {
+                $result[$qid] = ['total' => 0, 'qty_diminta' => 0];
+            }
+            $result[$qid]['total'] += $jml;
+            $result[$qid]['qty_diminta'] += $qty;
+        };
+
+        // Device & chemical: qty = jumlah apa adanya → cukup agregat di DB.
+        foreach ([QuotationDevices::class, QuotationChemical::class] as $model) {
+            $rows = $model::whereIn('quotation_id', $quotationIds)
                 ->selectRaw('quotation_id, COUNT(*) as jml, SUM(jumlah) as qty')
                 ->groupBy('quotation_id')
                 ->get();
 
             foreach ($rows as $row) {
-                $qid = (int) $row->quotation_id;
-                if (! isset($result[$qid])) {
-                    $result[$qid] = ['total' => 0, 'qty_diminta' => 0];
-                }
-                $result[$qid]['total'] += (int) $row->jml;
-                $result[$qid]['qty_diminta'] += (int) $row->qty;
+                $add((int) $row->quotation_id, (int) $row->jml, (int) $row->qty);
             }
         }
+
+        // Kaporlap: jumlah = kebutuhan PER PERSONIL, jadi qty riil = jumlah x jumlah_hc
+        // detail-nya. Dihitung di PHP lewat ItemFulfillmentService::kaporlapQty supaya
+        // rumusnya persis sama dengan summary per-PKS (tanpa join lintas tabel).
+        $hcMap = ItemFulfillmentService::detailHcMapMany($quotationIds);
+
+        QuotationKaporlap::whereIn('quotation_id', $quotationIds)
+            ->select('quotation_id', 'jumlah', 'quotation_detail_id')
+            ->chunk(500, function ($items) use ($add, $hcMap) {
+                foreach ($items as $item) {
+                    $add(
+                        (int) $item->quotation_id,
+                        1,
+                        ItemFulfillmentService::kaporlapQty((int) $item->jumlah, $item->quotation_detail_id, $hcMap),
+                    );
+                }
+            });
 
         return $result;
     }

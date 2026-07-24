@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Services\Pks\VisitSchedulingService;
+use App\Services\Pks\Fulfillment\VisitSchedulingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

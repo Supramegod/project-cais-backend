@@ -1,12 +1,13 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
+use App\Models\PksFulfillmentLog;
 use App\Models\PksVisitRecord;
 use App\Models\User;
-use App\Services\Pks\VisitFulfillmentService;
-use App\Services\Pks\VisitPhotoService;
+use App\Services\Pks\Fulfillment\VisitFulfillmentService;
+use App\Services\Pks\Fulfillment\VisitPhotoService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
@@ -180,6 +181,7 @@ class VisitFulfillmentServiceTest extends TestCase
     private function rebuildSchema(): void
     {
         foreach ([
+            'sl_pks_fulfillment_log',
             'sl_pks_visit_record_foto',
             'sl_pks_visit_record',
             'sl_pks_visit_schedule',
@@ -326,6 +328,19 @@ class VisitFulfillmentServiceTest extends TestCase
             $table->unsignedInteger('created_by_user_id')->nullable();
             $table->timestamp('created_at')->nullable();
         });
+
+        Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedBigInteger('pks_id');
+            $table->string('jenis', 32);
+            $table->unsignedBigInteger('reference_id');
+            $table->string('aksi', 32);
+            $table->text('catatan')->nullable();
+            $table->json('meta')->nullable();
+            $table->string('created_by')->nullable();
+            $table->unsignedInteger('created_by_user_id')->nullable();
+            $table->timestamp('created_at')->nullable();
+        });
     }
 
     // ─── TEST 1: createVisitRecord blocked jika target habis ─────────
@@ -424,6 +439,34 @@ class VisitFulfillmentServiceTest extends TestCase
             'role' => 'operasional',
             'target_terpakai' => 1,
         ]);
+    }
+
+    // ─── TEST 2b: createVisitRecord menulis log jenis visit ──────────
+    /** @test */
+    public function test_create_visit_record_writes_fulfillment_log(): void
+    {
+        $record = $this->service->createVisitRecord(
+            [
+                'schedule_id' => $this->scheduleId,
+                'pks_id' => $this->pksId,
+                'site_id' => $this->siteId,
+                'leads_id' => $this->leadsId,
+                'role' => 'operasional',
+                'tgl_visit_aktual' => '2026-06-15',
+                'hasil_visit' => 'selesai',
+                'catatan' => 'Visit operasional selesai',
+            ],
+            [UploadedFile::fake()->image('foto1.jpg')],
+            $this->user
+        );
+
+        $log = PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_VISIT, $record->id)->first();
+        $this->assertNotNull($log);
+        $this->assertEquals($this->pksId, $log->pks_id);
+        $this->assertSame('Visit operasional selesai', $log->catatan);
+        $this->assertSame('operasional', $log->meta['role']);
+        $this->assertSame('selesai', $log->meta['hasil_visit']);
+        $this->assertSame(1, $log->meta['jumlah_foto']);
     }
 
     // ─── TEST 3: createVisitRecord update jadwal ke done ─────────────
