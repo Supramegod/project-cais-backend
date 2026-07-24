@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;

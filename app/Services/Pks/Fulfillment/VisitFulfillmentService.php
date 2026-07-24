@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
+use App\Models\PksFulfillmentLog;
 use App\Models\PksVisitRecord;
 use App\Models\PksVisitRecordFoto;
 use App\Models\PksVisitSchedule;
@@ -124,6 +125,28 @@ class VisitFulfillmentService
                         );
                     }
                 }
+
+                // Log modul fulfillment jenis visit. Catatan hidup di sini.
+                PksFulfillmentLog::create([
+                    'pks_id' => $record->pks_id,
+                    'jenis' => PksFulfillmentLog::JENIS_VISIT,
+                    'reference_id' => $record->id,
+                    'aksi' => 'create',
+                    'catatan' => $data['catatan'],
+                    'meta' => [
+                        'role' => $data['role'],
+                        'schedule_id' => $record->schedule_id,
+                        'hasil_visit' => $data['hasil_visit'],
+                        'tgl_visit_aktual' => $data['tgl_visit_aktual'],
+                        'jumlah_foto' => count($uploadedFotos),
+                        // Sisa target setelah increment (null bila role tanpa target).
+                        'sisa_target' => $target
+                            ? max(0, $target->target_total - $target->target_terpakai - 1)
+                            : null,
+                    ],
+                    'created_by' => $user->full_name,
+                    'created_by_user_id' => $user->id,
+                ]);
 
                 return $record->load('fotos');
             });

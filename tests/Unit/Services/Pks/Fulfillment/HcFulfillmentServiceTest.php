@@ -1,9 +1,9 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
-use App\Services\Pks\HcFulfillmentService;
+use App\Services\Pks\Fulfillment\HcFulfillmentService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;

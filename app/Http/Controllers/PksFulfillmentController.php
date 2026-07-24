@@ -10,12 +10,12 @@ use App\Http\Requests\Pks\VisitScheduleManualStoreRequest;
 use App\Models\Pks;
 use App\Models\PksItemFulfillment;
 use App\Models\PksVisitSchedule;
-use App\Services\Pks\HcFulfillmentService;
-use App\Services\Pks\ItemFulfillmentService;
-use App\Services\Pks\PksFulfillmentDashboardService;
-use App\Services\Pks\PksFulfillmentSummaryService;
-use App\Services\Pks\VisitFulfillmentService;
-use App\Services\Pks\VisitSchedulingService;
+use App\Services\Pks\Fulfillment\HcFulfillmentService;
+use App\Services\Pks\Fulfillment\ItemFulfillmentService;
+use App\Services\Pks\Fulfillment\PksFulfillmentDashboardService;
+use App\Services\Pks\Fulfillment\PksFulfillmentSummaryService;
+use App\Services\Pks\Fulfillment\VisitFulfillmentService;
+use App\Services\Pks\Fulfillment\VisitSchedulingService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,7 +96,7 @@ class PksFulfillmentController extends Controller
      * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
      * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
      */
-    private const MANAGE_ROLES = [8, 10, 98];
+    private const MANAGE_ROLES = [2, 8, 10, 98 , 54, 55, 56];
 
     public function __construct(
         private ItemFulfillmentService $itemFulfillmentService,

@@ -5,7 +5,7 @@ namespace App\Jobs;
 use App\Mail\ItemFulfillmentReminderNotification;
 use App\Models\Pks;
 use App\Models\User;
-use App\Services\Pks\ItemFulfillmentService;
+use App\Services\Pks\Fulfillment\ItemFulfillmentService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

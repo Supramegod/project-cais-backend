@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
 use App\Models\PksVisitSchedule;
 use App\Models\PksVisitTarget;
 use App\Models\PksVisitTargetMaster;
+use App\Models\QuotationDetail;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class VisitSchedulingService
 {
@@ -24,10 +24,7 @@ class VisitSchedulingService
     public function snapshotTargets(Pks $pks): void
     {
         // Hitung total HC dari quotation_detail
-        $totalHc = DB::table('sl_quotation_detail')
-            ->where('quotation_id', $pks->quotation_id)
-            ->whereNull('deleted_at')
-            ->sum('jumlah_hc');
+        $totalHc = QuotationDetail::where('quotation_id', $pks->quotation_id)->sum('jumlah_hc');
 
         if ($totalHc <= 0) {
             return;

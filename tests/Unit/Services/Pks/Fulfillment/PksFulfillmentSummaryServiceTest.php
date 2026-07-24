@@ -1,9 +1,9 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
-use App\Services\Pks\PksFulfillmentSummaryService;
+use App\Services\Pks\Fulfillment\PksFulfillmentSummaryService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +51,7 @@ class PksFulfillmentSummaryServiceTest extends TestCase
     {
         foreach ([
             'sl_pks_visit_schedule', 'sl_pks_visit_target',
-            'sl_pks_item_fulfillment_log', 'sl_pks_item_fulfillment',
+            'sl_pks_fulfillment_log', 'sl_pks_item_fulfillment',
             'sl_quotation_chemical', 'sl_quotation_devices', 'sl_quotation_kaporlap',
             'sl_quotation_detail', 'sl_quotation', 'sl_site', 'sl_pks',
             'm_employee', 't_applicant', 'm_vacancy', 'm_position', 'm_site', 'm_branch',
@@ -132,6 +132,7 @@ class PksFulfillmentSummaryServiceTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('quotation_id')->nullable();
             $table->unsignedInteger('quotation_site_id')->nullable();
+            $table->unsignedInteger('jumlah_hc')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -166,6 +167,19 @@ class PksFulfillmentSummaryServiceTest extends TestCase
             $table->string('deleted_by')->nullable();
             $table->softDeletes();
             $table->timestamps();
+        });
+
+        Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedBigInteger('pks_id');
+            $table->string('jenis', 32);
+            $table->unsignedBigInteger('reference_id');
+            $table->string('aksi', 32);
+            $table->text('catatan')->nullable();
+            $table->json('meta')->nullable();
+            $table->string('created_by')->nullable();
+            $table->unsignedInteger('created_by_user_id')->nullable();
+            $table->timestamp('created_at')->nullable();
         });
 
         Schema::create('sl_pks_visit_target', function (Blueprint $table) {

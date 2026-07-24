@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
 use App\Models\PksVisitSchedule;
 use App\Models\User;
-use App\Services\Pks\BranchResolutionService;
-use App\Services\Pks\VisitSchedulingService;
+use App\Services\Pks\Fulfillment\BranchResolutionService;
+use App\Services\Pks\Fulfillment\VisitSchedulingService;
 use Carbon\Carbon;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;

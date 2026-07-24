@@ -14,6 +14,15 @@ class ProcessQuotationDuplication implements ShouldQueue
 {
     use InteractsWithQueue;
 
+    /**
+     * Duplikasi tidak boleh diulang: satu run parsial pun akan menggandakan detail & barang.
+     * retry_after queue database default 90 detik, jauh lebih pendek dari durasi duplikasi
+     * quotation besar — timeout dinaikkan agar job tidak diambil worker kedua.
+     */
+    public $tries = 1;
+
+    public $timeout = 900;
+
     protected $quotationDuplicationService;
     protected $quotationBusinessService;
 
@@ -94,6 +103,17 @@ class ProcessQuotationDuplication implements ShouldQueue
      */
     private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user): void
     {
+        // Guard idempotensi: kalau job ini sudah pernah jalan (retry / diambil worker kedua),
+        // detail sudah ada. Menjalankan ulang akan menggandakan detail beserta seluruh barangnya.
+        if ($quotation->quotationDetails()->exists()) {
+            Log::warning('Duplikasi dilewati, quotation sudah punya detail (kemungkinan job diulang)', [
+                'quotation_id' => $quotation->id,
+                'referensi_id' => $quotationReferensi->id,
+            ]);
+
+            return;
+        }
+
         // Ambil nama site referensi dan quotation baru
         $referensiSiteNames = $quotationReferensi->quotationSites->pluck('nama_site');
         $currentSiteNames = $quotation->quotationSites->pluck('nama_site');
