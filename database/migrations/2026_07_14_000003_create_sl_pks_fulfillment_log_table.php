@@ -29,7 +29,8 @@ return new class extends Migration
             $table->unsignedInteger('created_by_user_id')->nullable();
             $table->timestamp('created_at')->nullable();
 
-            // Log per PKS + lookup per record sub-modul
+            // Log per PKS + lookup per record sub-modul. site_id ditambah
+            // di migration terpisah (2026_07_22_000002) — lihat catatan di sana.
             $table->index('pks_id');
             $table->index(['jenis', 'reference_id']);
         });

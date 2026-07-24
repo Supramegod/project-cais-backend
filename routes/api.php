@@ -603,6 +603,9 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::patch('/item-fulfillment/{fulfillment}', 'editFulfillment');
         Route::get('/item-fulfillment/{fulfillment}/log', 'getFulfillmentLog');
 
+        // Log fulfillment per PKS (item + visit), filter opsional ?jenis=item|visit
+        Route::get('/{pks}/fulfillment-log', 'getPksLog');
+
         // Visit Scheduling
         Route::get('/{pks}/visit-schedule', 'getVisitSchedule');
         Route::post('/visit-schedule', 'storeManualSchedule');

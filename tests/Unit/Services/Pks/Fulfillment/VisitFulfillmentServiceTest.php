@@ -332,6 +332,7 @@ class VisitFulfillmentServiceTest extends TestCase
         Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedBigInteger('pks_id');
+            $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
             $table->string('aksi', 32);
@@ -463,6 +464,7 @@ class VisitFulfillmentServiceTest extends TestCase
         $log = PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_VISIT, $record->id)->first();
         $this->assertNotNull($log);
         $this->assertEquals($this->pksId, $log->pks_id);
+        $this->assertEquals($this->siteId, $log->site_id);
         $this->assertSame('Visit operasional selesai', $log->catatan);
         $this->assertSame('operasional', $log->meta['role']);
         $this->assertSame('selesai', $log->meta['hasil_visit']);

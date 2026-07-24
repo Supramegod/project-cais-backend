@@ -129,6 +129,7 @@ class VisitFulfillmentService
                 // Log modul fulfillment jenis visit. Catatan hidup di sini.
                 PksFulfillmentLog::create([
                     'pks_id' => $record->pks_id,
+                    'site_id' => $record->site_id,
                     'jenis' => PksFulfillmentLog::JENIS_VISIT,
                     'reference_id' => $record->id,
                     'aksi' => 'create',

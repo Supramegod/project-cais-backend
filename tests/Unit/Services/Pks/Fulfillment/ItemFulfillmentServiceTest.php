@@ -289,6 +289,7 @@ class ItemFulfillmentServiceTest extends TestCase
         Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedBigInteger('pks_id');
+            $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
             $table->string('aksi', 32);
@@ -574,6 +575,46 @@ class ItemFulfillmentServiceTest extends TestCase
         $log = $this->service->getFulfillmentLog($fulfillment->id);
         $this->assertSame('edit', $log->first()['aksi']);
         $this->assertSame('Koreksi jumlah jadi 8 unit', $log->first()['catatan']);
+    }
+
+    // ─── TEST 6e: getPksLog gabung item + visit, filter jenis ────────
+    /** @test */
+    public function test_get_pks_log_combines_item_and_visit_with_filter(): void
+    {
+        // 1 log item lewat createFulfillment
+        $this->service->createFulfillment([
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => 1,
+            'qty_diminta' => 10,
+            'qty' => 4,
+            'catatan' => 'Kirim item tahap 1',
+        ], $this->user);
+
+        // 1 log visit disisipkan langsung (tanpa mesin visit)
+        PksFulfillmentLog::create([
+            'pks_id' => $this->pksId,
+            'jenis' => PksFulfillmentLog::JENIS_VISIT,
+            'reference_id' => 99,
+            'aksi' => 'create',
+            'catatan' => 'Visit operasional',
+            'meta' => ['role' => 'operasional'],
+            'created_by' => $this->user->full_name,
+            'created_by_user_id' => $this->user->id,
+        ]);
+
+        // Gabungan: 2 baris, terbaru dulu (visit terakhir dibuat).
+        $all = $this->service->getPksLog($this->pksId);
+        $this->assertSame(2, $all->count());
+        $this->assertSame('visit', $all->first()['jenis']);
+
+        // Filter per jenis
+        $this->assertSame(1, $this->service->getPksLog($this->pksId, PksFulfillmentLog::JENIS_ITEM)->count());
+        $visitOnly = $this->service->getPksLog($this->pksId, PksFulfillmentLog::JENIS_VISIT);
+        $this->assertSame(1, $visitOnly->count());
+        $this->assertSame('operasional', $visitOnly->first()['meta']['role']);
     }
 
     // ─── TEST 7: createFulfillment restore soft-deleted ──────────────
