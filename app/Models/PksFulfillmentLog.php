@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $pks_id
+ * @property int|null $site_id
  * @property string $jenis
  * @property int $reference_id
  * @property string $aksi
@@ -42,6 +43,7 @@ class PksFulfillmentLog extends Model
 
     protected $fillable = [
         'pks_id',
+        'site_id',
         'jenis',
         'reference_id',
         'aksi',
@@ -72,6 +74,14 @@ class PksFulfillmentLog extends Model
     public function scopeForPks($query, int $pksId)
     {
         return $query->where('pks_id', $pksId);
+    }
+
+    /**
+     * Log satu site dalam PKS.
+     */
+    public function scopeForSite($query, int $siteId)
+    {
+        return $query->where('site_id', $siteId);
     }
 
     /**

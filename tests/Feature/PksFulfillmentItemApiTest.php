@@ -351,6 +351,7 @@ class PksFulfillmentItemApiTest extends TestCase
         Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedBigInteger('pks_id');
+            $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
             $table->string('aksi', 32);
@@ -552,6 +553,7 @@ class PksFulfillmentItemApiTest extends TestCase
         $response->assertStatus(200)
             ->assertJson(['success' => true])
             ->assertJsonPath('data.0.jenis', 'item')
+            ->assertJsonPath('data.0.site_id', $this->siteId)
             ->assertJsonPath('data.0.catatan', 'Mengisi sebagian kaporlap untuk log')
             ->assertJsonPath('data.0.meta.qty_sesi_ini', 3);
 

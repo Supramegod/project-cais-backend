@@ -333,6 +333,7 @@ class ItemFulfillmentReminderTest extends TestCase
         Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedBigInteger('pks_id');
+            $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
             $table->string('aksi', 32);

@@ -222,6 +222,7 @@ class ItemFulfillmentService
             // Insert log fulfillment. Catatan hidup di sini per sesi, bukan di row.
             PksFulfillmentLog::create([
                 'pks_id' => $fulfillment->pks_id,
+                'site_id' => $fulfillment->site_id,
                 'jenis' => PksFulfillmentLog::JENIS_ITEM,
                 'reference_id' => $fulfillment->id,
                 'aksi' => 'create',
@@ -265,6 +266,7 @@ class ItemFulfillmentService
             // Insert audit log fulfillment
             PksFulfillmentLog::create([
                 'pks_id' => $fulfillment->pks_id,
+                'site_id' => $fulfillment->site_id,
                 'jenis' => PksFulfillmentLog::JENIS_ITEM,
                 'reference_id' => $fulfillment->id,
                 'aksi' => 'edit',
@@ -287,7 +289,7 @@ class ItemFulfillmentService
         // Flatten meta JSON balik ke top-level supaya bentuk response endpoint
         // tetap sama seperti sebelum log dipindah ke tabel fulfillment.
         return PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillmentId)
-            ->select('id', 'reference_id', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
+            ->select('id', 'site_id', 'reference_id', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
             ->orderBy('id', 'desc')
             ->get()
             ->map(function (PksFulfillmentLog $log) {
@@ -295,6 +297,7 @@ class ItemFulfillmentService
 
                 return [
                     'id' => $log->id,
+                    'site_id' => $log->site_id,
                     'fulfillment_id' => $log->reference_id,
                     'aksi' => $log->aksi,
                     'qty_sesi_ini' => $meta['qty_sesi_ini'] ?? 0,
@@ -316,12 +319,13 @@ class ItemFulfillmentService
     {
         return PksFulfillmentLog::forPks($pksId)
             ->when($jenis !== null, fn ($q) => $q->where('jenis', $jenis))
-            ->select('id', 'pks_id', 'jenis', 'reference_id', 'aksi', 'catatan', 'meta', 'created_by', 'created_at')
+            ->select('id', 'pks_id', 'site_id', 'jenis', 'reference_id', 'aksi', 'catatan', 'meta', 'created_by', 'created_at')
             ->orderBy('id', 'desc')
             ->get()
             ->map(function (PksFulfillmentLog $log) {
                 return [
                     'id' => $log->id,
+                    'site_id' => $log->site_id,
                     'jenis' => $log->jenis,
                     'reference_id' => $log->reference_id,
                     'aksi' => $log->aksi,
