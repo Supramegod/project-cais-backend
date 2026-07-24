@@ -9,6 +9,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('m_pks_wizard_status')) {
+            return;
+        }
+
         Schema::create('m_pks_wizard_status', function (Blueprint $table) {
             $table->id();
             $table->string('kode')->unique();

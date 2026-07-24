@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sl_quotation', function (Blueprint $table) {
-            $table->timestamp('calculated_at')->nullable()->after('step');
+            if (! Schema::hasColumn('sl_quotation', 'calculated_at')) {
+                $table->timestamp('calculated_at')->nullable()->after('step');
+            }
         });
     }
 

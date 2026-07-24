@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('sl_quotation_management_fee')) {
+            return;
+        }
+
         Schema::create('sl_quotation_management_fee', function (Blueprint $table) {
             $table->id();
             

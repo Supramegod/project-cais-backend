@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sl_quotation_detail_tunjangan', function (Blueprint $table) {
-            $table->string('jenis', 50)->default('Nominal')->after('nominal_coss');
+            if (! Schema::hasColumn('sl_quotation_detail_tunjangan', 'jenis')) {
+                $table->string('jenis', 50)->default('Nominal')->after('nominal_coss');
+            }
         });
     }
 
