@@ -1,8 +1,8 @@
 <?php
 
-namespace Tests\Unit\Services\Pks;
+namespace Tests\Unit\Services\Pks\Fulfillment;
 
-use App\Services\Pks\PksFulfillmentDashboardService;
+use App\Services\Pks\Fulfillment\PksFulfillmentDashboardService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
@@ -45,10 +45,18 @@ class PksFulfillmentDashboardServiceTest extends TestCase
         foreach ([
             'sl_pks_visit_schedule', 'sl_pks_visit_target',
             'sl_pks_item_fulfillment', 'sl_quotation_chemical', 'sl_quotation_devices',
-            'sl_quotation_kaporlap', 'sl_site',
+            'sl_quotation_kaporlap', 'sl_quotation_detail', 'sl_site',
         ] as $t) {
             Schema::dropIfExists($t);
         }
+
+        Schema::create('sl_quotation_detail', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('quotation_id')->nullable();
+            $table->unsignedInteger('jumlah_hc')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
 
         // sl_site kosong — HC batched (overallForPksIds) early-return, hc = kosong.
         Schema::create('sl_site', function (Blueprint $table) {
@@ -62,6 +70,7 @@ class PksFulfillmentDashboardServiceTest extends TestCase
             Schema::create($t, function (Blueprint $table) {
                 $table->increments('id');
                 $table->unsignedInteger('quotation_id')->nullable();
+                $table->unsignedInteger('quotation_detail_id')->nullable();
                 $table->unsignedInteger('jumlah')->nullable();
                 $table->softDeletes();
                 $table->timestamps();

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Pks;
+namespace App\Services\Pks\Fulfillment;
 
 use App\Models\Pks;
 use App\Models\PksVisitSchedule;

@@ -182,7 +182,7 @@ class ItemFulfillmentReminderTest extends TestCase
     private function rebuildSchema(): void
     {
         foreach ([
-            'sl_pks_item_fulfillment_log',
+            'sl_pks_fulfillment_log',
             'sl_pks_item_fulfillment',
             'sl_quotation_chemical',
             'sl_quotation_devices',
@@ -330,14 +330,14 @@ class ItemFulfillmentReminderTest extends TestCase
             $table->timestamps();
         });
 
-        Schema::create('sl_pks_item_fulfillment_log', function (Blueprint $table) {
+        Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('fulfillment_id');
-            $table->string('aksi');
-            $table->unsignedInteger('qty_sesi_ini')->default(0);
-            $table->unsignedInteger('remaining_sebelum')->default(0);
-            $table->unsignedInteger('remaining_sesudah')->default(0);
+            $table->unsignedBigInteger('pks_id');
+            $table->string('jenis', 32);
+            $table->unsignedBigInteger('reference_id');
+            $table->string('aksi', 32);
             $table->text('catatan')->nullable();
+            $table->json('meta')->nullable();
             $table->string('created_by')->nullable();
             $table->unsignedInteger('created_by_user_id')->nullable();
             $table->timestamp('created_at')->nullable();

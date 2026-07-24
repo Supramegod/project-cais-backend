@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Pks $pks
  * @property-read Site $site
  * @property-read Leads $leads
- * @property-read \Illuminate\Database\Eloquent\Collection|PksItemFulfillmentLog[] $logs
+ * @property-read \Illuminate\Database\Eloquent\Collection|PksFulfillmentLog[] $logs
  */
 class PksItemFulfillment extends Model
 {
@@ -80,7 +80,9 @@ class PksItemFulfillment extends Model
 
     public function logs(): HasMany
     {
-        return $this->hasMany(PksItemFulfillmentLog::class, 'fulfillment_id');
+        // Log modul fulfillment jenis item: match reference_id = id.
+        return $this->hasMany(PksFulfillmentLog::class, 'reference_id')
+            ->where('jenis', PksFulfillmentLog::JENIS_ITEM);
     }
 
     // ─── Scopes ───────────────────────────────────────────────────
