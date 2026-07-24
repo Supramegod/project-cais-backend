@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sl_pks', function (Blueprint $table) {
-            $table->unsignedBigInteger('pks_induk_id')->nullable()->after('id');
-            $table->string('tipe_pks', 20)->nullable()->after('pks_induk_id');
+            if (! Schema::hasColumn('sl_pks', 'pks_induk_id')) {
+                $table->unsignedBigInteger('pks_induk_id')->nullable()->after('id');
+            }
+            if (! Schema::hasColumn('sl_pks', 'tipe_pks')) {
+                $table->string('tipe_pks', 20)->nullable()->after('pks_induk_id');
+            }
         });
     }
 

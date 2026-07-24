@@ -10,6 +10,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (Schema::connection($this->connection)->hasTable('m_umsp')) {
+            return;
+        }
+
         Schema::connection($this->connection)->create('m_umsp', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('province_id')->comment('FK referensi ke m_province (mysqlhris)');

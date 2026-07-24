@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('sl_quotation_site', function (Blueprint $table) {
-            $table->decimal('umsk', 15, 2)->nullable()->after('umk');
+            if (! Schema::hasColumn('sl_quotation_site', 'umsk')) {
+                $table->decimal('umsk', 15, 2)->nullable()->after('umk');
+            }
         });
     }
 

@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('sl_pks_visit_schedule')) {
+            return;
+        }
+
         Schema::create('sl_pks_visit_schedule', function (Blueprint $table) {
             $table->id();
             $table->bigInteger('pks_id');
