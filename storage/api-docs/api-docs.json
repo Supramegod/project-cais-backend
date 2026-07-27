@@ -17645,6 +17645,117 @@
                 ]
             }
         },
+        "/api/pks-fulfillment/item-fulfillment/bulk": {
+            "post": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Create item fulfillment sessions (bulk)",
+                "description": "Versi bulk dari POST /item-fulfillment. Semua item diproses dalam satu transaksi — gagal satu item, seluruh batch dibatalkan. Body boleh berupa {items:[...]} atau bare array [...]. Maksimal 100 item.",
+                "operationId": "112a7c1244346b702a13f1d9a31cad86",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "items"
+                                ],
+                                "properties": {
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "pks_id",
+                                                "site_id",
+                                                "item_type_id",
+                                                "item_id",
+                                                "qty",
+                                                "catatan"
+                                            ],
+                                            "properties": {
+                                                "pks_id": {
+                                                    "type": "integer",
+                                                    "example": 99
+                                                },
+                                                "site_id": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "item_type_id": {
+                                                    "description": "1=kaporlap, 2=device, 3=chemical",
+                                                    "type": "integer",
+                                                    "enum": [
+                                                        1,
+                                                        2,
+                                                        3
+                                                    ],
+                                                    "example": 1
+                                                },
+                                                "item_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "qty": {
+                                                    "type": "integer",
+                                                    "minimum": 1,
+                                                    "example": 5
+                                                },
+                                                "catatan": {
+                                                    "type": "string",
+                                                    "minLength": 10,
+                                                    "example": "Pengiriman batch pertama"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "maxItems": 100,
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "3 fulfillment berhasil disimpan."
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks-fulfillment/item-fulfillment/{fulfillment}": {
             "patch": {
                 "tags": [
