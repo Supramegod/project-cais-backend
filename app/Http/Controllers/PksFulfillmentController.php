@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Pks\ItemFulfillmentBulkStoreRequest;
 use App\Http\Requests\Pks\ItemFulfillmentEditRequest;
 use App\Http\Requests\Pks\ItemFulfillmentStoreRequest;
 use App\Http\Requests\Pks\VisitRecordStoreRequest;
@@ -97,7 +98,7 @@ class PksFulfillmentController extends Controller
      * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
      * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
      */
-    private const MANAGE_ROLES = [2,8, 10, 98,54,55,56];
+    private const MANAGE_ROLES = [8, 10, 98];
 
     public function __construct(
         private ItemFulfillmentService $itemFulfillmentService,
@@ -527,6 +528,80 @@ class PksFulfillmentController extends Controller
             );
 
             return $this->createdResponse($fulfillment, 'Fulfillment berhasil disimpan.');
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-fulfillment/item-fulfillment/bulk",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Create item fulfillment sessions (bulk)",
+     *     description="Versi bulk dari POST /item-fulfillment. Semua item diproses dalam satu transaksi — gagal satu item, seluruh batch dibatalkan. Body boleh berupa {items:[...]} atau bare array [...]. Maksimal 100 item.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"items"},
+     *
+     *             @OA\Property(
+     *                 property="items",
+     *                 type="array",
+     *                 minItems=1,
+     *                 maxItems=100,
+     *
+     *                 @OA\Items(
+     *                     type="object",
+     *                     required={"pks_id","site_id","item_type_id","item_id","qty","catatan"},
+     *
+     *                     @OA\Property(property="pks_id", type="integer", example=99),
+     *                     @OA\Property(property="site_id", type="integer", example=5),
+     *                     @OA\Property(property="item_type_id", type="integer", enum={1,2,3}, example=1, description="1=kaporlap, 2=device, 3=chemical"),
+     *                     @OA\Property(property="item_id", type="integer", example=10),
+     *                     @OA\Property(property="qty", type="integer", minimum=1, example=5),
+     *                     @OA\Property(property="catatan", type="string", minLength=10, example="Pengiriman batch pertama")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="3 fulfillment berhasil disimpan."),
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Validation error"
+     *     )
+     * )
+     */
+    public function storeBulkFulfillment(ItemFulfillmentBulkStoreRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        try {
+            $fulfillments = $this->itemFulfillmentService->createBulkFulfillment(
+                $request->validated('items'),
+                Auth::user()
+            );
+
+            return $this->createdResponse(
+                $fulfillments,
+                count($fulfillments).' fulfillment berhasil disimpan.'
+            );
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

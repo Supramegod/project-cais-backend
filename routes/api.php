@@ -600,6 +600,8 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // Item Fulfillment
         Route::get('/{pks}/items', 'getRequestedItems');
         Route::post('/item-fulfillment', 'storeFulfillment');
+        // Versi bulk — body {items:[...]} atau bare array, all-or-nothing
+        Route::post('/item-fulfillment/bulk', 'storeBulkFulfillment');
         Route::patch('/item-fulfillment/{fulfillment}', 'editFulfillment');
         Route::get('/item-fulfillment/{fulfillment}/log', 'getFulfillmentLog');
 

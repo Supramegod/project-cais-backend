@@ -532,6 +532,175 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->assertSame(3, $log->meta['qty_sesi_ini']);
     }
 
+    // ─── TEST 3a: POST bulk fulfillment ──────────────────────────────
+    /** @test */
+    public function test_store_bulk_fulfillment_creates_multiple_and_returns_201(): void
+    {
+        $this->clearFulfillments();
+
+        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 3,
+                    'catatan' => 'Bulk kaporlap batch pertama',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 5,
+                    'catatan' => 'Bulk device batch pertama',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('message', '2 fulfillment berhasil disimpan.')
+            ->assertJsonCount(2, 'data');
+
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'pks_id' => $this->pksId,
+            'item_type' => 'kaporlap',
+            'qty_terpenuhi' => 3,
+            'status' => 'partially_fulfilled',
+        ]);
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'pks_id' => $this->pksId,
+            'item_type' => 'device',
+            'qty_terpenuhi' => 5,
+            'status' => 'fully_fulfilled',
+        ]);
+
+        // Satu log per item
+        $this->assertSame(2, PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)->count());
+    }
+
+    // ─── TEST 3a-2: POST bulk dengan bare array di root ──────────────
+    /** @test */
+    public function test_store_bulk_fulfillment_accepts_bare_array_payload(): void
+    {
+        $this->clearFulfillments();
+
+        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            [
+                'pks_id' => $this->pksId,
+                'site_id' => $this->siteId,
+                'item_type_id' => 2,
+                'item_id' => $this->deviceId,
+                'qty' => 2,
+                'catatan' => 'Bulk bare array device',
+            ],
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonCount(1, 'data');
+
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'item_type' => 'device',
+            'qty_terpenuhi' => 2,
+        ]);
+    }
+
+    // ─── TEST 3a-3: bulk gagal = tidak ada yang tersimpan ────────────
+    /** @test */
+    public function test_store_bulk_fulfillment_rejects_whole_batch_when_one_item_invalid(): void
+    {
+        $this->clearFulfillments();
+
+        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 3,
+                    'catatan' => 'Item valid tapi ikut dibatalkan',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 99, // remaining device = 5
+                    'catatan' => 'Item ini melebihi remaining',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['message' => ['items.1.qty']]);
+
+        $this->assertSame(0, PksItemFulfillment::count());
+        $this->assertSame(0, PksFulfillmentLog::count());
+    }
+
+    // ─── TEST 3a-4: qty diakumulasi per item dalam satu batch ────────
+    /** @test */
+    public function test_store_bulk_fulfillment_accumulates_qty_of_duplicate_item(): void
+    {
+        $this->clearFulfillments();
+
+        // device remaining = 5; 3 + 3 = 6 → harus ditolak
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 3,
+                    'catatan' => 'Duplikat device pertama',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 3,
+                    'catatan' => 'Duplikat device kedua',
+                ],
+            ],
+        ])->assertStatus(422)
+            ->assertJsonStructure(['message' => ['items.1.qty']]);
+
+        // 3 + 2 = 5 → pas remaining, harus lolos dan digabung ke satu row
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 3,
+                    'catatan' => 'Duplikat device pertama ok',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 2,
+                    'catatan' => 'Duplikat device kedua ok',
+                ],
+            ],
+        ])->assertStatus(201);
+
+        $this->assertSame(1, PksItemFulfillment::where('item_type', 'device')->count());
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'item_type' => 'device',
+            'qty_terpenuhi' => 5,
+            'status' => 'fully_fulfilled',
+        ]);
+        $this->assertSame(2, PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)->count());
+    }
+
     // ─── TEST 3b: GET log fulfillment per PKS ────────────────────────
     /** @test */
     public function test_get_pks_fulfillment_log_returns_entries(): void
