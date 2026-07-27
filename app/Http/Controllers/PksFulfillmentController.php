@@ -97,7 +97,7 @@ class PksFulfillmentController extends Controller
      * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
      * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
      */
-    private const MANAGE_ROLES = [8, 10, 98];
+    private const MANAGE_ROLES = [2,8, 10, 98,54,55,56];
 
     public function __construct(
         private ItemFulfillmentService $itemFulfillmentService,
