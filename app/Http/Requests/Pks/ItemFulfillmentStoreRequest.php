@@ -5,9 +5,6 @@ namespace App\Http\Requests\Pks;
 use App\Http\Requests\BaseRequest;
 use App\Models\Pks;
 use App\Models\PksItemFulfillment;
-use App\Models\QuotationChemical;
-use App\Models\QuotationDevices;
-use App\Models\QuotationKaporlap;
 use App\Services\Pks\Fulfillment\ItemFulfillmentService;
 use Illuminate\Contracts\Validation\Validator;
 use SanderMuller\FluentValidation\FluentRule;
@@ -53,51 +50,11 @@ class ItemFulfillmentStoreRequest extends BaseRequest
 
     private function resolveQtyDiminta(int $quotationId, string $itemType, int $itemId): int
     {
-        // Scope per site, beda kolom acuan per jenis (lihat ItemFulfillmentService):
-        //  - kaporlap → quotation_detail_id (detail milik site)
-        //  - device/chemical → quotation_site_id langsung
-        // Site legacy tanpa quotation_site_id → tanpa filter.
-        $scope = $this->site_id
-            ? ItemFulfillmentService::resolveSiteScope($quotationId, (int) $this->site_id)
-            : ['quotation_site_id' => null, 'detail_ids' => null];
-
-        $detailIds = $scope['detail_ids'];
-        $quotationSiteId = $scope['quotation_site_id'];
-
-        $base = fn ($query) => $query->where('quotation_id', $quotationId)->where('id', $itemId);
-
-        return match ($itemType) {
-            // jumlah kaporlap = per personil → dikali jumlah_hc detail-nya.
-            'kaporlap' => $this->resolveKaporlapQty($quotationId, $itemId, $detailIds),
-            'device' => (int) ($base(QuotationDevices::query())
-                ->when($quotationSiteId !== null, fn ($q) => $q->where('quotation_site_id', $quotationSiteId))
-                ->value('jumlah') ?? 0),
-            'chemical' => (int) ($base(QuotationChemical::query())
-                ->when($quotationSiteId !== null, fn ($q) => $q->where('quotation_site_id', $quotationSiteId))
-                ->value('jumlah') ?? 0),
-            default => 0,
-        };
-    }
-
-    /**
-     * @param  array<int>|null  $detailIds
-     */
-    private function resolveKaporlapQty(int $quotationId, int $itemId, ?array $detailIds): int
-    {
-        $item = QuotationKaporlap::query()
-            ->where('quotation_id', $quotationId)
-            ->where('id', $itemId)
-            ->when($detailIds !== null, fn ($q) => $q->whereIn('quotation_detail_id', $detailIds))
-            ->first(['jumlah', 'quotation_detail_id']);
-
-        if (! $item) {
-            return 0;
-        }
-
-        return ItemFulfillmentService::kaporlapQty(
-            (int) $item->jumlah,
-            $item->quotation_detail_id,
-            ItemFulfillmentService::detailHcMap($quotationId),
+        return ItemFulfillmentService::resolveQtyDiminta(
+            $quotationId,
+            $itemType,
+            $itemId,
+            $this->site_id ? (int) $this->site_id : null,
         );
     }
 

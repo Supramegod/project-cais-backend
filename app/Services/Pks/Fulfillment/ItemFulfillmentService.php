@@ -5,7 +5,10 @@ namespace App\Services\Pks\Fulfillment;
 use App\Models\Pks;
 use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
+use App\Models\QuotationChemical;
 use App\Models\QuotationDetail;
+use App\Models\QuotationDevices;
+use App\Models\QuotationKaporlap;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -135,6 +138,71 @@ class ItemFulfillmentService
     }
 
     /**
+     * Qty diminta untuk satu item quotation, sudah di-scope per site.
+     * Beda kolom acuan per jenis (lihat resolveSiteScope):
+     *  - kaporlap        → quotation_detail_id (detail milik site), dikali jumlah_hc
+     *  - device/chemical → quotation_site_id langsung
+     * Site legacy tanpa quotation_site_id → tanpa filter.
+     *
+     * $cache dipakai untuk pemanggilan batch (bulk) supaya scope & hc map
+     * tidak di-query ulang per item. Cukup share satu array antar pemanggilan.
+     *
+     * @param  array<string, mixed>  $cache
+     */
+    public static function resolveQtyDiminta(
+        int $quotationId,
+        string $itemType,
+        int $itemId,
+        ?int $siteId,
+        array &$cache = []
+    ): int {
+        $scopeKey = "scope:{$quotationId}:".($siteId ?? 0);
+        if (! array_key_exists($scopeKey, $cache)) {
+            $cache[$scopeKey] = $siteId
+                ? self::resolveSiteScope($quotationId, $siteId)
+                : ['quotation_site_id' => null, 'detail_ids' => null];
+        }
+
+        $detailIds = $cache[$scopeKey]['detail_ids'];
+        $quotationSiteId = $cache[$scopeKey]['quotation_site_id'];
+
+        if ($itemType === 'kaporlap') {
+            $item = QuotationKaporlap::query()
+                ->where('quotation_id', $quotationId)
+                ->where('id', $itemId)
+                ->when($detailIds !== null, fn ($q) => $q->whereIn('quotation_detail_id', $detailIds))
+                ->first(['jumlah', 'quotation_detail_id']);
+
+            if (! $item) {
+                return 0;
+            }
+
+            $hcKey = "hc:{$quotationId}";
+            if (! array_key_exists($hcKey, $cache)) {
+                $cache[$hcKey] = self::detailHcMap($quotationId);
+            }
+
+            return self::kaporlapQty((int) $item->jumlah, $item->quotation_detail_id, $cache[$hcKey]);
+        }
+
+        $model = match ($itemType) {
+            'device' => QuotationDevices::query(),
+            'chemical' => QuotationChemical::query(),
+            default => null,
+        };
+
+        if ($model === null) {
+            return 0;
+        }
+
+        return (int) ($model
+            ->where('quotation_id', $quotationId)
+            ->where('id', $itemId)
+            ->when($quotationSiteId !== null, fn ($q) => $q->where('quotation_site_id', $quotationSiteId))
+            ->value('jumlah') ?? 0);
+    }
+
+    /**
      * Qty kaporlap riil = jumlah (per personil) x jumlah_hc detail.
      * Detail tidak diketahui / jumlah_hc null (data legacy) → pengali 1.
      *
@@ -237,6 +305,34 @@ class ItemFulfillmentService
             ]);
 
             return $fulfillment;
+        });
+    }
+
+    /**
+     * Bulk create fulfillment session — semua item dalam satu transaksi.
+     * Gagal satu item = rollback seluruh batch (all-or-nothing) supaya client
+     * tidak perlu tahu item mana yang sudah masuk sebagian.
+     *
+     * Item duplikat (pks+site+item sama) dalam satu batch tetap aman: guard
+     * atomic di createFulfillment membaca qty_terpenuhi hasil item sebelumnya.
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, PksItemFulfillment>
+     */
+    public function createBulkFulfillment(array $items, User $user): array
+    {
+        return DB::transaction(function () use ($items, $user) {
+            $results = [];
+
+            foreach ($items as $index => $item) {
+                try {
+                    $results[] = $this->createFulfillment($item, $user);
+                } catch (\RuntimeException $e) {
+                    throw new \RuntimeException('Item ke-'.($index + 1).': '.$e->getMessage(), 0, $e);
+                }
+            }
+
+            return $results;
         });
     }
 
