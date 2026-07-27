@@ -17825,6 +17825,51 @@
                 ]
             }
         },
+        "/api/pks-fulfillment/{pks}/fulfillment-log": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Get fulfillment log per PKS (item + visit)",
+                "description": "Log seluruh aktivitas fulfillment satu PKS, terbaru dulu. Filter opsional ?jenis=item|visit.",
+                "operationId": "67dea37431c24f6c9f098ea005578c31",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "jenis",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "item",
+                                "visit"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success"
+                    },
+                    "422": {
+                        "description": "Parameter jenis tidak valid"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks-fulfillment/{pks}/visit-schedule": {
             "get": {
                 "tags": [
