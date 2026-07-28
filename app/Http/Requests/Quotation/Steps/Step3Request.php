@@ -84,23 +84,23 @@ class Step3Request extends BaseRequest
                 );
             }
 
-            if (is_array($this->headCountData) && count($this->headCountData) > 0) {
-                $validPositionIds = Position::where('layanan_id', $quotation->kebutuhan_id)->pluck('id')->toArray();
-                $invalidPositions = [];
+            // if (is_array($this->headCountData) && count($this->headCountData) > 0) {
+            //     $validPositionIds = Position::where('layanan_id', $quotation->kebutuhan_id)->pluck('id')->toArray();
+            //     $invalidPositions = [];
 
-                foreach ($this->headCountData as $data) {
-                    if (! in_array($data['position_id'], $validPositionIds)) {
-                        $invalidPositions[] = $data['position_id'];
-                    }
-                }
+            //     foreach ($this->headCountData as $data) {
+            //         if (! in_array($data['position_id'], $validPositionIds)) {
+            //             $invalidPositions[] = $data['position_id'];
+            //         }
+            //     }
 
-                if (! empty($invalidPositions)) {
-                    $validator->errors()->add(
-                        'headCountData.invalid_positions',
-                        'Position ID: '.implode(', ', array_unique($invalidPositions)).' tidak valid untuk layanan ini.'
-                    );
-                }
-            }
+            //     if (! empty($invalidPositions)) {
+            //         $validator->errors()->add(
+            //             'headCountData.invalid_positions',
+            //             'Position ID: '.implode(', ', array_unique($invalidPositions)).' tidak valid untuk layanan ini.'
+            //         );
+            //     }
+            // }
         });
     }
 }
