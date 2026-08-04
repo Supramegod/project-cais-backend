@@ -34,7 +34,20 @@ class ReportDetailService
                 'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
             )
             ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
-            ->where('sa.created_by_user_id', $userId)
+            ->where(function ($query) use ($userId) {
+                $query->where('sa.created_by_user_id', $userId)
+                    ->orWhere(function ($q) use ($userId) {
+                        $q->where('sa.jenis_activity', 'Appointment')
+                            ->whereIn('sa.leads_id', function ($sub) use ($userId) {
+                                $sub->select('lk.leads_id')
+                                    ->from('sl_leads_kebutuhan as lk')
+                                    ->join('m_tim_sales_d as tsd', 'tsd.id', '=', 'lk.tim_sales_d_id')
+                                    ->whereNull('lk.deleted_at')
+                                    ->whereNull('tsd.deleted_at')
+                                    ->where('tsd.user_id', $userId);
+                            });
+                    });
+            })
             ->orderBy('sa.tgl_activity', 'desc')
             ->get();
 
