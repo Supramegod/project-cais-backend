@@ -61,33 +61,33 @@ class ItemFulfillmentStoreRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'pks_id'        => FluentRule::integer()->required()->exists('sl_pks', 'id'),
-            'site_id'       => FluentRule::integer()->required()->exists('sl_site', 'id'),
-            'item_type_id'  => FluentRule::integer()->required()->in([1, 2, 3]),
-            'item_id'       => FluentRule::integer()->required(),
-            'qty'           => FluentRule::integer()->required()->min(1),
-            'catatan'       => FluentRule::string()->required()->min(10),
+            'pks_id' => FluentRule::integer()->required()->exists('sl_pks', 'id'),
+            'site_id' => FluentRule::integer()->required()->exists('sl_site', 'id'),
+            'item_type_id' => FluentRule::integer()->required()->in([1, 2, 3]),
+            'item_id' => FluentRule::integer()->required(),
+            'qty' => FluentRule::integer()->required()->min(1),
+            // Opsional — kalau diisi tetap harus bermakna, bukan satu-dua huruf.
+            'catatan' => FluentRule::string()->nullable()->min(10),
             // Auto-derived oleh prepareForValidation() — tidak wajib dari client
-            'item_type'     => FluentRule::string()->nullable(),
-            'leads_id'      => FluentRule::integer()->nullable(),
-            'qty_diminta'   => FluentRule::integer()->nullable(),
+            'item_type' => FluentRule::string()->nullable(),
+            'leads_id' => FluentRule::integer()->nullable(),
+            'qty_diminta' => FluentRule::integer()->nullable(),
         ];
     }
 
     public function messages(): array
     {
         return [
-            'pks_id.required'    => 'PKS wajib dipilih.',
-            'pks_id.exists'      => 'PKS tidak ditemukan.',
-            'site_id.required'   => 'Site wajib dipilih.',
-            'site_id.exists'     => 'Site tidak ditemukan.',
+            'pks_id.required' => 'PKS wajib dipilih.',
+            'pks_id.exists' => 'PKS tidak ditemukan.',
+            'site_id.required' => 'Site wajib dipilih.',
+            'site_id.exists' => 'Site tidak ditemukan.',
             'item_type_id.required' => 'Tipe item wajib dipilih.',
-            'item_type_id.in'       => 'Tipe item harus 1 (kaporlap), 2 (device), atau 3 (chemical).',
-            'item_id.required'   => 'Item wajib dipilih.',
-            'qty.required'       => 'Qty wajib diisi.',
-            'qty.min'            => 'Qty minimal 1.',
-            'catatan.required'   => 'Catatan wajib diisi.',
-            'catatan.min'        => 'Catatan minimal 10 karakter.',
+            'item_type_id.in' => 'Tipe item harus 1 (kaporlap), 2 (device), atau 3 (chemical).',
+            'item_id.required' => 'Item wajib dipilih.',
+            'qty.required' => 'Qty wajib diisi.',
+            'qty.min' => 'Qty minimal 1.',
+            'catatan.min' => 'Catatan minimal 10 karakter.',
         ];
     }
 
@@ -96,37 +96,43 @@ class ItemFulfillmentStoreRequest extends BaseRequest
         $validator->after(function (Validator $validator) {
             $pks = Pks::find($this->pks_id);
 
-            if (!$pks || !$pks->quotation_id) {
+            if (! $pks || ! $pks->quotation_id) {
                 $validator->errors()->add('pks_id', 'PKS tidak valid atau belum memiliki quotation.');
+
                 return;
             }
 
             $qty = (int) $this->qty;
 
             // Cek item valid — ada di quotation source
-            if (!$this->item_type) {
+            if (! $this->item_type) {
                 $validator->errors()->add('item_type_id', 'Tipe item tidak valid.');
+
                 return;
             }
 
             $qtyDiminta = $this->resolveQtyDiminta($pks->quotation_id, $this->item_type, (int) $this->item_id);
             if ($qtyDiminta === 0) {
                 $validator->errors()->add('item_id', 'Item tidak ditemukan di quotation PKS ini.');
+
                 return;
             }
 
-            // Hitung remaining dari fulfillment yang sudah ada
+            // Batasnya bukan remaining, tapi sisa yang boleh di-request: barang
+            // yang sudah dikirim dan belum diterima (qty_request) tidak boleh
+            // dikirim ulang.
             $fulfillment = PksItemFulfillment::where('pks_id', $this->pks_id)
                 ->where('site_id', $this->site_id)
                 ->where('item_type', $this->item_type)
                 ->where('item_id', $this->item_id)
                 ->first();
 
-            $terpenuhi = $fulfillment?->qty_terpenuhi ?? 0;
-            $remaining = $qtyDiminta - $terpenuhi;
+            $terpenuhi = (int) ($fulfillment?->qty_terpenuhi ?? 0);
+            $berjalan = (int) ($fulfillment?->qty_request ?? 0);
+            $boleh = $qtyDiminta - $terpenuhi - $berjalan;
 
-            if ($qty > $remaining) {
-                $validator->errors()->add('qty', "Qty melebihi remaining ({$remaining}).");
+            if ($qty > $boleh) {
+                $validator->errors()->add('qty', "Qty melebihi sisa yang boleh di-request ({$boleh}).");
             }
         });
     }

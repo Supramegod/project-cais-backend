@@ -81,6 +81,7 @@ class PksFulfillmentDashboardServiceTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('pks_id');
             $table->unsignedInteger('qty_terpenuhi')->default(0);
+            $table->unsignedInteger('qty_request')->default(0);
             $table->string('status')->default('not_yet_fulfilled');
             $table->softDeletes();
             $table->timestamps();

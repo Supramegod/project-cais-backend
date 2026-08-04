@@ -5,6 +5,7 @@ namespace App\Services\Pks\Fulfillment;
 use App\Models\Pks;
 use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
+use App\Models\PksItemRequest;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDetail;
 use App\Models\QuotationDevices;
@@ -13,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ItemFulfillmentService
 {
@@ -41,7 +43,7 @@ class ItemFulfillmentService
         // Preload ALL fulfillments untuk PKS + site ini dalam 1 query (select kolom yg dibutuhin aja)
         $fulfillments = PksItemFulfillment::where('pks_id', $pks->id)
             ->where('site_id', $siteId)
-            ->select('id', 'pks_id', 'site_id', 'item_type', 'item_id', 'qty_diminta', 'qty_terpenuhi', 'status')
+            ->select('id', 'pks_id', 'site_id', 'item_type', 'item_id', 'qty_diminta', 'qty_request', 'qty_terpenuhi', 'status')
             ->get()
             ->keyBy(function ($f) {
                 return $f->item_type.'_'.$f->item_id;
@@ -218,6 +220,7 @@ class ItemFulfillmentService
     private function formatItem(int $typeId, string $type, int $itemId, string $nama, int $qtyDiminta, $fulfillment): array
     {
         $terpenuhi = $fulfillment?->qty_terpenuhi ?? 0;
+        $request = (int) ($fulfillment?->qty_request ?? 0);
 
         return [
             'item_type_id' => $typeId,
@@ -225,15 +228,30 @@ class ItemFulfillmentService
             'item_id' => $itemId,
             'nama' => $nama,
             'qty_diminta' => $qtyDiminta,
+            // Sudah dikirim, menunggu konfirmasi penerimaan.
+            'qty_request' => $request,
+            // Sudah diterima site.
             'qty_terpenuhi' => $terpenuhi,
             'remaining' => $qtyDiminta - $terpenuhi,
-            'status' => $fulfillment?->status ?? 'not_yet_fulfilled',
+            // Batas input request berikutnya — barang di jalan tidak boleh
+            // dikirim ulang.
+            'boleh_direquest' => max(0, $qtyDiminta - $terpenuhi - $request),
+            'status' => $fulfillment?->status ?? PksItemFulfillment::STATUS_NOT_YET,
             // Catatan tidak di sini — hanya tampil di list log (getFulfillmentLog).
         ];
     }
 
     /**
-     * Create fulfillment session — atomic increment.
+     * Tahap 1 — request barang: catat pengiriman, bukan pemenuhan.
+     *
+     * qty_request naik di sini; qty_terpenuhi baru naik saat site mengonfirmasi
+     * penerimaan lewat ItemReceivingService. Satu baris sl_pks_item_request
+     * dibuat sebagai "yang ditunggu" dari batch ini.
+     *
+     * $data['batch_id'] + $data['batch_ke'] diisi saat pemanggilan datang dari
+     * endpoint bulk, supaya seluruh item satu pengiriman punya penanda kelompok
+     * yang sama. Kirim satuan tidak mengisi keduanya, jadi di sini dibuatkan
+     * batch sendiri berisi satu item — setiap log selalu punya batch.
      */
     public function createFulfillment(array $data, User $user): PksItemFulfillment
     {
@@ -256,36 +274,62 @@ class ItemFulfillmentService
                     'item_id' => $data['item_id'],
                     'leads_id' => $data['leads_id'] ?? null,
                     'qty_diminta' => $data['qty_diminta'] ?? 0,
+                    'qty_request' => 0,
                     'qty_terpenuhi' => 0,
-                    'status' => 'not_yet_fulfilled',
+                    'status' => PksItemFulfillment::STATUS_NOT_YET,
                     'created_by' => $user->full_name,
                     'created_by_user_id' => $user->id,
                 ]);
             }
 
-            $qty = (int) $data['qty'];
-            $remainingBefore = $fulfillment->qty_diminta - $fulfillment->qty_terpenuhi;
+            $batch = isset($data['batch_id'])
+                ? ['batch_id' => $data['batch_id'], 'batch_ke' => $data['batch_ke'] ?? null]
+                : PksFulfillmentLog::newBatch(
+                    (int) $fulfillment->pks_id,
+                    PksFulfillmentLog::JENIS_ITEM,
+                    PksFulfillmentLog::AKSI_REQUEST
+                );
 
-            // Atomic increment dengan guard
+            $qty = (int) $data['qty'];
+            $bolehSebelum = $fulfillment->qty_diminta - $fulfillment->qty_terpenuhi - (int) $fulfillment->qty_request;
+
+            // Atomic increment dengan guard. Barang yang masih di jalan
+            // (qty_request) ikut mengurangi jatah, supaya satu kebutuhan tidak
+            // dikirim dua kali sambil menunggu penerimaan.
             $affected = PksItemFulfillment::where('id', $fulfillment->id)
-                ->whereRaw('(qty_diminta - qty_terpenuhi) >= ?', [$qty])
+                ->whereRaw('(qty_diminta - qty_terpenuhi - qty_request) >= ?', [$qty])
                 ->update([
-                    'qty_terpenuhi' => DB::raw("qty_terpenuhi + {$qty}"),
+                    'qty_request' => DB::raw("qty_request + {$qty}"),
                     'updated_by' => $user->full_name,
                     'updated_at' => now(),
                 ]);
 
             if ($affected === 0) {
-                throw new \RuntimeException('Qty melebihi remaining atau race condition.');
+                throw new \RuntimeException('Qty melebihi sisa yang boleh di-request atau race condition.');
             }
 
             // Refresh model
             $fulfillment->refresh();
 
-            // Update status
-            $remaining = $fulfillment->qty_diminta - $fulfillment->qty_terpenuhi;
-            $fulfillment->status = $remaining === 0 ? 'fully_fulfilled' : 'partially_fulfilled';
+            $fulfillment->status = $fulfillment->resolveStatus();
             $fulfillment->save();
+
+            // Baris yang ditunggu penerimaannya — inilah yang ditutup saat
+            // barang dikonfirmasi diterima.
+            $request = PksItemRequest::create([
+                'pks_id' => $fulfillment->pks_id,
+                'site_id' => $fulfillment->site_id,
+                'fulfillment_id' => $fulfillment->id,
+                'batch_id' => $batch['batch_id'],
+                'batch_ke' => $batch['batch_ke'],
+                'item_type' => $fulfillment->item_type,
+                'item_id' => $fulfillment->item_id,
+                'qty_request' => $qty,
+                'qty_diterima' => 0,
+                'status' => PksItemRequest::STATUS_OPEN,
+                'created_by' => $user->full_name,
+                'created_by_user_id' => $user->id,
+            ]);
 
             // Insert log fulfillment. Catatan hidup di sini per sesi, bukan di row.
             PksFulfillmentLog::create([
@@ -293,12 +337,16 @@ class ItemFulfillmentService
                 'site_id' => $fulfillment->site_id,
                 'jenis' => PksFulfillmentLog::JENIS_ITEM,
                 'reference_id' => $fulfillment->id,
-                'aksi' => 'create',
+                'batch_id' => $batch['batch_id'],
+                'batch_ke' => $batch['batch_ke'],
+                'aksi' => PksFulfillmentLog::AKSI_REQUEST,
                 'catatan' => $data['catatan'] ?? null,
                 'meta' => [
+                    'request_id' => $request->id,
                     'qty_sesi_ini' => $qty,
-                    'remaining_sebelum' => $remainingBefore,
-                    'remaining_sesudah' => $remaining,
+                    'qty_request_berjalan' => (int) $fulfillment->qty_request,
+                    'boleh_direquest_sebelum' => $bolehSebelum,
+                    'boleh_direquest_sesudah' => $bolehSebelum - $qty,
                 ],
                 'created_by' => $user->full_name,
                 'created_by_user_id' => $user->id,
@@ -316,15 +364,36 @@ class ItemFulfillmentService
      * Item duplikat (pks+site+item sama) dalam satu batch tetap aman: guard
      * atomic di createFulfillment membaca qty_terpenuhi hasil item sebelumnya.
      *
+     * Seluruh log yang lahir dari satu panggilan berbagi satu batch_id, jadi
+     * satu kelompok pengiriman bisa ditarik utuh belakangan. Penelusuran lewat
+     * pks_id + created_at tetap jalan karena semua baris ditulis dalam satu
+     * transaksi, jadi created_at-nya berdempetan.
+     *
      * @param  array<int, array<string, mixed>>  $items
-     * @return array<int, PksItemFulfillment>
+     *                                                   batch_ke adalah nomor urut batch dalam satu PKS — versi terbaca manusia
+     *                                                   dari batch_id. Dihitung di dalam transaksi supaya dua pengiriman bersamaan
+     *                                                   pada PKS yang sama tidak mendapat nomor kembar.
+     * @return array{batch_id: string, batch_ke: array<int, int>, items: array<int, PksItemFulfillment>}
      */
-    public function createBulkFulfillment(array $items, User $user): array
+    public function createBulkFulfillment(array $items, User $user, ?string $batchId = null): array
     {
-        return DB::transaction(function () use ($items, $user) {
+        $batchId ??= (string) Str::uuid();
+
+        return DB::transaction(function () use ($items, $user, $batchId) {
             $results = [];
+            $batchKe = [];
 
             foreach ($items as $index => $item) {
+                $pksId = (int) $item['pks_id'];
+                $batchKe[$pksId] ??= PksFulfillmentLog::nextBatchKe(
+                    $pksId,
+                    PksFulfillmentLog::JENIS_ITEM,
+                    PksFulfillmentLog::AKSI_REQUEST
+                );
+
+                $item['batch_id'] = $batchId;
+                $item['batch_ke'] = $batchKe[$pksId];
+
                 try {
                     $results[] = $this->createFulfillment($item, $user);
                 } catch (\RuntimeException $e) {
@@ -332,12 +401,16 @@ class ItemFulfillmentService
                 }
             }
 
-            return $results;
+            return ['batch_id' => $batchId, 'batch_ke' => $batchKe, 'items' => $results];
         });
     }
 
     /**
-     * Edit fulfillment — hanya untuk cais_role_id 8/10/98 (di-check di controller level).
+     * Koreksi jumlah yang DITERIMA (qty_terpenuhi) — hanya untuk role tertentu
+     * (di-check di controller level).
+     *
+     * Tidak menyentuh qty_request: barang yang masih di jalan urusan penerimaan,
+     * bukan koreksi angka terima.
      */
     public function editFulfillment(PksItemFulfillment $fulfillment, int $newQty, string $catatan, User $user): PksItemFulfillment
     {
@@ -352,12 +425,18 @@ class ItemFulfillmentService
             $fulfillment->qty_terpenuhi = $newQty;
             $remainingAfter = $fulfillment->qty_diminta - $newQty;
 
-            $fulfillment->status = $remainingAfter === 0
-                ? 'fully_fulfilled'
-                : ($newQty > 0 ? 'partially_fulfilled' : 'not_yet_fulfilled');
+            $fulfillment->status = $fulfillment->resolveStatus();
 
             $fulfillment->updated_by = $user->full_name;
             $fulfillment->save();
+
+            // Edit juga satu batch — isinya satu log — supaya riwayat PKS bisa
+            // dibaca seragam per batch tanpa kasus khusus.
+            $batch = PksFulfillmentLog::newBatch(
+                (int) $fulfillment->pks_id,
+                PksFulfillmentLog::JENIS_ITEM,
+                PksFulfillmentLog::AKSI_EDIT
+            );
 
             // Insert audit log fulfillment
             PksFulfillmentLog::create([
@@ -365,7 +444,9 @@ class ItemFulfillmentService
                 'site_id' => $fulfillment->site_id,
                 'jenis' => PksFulfillmentLog::JENIS_ITEM,
                 'reference_id' => $fulfillment->id,
-                'aksi' => 'edit',
+                'batch_id' => $batch['batch_id'],
+                'batch_ke' => $batch['batch_ke'],
+                'aksi' => PksFulfillmentLog::AKSI_EDIT,
                 'catatan' => $catatan,
                 'meta' => [
                     'qty_sesi_ini' => $newQty - $oldQty, // delta
@@ -385,7 +466,7 @@ class ItemFulfillmentService
         // Flatten meta JSON balik ke top-level supaya bentuk response endpoint
         // tetap sama seperti sebelum log dipindah ke tabel fulfillment.
         return PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillmentId)
-            ->select('id', 'site_id', 'reference_id', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
+            ->select('id', 'site_id', 'reference_id', 'batch_id', 'batch_ke', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
             ->orderBy('id', 'desc')
             ->get()
             ->map(function (PksFulfillmentLog $log) {
@@ -395,38 +476,13 @@ class ItemFulfillmentService
                     'id' => $log->id,
                     'site_id' => $log->site_id,
                     'fulfillment_id' => $log->reference_id,
+                    'batch_id' => $log->batch_id,
+                    'batch_ke' => $log->batch_ke,
                     'aksi' => $log->aksi,
                     'qty_sesi_ini' => $meta['qty_sesi_ini'] ?? 0,
                     'remaining_sebelum' => $meta['remaining_sebelum'] ?? 0,
                     'remaining_sesudah' => $meta['remaining_sesudah'] ?? 0,
                     'catatan' => $log->catatan,
-                    'created_by' => $log->created_by,
-                    'created_at' => $log->created_at,
-                ];
-            });
-    }
-
-    /**
-     * Log seluruh modul fulfillment untuk satu PKS (item + visit), terbaru dulu.
-     * Filter opsional per jenis (PksFulfillmentLog::JENIS_ITEM / JENIS_VISIT).
-     * meta dikembalikan apa adanya karena isinya beda per jenis.
-     */
-    public function getPksLog(int $pksId, ?string $jenis = null): Collection
-    {
-        return PksFulfillmentLog::forPks($pksId)
-            ->when($jenis !== null, fn ($q) => $q->where('jenis', $jenis))
-            ->select('id', 'pks_id', 'site_id', 'jenis', 'reference_id', 'aksi', 'catatan', 'meta', 'created_by', 'created_at')
-            ->orderBy('id', 'desc')
-            ->get()
-            ->map(function (PksFulfillmentLog $log) {
-                return [
-                    'id' => $log->id,
-                    'site_id' => $log->site_id,
-                    'jenis' => $log->jenis,
-                    'reference_id' => $log->reference_id,
-                    'aksi' => $log->aksi,
-                    'catatan' => $log->catatan,
-                    'meta' => $log->meta,
                     'created_by' => $log->created_by,
                     'created_at' => $log->created_at,
                 ];

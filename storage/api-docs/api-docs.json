@@ -17537,8 +17537,7 @@
                                     "site_id",
                                     "item_type_id",
                                     "item_id",
-                                    "qty",
-                                    "catatan"
+                                    "qty"
                                 ],
                                 "properties": {
                                     "pks_id": {
@@ -17571,7 +17570,8 @@
                                     "catatan": {
                                         "type": "string",
                                         "minLength": 10,
-                                        "example": "Pengiriman batch pertama"
+                                        "example": "Pengiriman batch pertama",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -17670,8 +17670,7 @@
                                                 "site_id",
                                                 "item_type_id",
                                                 "item_id",
-                                                "qty",
-                                                "catatan"
+                                                "qty"
                                             ],
                                             "properties": {
                                                 "pks_id": {
@@ -17704,7 +17703,8 @@
                                                 "catatan": {
                                                     "type": "string",
                                                     "minLength": 10,
-                                                    "example": "Pengiriman batch pertama"
+                                                    "example": "Pengiriman batch pertama",
+                                                    "nullable": true
                                                 }
                                             },
                                             "type": "object"
@@ -17734,9 +17734,223 @@
                                             "example": "3 fulfillment berhasil disimpan."
                                         },
                                         "data": {
+                                            "properties": {
+                                                "batch_id": {
+                                                    "description": "Penanda satu kelompok pengiriman; dipakai untuk menarik ulang log batch ini",
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "batch_ke": {
+                                                    "description": "Nomor urut batch dalam PKS ini. NULL bila satu batch mencakup lebih dari satu PKS",
+                                                    "type": "integer",
+                                                    "example": 3,
+                                                    "nullable": true
+                                                },
+                                                "batch_ke_per_pks": {
+                                                    "description": "Nomor batch per pks_id,",
+                                                    "type": "object"
+                                                },
+                                                "fulfillments": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/item-fulfillment/receive": {
+            "post": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Catat penerimaan barang di site (tahap 2)",
+                "description": "Tahap kedua alur item fulfillment. qty_terpenuhi baru naik di sini, bukan saat request. Qty diterima boleh lebih kecil dari yang dikirim — selisihnya kembali menjadi sisa yang boleh di-request ulang. All-or-nothing: satu item gagal, seluruh penerimaan dibatalkan.",
+                "operationId": "64dbe452360fefc4b0382fe64e260b43",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "items"
+                                ],
+                                "properties": {
+                                    "batch_id": {
+                                        "description": "Batasi penutupan ke satu batch pengiriman. Kosong = pengiriman paling lama ditutup lebih dulu",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "catatan": {
+                                        "type": "string",
+                                        "minLength": 10,
+                                        "example": "Satu seragam rusak saat diterima",
+                                        "nullable": true
+                                    },
+                                    "items": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "fulfillment_id",
+                                                "qty"
+                                            ],
+                                            "properties": {
+                                                "fulfillment_id": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                },
+                                                "qty": {
+                                                    "description": "Qty yang benar-benar diterima",
+                                                    "type": "integer",
+                                                    "minimum": 1,
+                                                    "example": 4
+                                                },
+                                                "catatan": {
+                                                    "type": "string",
+                                                    "minLength": 10,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "maxItems": 100,
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "2 item berhasil diterima."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "batch_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "batch_ke": {
+                                                    "description": "Nomor batch penerimaan; deretnya terpisah dari batch pengiriman",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/{pks}/item-request": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Daftar permintaan barang per batch",
+                "description": "Sumber data form penerimaan: barang apa saja yang sudah dikirim dan menunggu dikonfirmasi diterima. Default hanya yang berstatus open.",
+                "operationId": "b556ede0456e42553ca5099eb535325f",
+                "parameters": [
+                    {
+                        "name": "pks",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "site_id",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "open (default) | received | short | all",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "open",
+                                "received",
+                                "short",
+                                "all"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object"
+                                                "$ref": "#/components/schemas/PksItemRequestRow"
                                             }
                                         }
                                     },
@@ -17941,8 +18155,8 @@
                 "tags": [
                     "PKS Fulfillment"
                 ],
-                "summary": "Get fulfillment log per PKS (item + visit)",
-                "description": "Log seluruh aktivitas fulfillment satu PKS, terbaru dulu. Filter opsional ?jenis=item|visit.",
+                "summary": "Get fulfillment log per PKS (item + visit), dikelompokkan per batch",
+                "description": "Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.",
                 "operationId": "67dea37431c24f6c9f098ea005578c31",
                 "parameters": [
                     {
@@ -17972,6 +18186,86 @@
                     },
                     "422": {
                         "description": "Parameter jenis tidak valid"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/pks-fulfillment/fulfillment-log/batch/{batchId}": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Detail satu batch pengiriman",
+                "description": "Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.",
+                "operationId": "faf52e8f6b8232d64c450e701baa52f2",
+                "parameters": [
+                    {
+                        "name": "batchId",
+                        "in": "path",
+                        "description": "batch_id (UUID) dari response bulk atau dari fulfillment-log",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "batch_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "batch_ke": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "jenis": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "item",
+                                                        "visit"
+                                                    ]
+                                                },
+                                                "pks_id": {
+                                                    "type": "integer"
+                                                },
+                                                "jumlah_item": {
+                                                    "type": "integer"
+                                                },
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Batch tidak ditemukan"
                     }
                 },
                 "security": [
@@ -22216,6 +22510,257 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Failed to retrieve quotation references"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/quotations-step/{id}/step/{step}": {
+            "get": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Get quotation data for specific step",
+                "description": "Get quotation data for specific step",
+                "operationId": "0976db217d5ef182bb025584f9a91431",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step data retrieved successfully"
+                                        },
+                                        "processing_time": {
+                                            "type": "string",
+                                            "example": "42.30ms"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Quotation not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to get step data"
+                                        },
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Quotations"
+                ],
+                "summary": "Update specific quotation step",
+                "description": "Update specific step",
+                "operationId": "b8a02c6bc4046bcf3a23f6b4fbf9281b",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "step",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 12,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "edit": {
+                                        "type": "boolean",
+                                        "example": false
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "object"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step 1 updated successfully"
+                                        },
+                                        "processing_time": {
+                                            "type": "string",
+                                            "example": "85.10ms"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Step method not found"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Validation failed"
+                                        },
+                                        "errors": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to update step 1"
+                                        },
+                                        "error": {
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"
@@ -33151,14 +33696,84 @@
                     "qty_diminta": {
                         "type": "integer"
                     },
+                    "qty_request": {
+                        "description": "Sudah dikirim, menunggu konfirmasi penerimaan",
+                        "type": "integer"
+                    },
                     "qty_terpenuhi": {
+                        "description": "Sudah diterima site",
                         "type": "integer"
                     },
                     "remaining": {
+                        "description": "qty_diminta - qty_terpenuhi",
+                        "type": "integer"
+                    },
+                    "boleh_direquest": {
+                        "description": "Batas qty request berikutnya: qty_diminta - qty_terpenuhi - qty_request",
                         "type": "integer"
                     },
                     "status": {
+                        "type": "string",
+                        "enum": [
+                            "not_yet_fulfilled",
+                            "requested",
+                            "partially_fulfilled",
+                            "fully_fulfilled"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "PksItemRequestRow": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "fulfillment_id": {
+                        "type": "integer"
+                    },
+                    "site_id": {
+                        "type": "integer"
+                    },
+                    "batch_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "batch_ke": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "item_type": {
                         "type": "string"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "nama": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "qty_request": {
+                        "type": "integer"
+                    },
+                    "qty_diterima": {
+                        "type": "integer"
+                    },
+                    "kurang": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "received",
+                            "short"
+                        ]
+                    },
+                    "received_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     }
                 },
                 "type": "object"

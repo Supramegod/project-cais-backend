@@ -21,17 +21,22 @@ use Tests\TestCase;
 class PksFulfillmentItemApiTest extends TestCase
 {
     private int $pksId;
+
     private int $siteId;
+
     private int $leadsId;
+
     private int $quotationId;
+
     private int $kaporlapId;
+
     private int $deviceId;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $databasePath = $this->tempDbPath = storage_path('framework/testing-' . Str::random(8) . '.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -173,6 +178,7 @@ class PksFulfillmentItemApiTest extends TestCase
     {
         foreach ([
             'sl_pks_fulfillment_log',
+            'sl_pks_item_request',
             'sl_pks_item_fulfillment',
             'sl_quotation_chemical',
             'sl_quotation_devices',
@@ -338,6 +344,7 @@ class PksFulfillmentItemApiTest extends TestCase
             $table->string('item_type');
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_diminta')->default(0);
+            $table->unsignedInteger('qty_request')->default(0);
             $table->unsignedInteger('qty_terpenuhi')->default(0);
             $table->string('status')->default('not_yet_fulfilled');
             $table->string('created_by')->nullable();
@@ -348,12 +355,33 @@ class PksFulfillmentItemApiTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('sl_pks_item_request', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('pks_id');
+            $table->unsignedInteger('site_id');
+            $table->unsignedInteger('fulfillment_id');
+            $table->uuid('batch_id');
+            $table->unsignedInteger('batch_ke')->nullable();
+            $table->string('item_type', 32);
+            $table->unsignedInteger('item_id');
+            $table->unsignedInteger('qty_request');
+            $table->unsignedInteger('qty_diterima')->default(0);
+            $table->string('status', 32)->default('open');
+            $table->timestamp('received_at')->nullable();
+            $table->string('created_by')->nullable();
+            $table->unsignedInteger('created_by_user_id')->nullable();
+            $table->string('updated_by')->nullable();
+            $table->timestamps();
+        });
+
         Schema::create('sl_pks_fulfillment_log', function (Blueprint $table) {
             $table->increments('id');
             $table->unsignedBigInteger('pks_id');
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
+            $table->uuid('batch_id')->nullable();
+            $table->unsignedInteger('batch_ke')->nullable();
             $table->string('aksi', 32);
             $table->text('catatan')->nullable();
             $table->json('meta')->nullable();
@@ -377,7 +405,7 @@ class PksFulfillmentItemApiTest extends TestCase
             'item_id' => $itemId,
             'qty_diminta' => $qtyDiminta,
             'qty' => $qty,
-            'catatan' => 'Testing fulfillment ' . $itemType,
+            'catatan' => 'Testing fulfillment '.$itemType,
         ]);
 
         return PksItemFulfillment::where('pks_id', $this->pksId)
@@ -513,21 +541,24 @@ class PksFulfillmentItemApiTest extends TestCase
             'catatan' => 'Mengisi sebagian kaporlap untuk site 1',
         ]);
 
+        // POST ini tahap request: yang naik qty_request, bukan qty_terpenuhi.
         $response->assertStatus(201)
             ->assertJson(['success' => true])
             ->assertJsonPath('message', 'Fulfillment berhasil disimpan.')
-            ->assertJsonPath('data.qty_terpenuhi', 3)
-            ->assertJsonPath('data.status', 'partially_fulfilled');
+            ->assertJsonPath('data.qty_request', 3)
+            ->assertJsonPath('data.qty_terpenuhi', 0)
+            ->assertJsonPath('data.status', 'requested');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'pks_id' => $this->pksId,
             'site_id' => $this->siteId,
             'item_type' => 'kaporlap',
-            'qty_terpenuhi' => 3,
+            'qty_request' => 3,
+            'qty_terpenuhi' => 0,
         ]);
 
         $log = PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)
-            ->where('aksi', 'create')->first();
+            ->where('aksi', PksFulfillmentLog::AKSI_REQUEST)->first();
         $this->assertNotNull($log);
         $this->assertSame(3, $log->meta['qty_sesi_ini']);
     }
@@ -562,19 +593,21 @@ class PksFulfillmentItemApiTest extends TestCase
         $response->assertStatus(201)
             ->assertJson(['success' => true])
             ->assertJsonPath('message', '2 fulfillment berhasil disimpan.')
-            ->assertJsonCount(2, 'data');
+            ->assertJsonCount(2, 'data.fulfillments');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'pks_id' => $this->pksId,
             'item_type' => 'kaporlap',
-            'qty_terpenuhi' => 3,
-            'status' => 'partially_fulfilled',
+            'qty_request' => 3,
+            'qty_terpenuhi' => 0,
+            'status' => 'requested',
         ]);
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'pks_id' => $this->pksId,
             'item_type' => 'device',
-            'qty_terpenuhi' => 5,
-            'status' => 'fully_fulfilled',
+            'qty_request' => 5,
+            'qty_terpenuhi' => 0,
+            'status' => 'requested',
         ]);
 
         // Satu log per item
@@ -599,11 +632,11 @@ class PksFulfillmentItemApiTest extends TestCase
         ]);
 
         $response->assertStatus(201)
-            ->assertJsonCount(1, 'data');
+            ->assertJsonCount(1, 'data.fulfillments');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'item_type' => 'device',
-            'qty_terpenuhi' => 2,
+            'qty_request' => 2,
         ]);
     }
 
@@ -695,10 +728,145 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->assertSame(1, PksItemFulfillment::where('item_type', 'device')->count());
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'item_type' => 'device',
-            'qty_terpenuhi' => 5,
-            'status' => 'fully_fulfilled',
+            'qty_request' => 5,
+            'qty_terpenuhi' => 0,
+            'status' => 'requested',
         ]);
         $this->assertSame(2, PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)->count());
+    }
+
+    // ─── TEST 3a-5: satu batch_id untuk seluruh item bulk ────────────
+    /** @test */
+    public function test_store_bulk_fulfillment_stamps_one_batch_id_on_every_log(): void
+    {
+        $this->clearFulfillments();
+
+        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 3,
+                    'catatan' => 'Bulk kaporlap batch pertama',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 5,
+                    'catatan' => 'Bulk device batch pertama',
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $batchId = $response->json('data.batch_id');
+        $this->assertNotEmpty($batchId);
+
+        $logs = PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)->get();
+        $this->assertCount(2, $logs);
+        $this->assertSame([$batchId], $logs->pluck('batch_id')->unique()->values()->all());
+        $this->assertSame([1], $logs->pluck('batch_ke')->unique()->values()->all());
+        $this->assertSame(1, $response->json('data.batch_ke'));
+
+        // Batch bisa ditarik lewat pks_id + created_at seperti lewat batch_id.
+        $this->assertSame(2, PksFulfillmentLog::forPks($this->pksId)
+            ->forBatch($batchId)
+            ->count());
+    }
+
+    // ─── TEST 3a-5b: nomor batch naik per PKS ────────────────────────
+    /** @test */
+    public function test_bulk_batch_ke_increments_per_pks(): void
+    {
+        $this->clearFulfillments();
+
+        $kirim = fn (int $qty, int $itemId, int $typeId) => $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => $typeId,
+                    'item_id' => $itemId,
+                    'qty' => $qty,
+                    'catatan' => 'Pengiriman bertahap item fulfillment',
+                ],
+            ],
+        ]);
+
+        $this->assertSame(1, $kirim(2, $this->deviceId, 2)->assertStatus(201)->json('data.batch_ke'));
+        $this->assertSame(2, $kirim(3, $this->deviceId, 2)->assertStatus(201)->json('data.batch_ke'));
+        $this->assertSame(3, $kirim(4, $this->kaporlapId, 1)->assertStatus(201)->json('data.batch_ke'));
+
+        $this->assertSame(
+            [1, 2, 3],
+            PksFulfillmentLog::where('pks_id', $this->pksId)
+                ->whereNotNull('batch_ke')
+                ->orderBy('id')
+                ->pluck('batch_ke')
+                ->all()
+        );
+    }
+
+    // --- TEST 3a-6: pengiriman satuan tetap punya batch sendiri ---
+    /** @test */
+    public function test_store_single_fulfillment_gets_its_own_batch(): void
+    {
+        $this->clearFulfillments();
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'item_type_id' => 2,
+            'item_id' => $this->deviceId,
+            'qty' => 2,
+            'catatan' => 'Pengiriman satuan device',
+        ])->assertStatus(201);
+
+        // Satuan = batch berisi satu log, jadi riwayat PKS terbaca seragam.
+        $log = PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)->first();
+        $this->assertNotNull($log->batch_id);
+        $this->assertSame(1, $log->batch_ke);
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$log->batch_id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.jumlah_item', 1)
+            ->assertJsonPath('data.items.0.qty_dikirim', 2);
+    }
+
+    // ─── TEST 3a-7: catatan opsional ─────────────────────────────────
+    /** @test */
+    public function test_fulfillment_accepts_missing_catatan(): void
+    {
+        $this->clearFulfillments();
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'item_type_id' => 2,
+            'item_id' => $this->deviceId,
+            'qty' => 1,
+        ])->assertStatus(201);
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 2,
+                ],
+            ],
+        ])->assertStatus(201);
+
+        $this->assertSame(2, PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_ITEM)
+            ->whereNull('catatan')
+            ->count());
     }
 
     // ─── TEST 3b: GET log fulfillment per PKS ────────────────────────
@@ -718,13 +886,16 @@ class PksFulfillmentItemApiTest extends TestCase
             'catatan' => 'Mengisi sebagian kaporlap untuk log',
         ])->assertStatus(201);
 
+        // Log dikelompokkan per batch: satu grup berisi log-lognya.
         $response = $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log");
         $response->assertStatus(200)
             ->assertJson(['success' => true])
             ->assertJsonPath('data.0.jenis', 'item')
-            ->assertJsonPath('data.0.site_id', $this->siteId)
-            ->assertJsonPath('data.0.catatan', 'Mengisi sebagian kaporlap untuk log')
-            ->assertJsonPath('data.0.meta.qty_sesi_ini', 3);
+            ->assertJsonPath('data.0.batch_ke', 1)
+            ->assertJsonPath('data.0.jumlah_log', 1)
+            ->assertJsonPath('data.0.logs.0.site_id', $this->siteId)
+            ->assertJsonPath('data.0.logs.0.catatan', 'Mengisi sebagian kaporlap untuk log')
+            ->assertJsonPath('data.0.logs.0.meta.qty_sesi_ini', 3);
 
         // Filter jenis tidak valid → 422
         $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=ngawur")
@@ -734,6 +905,56 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=visit")
             ->assertStatus(200)
             ->assertJsonCount(0, 'data');
+    }
+
+    // --- TEST 3c: detail satu batch lewat batch_id ---
+    /** @test */
+    public function test_get_batch_detail_returns_items_of_that_batch(): void
+    {
+        $this->clearFulfillments();
+
+        $batchId = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 3,
+                    'catatan' => 'Kirim kaporlap batch detail',
+                ],
+                [
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 2,
+                    'item_id' => $this->deviceId,
+                    'qty' => 5,
+                    'catatan' => 'Kirim device batch detail',
+                ],
+            ],
+        ])->assertStatus(201)->json('data.batch_id');
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$batchId}")
+            ->assertStatus(200)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('data.batch_id', $batchId)
+            ->assertJsonPath('data.batch_ke', 1)
+            ->assertJsonPath('data.jenis', 'item')
+            ->assertJsonPath('data.jumlah_item', 2)
+            ->assertJsonPath('data.items.0.item_type', 'kaporlap')
+            ->assertJsonPath('data.items.0.qty_dikirim', 3)
+            ->assertJsonPath('data.items.0.catatan', 'Kirim kaporlap batch detail')
+            ->assertJsonPath('data.items.1.item_type', 'device')
+            ->assertJsonPath('data.items.1.qty_dikirim', 5);
+    }
+
+    // --- TEST 3d: batch tidak ada -> 404 ---
+    /** @test */
+    public function test_get_batch_detail_returns_404_when_batch_missing(): void
+    {
+        $this->getJson('/api/pks-fulfillment/fulfillment-log/batch/'.Str::uuid())
+            ->assertStatus(404)
+            ->assertJson(['success' => false]);
     }
 
     // ─── TEST 4: POST fulfillment qty > remaining ────────────────────
@@ -791,13 +1012,13 @@ class PksFulfillmentItemApiTest extends TestCase
             ->assertJsonStructure(['message' => ['catatan']]);
     }
 
-    // ─── TEST 6: POST fulfillment fully fulfilled ────────────────────
+    // ─── TEST 6: request penuh lalu diterima penuh ───────────────────
     /** @test */
-    public function test_store_fulfillment_fully_fulfilled_when_qty_equals_remaining(): void
+    public function test_receive_full_marks_item_fully_fulfilled(): void
     {
         $this->clearFulfillments();
 
-        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+        $fulfillmentId = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
             'pks_id' => $this->pksId,
             'site_id' => $this->siteId,
             'leads_id' => $this->leadsId,
@@ -805,21 +1026,85 @@ class PksFulfillmentItemApiTest extends TestCase
             'item_id' => $this->kaporlapId,
             'qty_diminta' => 10,
             'qty' => 10,
-            'catatan' => 'Mengisi lengkap 10 unit kaporlap',
-        ]);
+            'catatan' => 'Mengirim lengkap 10 unit kaporlap',
+        ])->assertStatus(201)
+            ->assertJsonPath('data.status', 'requested')
+            ->json('data.id');
 
-        $response->assertStatus(201)
-            ->assertJsonPath('data.qty_terpenuhi', 10)
-            ->assertJsonPath('data.status', 'fully_fulfilled');
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillmentId, 'qty' => 10]],
+            'catatan' => 'Seluruh barang diterima site',
+        ])->assertStatus(201)
+            ->assertJsonPath('data.batch_ke', 1)
+            ->assertJsonPath('data.items.0.qty_terpenuhi', 10)
+            ->assertJsonPath('data.items.0.status', 'fully_fulfilled');
+
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'id' => $fulfillmentId,
+            'qty_request' => 0,
+            'qty_terpenuhi' => 10,
+            'status' => 'fully_fulfilled',
+        ]);
     }
 
-    // ─── TEST 7: POST fulfillment partially fulfilled ────────────────
+    // ─── TEST 7: diterima kurang, sisanya boleh dikirim lagi ─────────
     /** @test */
-    public function test_store_fulfillment_partially_fulfilled_when_qty_less_than_remaining(): void
+    public function test_receive_short_leaves_the_gap_requestable(): void
     {
         $this->clearFulfillments();
 
-        $response = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+        $fulfillmentId = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => $this->kaporlapId,
+            'qty_diminta' => 10,
+            'qty' => 5,
+            'catatan' => 'Mengirim 5 dari 10 unit kaporlap',
+        ])->assertStatus(201)->json('data.id');
+
+        // Barang yang sudah di jalan tidak boleh dikirim ulang.
+        $this->getJson("/api/pks-fulfillment/{$this->pksId}/item-request?site_id={$this->siteId}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.qty_request', 5)
+            ->assertJsonPath('data.0.status', 'open');
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillmentId, 'qty' => 4]],
+            'catatan' => 'Satu unit rusak saat diterima',
+        ])->assertStatus(201)
+            ->assertJsonPath('data.items.0.kurang', 1)
+            ->assertJsonPath('data.items.0.status', 'partially_fulfilled')
+            ->assertJsonPath('data.items.0.boleh_direquest', 6);
+
+        // Baris permintaan ditutup sebagai kurang, tidak menggantung.
+        $this->getJson("/api/pks-fulfillment/{$this->pksId}/item-request?status=short")
+            ->assertStatus(200)
+            ->assertJsonPath('data.0.qty_diterima', 4)
+            ->assertJsonPath('data.0.kurang', 1);
+
+        // Kekurangan 1 unit itu boleh dikirim ulang bersama sisa 5 lainnya.
+        $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => $this->kaporlapId,
+            'qty_diminta' => 10,
+            'qty' => 6,
+            'catatan' => 'Mengirim ulang sisa kaporlap',
+        ])->assertStatus(201)
+            ->assertJsonPath('data.qty_request', 6);
+    }
+
+    // ─── TEST 7a: terima lebih dari yang dikirim ditolak ─────────────
+    /** @test */
+    public function test_receive_more_than_sent_returns_422(): void
+    {
+        $this->clearFulfillments();
+
+        $fulfillmentId = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
             'pks_id' => $this->pksId,
             'site_id' => $this->siteId,
             'leads_id' => $this->leadsId,
@@ -827,12 +1112,42 @@ class PksFulfillmentItemApiTest extends TestCase
             'item_id' => $this->kaporlapId,
             'qty_diminta' => 10,
             'qty' => 3,
-            'catatan' => 'Mengisi 3 dari 10 unit kaporlap',
+            'catatan' => 'Mengirim 3 unit kaporlap',
+        ])->assertStatus(201)->json('data.id');
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillmentId, 'qty' => 4]],
+        ])->assertStatus(422)
+            ->assertJsonStructure(['message' => ['items.0.qty']]);
+    }
+
+    // ─── TEST 7b: penerimaan butuh hak akses ─────────────────────────
+    /** @test */
+    public function test_receive_forbidden_for_non_authorized_role(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(3, 'kaporlap');
+
+        // User dengan role di luar MANAGE_ROLES.
+        DB::connection('mysqlhris')->table('m_user')->insert([
+            'id' => 3,
+            'username' => 'sales-receive',
+            'password' => bcrypt('secret'),
+            'full_name' => 'Sales User',
+            'email' => 'sales-receive@example.com',
+            'cais_role_id' => 29,
+            'branch_id' => 1,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        $response->assertStatus(201)
-            ->assertJsonPath('data.qty_terpenuhi', 3)
-            ->assertJsonPath('data.status', 'partially_fulfilled');
+        $this->actingAs(User::query()->findOrFail(3));
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 1]],
+        ])->assertStatus(403)
+            ->assertJson(['success' => false]);
     }
 
     // ─── TEST 8: PATCH edit fulfillment role 8/10/98 ─────────────────
