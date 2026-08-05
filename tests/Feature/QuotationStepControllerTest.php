@@ -88,6 +88,7 @@ class QuotationStepControllerTest extends TestCase
             'jenis_kontrak' => 'Reguler',
             'status_quotation_id' => $status,
             'step' => $step,
+            'version' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -204,6 +205,7 @@ class QuotationStepControllerTest extends TestCase
             $table->string('jenis_kontrak')->nullable();
             $table->unsignedInteger('status_quotation_id')->nullable();
             $table->integer('step')->nullable();
+            $table->integer('version')->default(1);
             $table->string('created_by')->nullable();
             $table->string('updated_by')->nullable();
             $table->softDeletes();
