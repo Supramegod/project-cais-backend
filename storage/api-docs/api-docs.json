@@ -22307,7 +22307,7 @@
                             "schema": {},
                             "examples": {
                                 "step_1_data_site": {
-                                    "summary": "(v2) Step 1: Data Site",
+                                    "summary": "Step 1: Data Site (version-2)",
                                     "value": {
                                         "nama_perusahaan": "PT Angin Ribut",
                                         "kota": "Jakarta",
@@ -22322,14 +22322,14 @@
                                     }
                                 },
                                 "step_1": {
-                                    "summary": "(v1) Step 1 / (v2) Step 2: Jenis Kontrak",
+                                    "summary": "Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)",
                                     "value": {
                                         "jenis_kontrak": "Reguler",
                                         "edit": false
                                     }
                                 },
                                 "step_2": {
-                                    "summary": "(v1) Step 2 / (v2) Step 3: Detail Kontrak",
+                                    "summary": "Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)",
                                     "value": {
                                         "mulai_kontrak": "2024-01-01",
                                         "kontrak_selesai": "2024-12-31",
