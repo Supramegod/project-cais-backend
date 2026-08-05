@@ -97,7 +97,17 @@ class QuotationStepController extends Controller
     // =========================================================================
 
     /**
-     * Get quotation data for specific step
+     * @OA\Get(
+     *     path="/api/quotations-step/{id}/step/{step}",
+     *     summary="Get quotation data for a specific step",
+     *     tags={"Quotations"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="step", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Response(response=200, description="Step data retrieved successfully"),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Quotation not found")
+     * )
      */
     public function getStep(string $id, int $step): JsonResponse
     {
@@ -139,34 +149,117 @@ class QuotationStepController extends Controller
     }
 
     /**
-     * Update specific step
+     * @OA\Post(
+     *     path="/api/quotations-step/{id}/step/{step}",
+     *     summary="Update quotation data for a specific step",
+     *     tags={"Quotations"},
+     *     security={{"sanctum":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, description="Quotation ID", @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="step", in="path", required=true, description="Step Number (1-12)", @OA\Schema(type="integer")),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Payload varies depending on the step number. Select from the examples dropdown.",
+     *         @OA\JsonContent(
+     *             @OA\Examples(example="step_1_data_site", summary="(v2) Step 1: Data Site", value={"nama_perusahaan": "PT Angin Ribut", "kota": "Jakarta", "cabang": "Sudirman", "jenis_perusahaan": "Manufaktur", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri", "alamat_lengkap": "Jl. Sudirman No 1", "hari_operasional": "Senin-Jumat", "pengaturan_shift_kerja": "2 Shift", "edit": false}),
+     *             @OA\Examples(example="step_1", summary="(v1) Step 1 / (v2) Step 2: Jenis Kontrak", value={"jenis_kontrak": "Reguler", "edit": false}),
+     *             @OA\Examples(example="step_2", summary="(v1) Step 2 / (v2) Step 3: Detail Kontrak", value={"mulai_kontrak": "2024-01-01", "kontrak_selesai": "2024-12-31", "tgl_penempatan": "2024-01-01", "top": "Lebih Dari 7 Hari", "salary_rule": 1, "jumlah_hari_invoice": 14, "tipe_hari_invoice": "Kerja", "evaluasi_kontrak": "Tahunan", "durasi_kerjasama": "12 Bulan", "durasi_karyawan": "12 Bulan", "evaluasi_karyawan": "Tahunan", "ada_cuti": "Ada", "cuti": {"Cuti Tahunan", "Cuti Menikah"}, "gaji_saat_cuti": "Prorate", "prorate": 20, "shift_kerja": "Non Shift", "hari_kerja": "Senin - Jumat", "jam_kerja": "08:00 - 17:00", "edit": false}),
+     *             @OA\Examples(example="step_3", summary="Step 3: Headcount", value={"headCountData": {{"quotation_site_id": 1, "position_id": 5, "jumlah_hc": 10, "jabatan_kebutuhan": "Security Guard", "nama_site": "Head Office"}}, "edit": false}),
+     *             @OA\Examples(example="step_4", summary="Step 4: Costing", value={"is_ppn": 1, "ppn_pph_dipotong": "Total Invoice", "management_fee_id": 1, "persentase": 10, "position_data": {{"quotation_detail_id": 1, "upah": "Custom", "hitungan_upah": "Per Bulan", "nominal_upah": 5000000, "lembur": "Flat", "nominal_lembur": 100000, "jenis_bayar_lembur": "Per Jam", "jam_per_bulan_lembur": 10, "lembur_ditagihkan": "Ditagihkan", "kompensasi": "Diprovisikan", "thr": "Diprovisikan", "tunjangan_holiday": "Flat", "nominal_tunjangan_holiday": 150000, "jenis_bayar_tunjangan_holiday": "Per Hari"}}, "edit": false}),
+     *             @OA\Examples(example="step_5", summary="Step 5: BPJS", value={"jenis_perusahaan_id": 21, "bidang_perusahaan_id": 12, "resiko": "Sangat Rendah", "program_bpjs": "BPJS Kesehatan", "penjamin": {"BPJS Kesehatan"}, "jkk": {true}, "jkm": {true}, "jht": {false}, "jp": {false}, "kes": {true}, "nominal_takaful": {0}, "edit": false}),
+     *             @OA\Examples(example="step_6", summary="Step 6: Aplikasi Pendukung", value={"aplikasi_pendukung": {1, 2, 3}, "edit": false}),
+     *             @OA\Examples(example="step_9", summary="Step 9: Chemical / Peralatan", value={"barang_id": 10, "jumlah": 5, "masa_pakai": 12, "harga": 150000, "chemicals": {{"barang_id": 12, "jumlah": 2, "masa_pakai": 6, "harga": 50000}}, "edit": false}),
+     *             @OA\Examples(example="step_10", summary="Step 10: Operasional", value={"jumlah_kunjungan_operasional": 2, "bulan_tahun_kunjungan_operasional": "Bulan", "jumlah_kunjungan_tim_crm": 1, "bulan_tahun_kunjungan_tim_crm": "Tahun", "keterangan_kunjungan_operasional": "Kunjungan rutin", "keterangan_kunjungan_tim_crm": "Evaluasi tahunan", "ada_training": "Ada", "training": "Basic Security Training", "persen_bunga_bank": 5.5, "edit": false}),
+     *             @OA\Examples(example="step_11", summary="Step 11: Pricing", value={"penagihan": "Sesuai BAST", "tunjangan_data": {{{"nama_tunjangan": "Tunjangan Makan", "nominal": 50000}}}, "edit": false}),
+     *             @OA\Examples(example="step_12", summary="Step 12: Finalization", value={"is_draft": false})
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Step updated successfully",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object", description="Quotation data along with relations and step-specific additional_data",
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="step", type="integer", example=1),
+     *                 @OA\Property(property="leads_id", type="integer", example=10),
+     *                 @OA\Property(property="quotation_details", type="array", @OA\Items(type="object")),
+     *                 @OA\Property(property="quotation_sites", type="array", @OA\Items(type="object")),
+     *                 @OA\Property(property="additional_data", type="object", description="Step-specific reference data or calculated data")
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Step 1 updated successfully"),
+     *             @OA\Property(property="processing_time", type="string", example="120.50ms")
+     *         )
+     *     ),
+     *     @OA\Response(response=422, description="Validation Error / Sequence Violation")
+     * )
      */
     public function updateStep(QuotationStepRequest $request, $id, $step): JsonResponse
     {
         $startTime = microtime(true);
 
-        $updateMethod = 'updateStep'.$step;
-        if (! method_exists($this->quotationStepService, $updateMethod) && ! preg_match('/^updateStep(1[0-2]|[1-9])$/', $updateMethod)) {
+        // DDD Domain Services Interception for non-strict steps
+        $quotation = Quotation::notDeleted()->findOrFail($id);
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version, (int)$step);
+
+        if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
+            DB::transaction(function () use ($request, $quotation, $logicalStepName) {
+                if ($logicalStepName === 'updateCosting') {
+                    app(\App\Services\Quotation\Domain\CostingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updatePricing') {
+                    app(\App\Services\Quotation\Domain\PricingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updateFinalization') {
+                    app(\App\Services\Quotation\Domain\FinalizationService::class)->execute($quotation, $request);
+                }
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $this->prepareStepData(Quotation::notDeleted()->findOrFail($id), $step),
+                'message' => "Step {$step} updated successfully",
+                'processing_time' => $this->elapsedMs($startTime),
+            ]);
+        }
+
+        if ($logicalStepName === 'notFound') {
             return $this->notFoundResponse('Step method not found');
         }
 
-        $quotation = Quotation::notDeleted()->findOrFail($id);
         if ($step > $quotation->step + 1) {
             return $this->errorResponse("Cannot update step {$step}. Please complete previous steps first (current step: {$quotation->step}).", 422);
         }
 
-        DB::transaction(function () use ($request, $id, $step, $updateMethod) {
+        DB::transaction(function () use ($request, $id, $step, $logicalStepName) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
             if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
                 throw new \Symfony\Component\HttpKernel\Exception\HttpException(403, 'Quotation has been finalized and cannot be updated.');
             }
 
-            $this->quotationStepService->$updateMethod($quotation, $request);
+            $this->quotationStepService->$logicalStepName($quotation, $request);
 
-            if ($quotation->step < 12) {
+            $maxOperationalStep = $quotation->version === 1 ? 10 : 11;
+
+            if ($quotation->step <= $maxOperationalStep) {
+                $nextStep = $step + 1;
+
+                if ($quotation->version === 1) {
+                    if ($nextStep == 4) {
+                        $nextStep = 5;
+                    }
+                    if ($nextStep == 11) {
+                        $nextStep = 10;
+                    }
+                } else {
+                    if ($nextStep == 5) {
+                        $nextStep = 6;
+                    }
+                    if ($nextStep == 12) {
+                        $nextStep = 11;
+                    }
+                }
+
                 $quotation->update([
-                    'step' => max($quotation->step, $step + 1),
+                    'step' => max($quotation->step, $nextStep),
                     'updated_by' => Auth::user()->full_name,
                 ]);
             }
@@ -908,7 +1001,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep6(Quotation $quotation): array
     {
         return [
-            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'harga', 'link_icon')->get(),
+            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'link_icon')->get(),
         ];
     }
 
@@ -918,7 +1011,7 @@ class QuotationStepController extends Controller
         $listJenis = JenisBarang::whereIn('id', $arrKaporlap)->select('id', 'nama')->get();
 
         $listKaporlap = Barang::whereIn('jenis_barang_id', $arrKaporlap)
-            ->select('id', 'nama', 'harga', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id')
             ->ordered()
             ->get();
         $barangIds = $listKaporlap->pluck('id')->toArray();
@@ -979,7 +1072,7 @@ class QuotationStepController extends Controller
             ->get();
 
         $listDevices = Barang::whereIn('jenis_barang_id', [8, 9, 10, 11, 12, 17])
-            ->select('id', 'nama', 'harga', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id')
             ->ordered()
             ->get();
 
@@ -1039,15 +1132,13 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep9(Quotation $quotation): array
     {
         $chemicalList = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->select('id', 'nama', 'harga')
+            ->select('id', 'nama')
             ->ordered()
             ->get()
             ->map(function ($chemical) {
-                $chemical->harga_formatted = number_format($chemical->harga, 0, ',', '.');
                 $chemical->jumlah = 0;
                 $chemical->masa_pakai = $chemical->masa_pakai ?? 12;
                 $chemical->jumlah_pertahun = 0;
-                $chemical->total_formatted = 'Rp 0';
 
                 return $chemical;
             });
@@ -1100,14 +1191,10 @@ class QuotationStepController extends Controller
 
         return [
             'ohc_list' => Barang::whereIn('jenis_barang_id', [6, 7, 8])
-                ->select('id', 'nama', 'harga', 'jenis_barang_id', 'urutan')
+                ->select('id', 'nama', 'jenis_barang_id', 'urutan')
                 ->orderBy('urutan', 'asc')
                 ->orderBy('nama', 'asc')
-                ->get()
-                ->map(function ($ohc) {
-                    $ohc->harga_formatted = number_format($ohc->harga, 0, ',', '.');
-                    return $ohc;
-                }),
+                ->get(),
             'quotation_sites' => $quotation->quotationSites->map(function ($site) use ($hcPerSite) {
                 return [
                     'id' => $site->id,

@@ -225,14 +225,14 @@ class StepQuotationDetailService
                 QuotationDetailHpp::where('id', $data['id'])->update([
                     'jumlah_hc' => $data['jumlah_hc'],
                     'updated_at' => $data['updated_at'] ?? now(),
-                    'updated_by' => $data['updated_by'] ?? auth()->user()->full_name,
+                    'updated_by' => $data['updated_by'] ?? auth::user()->full_name,
                 ]);
             }
             foreach ($cossUpdate as $data) {
                 QuotationDetailCoss::where('id', $data['id'])->update([
                     'jumlah_hc' => $data['jumlah_hc'],
                     'updated_at' => $data['updated_at'] ?? now(),
-                    'updated_by' => $data['updated_by'] ?? auth()->user()->full_name,
+                    'updated_by' => $data['updated_by'] ?? auth::user()->full_name,
                 ]);
             }
         } catch (\Exception $e) {

@@ -107,7 +107,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 3', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'headcount_count' => count($request->headCountData)
         ]);
 
@@ -182,7 +182,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 7', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'kaporlap_count' => count($request->kaporlaps)
         ]);
 
@@ -257,7 +257,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 8', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'devices_count' => count($request->devices)
         ]);
 
@@ -332,7 +332,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 9', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'chemicals_count' => count($request->chemicals)
         ]);
 
@@ -415,7 +415,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 10', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'ohc_count' => $request->has('ohcs') ? count($request->ohcs) : 0,
             'training_count' => $request->has('quotation_trainings') ? count($request->quotation_trainings) : 0
         ]);
@@ -667,7 +667,7 @@ class AdminPanelController extends Controller
 
         Log::info('Admin Panel - Update Step 11', [
             'quotation_id' => $quotation->id,
-            'user_id' => auth()->id(),
+            'user_id' => \Illuminate\Support\Facades\Auth::id(),
             'has_persentase' => $request->has('persentase'),
             'has_nominal_upah_data' => $request->has('nominal_upah_data'),
             'has_bpjs_persentase_data' => $request->has('bpjs_persentase_data'),

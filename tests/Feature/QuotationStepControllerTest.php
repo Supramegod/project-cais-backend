@@ -149,14 +149,13 @@ class QuotationStepControllerTest extends TestCase
         $this->actingAs($this->seedUser(), 'web');
         $this->seedQuotation(step: 1);
 
-        // Step 12 carries no FormRequest rules, so validation passes and we reach
-        // the controller's step-sequence guard (12 > current 1 + 1).
-        $response = $this->postJson('/api/quotations-step/'.self::QUOTATION_ID.'/step/12', []);
+        // Step 6 should trigger the sequence guard because current step is 1.
+        $response = $this->postJson('/api/quotations-step/'.self::QUOTATION_ID.'/step/6', []);
 
         $response->assertStatus(422)
             ->assertExactJson([
                 'success' => false,
-                'message' => 'Cannot update step 12. Please complete previous steps first (current step: 1).',
+                'message' => 'Cannot update step 6. Please complete previous steps first (current step: 1).',
             ]);
     }
 

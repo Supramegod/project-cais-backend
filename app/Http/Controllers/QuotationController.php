@@ -49,6 +49,7 @@ class QuotationController extends Controller
     protected $quotationService;
     protected $quotationBusinessService;
     protected $quotationDuplicationService;
+    protected $quotationNotificationService;
     public function __construct(
         QuotationService $quotationService,
         QuotationBusinessService $quotationBusinessService,
@@ -291,34 +292,34 @@ class QuotationController extends Controller
      *             @OA\Property(property="layanan", type="integer", description="ID layanan/kebutuhan", example=1),
      *             @OA\Property(property="jumlah_site", type="string", enum={"Single Site","Multi Site"}, description="Tipe penempatan site", example="Single Site"),
      *             @OA\Property(property="quotation_referensi_id", type="integer", description="ID quotation referensi untuk revisi/rekontrak", example=1),
-     *             
+     *
      *             @OA\Property(
-     *                 property="nama_site", 
-     *                 type="string", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="nama_site",
+     *                 type="string",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example="Head Office Jakarta",
      *                 maxLength=255
      *             ),
      *             @OA\Property(
-     *                 property="provinsi", 
-     *                 type="integer", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="provinsi",
+     *                 type="integer",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example=1
      *             ),
      *             @OA\Property(
-     *                 property="kota", 
-     *                 type="integer", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="kota",
+     *                 type="integer",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example=1
      *             ),
      *             @OA\Property(
-     *                 property="penempatan", 
-     *                 type="string", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="penempatan",
+     *                 type="string",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example="Jakarta Pusat",
      *                 maxLength=255
      *             ),
-     *             
+     *
      *             @OA\Property(
      *                 property="multisite",
      *                 type="array",
@@ -361,7 +362,7 @@ class QuotationController extends Controller
      *                 ),
      *                 example={"Jakarta", "Bandung"}
      *             ),
-     *             
+     *
      *             @OA\Property(
      *                 property="tipe",
      *                 type="string",
@@ -878,7 +879,7 @@ class QuotationController extends Controller
                 );
             }
 
-            $user = auth()->user();
+            $user = auth::user();
 
             // Base query dengan relasi yang diperlukan
             $query = Leads::select('id', 'nama_perusahaan', 'pic', 'status_leads_id', 'branch_id', 'customer_id')
