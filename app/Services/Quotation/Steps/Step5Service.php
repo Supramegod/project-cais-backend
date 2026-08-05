@@ -51,7 +51,7 @@ class Step5Service
 
         $quotationUpdateData = array_merge([
             'is_aktif' => $this->calculateIsAktif($quotation, $request),
-            'program_bpjs' => $request->input('program-bpjs'),
+            'program_bpjs' => $request->input('program_bpjs', $request->input('program-bpjs')),
             'calculated_at' => null,
             'updated_by' => Auth::user()->full_name,
         ], $companyData);
@@ -65,8 +65,8 @@ class Step5Service
 
     private function prepareCompanyData(Request $request): array
     {
-        $jenisPerusahaanId = $request->input('jenis-perusahaan');
-        $bidangPerusahaanId = $request->input('bidang-perusahaan');
+        $jenisPerusahaanId = $request->input('jenis_perusahaan_id', $request->input('jenis-perusahaan'));
+        $bidangPerusahaanId = $request->input('bidang_perusahaan_id', $request->input('bidang-perusahaan'));
 
         $data = [
             'jenis_perusahaan_id' => $jenisPerusahaanId,

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Quotation\Steps;
+namespace App\Services\Quotation\Domain;
 
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
@@ -10,12 +10,13 @@ use App\Models\QuotationDetailWage;
 use App\Models\QuotationSite;
 use App\Models\Umk;
 use App\Models\Ump;
+use App\Services\Quotation\Steps\StepQuotationDetailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class Step4Service
+class CostingService
 {
     public function __construct(
         protected StepQuotationDetailService $quotationDetailService,

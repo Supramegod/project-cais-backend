@@ -48,24 +48,23 @@ class StepUpdateService
         Step1Service $step1,
         Step2Service $step2,
         \App\Services\Quotation\Steps\Step3Service $step3,
-        \App\Services\Quotation\Steps\Step4Service $step4,
         Step5Service $step5,
         Step6Service $step6,
         Step7Service $step7,
         Step8Service $step8,
         Step9Service $step9,
         Step10Service $step10,
-        Step11Service $step11,
-        Step12Service $step12,
+        DataSiteService $dataSite
     ) {
         $this->quotationBarangService = $quotationBarangService;
         $this->quotationNotificationService = $quotationNotificationService;
         $this->quotationBusinessService = $quotationBusinessService;
 
         $this->handlers = [
-            1 => $step1, 2 => $step2, 3 => $step3, 4 => $step4,
+            'dataSite' => $dataSite,
+            1 => $step1, 2 => $step2, 3 => $step3,
             5 => $step5, 6 => $step6, 7 => $step7, 8 => $step8,
-            9 => $step9, 10 => $step10, 11 => $step11, 12 => $step12,
+            9 => $step9, 10 => $step10,
         ];
     }
 
@@ -85,40 +84,26 @@ class StepUpdateService
             'company',
         ];
 
-        $additionalRelations = [];
-        if ($step == 3) {
+        $logicalStepName = StepMapper::resolveUpdateMethod($version ?? 1, $step);
+
+        if ($logicalStepName === 'updateHeadcount') {
             $additionalRelations[] = 'quotationDetails.quotationDetailRequirements';
             $additionalRelations[] = 'quotationDetails.quotationDetailTunjangans';
             $additionalRelations[] = 'quotationDetails.position';
         }
-        if ($step == 4) {
+        if ($logicalStepName === 'updateCosting') {
             $additionalRelations[] = 'quotationDetails.wage';
         }
 
-        if ($step >= 6) {
-            $additionalRelations[] = 'quotationAplikasis';
-        }
-
-        if ($step >= 7) {
-            $additionalRelations[] = 'quotationKaporlaps';
-        }
-
-        if ($step >= 8) {
-            $additionalRelations[] = 'quotationDevices';
-        }
-
-        if ($step >= 9) {
-            $additionalRelations[] = 'quotationChemicals';
-        }
-
-        if ($step >= 10) {
-            $additionalRelations[] = 'quotationOhcs';
-            $additionalRelations[] = 'quotationTrainings';
-        }
-
-        if ($step >= 11) {
-            $additionalRelations[] = 'quotationKerjasamas';
-        }
+        // Just include all standard operational relations if it's beyond a certain point,
+        // or just include them always since it's lazy loading anyway.
+        $additionalRelations[] = 'quotationAplikasis';
+        $additionalRelations[] = 'quotationKaporlaps';
+        $additionalRelations[] = 'quotationDevices';
+        $additionalRelations[] = 'quotationChemicals';
+        $additionalRelations[] = 'quotationOhcs';
+        $additionalRelations[] = 'quotationTrainings';
+        $additionalRelations[] = 'quotationKerjasamas';
 
         return array_merge($relations, $additionalRelations);
     }
@@ -131,11 +116,17 @@ class StepUpdateService
             'additional_data' => [],
         ];
 
-        switch ($step) {
-            case 1:
+        $logicalStepName = StepMapper::resolveUpdateMethod($quotation->version, $step);
+
+        switch ($logicalStepName) {
+            case 'updateDataSite':
+                $data['additional_data']['jenis_perusahaan_list'] = \App\Models\JenisPerusahaan::getAllActive();
                 break;
 
-            case 2:
+            case 'updateJenisKontrak':
+                break;
+
+            case 'updateDetailKontrak':
                 $roleId = Auth::user()->cais_role_id;
                 $data['additional_data']['salary_rules'] = in_array($roleId, [29, 30, 31, 32, 33])
                     ? SalaryRule::whereIn('id', [1, 2])->get()
@@ -143,7 +134,7 @@ class StepUpdateService
                 $data['additional_data']['top_list'] = Top::orderBy('nama', 'asc')->get();
                 break;
 
-            case 3:
+            case 'updateHeadcount':
                 $data['additional_data']['positions'] = Position::where('is_active', 1)
                     ->where('layanan_id', $quotation->kebutuhan_id)
                     ->orderBy('name', 'asc')
@@ -160,7 +151,7 @@ class StepUpdateService
                 })->toArray();
                 break;
 
-            case 4:
+            case 'updateCosting':
                 $data['additional_data']['manajemen_fee_list'] = ManagementFee::all();
                 $data['additional_data']['management_fee_config'] =
                     QuotationManagementFee::resolveForQuotation($quotation->id);
@@ -196,19 +187,19 @@ class StepUpdateService
                 }
                 break;
 
-            case 5:
+            case 'updateBpjs':
                 $data['additional_data']['jenis_perusahaan_list'] = JenisPerusahaan::getAllActive();
                 $data['additional_data']['bidang_perusahaan_list'] = BidangPerusahaan::getAllActive();
                 break;
 
-            case 6:
+            case 'updateAplikasiPendukung':
                 $data['additional_data']['aplikasi_pendukung_list'] = AplikasiPendukung::getAllActive();
                 $data['additional_data']['selected_aplikasi'] = $quotation->quotationAplikasis
                     ->pluck('aplikasi_pendukung_id')
                     ->toArray();
                 break;
 
-            case 7:
+            case 'updateKaporlap':
                 $arrKaporlap = $quotation->kebutuhan_id != 1 ? [5] : [1, 2, 3, 4, 5];
 
                 $data['additional_data']['jenis_barang_list'] = JenisBarang::whereIn('id', $arrKaporlap)->get();
@@ -236,7 +227,7 @@ class StepUpdateService
                     });
                 break;
 
-            case 8:
+            case 'updatePeralatan':
                 $data['additional_data']['jenis_barang_list'] = JenisBarang::whereIn('id', [9, 10, 11, 12, 17])->get();
 
                 $data['additional_data']['devices_list'] = Barang::whereIn('jenis_barang_id', [8, 9, 10, 11, 12, 17])
@@ -262,7 +253,7 @@ class StepUpdateService
                     });
                 break;
 
-            case 9:
+            case 'updateChemical':
                 $data['additional_data']['jenis_barang_list'] = JenisBarang::whereIn('id', [13, 14, 15, 16, 18, 19])->get();
 
                 $data['additional_data']['chemical_list'] = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
@@ -275,7 +266,7 @@ class StepUpdateService
                     });
                 break;
 
-            case 10:
+            case 'updateOperasional':
                 $data['additional_data']['jenis_barang_list'] = JenisBarang::whereIn('id', [6, 7, 8])->get();
                 $data['additional_data']['training_list'] = Training::all();
                 $data['additional_data']['ohc_list'] = Barang::whereIn('jenis_barang_id', [6, 7, 8])
@@ -288,7 +279,7 @@ class StepUpdateService
                     });
                 break;
 
-            case 11:
+            case 'updatePricing':
                 $data['additional_data']['calculated_quotation'] = $this->getQuotationService()->calculateQuotation($quotation);
 
                 $data['additional_data']['hpp_details'] = [];
@@ -348,6 +339,28 @@ class StepUpdateService
 
     public function __call(string $method, array $args): void
     {
+        $handlerMap = [
+            'updateDataSite' => 'dataSite',
+            'updateJenisKontrak' => 1,
+            'updateDetailKontrak' => 2,
+            'updateHeadcount' => 3,
+            'updateBpjs' => 5,
+            'updateAplikasiPendukung' => 6,
+            'updateKaporlap' => 7,
+            'updatePeralatan' => 8,
+            'updateChemical' => 9,
+            'updateOperasional' => 10,
+        ];
+
+        if (isset($handlerMap[$method])) {
+            $key = $handlerMap[$method];
+            if (isset($this->handlers[$key])) {
+                $this->handlers[$key]->execute($args[0], $args[1]);
+                return;
+            }
+        }
+
+        // Keep backward compatibility for things directly calling updateStepX
         if (preg_match('/^updateStep(\d+)$/', $method, $m)) {
             $step = (int) $m[1];
             if (isset($this->handlers[$step])) {

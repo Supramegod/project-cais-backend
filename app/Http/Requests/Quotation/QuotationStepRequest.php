@@ -22,13 +22,30 @@ class QuotationStepRequest extends BaseRequest
     public function rules(): array
     {
         $step = $this->route('step');
+        $id = $this->route('id') ?? $this->route('quotation') ?? $this->route('quotation_id') ?? $this->segment(3);
+        $quotation = \App\Models\Quotation::find($id);
+
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
+            $quotation ? $quotation->version : 1,
+            (int)$step
+        );
 
         $rules = [
             'edit' => FluentRule::boolean()->sometimes(),
         ];
 
-        switch ($step) {
-            case 1:
+        switch ($logicalStepName) {
+            case 'updateDataSite':
+                $rules['nama_perusahaan'] = FluentRule::string()->required();
+                $rules['kota'] = FluentRule::string()->required();
+                $rules['cabang'] = FluentRule::string()->required();
+                $rules['jenis_perusahaan'] = FluentRule::string()->required();
+                $rules['status_gedung'] = FluentRule::string()->required();
+                $rules['alamat_lengkap'] = FluentRule::string()->required();
+                $rules['hari_operasional'] = FluentRule::string()->required();
+                break;
+
+            case 'updateJenisKontrak':
                 $rules['jenis_kontrak'] = FluentRule::string()->required()->in([
                     'Reguler',
                     'Event Gaji Harian',
@@ -38,9 +55,11 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 2:
+            case 'updateDetailKontrak':
                 $excludedRoles = [53, 54, 55, 56, 2];
-                $userRole = auth()->user()?->cais_role_id;
+                /** @var \App\Models\User|null $user */
+                $user = \Illuminate\Support\Facades\Auth::user();
+                $userRole = $user?->cais_role_id;
 
                 // Aturan dasar selalu: date (jika ada input)
                 $rules['mulai_kontrak'] = FluentRule::date()
@@ -77,7 +96,7 @@ class QuotationStepRequest extends BaseRequest
                 $rules['jam_kerja'] = FluentRule::string()->required();
                 break;
 
-            case 3:
+            case 'updateHeadcount':
                 $rules['headCountData'] = FluentRule::array()->required()->each([
                     'quotation_site_id' => FluentRule::integer()->required(),
                     'position_id' => FluentRule::integer()->required(),
@@ -87,7 +106,7 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 4:
+            case 'updateCosting':
                 $rules['is_ppn'] = FluentRule::integer()->required()->in([0, 1]);
                 $rules['ppn_pph_dipotong'] = FluentRule::string()->required()->in(['Total Invoice', 'Management Fee']);
                 $rules['management_fee_id'] = FluentRule::integer()->required()->exists('m_management_fee', 'id');
@@ -110,7 +129,7 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 5:
+            case 'updateBpjs':
                 $rules['jenis-perusahaan'] = FluentRule::integer()->required()->exists('m_jenis_perusahaan', 'id');
                 $rules['bidang-perusahaan'] = FluentRule::integer()->required()->exists('m_bidang_perusahaan', 'id');
                 $rules['resiko'] = FluentRule::string()->required();
@@ -135,13 +154,13 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 6:
+            case 'updateAplikasiPendukung':
                 $rules['aplikasi_pendukung'] = FluentRule::array()->sometimes()->children([
                     '*' => FluentRule::integer()->exists('m_aplikasi_pendukung', 'id'),
                 ]);
                 break;
 
-            case 9:
+            case 'updateChemical':
                 $rules['barang_id'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang', 'id');
                 $rules['jumlah'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->min(0);
                 $rules['masa_pakai'] = FluentRule::integer()->sometimes()->min(1);
@@ -155,7 +174,7 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 10:
+            case 'updateOperasional':
                 $rules['jumlah_kunjungan_operasional'] = FluentRule::integer()->required()->min(0);
                 $rules['bulan_tahun_kunjungan_operasional'] = FluentRule::string()->required()->in(['Bulan', 'Tahun']);
                 $rules['jumlah_kunjungan_tim_crm'] = FluentRule::integer()->required()->min(0);
@@ -167,7 +186,7 @@ class QuotationStepRequest extends BaseRequest
                 $rules['persen_bunga_bank'] = FluentRule::numeric()->sometimes()->min(0);
                 break;
 
-            case 11:
+            case 'updatePricing':
                 $rules['penagihan'] = FluentRule::string()->required();
                 $rules['tunjangan_data'] = FluentRule::array()->sometimes()->children([
                     '*' => FluentRule::array()->sometimes()->each([   // ← pakai each() karena array numerik
@@ -177,7 +196,7 @@ class QuotationStepRequest extends BaseRequest
                 ]);
                 break;
 
-            case 12:
+            case 'updateFinalization':
                 break;
         }
 
@@ -384,14 +403,22 @@ class QuotationStepRequest extends BaseRequest
     {
         $validator->after(function ($validator) {
             $step = $this->route('step');
+            $id = $this->route('id') ?? $this->route('quotation') ?? $this->route('quotation_id') ?? $this->segment(3);
+            $quotation = \App\Models\Quotation::find($id);
+            $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
+                $quotation ? $quotation->version : 1,
+                (int)$step
+            );
 
-            // Validasi custom untuk step 2
-            if ($step == 2) {
+            // Validasi custom untuk updateDetailKontrak
+            if ($logicalStepName === 'updateDetailKontrak') {
                 // Daftar role_id yang boleh melewati validasi (CRM)
                 $excludedRoles = [53, 54, 55, 56, 2];
 
                 // Ambil role dari user yang sedang login
-                $userRole = auth()->user()->cais_role_id ?? null;
+                /** @var \App\Models\User|null $user */
+                $user = \Illuminate\Support\Facades\Auth::user();
+                $userRole = $user->cais_role_id ?? null;
 
                 // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
                 if (!in_array($userRole, $excludedRoles)) {
@@ -418,8 +445,8 @@ class QuotationStepRequest extends BaseRequest
                 }
             }
 
-            // Validasi custom untuk step 3
-            if ($step == 3) {
+            // Validasi custom untuk updateHeadcount
+            if ($logicalStepName === 'updateHeadcount') {
                 \Log::info('=== STEP 3 VALIDATION START ===', [
                     'all_route_parameters' => $this->route()->parameters(),
                     'step' => $step,
@@ -561,7 +588,7 @@ class QuotationStepRequest extends BaseRequest
             }
 
             // Validasi custom untuk step 4
-            // if ($step == 4) {
+            // if ($logicalStepName === 'updateCosting') {
             //     $hasGlobalData = $this->hasAny(['is_ppn', 'ppn_pph_dipotong', 'management_fee_id', 'persentase']);
             //     $hasPositionData = $this->has('position_data') && !empty($this->position_data);
 
@@ -647,14 +674,21 @@ class QuotationStepRequest extends BaseRequest
         $step = $this->route('step');
 
         // Untuk step 4, handle field management_fee_id yang mungkin dikirim sebagai manajemen_fee
-        if ($step == 4 && $this->has('manajemen_fee')) {
+        $id = $this->route('id') ?? $this->route('quotation') ?? $this->route('quotation_id') ?? $this->segment(3);
+        $quotation = \App\Models\Quotation::find($id);
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
+            $quotation ? $quotation->version : 1,
+            (int)$step
+        );
+
+        if ($logicalStepName === 'updateCosting' && $this->has('manajemen_fee')) {
             $this->merge([
                 'management_fee_id' => $this->manajemen_fee
             ]);
         }
 
         // Untuk step 5, handle field dengan dash
-        if ($step == 5) {
+        if ($logicalStepName === 'updateBpjs') {
             $this->merge([
                 'jenis_perusahaan_id' => $this->input('jenis-perusahaan'),
                 'bidang_perusahaan_id' => $this->input('bidang-perusahaan')
