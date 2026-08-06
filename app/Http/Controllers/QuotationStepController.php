@@ -201,25 +201,6 @@ class QuotationStepController extends Controller
         $quotation = Quotation::notDeleted()->findOrFail($id);
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, (int)$step);
 
-        if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
-            DB::transaction(function () use ($request, $quotation, $logicalStepName) {
-                if ($logicalStepName === 'updateCosting') {
-                    app(\App\Services\Quotation\Domain\CostingService::class)->execute($quotation, $request);
-                } elseif ($logicalStepName === 'updatePricing') {
-                    app(\App\Services\Quotation\Domain\PricingService::class)->execute($quotation, $request);
-                } elseif ($logicalStepName === 'updateFinalization') {
-                    app(\App\Services\Quotation\Domain\FinalizationService::class)->execute($quotation, $request);
-                }
-            });
-
-            return response()->json([
-                'success' => true,
-                'data' => $this->prepareStepData(Quotation::notDeleted()->findOrFail($id), $step),
-                'message' => "Step {$step} updated successfully",
-                'processing_time' => $this->elapsedMs($startTime),
-            ]);
-        }
-
         if ($logicalStepName === 'notFound') {
             return $this->notFoundResponse('Step method not found');
         }
@@ -235,21 +216,26 @@ class QuotationStepController extends Controller
                 throw new \Symfony\Component\HttpKernel\Exception\HttpException(403, 'Quotation has been finalized and cannot be updated.');
             }
 
-            $this->quotationStepService->$logicalStepName($quotation, $request);
+            // Execute the corresponding service
+            if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
+                if ($logicalStepName === 'updateCosting') {
+                    app(\App\Services\Quotation\Domain\CostingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updatePricing') {
+                    app(\App\Services\Quotation\Domain\PricingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updateFinalization') {
+                    app(\App\Services\Quotation\Domain\FinalizationService::class)->execute($quotation, $request);
+                }
+            } else {
+                $this->quotationStepService->$logicalStepName($quotation, $request);
+            }
 
+            // Step increment logic
             $maxOperationalStep = $quotation->version === 1 ? 10 : 11;
 
             if ($quotation->step <= $maxOperationalStep) {
                 $nextStep = $step + 1;
 
                 if ($quotation->version === 1) {
-                    if ($nextStep == 4) {
-                        $nextStep = 5;
-                    }
-                    if ($nextStep == 11) {
-                        $nextStep = 10;
-                    }
-                } else {
                     if ($nextStep == 5) {
                         $nextStep = 6;
                     }

@@ -84,7 +84,7 @@ class StepUpdateService
             'company',
         ];
 
-        $logicalStepName = StepMapper::resolveUpdateMethod($version ?? 1, $step);
+        $logicalStepName = StepMapper::resolveUpdateMethod(1, $step);
 
         if ($logicalStepName === 'updateHeadcount') {
             $additionalRelations[] = 'quotationDetails.quotationDetailRequirements';
