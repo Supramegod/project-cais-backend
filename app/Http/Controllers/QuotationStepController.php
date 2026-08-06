@@ -160,9 +160,9 @@ class QuotationStepController extends Controller
      *         required=true,
      *         description="Payload varies depending on the step number. Select from the examples dropdown.",
      *         @OA\JsonContent(
-     *             @OA\Examples(example="step_1_data_site", summary="(v2) Step 1: Data Site", value={"nama_perusahaan": "PT Angin Ribut", "kota": "Jakarta", "cabang": "Sudirman", "jenis_perusahaan": "Manufaktur", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri", "alamat_lengkap": "Jl. Sudirman No 1", "hari_operasional": "Senin-Jumat", "pengaturan_shift_kerja": "2 Shift", "edit": false}),
-     *             @OA\Examples(example="step_1", summary="(v1) Step 1 / (v2) Step 2: Jenis Kontrak", value={"jenis_kontrak": "Reguler", "edit": false}),
-     *             @OA\Examples(example="step_2", summary="(v1) Step 2 / (v2) Step 3: Detail Kontrak", value={"mulai_kontrak": "2024-01-01", "kontrak_selesai": "2024-12-31", "tgl_penempatan": "2024-01-01", "top": "Lebih Dari 7 Hari", "salary_rule": 1, "jumlah_hari_invoice": 14, "tipe_hari_invoice": "Kerja", "evaluasi_kontrak": "Tahunan", "durasi_kerjasama": "12 Bulan", "durasi_karyawan": "12 Bulan", "evaluasi_karyawan": "Tahunan", "ada_cuti": "Ada", "cuti": {"Cuti Tahunan", "Cuti Menikah"}, "gaji_saat_cuti": "Prorate", "prorate": 20, "shift_kerja": "Non Shift", "hari_kerja": "Senin - Jumat", "jam_kerja": "08:00 - 17:00", "edit": false}),
+     *             @OA\Examples(example="step_1_data_site", summary="Step 1: Data Site (version-2)", value={"nama_perusahaan": "PT Angin Ribut", "kota": "Jakarta", "cabang": "Sudirman", "jenis_perusahaan": "Manufaktur", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri", "alamat_lengkap": "Jl. Sudirman No 1", "hari_operasional": "Senin-Jumat", "pengaturan_shift_kerja": "2 Shift", "edit": false}),
+     *             @OA\Examples(example="step_1", summary="Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)", value={"jenis_kontrak": "Reguler", "edit": false}),
+     *             @OA\Examples(example="step_2", summary="Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)", value={"mulai_kontrak": "2024-01-01", "kontrak_selesai": "2024-12-31", "tgl_penempatan": "2024-01-01", "top": "Lebih Dari 7 Hari", "salary_rule": 1, "jumlah_hari_invoice": 14, "tipe_hari_invoice": "Kerja", "evaluasi_kontrak": "Tahunan", "durasi_kerjasama": "12 Bulan", "durasi_karyawan": "12 Bulan", "evaluasi_karyawan": "Tahunan", "ada_cuti": "Ada", "cuti": {"Cuti Tahunan", "Cuti Menikah"}, "gaji_saat_cuti": "Prorate", "prorate": 20, "shift_kerja": "Non Shift", "hari_kerja": "Senin - Jumat", "jam_kerja": "08:00 - 17:00", "edit": false}),
      *             @OA\Examples(example="step_3", summary="Step 3: Headcount", value={"headCountData": {{"quotation_site_id": 1, "position_id": 5, "jumlah_hc": 10, "jabatan_kebutuhan": "Security Guard", "nama_site": "Head Office"}}, "edit": false}),
      *             @OA\Examples(example="step_4", summary="Step 4: Costing", value={"is_ppn": 1, "ppn_pph_dipotong": "Total Invoice", "management_fee_id": 1, "persentase": 10, "position_data": {{"quotation_detail_id": 1, "upah": "Custom", "hitungan_upah": "Per Bulan", "nominal_upah": 5000000, "lembur": "Flat", "nominal_lembur": 100000, "jenis_bayar_lembur": "Per Jam", "jam_per_bulan_lembur": 10, "lembur_ditagihkan": "Ditagihkan", "kompensasi": "Diprovisikan", "thr": "Diprovisikan", "tunjangan_holiday": "Flat", "nominal_tunjangan_holiday": 150000, "jenis_bayar_tunjangan_holiday": "Per Hari"}}, "edit": false}),
      *             @OA\Examples(example="step_5", summary="Step 5: BPJS", value={"jenis_perusahaan_id": 21, "bidang_perusahaan_id": 12, "resiko": "Sangat Rendah", "program_bpjs": "BPJS Kesehatan", "penjamin": {"BPJS Kesehatan"}, "jkk": {true}, "jkm": {true}, "jht": {false}, "jp": {false}, "kes": {true}, "nominal_takaful": {0}, "edit": false}),
@@ -201,25 +201,6 @@ class QuotationStepController extends Controller
         $quotation = Quotation::notDeleted()->findOrFail($id);
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, (int)$step);
 
-        if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
-            DB::transaction(function () use ($request, $quotation, $logicalStepName) {
-                if ($logicalStepName === 'updateCosting') {
-                    app(\App\Services\Quotation\Domain\CostingService::class)->execute($quotation, $request);
-                } elseif ($logicalStepName === 'updatePricing') {
-                    app(\App\Services\Quotation\Domain\PricingService::class)->execute($quotation, $request);
-                } elseif ($logicalStepName === 'updateFinalization') {
-                    app(\App\Services\Quotation\Domain\FinalizationService::class)->execute($quotation, $request);
-                }
-            });
-
-            return response()->json([
-                'success' => true,
-                'data' => $this->prepareStepData(Quotation::notDeleted()->findOrFail($id), $step),
-                'message' => "Step {$step} updated successfully",
-                'processing_time' => $this->elapsedMs($startTime),
-            ]);
-        }
-
         if ($logicalStepName === 'notFound') {
             return $this->notFoundResponse('Step method not found');
         }
@@ -235,21 +216,26 @@ class QuotationStepController extends Controller
                 throw new \Symfony\Component\HttpKernel\Exception\HttpException(403, 'Quotation has been finalized and cannot be updated.');
             }
 
-            $this->quotationStepService->$logicalStepName($quotation, $request);
+            // Execute the corresponding service
+            if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
+                if ($logicalStepName === 'updateCosting') {
+                    app(\App\Services\Quotation\Domain\CostingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updatePricing') {
+                    app(\App\Services\Quotation\Domain\PricingService::class)->execute($quotation, $request);
+                } elseif ($logicalStepName === 'updateFinalization') {
+                    app(\App\Services\Quotation\Domain\FinalizationService::class)->execute($quotation, $request);
+                }
+            } else {
+                $this->quotationStepService->$logicalStepName($quotation, $request);
+            }
 
+            // Step increment logic
             $maxOperationalStep = $quotation->version === 1 ? 10 : 11;
 
             if ($quotation->step <= $maxOperationalStep) {
                 $nextStep = $step + 1;
 
                 if ($quotation->version === 1) {
-                    if ($nextStep == 4) {
-                        $nextStep = 5;
-                    }
-                    if ($nextStep == 11) {
-                        $nextStep = 10;
-                    }
-                } else {
                     if ($nextStep == 5) {
                         $nextStep = 6;
                     }
