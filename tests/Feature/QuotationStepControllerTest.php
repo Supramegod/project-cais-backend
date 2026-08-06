@@ -50,7 +50,7 @@ class QuotationStepControllerTest extends TestCase
 
         $this->rebuildSchema();
         $this->withoutMiddleware(CheckTokenExpiry::class);
-    }
+    }   
 
     private function seedUser(int $roleId = 2, int $id = 1): User
     {

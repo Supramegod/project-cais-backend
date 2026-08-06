@@ -64,10 +64,12 @@ class QuotationStepService
             ];
 
             if (isset($handlers[$step])) {
-                $handlers[$step]->execute($args[0], $args[1]);
+                $handlers[$step]->execute($args[0], $args[1] ?? null);
                 return;
             }
         }
-        throw new \BadMethodCallException("Method {$method} not found");
+
+        // Delegate logical method calls (e.g. updateJenisKontrak) to inner StepUpdateService
+        $this->inner->$method(...$args);
     }
 }

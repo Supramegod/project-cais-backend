@@ -21495,6 +21495,26 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Quotation created successfully"
+                                        },
+                                        "metadata": {
+                                            "properties": {
+                                                "sites_created": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tipe_quotation": {
+                                                    "type": "string",
+                                                    "example": "baru"
+                                                },
+                                                "survey_ids": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"

@@ -402,7 +402,14 @@ class QuotationController extends Controller
      *                     )
      *                 )
      *             ),
-     *             @OA\Property(property="message", type="string", example="Quotation created successfully")
+     *             @OA\Property(property="message", type="string", example="Quotation created successfully"),
+     *             @OA\Property(property="metadata", type="object",
+     *                 @OA\Property(property="sites_created", type="integer", example=1),
+     *                 @OA\Property(property="tipe_quotation", type="string", example="baru"),
+     *                 @OA\Property(property="survey_ids", type="array",
+     *                     @OA\Items(type="integer", example=1)
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -487,6 +494,7 @@ class QuotationController extends Controller
 
             $quotation = Quotation::create($quotationData);
 
+
             Log::info('New Quotation created', [
                 'id' => $quotation->id,
                 'nomor' => $quotation->nomor,
@@ -514,6 +522,48 @@ class QuotationController extends Controller
                 $this->updateRevisionStatuses($quotationReferensi);
             }
 
+            // Create corresponding SdtSurvey records for all sites
+            $company = \App\Models\Company::find($quotation->company_id);
+            $divisionCode = $company ? $company->code : 'UKN';
+            $year = \Carbon\Carbon::now()->year;
+
+            $lastSequence = DB::table('sdt_survey')
+                ->where('doc_division', $divisionCode)
+                ->where('doc_year', $year)
+                ->lockForUpdate()
+                ->max('doc_sequence');
+
+            $currentSequence = $lastSequence ? $lastSequence + 1 : 1;
+            
+            $sites = \App\Models\QuotationSite::where('quotation_id', $quotation->id)->get();
+            $surveyIds = [];
+
+            foreach ($sites as $site) {
+                $docNumber = sprintf('%03d/%s/%s/%d', $currentSequence, 'SURVEY', $divisionCode, $year);
+                
+                $surveyId = DB::table('sdt_survey')->insertGetId([
+                    'quotation_id' => $quotation->id,
+                    'leads_id' => $quotation->leads_id,
+                    'company_id' => $quotation->company_id,
+                    'company' => $quotation->company,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'kebutuhan' => $quotation->kebutuhan,
+                    'kebutuhan_id' => $quotation->kebutuhan_id,
+                    'site_id' => $site->id,
+                    'doc_sequence' => $currentSequence,
+                    'doc_division' => $divisionCode,
+                    'doc_year' => $year,
+                    'document_number' => $docNumber,
+                    'status' => 'draft',
+                    'created_by' => $user->id ?? null,
+                    'created_by_name' => $user->full_name ?? null,
+                    'created_at' => \Carbon\Carbon::now(),
+                    'updated_at' => \Carbon\Carbon::now(),
+                ]);
+                $surveyIds[] = $surveyId;
+                $currentSequence++;
+            }
+
             DB::commit();
 
             // Reload untuk response
@@ -533,6 +583,7 @@ class QuotationController extends Controller
                 'metadata' => [
                     'sites_created' => $newSitesCount,
                     'tipe_quotation' => $tipe_quotation,
+                    'survey_ids' => $surveyIds,
                 ],
             ], 201);
 
