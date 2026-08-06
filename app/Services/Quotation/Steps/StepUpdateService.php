@@ -116,7 +116,7 @@ class StepUpdateService
             'additional_data' => [],
         ];
 
-        $logicalStepName = StepMapper::resolveUpdateMethod($quotation->version, $step);
+        $logicalStepName = StepMapper::resolveUpdateMethod($quotation->version ?? 1, $step);
 
         switch ($logicalStepName) {
             case 'updateDataSite':

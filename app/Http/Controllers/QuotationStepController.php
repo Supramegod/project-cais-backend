@@ -199,7 +199,7 @@ class QuotationStepController extends Controller
 
         // DDD Domain Services Interception for non-strict steps
         $quotation = Quotation::notDeleted()->findOrFail($id);
-        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version, (int)$step);
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, (int)$step);
 
         if (in_array($logicalStepName, ['updateCosting', 'updatePricing', 'updateFinalization'])) {
             DB::transaction(function () use ($request, $quotation, $logicalStepName) {

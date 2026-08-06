@@ -26,7 +26,7 @@ class QuotationStepRequest extends BaseRequest
         $quotation = \App\Models\Quotation::find($id);
 
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
-            $quotation ? $quotation->version : 1,
+            $quotation?->version ?? 1,
             (int)$step
         );
 
@@ -406,7 +406,7 @@ class QuotationStepRequest extends BaseRequest
             $id = $this->route('id') ?? $this->route('quotation') ?? $this->route('quotation_id') ?? $this->segment(3);
             $quotation = \App\Models\Quotation::find($id);
             $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
-                $quotation ? $quotation->version : 1,
+                $quotation?->version ?? 1,
                 (int)$step
             );
 
@@ -677,7 +677,7 @@ class QuotationStepRequest extends BaseRequest
         $id = $this->route('id') ?? $this->route('quotation') ?? $this->route('quotation_id') ?? $this->segment(3);
         $quotation = \App\Models\Quotation::find($id);
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
-            $quotation ? $quotation->version : 1,
+            $quotation->version ?? 1,
             (int)$step
         );
 
