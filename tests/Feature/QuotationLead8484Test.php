@@ -144,6 +144,9 @@ class QuotationLead8484Test extends TestCase
         ]);
         $responseStep4->assertStatus(200);
 
+        // Simulate passing steps 5-10
+        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['step' => 10]);
+
         // 2. Test Step 11 (Pricing)
         $responseStep11 = $this->postJson('/api/quotations-step/' . self::QUOTATION_ID . '/step/11', [
             'penagihan' => 'Transfer',
