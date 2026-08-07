@@ -21789,6 +21789,26 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Quotation created successfully"
+                                        },
+                                        "metadata": {
+                                            "properties": {
+                                                "sites_created": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "tipe_quotation": {
+                                                    "type": "string",
+                                                    "example": "baru"
+                                                },
+                                                "survey_ids": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -22530,8 +22550,7 @@
                 "tags": [
                     "Quotations"
                 ],
-                "summary": "Get quotation data for specific step",
-                "description": "Get quotation data for specific step",
+                "summary": "Get quotation data for a specific step",
                 "operationId": "0976db217d5ef182bb025584f9a91431",
                 "parameters": [
                     {
@@ -22539,7 +22558,7 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     },
                     {
@@ -22547,87 +22566,24 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "integer",
-                            "maximum": 12,
-                            "minimum": 1
+                            "type": "integer"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Success",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "data": {
-                                            "type": "object"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Step data retrieved successfully"
-                                        },
-                                        "processing_time": {
-                                            "type": "string",
-                                            "example": "42.30ms"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Step data retrieved successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden"
                     },
                     "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Quotation not found"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to get step data"
-                                        },
-                                        "error": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Quotation not found"
                     }
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "sanctum": []
                     }
                 ]
             },
@@ -22635,48 +22591,230 @@
                 "tags": [
                     "Quotations"
                 ],
-                "summary": "Update specific quotation step",
-                "description": "Update specific step",
+                "summary": "Update quotation data for a specific step",
                 "operationId": "b8a02c6bc4046bcf3a23f6b4fbf9281b",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
+                        "description": "Quotation ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "integer"
                         }
                     },
                     {
                         "name": "step",
                         "in": "path",
+                        "description": "Step Number (1-12)",
                         "required": true,
                         "schema": {
-                            "type": "integer",
-                            "maximum": 12,
-                            "minimum": 1
+                            "type": "integer"
                         }
                     }
                 ],
                 "requestBody": {
+                    "description": "Payload varies depending on the step number. Select from the examples dropdown.",
                     "required": true,
                     "content": {
                         "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "edit": {
-                                        "type": "boolean",
-                                        "example": false
+                            "schema": {},
+                            "examples": {
+                                "step_1_data_site": {
+                                    "summary": "Step 1: Data Site (version-2)",
+                                    "value": {
+                                        "nama_perusahaan": "PT Angin Ribut",
+                                        "kota": "Jakarta",
+                                        "cabang": "Sudirman",
+                                        "jenis_perusahaan": "Manufaktur",
+                                        "jenis_perusahaan_id": 1,
+                                        "status_gedung": "Milik Sendiri",
+                                        "alamat_lengkap": "Jl. Sudirman No 1",
+                                        "hari_operasional": "Senin-Jumat",
+                                        "pengaturan_shift_kerja": "2 Shift",
+                                        "edit": false
                                     }
                                 },
-                                "type": "object"
+                                "step_1": {
+                                    "summary": "Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)",
+                                    "value": {
+                                        "jenis_kontrak": "Reguler",
+                                        "edit": false
+                                    }
+                                },
+                                "step_2": {
+                                    "summary": "Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)",
+                                    "value": {
+                                        "mulai_kontrak": "2024-01-01",
+                                        "kontrak_selesai": "2024-12-31",
+                                        "tgl_penempatan": "2024-01-01",
+                                        "top": "Lebih Dari 7 Hari",
+                                        "salary_rule": 1,
+                                        "jumlah_hari_invoice": 14,
+                                        "tipe_hari_invoice": "Kerja",
+                                        "evaluasi_kontrak": "Tahunan",
+                                        "durasi_kerjasama": "12 Bulan",
+                                        "durasi_karyawan": "12 Bulan",
+                                        "evaluasi_karyawan": "Tahunan",
+                                        "ada_cuti": "Ada",
+                                        "cuti": [
+                                            "Cuti Tahunan",
+                                            "Cuti Menikah"
+                                        ],
+                                        "gaji_saat_cuti": "Prorate",
+                                        "prorate": 20,
+                                        "shift_kerja": "Non Shift",
+                                        "hari_kerja": "Senin - Jumat",
+                                        "jam_kerja": "08:00 - 17:00",
+                                        "edit": false
+                                    }
+                                },
+                                "step_3": {
+                                    "summary": "Step 3: Headcount",
+                                    "value": {
+                                        "headCountData": [
+                                            {
+                                                "quotation_site_id": 1,
+                                                "position_id": 5,
+                                                "jumlah_hc": 10,
+                                                "jabatan_kebutuhan": "Security Guard",
+                                                "nama_site": "Head Office"
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_4": {
+                                    "summary": "Step 4: Costing",
+                                    "value": {
+                                        "is_ppn": 1,
+                                        "ppn_pph_dipotong": "Total Invoice",
+                                        "management_fee_id": 1,
+                                        "persentase": 10,
+                                        "position_data": [
+                                            {
+                                                "quotation_detail_id": 1,
+                                                "upah": "Custom",
+                                                "hitungan_upah": "Per Bulan",
+                                                "nominal_upah": 5000000,
+                                                "lembur": "Flat",
+                                                "nominal_lembur": 100000,
+                                                "jenis_bayar_lembur": "Per Jam",
+                                                "jam_per_bulan_lembur": 10,
+                                                "lembur_ditagihkan": "Ditagihkan",
+                                                "kompensasi": "Diprovisikan",
+                                                "thr": "Diprovisikan",
+                                                "tunjangan_holiday": "Flat",
+                                                "nominal_tunjangan_holiday": 150000,
+                                                "jenis_bayar_tunjangan_holiday": "Per Hari"
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_5": {
+                                    "summary": "Step 5: BPJS",
+                                    "value": {
+                                        "jenis_perusahaan_id": 21,
+                                        "bidang_perusahaan_id": 12,
+                                        "resiko": "Sangat Rendah",
+                                        "program_bpjs": "BPJS Kesehatan",
+                                        "penjamin": [
+                                            "BPJS Kesehatan"
+                                        ],
+                                        "jkk": [
+                                            true
+                                        ],
+                                        "jkm": [
+                                            true
+                                        ],
+                                        "jht": [
+                                            false
+                                        ],
+                                        "jp": [
+                                            false
+                                        ],
+                                        "kes": [
+                                            true
+                                        ],
+                                        "nominal_takaful": [
+                                            0
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_6": {
+                                    "summary": "Step 6: Aplikasi Pendukung",
+                                    "value": {
+                                        "aplikasi_pendukung": [
+                                            1,
+                                            2,
+                                            3
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_9": {
+                                    "summary": "Step 9: Chemical / Peralatan",
+                                    "value": {
+                                        "barang_id": 10,
+                                        "jumlah": 5,
+                                        "masa_pakai": 12,
+                                        "harga": 150000,
+                                        "chemicals": [
+                                            {
+                                                "barang_id": 12,
+                                                "jumlah": 2,
+                                                "masa_pakai": 6,
+                                                "harga": 50000
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_10": {
+                                    "summary": "Step 10: Operasional",
+                                    "value": {
+                                        "jumlah_kunjungan_operasional": 2,
+                                        "bulan_tahun_kunjungan_operasional": "Bulan",
+                                        "jumlah_kunjungan_tim_crm": 1,
+                                        "bulan_tahun_kunjungan_tim_crm": "Tahun",
+                                        "keterangan_kunjungan_operasional": "Kunjungan rutin",
+                                        "keterangan_kunjungan_tim_crm": "Evaluasi tahunan",
+                                        "ada_training": "Ada",
+                                        "training": "Basic Security Training",
+                                        "persen_bunga_bank": 5.5,
+                                        "edit": false
+                                    }
+                                },
+                                "step_11": {
+                                    "summary": "Step 11: Pricing",
+                                    "value": {
+                                        "penagihan": "Sesuai BAST",
+                                        "tunjangan_data": [
+                                            [
+                                                {
+                                                    "nama_tunjangan": "Tunjangan Makan",
+                                                    "nominal": 50000
+                                                }
+                                            ]
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_12": {
+                                    "summary": "Step 12: Finalization",
+                                    "value": {
+                                        "is_draft": false
+                                    }
+                                }
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "Success",
+                        "description": "Step updated successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22686,6 +22824,37 @@
                                             "example": true
                                         },
                                         "data": {
+                                            "description": "Quotation data along with relations and step-specific additional_data",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "step": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "leads_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "quotation_details": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "quotation_sites": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "additional_data": {
+                                                    "description": "Step-specific reference data or calculated data",
+                                                    "type": "object"
+                                                }
+                                            },
                                             "type": "object"
                                         },
                                         "message": {
@@ -22694,27 +22863,7 @@
                                         },
                                         "processing_time": {
                                             "type": "string",
-                                            "example": "85.10ms"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Not found",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Step method not found"
+                                            "example": "120.50ms"
                                         }
                                     },
                                     "type": "object"
@@ -22723,55 +22872,12 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Validation failed"
-                                        },
-                                        "errors": {
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean",
-                                            "example": false
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Failed to update step 1"
-                                        },
-                                        "error": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Validation Error / Sequence Violation"
                     }
                 },
                 "security": [
                     {
-                        "bearerAuth": []
+                        "sanctum": []
                     }
                 ]
             }

@@ -50,7 +50,7 @@ class QuotationStepControllerTest extends TestCase
 
         $this->rebuildSchema();
         $this->withoutMiddleware(CheckTokenExpiry::class);
-    }
+    }   
 
     private function seedUser(int $roleId = 2, int $id = 1): User
     {
@@ -88,6 +88,7 @@ class QuotationStepControllerTest extends TestCase
             'jenis_kontrak' => 'Reguler',
             'status_quotation_id' => $status,
             'step' => $step,
+            'version' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -149,14 +150,13 @@ class QuotationStepControllerTest extends TestCase
         $this->actingAs($this->seedUser(), 'web');
         $this->seedQuotation(step: 1);
 
-        // Step 12 carries no FormRequest rules, so validation passes and we reach
-        // the controller's step-sequence guard (12 > current 1 + 1).
-        $response = $this->postJson('/api/quotations-step/'.self::QUOTATION_ID.'/step/12', []);
+        // Step 6 should trigger the sequence guard because current step is 1.
+        $response = $this->postJson('/api/quotations-step/'.self::QUOTATION_ID.'/step/6', []);
 
         $response->assertStatus(422)
             ->assertExactJson([
                 'success' => false,
-                'message' => 'Cannot update step 12. Please complete previous steps first (current step: 1).',
+                'message' => 'Cannot update step 6. Please complete previous steps first (current step: 1).',
             ]);
     }
 
@@ -205,6 +205,7 @@ class QuotationStepControllerTest extends TestCase
             $table->string('jenis_kontrak')->nullable();
             $table->unsignedInteger('status_quotation_id')->nullable();
             $table->integer('step')->nullable();
+            $table->integer('version')->default(1);
             $table->string('created_by')->nullable();
             $table->string('updated_by')->nullable();
             $table->softDeletes();

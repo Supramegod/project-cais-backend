@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Quotation\Steps;
+namespace App\Services\Quotation\Domain;
 
 use App\DTO\CalculationSummary;
 use App\Jobs\ProcessQuotationFinalization;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class Step12Service
+class FinalizationService
 {
     private ?QuotationService $quotationService = null;
 

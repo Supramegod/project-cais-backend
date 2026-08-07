@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Quotation\Steps;
+namespace App\Services\Quotation\Domain;
 
 use App\Models\Quotation;
 use App\Models\QuotationAplikasi;
@@ -14,13 +14,16 @@ use App\Models\SalaryRule;
 use App\Models\Umk;
 use App\Models\Ump;
 use App\Services\Quotation\QuotationService;
+use App\Services\Quotation\Steps\StepCalculationService;
+use App\Services\Quotation\Steps\StepHelperService;
+use App\Services\Quotation\Steps\StepTunjanganService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-class Step11Service
+class PricingService
 {
     private ?QuotationService $quotationService = null;
 
