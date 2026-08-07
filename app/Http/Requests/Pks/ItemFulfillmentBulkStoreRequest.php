@@ -96,7 +96,8 @@ class ItemFulfillmentBulkStoreRequest extends BaseRequest
             'items.*.item_type_id' => FluentRule::integer()->required()->in([1, 2, 3]),
             'items.*.item_id' => FluentRule::integer()->required(),
             'items.*.qty' => FluentRule::integer()->required()->min(1),
-            'items.*.catatan' => FluentRule::string()->required()->min(10),
+            // Opsional — kalau diisi tetap harus bermakna, bukan satu-dua huruf.
+            'items.*.catatan' => FluentRule::string()->nullable()->min(10),
             // Auto-derived oleh prepareForValidation() — tidak wajib dari client
             'items.*.item_type' => FluentRule::string()->nullable(),
             'items.*.leads_id' => FluentRule::integer()->nullable(),
@@ -121,7 +122,6 @@ class ItemFulfillmentBulkStoreRequest extends BaseRequest
             'items.*.item_id.required' => 'Item wajib dipilih.',
             'items.*.qty.required' => 'Qty wajib diisi.',
             'items.*.qty.min' => 'Qty minimal 1.',
-            'items.*.catatan.required' => 'Catatan wajib diisi.',
             'items.*.catatan.min' => 'Catatan minimal 10 karakter.',
         ];
     }
@@ -134,7 +134,7 @@ class ItemFulfillmentBulkStoreRequest extends BaseRequest
             }
 
             // Qty item yang sama boleh dikirim beberapa baris dalam satu batch,
-            // jadi remaining dicek terhadap akumulasi qty batch, bukan per baris.
+            // jadi sisa dicek terhadap akumulasi qty batch, bukan per baris.
             $accumulated = [];
 
             foreach ((array) $this->input('items', []) as $i => $item) {
@@ -163,20 +163,25 @@ class ItemFulfillmentBulkStoreRequest extends BaseRequest
                 $key = $item['pks_id'].'_'.$item['site_id'].'_'.$itemType.'_'.$item['item_id'];
 
                 if (! array_key_exists($key, $accumulated)) {
-                    $terpenuhi = PksItemFulfillment::where('pks_id', $item['pks_id'])
+                    // Barang yang sudah dikirim tapi belum diterima (qty_request)
+                    // ikut memotong jatah — kebutuhan yang sama tidak boleh
+                    // dikirim dua kali sambil menunggu penerimaan.
+                    $row = PksItemFulfillment::where('pks_id', $item['pks_id'])
                         ->where('site_id', $item['site_id'])
                         ->where('item_type', $itemType)
                         ->where('item_id', $item['item_id'])
-                        ->value('qty_terpenuhi') ?? 0;
+                        ->first(['qty_request', 'qty_terpenuhi']);
 
-                    $accumulated[$key] = $qtyDiminta - (int) $terpenuhi;
+                    $accumulated[$key] = $qtyDiminta
+                        - (int) ($row->qty_terpenuhi ?? 0)
+                        - (int) ($row->qty_request ?? 0);
                 }
 
                 $accumulated[$key] -= (int) $item['qty'];
 
                 if ($accumulated[$key] < 0) {
                     $sisa = $accumulated[$key] + (int) $item['qty'];
-                    $validator->errors()->add("items.{$i}.qty", "Qty melebihi remaining ({$sisa}).");
+                    $validator->errors()->add("items.{$i}.qty", "Qty melebihi sisa yang boleh di-request ({$sisa}).");
                 }
             }
         });

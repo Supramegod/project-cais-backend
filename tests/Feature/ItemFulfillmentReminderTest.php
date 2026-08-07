@@ -22,16 +22,20 @@ use Tests\TestCase;
 class ItemFulfillmentReminderTest extends TestCase
 {
     private int $leadsId;
+
     private int $quotationId;
+
     private int $kaporlapId;
+
     private int $deviceId;
+
     private int $chemicalId;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $databasePath = $this->tempDbPath = storage_path('framework/testing-' . Str::random(8) . '.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -320,6 +324,7 @@ class ItemFulfillmentReminderTest extends TestCase
             $table->string('item_type');
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_diminta')->default(0);
+            $table->unsignedInteger('qty_request')->default(0);
             $table->unsignedInteger('qty_terpenuhi')->default(0);
             $table->string('status')->default('not_yet_fulfilled');
             $table->string('created_by')->nullable();
@@ -336,6 +341,8 @@ class ItemFulfillmentReminderTest extends TestCase
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
+            $table->uuid('batch_id')->nullable();
+            $table->unsignedInteger('batch_ke')->nullable();
             $table->string('aksi', 32);
             $table->text('catatan')->nullable();
             $table->json('meta')->nullable();
@@ -353,7 +360,7 @@ class ItemFulfillmentReminderTest extends TestCase
 
         $pksId = $this->createPks(now()->subMonths(8), now()->addMonths(4));
 
-        (new SendItemFulfillmentReminder())->handle();
+        (new SendItemFulfillmentReminder)->handle();
 
         Mail::assertSent(ItemFulfillmentReminderNotification::class, 1);
 
@@ -372,7 +379,7 @@ class ItemFulfillmentReminderTest extends TestCase
         $pksId = $this->createPks(now()->subMonths(8), now()->addMonths(4));
         $this->fullyFulfill($pksId);
 
-        (new SendItemFulfillmentReminder())->handle();
+        (new SendItemFulfillmentReminder)->handle();
 
         Mail::assertNothingSent();
     }
@@ -385,7 +392,7 @@ class ItemFulfillmentReminderTest extends TestCase
 
         $this->createPks(now()->subDay(), now()->addYear());
 
-        (new SendItemFulfillmentReminder())->handle();
+        (new SendItemFulfillmentReminder)->handle();
 
         Mail::assertNothingSent();
     }
@@ -398,7 +405,7 @@ class ItemFulfillmentReminderTest extends TestCase
 
         $this->createPks(now()->subMonths(8), now()->addMonths(4), now()->subDay());
 
-        (new SendItemFulfillmentReminder())->handle();
+        (new SendItemFulfillmentReminder)->handle();
 
         Mail::assertNothingSent();
     }

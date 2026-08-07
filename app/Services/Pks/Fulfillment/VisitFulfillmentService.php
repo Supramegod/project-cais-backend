@@ -126,12 +126,18 @@ class VisitFulfillmentService
                     }
                 }
 
+                // Satu visit = satu batch berisi satu log. Nomornya berjalan
+                // sendiri dari batch item — lihat PksFulfillmentLog::newBatch().
+                $batch = PksFulfillmentLog::newBatch((int) $record->pks_id, PksFulfillmentLog::JENIS_VISIT);
+
                 // Log modul fulfillment jenis visit. Catatan hidup di sini.
                 PksFulfillmentLog::create([
                     'pks_id' => $record->pks_id,
                     'site_id' => $record->site_id,
                     'jenis' => PksFulfillmentLog::JENIS_VISIT,
                     'reference_id' => $record->id,
+                    'batch_id' => $batch['batch_id'],
+                    'batch_ke' => $batch['batch_ke'],
                     'aksi' => 'create',
                     'catatan' => $data['catatan'],
                     'meta' => [

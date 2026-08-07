@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Pks\ItemFulfillmentBulkStoreRequest;
 use App\Http\Requests\Pks\ItemFulfillmentEditRequest;
+use App\Http\Requests\Pks\ItemFulfillmentReceiveRequest;
 use App\Http\Requests\Pks\ItemFulfillmentStoreRequest;
 use App\Http\Requests\Pks\VisitRecordStoreRequest;
 use App\Http\Requests\Pks\VisitRescheduleRequest;
@@ -11,9 +12,12 @@ use App\Http\Requests\Pks\VisitScheduleManualStoreRequest;
 use App\Models\Pks;
 use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
+use App\Models\PksItemRequest;
 use App\Models\PksVisitSchedule;
+use App\Services\Pks\Fulfillment\FulfillmentLogService;
 use App\Services\Pks\Fulfillment\HcFulfillmentService;
 use App\Services\Pks\Fulfillment\ItemFulfillmentService;
+use App\Services\Pks\Fulfillment\ItemReceivingService;
 use App\Services\Pks\Fulfillment\PksFulfillmentDashboardService;
 use App\Services\Pks\Fulfillment\PksFulfillmentSummaryService;
 use App\Services\Pks\Fulfillment\VisitFulfillmentService;
@@ -39,9 +43,30 @@ use Illuminate\Support\Facades\DB;
  *     @OA\Property(property="item_id", type="integer"),
  *     @OA\Property(property="nama", type="string"),
  *     @OA\Property(property="qty_diminta", type="integer"),
- *     @OA\Property(property="qty_terpenuhi", type="integer"),
- *     @OA\Property(property="remaining", type="integer"),
- *     @OA\Property(property="status", type="string")
+ *     @OA\Property(property="qty_request", type="integer", description="Sudah dikirim, menunggu konfirmasi penerimaan"),
+ *     @OA\Property(property="qty_terpenuhi", type="integer", description="Sudah diterima site"),
+ *     @OA\Property(property="remaining", type="integer", description="qty_diminta - qty_terpenuhi"),
+ *     @OA\Property(property="boleh_direquest", type="integer", description="Batas qty request berikutnya: qty_diminta - qty_terpenuhi - qty_request"),
+ *     @OA\Property(property="status", type="string", enum={"not_yet_fulfilled","requested","partially_fulfilled","fully_fulfilled"})
+ * )
+ *
+ * @OA\Schema(
+ *     schema="PksItemRequestRow",
+ *     type="object",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="fulfillment_id", type="integer"),
+ *     @OA\Property(property="site_id", type="integer"),
+ *     @OA\Property(property="batch_id", type="string", format="uuid"),
+ *     @OA\Property(property="batch_ke", type="integer", nullable=true),
+ *     @OA\Property(property="item_type", type="string"),
+ *     @OA\Property(property="item_id", type="integer"),
+ *     @OA\Property(property="nama", type="string", nullable=true),
+ *     @OA\Property(property="qty_request", type="integer"),
+ *     @OA\Property(property="qty_diterima", type="integer"),
+ *     @OA\Property(property="kurang", type="integer"),
+ *     @OA\Property(property="status", type="string", enum={"open","received","short"}),
+ *     @OA\Property(property="received_at", type="string", format="date-time", nullable=true)
  * )
  *
  * @OA\Schema(
@@ -98,10 +123,12 @@ class PksFulfillmentController extends Controller
      * CATATAN: daftar role final masih menunggu konfirmasi bisnis — ubah di satu
      * tempat ini saja. Sementara mengikuti set yang sudah dipakai editFulfillment.
      */
-    private const MANAGE_ROLES = [2,8, 10,54,55,56, 98];
+    private const MANAGE_ROLES = [2, 8, 10, 54, 55, 56, 98];
 
     public function __construct(
         private ItemFulfillmentService $itemFulfillmentService,
+        private ItemReceivingService $itemReceivingService,
+        private FulfillmentLogService $fulfillmentLogService,
         private VisitSchedulingService $visitSchedulingService,
         private VisitFulfillmentService $visitFulfillmentService,
     ) {}
@@ -475,14 +502,14 @@ class PksFulfillmentController extends Controller
      *         required=true,
      *
      *         @OA\JsonContent(
-     *             required={"pks_id","site_id","item_type_id","item_id","qty","catatan"},
+     *             required={"pks_id","site_id","item_type_id","item_id","qty"},
      *
      *             @OA\Property(property="pks_id", type="integer", example=99),
      *             @OA\Property(property="site_id", type="integer", example=5),
      *             @OA\Property(property="item_type_id", type="integer", enum={1,2,3}, example=1, description="1=kaporlap, 2=device, 3=chemical"),
      *             @OA\Property(property="item_id", type="integer", example=10),
      *             @OA\Property(property="qty", type="integer", minimum=1, example=5),
-     *             @OA\Property(property="catatan", type="string", minLength=10, example="Pengiriman batch pertama")
+     *             @OA\Property(property="catatan", type="string", nullable=true, minLength=10, example="Pengiriman batch pertama")
      *         )
      *     ),
      *
@@ -555,14 +582,14 @@ class PksFulfillmentController extends Controller
      *
      *                 @OA\Items(
      *                     type="object",
-     *                     required={"pks_id","site_id","item_type_id","item_id","qty","catatan"},
+     *                     required={"pks_id","site_id","item_type_id","item_id","qty"},
      *
      *                     @OA\Property(property="pks_id", type="integer", example=99),
      *                     @OA\Property(property="site_id", type="integer", example=5),
      *                     @OA\Property(property="item_type_id", type="integer", enum={1,2,3}, example=1, description="1=kaporlap, 2=device, 3=chemical"),
      *                     @OA\Property(property="item_id", type="integer", example=10),
      *                     @OA\Property(property="qty", type="integer", minimum=1, example=5),
-     *                     @OA\Property(property="catatan", type="string", minLength=10, example="Pengiriman batch pertama")
+     *                     @OA\Property(property="catatan", type="string", nullable=true, minLength=10, example="Pengiriman batch pertama")
      *                 )
      *             )
      *         )
@@ -576,7 +603,12 @@ class PksFulfillmentController extends Controller
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="3 fulfillment berhasil disimpan."),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="batch_id", type="string", format="uuid", description="Penanda satu kelompok pengiriman; dipakai untuk menarik ulang log batch ini"),
+     *                 @OA\Property(property="batch_ke", type="integer", nullable=true, example=3, description="Nomor urut batch dalam PKS ini. NULL bila satu batch mencakup lebih dari satu PKS"),
+     *                 @OA\Property(property="batch_ke_per_pks", type="object", description="Nomor batch per pks_id,"),
+     *                 @OA\Property(property="fulfillments", type="array", @OA\Items(type="object"))
+     *             )
      *         )
      *     ),
      *
@@ -593,18 +625,155 @@ class PksFulfillmentController extends Controller
         }
 
         try {
-            $fulfillments = $this->itemFulfillmentService->createBulkFulfillment(
+            $batch = $this->itemFulfillmentService->createBulkFulfillment(
                 $request->validated('items'),
                 Auth::user()
             );
 
             return $this->createdResponse(
-                $fulfillments,
-                count($fulfillments).' fulfillment berhasil disimpan.'
+                [
+                    // batch_id dipakai client untuk menarik ulang satu kelompok
+                    // pengiriman lewat log. batch_ke versi terbacanya: nomor urut
+                    // batch dalam satu PKS. Satu batch hampir selalu satu PKS —
+                    // kalau ternyata lintas PKS, nomornya beda per PKS, jadi
+                    // yang tunggal dikosongkan dan yang dipakai peta di bawahnya.
+                    'batch_id' => $batch['batch_id'],
+                    'batch_ke' => count($batch['batch_ke']) === 1
+                        ? reset($batch['batch_ke'])
+                        : null,
+                    'batch_ke_per_pks' => $batch['batch_ke'],
+                    'fulfillments' => $batch['items'],
+                ],
+                count($batch['items']).' fulfillment berhasil disimpan.'
             );
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/pks-fulfillment/item-fulfillment/receive",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Catat penerimaan barang di site (tahap 2)",
+     *     description="Tahap kedua alur item fulfillment. qty_terpenuhi baru naik di sini, bukan saat request. Qty diterima boleh lebih kecil dari yang dikirim — selisihnya kembali menjadi sisa yang boleh di-request ulang. All-or-nothing: satu item gagal, seluruh penerimaan dibatalkan.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"items"},
+     *
+     *             @OA\Property(property="batch_id", type="string", format="uuid", nullable=true, description="Batasi penutupan ke satu batch pengiriman. Kosong = pengiriman paling lama ditutup lebih dulu"),
+     *             @OA\Property(property="catatan", type="string", nullable=true, minLength=10, example="Satu seragam rusak saat diterima"),
+     *             @OA\Property(property="items", type="array", minItems=1, maxItems=100,
+     *
+     *                 @OA\Items(type="object",
+     *                     required={"fulfillment_id","qty"},
+     *
+     *                     @OA\Property(property="fulfillment_id", type="integer", example=12),
+     *                     @OA\Property(property="qty", type="integer", minimum=1, example=4, description="Qty yang benar-benar diterima"),
+     *                     @OA\Property(property="catatan", type="string", nullable=true, minLength=10)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Created",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="message", type="string", example="2 item berhasil diterima."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="batch_id", type="string", format="uuid"),
+     *                 @OA\Property(property="batch_ke", type="integer", example=1, description="Nomor batch penerimaan; deretnya terpisah dari batch pengiriman"),
+     *                 @OA\Property(property="items", type="array", @OA\Items(type="object"))
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
+    public function receiveFulfillment(ItemFulfillmentReceiveRequest $request): JsonResponse
+    {
+        if ($denied = $this->ensureCanManage()) {
+            return $denied;
+        }
+
+        try {
+            $batch = $this->itemReceivingService->receive(
+                $request->validated('items'),
+                Auth::user(),
+                $request->validated('batch_id'),
+                $request->validated('catatan'),
+            );
+
+            return $this->createdResponse(
+                $batch,
+                count($batch['items']).' item berhasil diterima.'
+            );
+        } catch (\RuntimeException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/{pks}/item-request",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Daftar permintaan barang per batch",
+     *     description="Sumber data form penerimaan: barang apa saja yang sudah dikirim dan menunggu dikonfirmasi diterima. Default hanya yang berstatus open.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="pks", in="path", required=true, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="site_id", in="query", required=false, @OA\Schema(type="integer")),
+     *     @OA\Parameter(
+     *         name="status",
+     *         in="query",
+     *         required=false,
+     *         description="open (default) | received | short | all",
+     *
+     *         @OA\Schema(type="string", enum={"open","received","short","all"})
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/PksItemRequestRow"))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
+    public function getItemRequests(Pks $pks, Request $request): JsonResponse
+    {
+        $status = $request->query('status', PksItemRequest::STATUS_OPEN);
+
+        if (! in_array($status, [PksItemRequest::STATUS_OPEN, PksItemRequest::STATUS_RECEIVED, PksItemRequest::STATUS_SHORT, 'all'], true)) {
+            return $this->errorResponse('Status harus open, received, short, atau all.', 422);
+        }
+
+        $siteId = $request->query('site_id');
+
+        return $this->successResponse(
+            $this->itemReceivingService->getPksRequests(
+                $pks->id,
+                $siteId !== null ? (int) $siteId : null,
+                $status === 'all' ? null : $status,
+            ),
+            'Item request retrieved successfully.'
+        );
     }
 
     /**
@@ -745,8 +914,8 @@ class PksFulfillmentController extends Controller
      * @OA\Get(
      *     path="/api/pks-fulfillment/{pks}/fulfillment-log",
      *     tags={"PKS Fulfillment"},
-     *     summary="Get fulfillment log per PKS (item + visit)",
-     *     description="Log seluruh aktivitas fulfillment satu PKS, terbaru dulu. Filter opsional ?jenis=item|visit.",
+     *     summary="Get fulfillment log per PKS (item + visit), dikelompokkan per batch",
+     *     description="Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="pks", in="path", required=true, @OA\Schema(type="integer")),
@@ -763,9 +932,51 @@ class PksFulfillmentController extends Controller
             return $this->errorResponse('Parameter jenis tidak valid (item / visit).', 422);
         }
 
-        $logs = $this->itemFulfillmentService->getPksLog($pks->id, $jenis);
+        $logs = $this->fulfillmentLogService->getPksLog($pks->id, $jenis);
 
         return $this->successResponse($logs, 'Fulfillment log retrieved successfully.');
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/pks-fulfillment/fulfillment-log/batch/{batchId}",
+     *     tags={"PKS Fulfillment"},
+     *     summary="Detail satu batch pengiriman",
+     *     description="Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.",
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="batchId", in="path", required=true, description="batch_id (UUID) dari response bulk atau dari fulfillment-log", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Success",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="batch_id", type="string", format="uuid"),
+     *                 @OA\Property(property="batch_ke", type="integer", example=3),
+     *                 @OA\Property(property="jenis", type="string", enum={"item","visit"}),
+     *                 @OA\Property(property="pks_id", type="integer"),
+     *                 @OA\Property(property="jumlah_item", type="integer"),
+     *                 @OA\Property(property="items", type="array", @OA\Items(type="object"))
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Batch tidak ditemukan")
+     * )
+     */
+    public function getBatchDetail(string $batchId): JsonResponse
+    {
+        $batch = $this->fulfillmentLogService->getBatchDetail($batchId);
+
+        if ($batch === null) {
+            return $this->errorResponse('Batch tidak ditemukan.', 404);
+        }
+
+        return $this->successResponse($batch, 'Batch detail retrieved successfully.');
     }
 
     // ==================== VISIT SCHEDULING ====================

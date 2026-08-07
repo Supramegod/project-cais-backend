@@ -1,52 +1,52 @@
 <?php
 
 use App\Http\Controllers\AdminPanelController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BarangController;
+use App\Http\Controllers\BentukUsahaController;
+use App\Http\Controllers\ChemicalController;
 use App\Http\Controllers\CompanyGroupController;
 use App\Http\Controllers\CustomerActivityController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardApprovalController;
 use App\Http\Controllers\DashboardPksController;
+use App\Http\Controllers\DevicesController;
+use App\Http\Controllers\JenisBarangController;
+use App\Http\Controllers\JenisPerusahaanController;
+use App\Http\Controllers\KaporlapController;
+use App\Http\Controllers\KebutuhanController;
 use App\Http\Controllers\LeadsController;
+use App\Http\Controllers\ManagementFeeController;
 use App\Http\Controllers\MenuController;
+use App\Http\Controllers\OhcController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\PksFulfillmentController;
 use App\Http\Controllers\PksWizardController;
+use App\Http\Controllers\PositionController;
 use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\QuotationStepController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
-use App\Http\Controllers\SalesActivityController;
-use App\Http\Controllers\SalesTargetController;
-use App\Http\Controllers\SpkController;
-use App\Http\Controllers\TrainingController;
-use App\Http\Controllers\TimSalesController;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\JenisPerusahaanController;
-use App\Http\Controllers\BentukUsahaController;
-use App\Http\Controllers\KebutuhanController;
-use App\Http\Controllers\PositionController;
-use App\Http\Controllers\KaporlapController;
-use App\Http\Controllers\DevicesController;
-use App\Http\Controllers\OhcController;
-use App\Http\Controllers\ChemicalController;
-use App\Http\Controllers\BarangController;
-use App\Http\Controllers\JenisBarangController;
-use App\Http\Controllers\ManagementFeeController;
-use App\Http\Controllers\TopController;
 use App\Http\Controllers\SalaryRuleController;
-use App\Http\Controllers\TunjanganController;
-use App\Http\Controllers\UmpController;
-use App\Http\Controllers\UmkController;
-use App\Http\Controllers\UpahController;
-use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\SalesActivityController;
 use App\Http\Controllers\SalesRevenueController;
+use App\Http\Controllers\SalesTargetController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\UserEmailConfigController;
+use App\Http\Controllers\SpkController;
 use App\Http\Controllers\SubmissionController;
 use App\Http\Controllers\SubmissionV2Controller;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\SystemAnnouncementController;
 use App\Http\Controllers\SystemAnnouncementV2Controller;
+use App\Http\Controllers\TimSalesController;
+use App\Http\Controllers\TopController;
+use App\Http\Controllers\TrainingController;
+use App\Http\Controllers\TunjanganController;
+use App\Http\Controllers\UmkController;
+use App\Http\Controllers\UmpController;
+use App\Http\Controllers\UpahController;
+use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -57,7 +57,6 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
 
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/user', [AuthController::class, 'user']);
-
 
     // Site Management
     Route::prefix('site')->controller(SiteController::class)->group(function () {
@@ -114,11 +113,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/list', 'list');
         // detail
         Route::get('/list-detail/{id}', 'listDetail');
-        //Detail Tunjangan
+        // Detail Tunjangan
         Route::get('/list-detail-tunjangan/{id}', 'listDetailTunjangan');
         Route::post('/add-detail-tunjangan', 'addDetailTunjangan');
         Route::delete('/delete-detail-tunjangan/{id}', 'deleteDetailTunjangan');
-        //Detail Requirement
+        // Detail Requirement
         Route::get('/list-detail-requirement/{id}', 'listDetailRequirement');
         Route::post('/add-detail-requirement', 'addDetailRequirement');
         Route::delete('/delete-detail-requirement/{id}', 'deleteDetailRequirement');
@@ -597,15 +596,25 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         // Pemenuhan HC per PKS (read-only, dari HRIS)
         Route::get('/{pks}/hc', 'getHcFulfillment');
 
-        // Item Fulfillment
+        // Item Fulfillment — dua tahap: request barang lalu penerimaan barang.
         Route::get('/{pks}/items', 'getRequestedItems');
+        // Tahap 1: request barang. Menaikkan qty_request, bukan qty_terpenuhi.
         Route::post('/item-fulfillment', 'storeFulfillment');
         // Versi bulk — body {items:[...]} atau bare array, all-or-nothing
         Route::post('/item-fulfillment/bulk', 'storeBulkFulfillment');
+        // Tahap 2: penerimaan barang di site. Di sinilah qty_terpenuhi naik.
+        Route::post('/item-fulfillment/receive', 'receiveFulfillment');
+        // Barang yang sudah dikirim dan menunggu diterima — isi form penerimaan
+        Route::get('/{pks}/item-request', 'getItemRequests');
         Route::patch('/item-fulfillment/{fulfillment}', 'editFulfillment');
         Route::get('/item-fulfillment/{fulfillment}/log', 'getFulfillmentLog');
 
-        // Log fulfillment per PKS (item + visit), filter opsional ?jenis=item|visit
+        // Isi satu batch pengiriman — didaftarkan sebelum rute /{pks}/... supaya
+        // tidak tertangkap route binding PKS.
+        Route::get('/fulfillment-log/batch/{batchId}', 'getBatchDetail');
+
+        // Log fulfillment per PKS (item + visit), dikelompokkan per batch,
+        // filter opsional ?jenis=item|visit
         Route::get('/{pks}/fulfillment-log', 'getPksLog');
 
         // Visit Scheduling

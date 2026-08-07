@@ -19,9 +19,13 @@ use Tests\TestCase;
 class PksFulfillmentSummaryServiceTest extends TestCase
 {
     private PksFulfillmentSummaryService $service;
+
     private int $pksId;
+
     private int $quotationId;
+
     private int $leadsId;
+
     private int $siteId;
 
     protected function setUp(): void
@@ -159,6 +163,7 @@ class PksFulfillmentSummaryServiceTest extends TestCase
             $table->string('item_type');
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_diminta')->default(0);
+            $table->unsignedInteger('qty_request')->default(0);
             $table->unsignedInteger('qty_terpenuhi')->default(0);
             $table->string('status')->default('not_yet_fulfilled');
             $table->string('created_by')->nullable();
@@ -175,6 +180,8 @@ class PksFulfillmentSummaryServiceTest extends TestCase
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
+            $table->uuid('batch_id')->nullable();
+            $table->unsignedInteger('batch_ke')->nullable();
             $table->string('aksi', 32);
             $table->text('catatan')->nullable();
             $table->json('meta')->nullable();

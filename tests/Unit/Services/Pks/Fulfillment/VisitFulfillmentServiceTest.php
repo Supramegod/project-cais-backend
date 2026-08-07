@@ -335,6 +335,8 @@ class VisitFulfillmentServiceTest extends TestCase
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
+            $table->uuid('batch_id')->nullable();
+            $table->unsignedInteger('batch_ke')->nullable();
             $table->string('aksi', 32);
             $table->text('catatan')->nullable();
             $table->json('meta')->nullable();

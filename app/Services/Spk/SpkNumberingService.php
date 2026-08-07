@@ -5,6 +5,7 @@ namespace App\Services\Spk;
 use App\Models\Company;
 use App\Models\Leads;
 use App\Models\Spk;
+use App\Services\Numbering\DocumentVersionChain;
 use Carbon\Carbon;
 
 /**
@@ -38,9 +39,20 @@ class SpkNumberingService
         $base .= $company ? $company->code . '/' : 'NN/';
         $base .= ($leads->nomor ?? 'NNNNN') . '-';
 
-        $seq = Spk::where('nomor', 'like', $base . $monthYear . '-%')
-            ->count() + 1;
+        $prefix = $base . $monthYear . '-';
 
-        return $base . $monthYear . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
+        // SEQ diambil dari nomor tertinggi yang sudah terpakai, atas query
+        // `withTrashed()`. Spk memakai SoftDeletes, jadi `count() + 1` akan
+        // melewatkan baris terhapus dan memakai ulang nomornya.
+        $existing = Spk::withTrashed()
+            ->where('nomor', 'like', $prefix . '%')
+            ->pluck('nomor')
+            ->all();
+
+        $seq = DocumentVersionChain::nextSequence($existing, $prefix);
+
+        return DocumentVersionChain::assertLength(
+            $prefix . str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
+        );
     }
 }

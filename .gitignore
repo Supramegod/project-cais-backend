@@ -56,3 +56,6 @@ plan_analitytic.md
 
 AGENTS.md
 CLAUDE.md
+Dockerfile.local
+docker-compose.local.yml
+docker/nginx-local.conf

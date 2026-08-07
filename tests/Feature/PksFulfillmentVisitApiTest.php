@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\CheckTokenExpiry;
+use App\Models\PksFulfillmentLog;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
@@ -21,15 +22,18 @@ use Tests\TestCase;
 class PksFulfillmentVisitApiTest extends TestCase
 {
     private int $pksId;
+
     private int $siteId;
+
     private int $leadsId;
+
     private int $scheduleId;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $databasePath = $this->tempDbPath = storage_path('framework/testing-' . Str::random(8) . '.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -346,6 +350,8 @@ class PksFulfillmentVisitApiTest extends TestCase
             $table->unsignedBigInteger('site_id')->nullable();
             $table->string('jenis', 32);
             $table->unsignedBigInteger('reference_id');
+            $table->uuid('batch_id')->nullable();
+            $table->unsignedInteger('batch_ke')->nullable();
             $table->string('aksi', 32);
             $table->text('catatan')->nullable();
             $table->json('meta')->nullable();
@@ -538,6 +544,20 @@ class PksFulfillmentVisitApiTest extends TestCase
             'role' => 'operasional',
             'hasil_visit' => 'selesai',
         ]);
+
+        // Visit juga satu batch berisi satu log, dengan nomor yang berjalan
+        // sendiri dari batch item.
+        $log = PksFulfillmentLog::where('jenis', PksFulfillmentLog::JENIS_VISIT)->first();
+        $this->assertNotNull($log->batch_id);
+        $this->assertSame(1, $log->batch_ke);
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$log->batch_id}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.jenis', 'visit')
+            ->assertJsonPath('data.jumlah_item', 1)
+            ->assertJsonPath('data.items.0.role', 'operasional')
+            ->assertJsonPath('data.items.0.hasil_visit', 'selesai')
+            ->assertJsonPath('data.items.0.jumlah_foto', 1);
     }
 
     // ─── TEST 9: POST visit record tanpa foto ────────────────────────
