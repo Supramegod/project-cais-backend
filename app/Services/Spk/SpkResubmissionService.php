@@ -48,7 +48,7 @@ class SpkResubmissionService
             foreach ($quotationGroups as $quotationId => $spkSites) {
                 $quotationAsal = $spkSites->first()->quotation;
                 if (!$quotationAsal) continue;
-                $nomorBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id);
+                $nomorBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id, $quotationAsal->id);
                 $newQuotation = $this->createNewQuotation($quotationAsal, $nomorBaru, $alasan);
                 $newQuotations[] = $newQuotation;
                 $this->copyQuotationRelatedData($quotationAsal->id, $newQuotation->id);
@@ -79,10 +79,15 @@ class SpkResubmissionService
         });
     }
 
-    private function generateNomorQuotation(int $leadsId, ?int $companyId): string
+    /**
+     * Pengajuan ulang menghasilkan REVISI dari quotation asal, bukan dokumen
+     * baru. Sebelumnya tipe di-hardcode 'baru' sehingga quotation revisi
+     * mendapat nomor QUOT/ORG/... dan urutan revisinya tidak terlihat di nomor.
+     */
+    private function generateNomorQuotation(int $leadsId, ?int $companyId, int $referensiId): string
     {
         return app(\App\Services\Quotation\QuotationNumberingService::class)
-            ->generate($leadsId, $companyId ?? 0, 'baru');
+            ->generate($leadsId, $companyId ?? 0, 'revisi', $referensiId);
     }
 
     private function createNewQuotation($quotationAsal, string $nomorQuotationBaru, string $alasan)
@@ -93,6 +98,11 @@ class SpkResubmissionService
         $data['revisi'] = ($quotationAsal->revisi ?? 0) + 1;
         $data['alasan_revisi'] = $alasan;
         $data['quotation_asal_id'] = $quotationAsal->id;
+        // Selaraskan data dengan nomor yang digenerate: dokumen ini adalah
+        // revisi, dan rantai versinya ditelusuri lewat quotation_referensi_id.
+        // Tanpa ini, toArray() akan mewarisi referensi milik quotation asal.
+        $data['quotation_referensi_id'] = $quotationAsal->id;
+        $data['tipe_quotation'] = 'revisi';
         $data['created_at'] = now();
         $data['created_by'] = Auth::user()->full_name;
         $data['updated_at'] = null;

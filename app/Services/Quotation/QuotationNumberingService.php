@@ -5,6 +5,8 @@ namespace App\Services\Quotation;
 use App\Models\Company;
 use App\Models\Leads;
 use App\Models\Quotation;
+use App\Services\Numbering\DocumentFamily;
+use App\Services\Numbering\DocumentVersionChain;
 use Carbon\Carbon;
 
 /**
@@ -12,25 +14,29 @@ use Carbon\Carbon;
  *
  * Format: {PREFIX}/{TIPE}/{COMPANY_CODE}/{LEADS_NOMOR}-{MMYYYY}-{SEQ}{VERSION}
  *
- * TIPE:
+ * TIPE (selalu mengikuti tipe dokumen ini sendiri, bukan warisan referensi):
  *   ORG = Original (baru)
  *   RVS = Revisi
  *   RKT = Rekontrak
  *   ADD = Addendum
  *
- * VERSION (multi-level):
+ * VERSION — satu huruf tidak pernah muncul dua kali dalam satu rantai;
+ * counter-nya yang naik. Nesting hanya terjadi antar huruf berbeda.
  *   (none) = Original document
- *   -V{01} = Revisi ke-N dari dokumen
- *   -K{01} = Rekontrak ke-N dari dokumen
- *   -A{01} = Addendum ke-N dari dokumen
- *   -R{01} = untuk SPK atau dokumen lain
+ *   -V{NN} = Revisi ke-N
+ *   -K{NN} = Rekontrak ke-N
+ *   -A{NN} = Addendum ke-N
  *
  * Contoh:
  *   QUOT/ORG/ION/LS001-072026-00001         ← Original
  *   QUOT/RVS/ION/LS001-072026-00001-V01     ← Revisi 1
+ *   QUOT/RVS/ION/LS001-072026-00001-V02     ← Revisi 2 (dari revisi 1)
  *   QUOT/RKT/ION/LS001-072026-00001-K01     ← Rekontrak 1
- *   QUOT/ADD/ION/LS001-072026-00001-A01     ← Addendum 1
  *   QUOT/RVS/ION/LS001-072026-00001-K01-V01 ← Revisi 1 dari Rekontrak 1
+ *   QUOT/RVS/ION/LS001-072026-00001-K01-V02 ← Revisi 2 dari Rekontrak 1
+ *
+ * @see DocumentVersionChain aturan penyusunan rantai versi
+ * @see DocumentFamily       cara counter dihitung terhadap keluarga dokumen
  */
 class QuotationNumberingService
 {
@@ -50,12 +56,12 @@ class QuotationNumberingService
     ];
 
     /**
-     * Generate nomor untuk Quotation baru (original).
+     * Generate nomor untuk Quotation.
      *
      * @param int    $leadsId
      * @param int    $companyId
      * @param string $tipeQuotation  'baru'|'revisi'|'rekontrak'|'addendum'
-     * @param int|null $referensiId ID of parent quotation (untuk revisi/rkt/add)
+     * @param int|null $referensiId ID quotation referensi (untuk revisi/rkt/add)
      * @return string
      */
     public function generate(
@@ -80,15 +86,16 @@ class QuotationNumberingService
         $base .= $company ? $company->code . '/' : 'NN/';
         $base .= ($leads->nomor ?? 'NNNNN') . '-';
 
-        // --- Generate SEQ & VERSION ---
-
-        // Original (baru): SEQ counter per bulan
+        // --- Original (baru): SEQ counter per bulan ---
         if ($tipeQuotation === 'baru') {
             $seq = $this->getNextSequence($base, $monthYear);
-            return $base . $monthYear . '-' . str_pad($seq, 5, '0', STR_PAD_LEFT);
+
+            return DocumentVersionChain::assertLength(
+                $base . $monthYear . '-' . str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
+            );
         }
 
-        // Turunan (revisi/rekontrak/addendum) — perlu referensi
+        // --- Turunan (revisi/rekontrak/addendum) — perlu referensi ---
         if (!$referensiId) {
             throw new \InvalidArgumentException(
                 "Referensi ID wajib untuk tipe '{$tipeQuotation}'"
@@ -96,36 +103,32 @@ class QuotationNumberingService
         }
 
         $referensi = Quotation::findOrFail($referensiId);
-        $nomorReferensi = $referensi->nomor;
 
-        // Ekstrak {MMYYYY}-{SEQ} dari nomor referensi (bagian numerik saja, TIPE
-        // code TIDAK diikutkan karena nomor turunan harus pakai TIPE code-nya
-        // sendiri, bukan warisan dari referensi — lih. $base di atas).
-        // Contoh: QUOT/ORG/ION/LS001-072026-00001 → dateSeq = 072026-00001
-        preg_match('/-(\d{6}-\d{5})(?:-[VKA]\d{2}(?:-[VKA]\d{2})*)?$/', $nomorReferensi, $matches);
-        $dateSeq = $matches[1] ?? ($monthYear . '-00001');
+        // dateSeq & rantai versi diwarisi dari nomor referensi. Segmen TIPE
+        // TIDAK diwarisi — nomor turunan memakai TIPE code-nya sendiri
+        // (lih. $base di atas).
+        $parsed = DocumentVersionChain::parse($referensi->nomor);
+        $dateSeq = $parsed['dateSeq'] ?? ($monthYear . '-00001');
 
-        // Ekstrak existing version suffix dari referensi
-        // Contoh: QUOT/ORG/ION/LS001-072026-00001-K01 → K01
-        //         QUOT/ORG/ION/LS001-072026-00001-K01-V01 → K01-V01
-        $existingVersion = '';
-        if (preg_match('/-((?:[VKA]\d{2}(?:-[VKA]\d{2})*))$/', $nomorReferensi, $vMatches)) {
-            $existingVersion = $vMatches[1];
-        }
-
-        // Tentukan version code baru
         $versionCode = $this->getVersionCode($tipeQuotation);
 
-        // Hitung urutan untuk version ini
-        $counter = $this->getVersionCounter($referensiId, $tipeQuotation, $now->year);
+        // Kalau rantai referensi sudah berakhir dengan huruf yang sama, segmen
+        // itu diganti (counter naik), bukan ditambah. Tanpa ini, revisi dari
+        // revisi menghasilkan `-V02-V02-V02`.
+        $prefix = DocumentVersionChain::prefixFor($parsed['chain'], $versionCode);
 
-        // Gabungkan: existingVersion + versionCode+counter baru (mis. K01-V01, bukan K-01-V-01)
-        $versionSegment = $versionCode . str_pad($counter, 2, '0', STR_PAD_LEFT);
-        $fullVersion = $existingVersion
-            ? $existingVersion . '-' . $versionSegment
-            : $versionSegment;
+        $counter = DocumentVersionChain::nextCounter(
+            DocumentFamily::nomorOf(Quotation::class, 'quotation_referensi_id', $referensiId),
+            $dateSeq,
+            $prefix,
+            $versionCode
+        );
 
-        return $base . $dateSeq . '-' . $fullVersion;
+        $chain = DocumentVersionChain::append($prefix, $versionCode, $counter);
+
+        return DocumentVersionChain::assertLength(
+            DocumentVersionChain::render($base, $dateSeq, $chain)
+        );
     }
 
     /**
@@ -143,28 +146,20 @@ class QuotationNumberingService
 
     /**
      * Dapatkan sequence number untuk original document per bulan.
+     *
+     * Dihitung dari SEQ tertinggi yang sudah terpakai atas query `withTrashed()`
+     * — bukan `count() + 1`. Quotation memakai SoftDeletes, jadi `count()` akan
+     * melewatkan baris terhapus dan memakai ulang nomornya.
      */
     private function getNextSequence(string $base, string $monthYear): int
     {
-        return Quotation::where('nomor', 'like', $base . $monthYear . '-%')
-            ->count() + 1;
-    }
+        $prefix = $base . $monthYear . '-';
 
-    /**
-     * Dapatkan counter untuk version tertentu (revisi ke berapa).
-     */
-    private function getVersionCounter(
-        int $referensiId,
-        string $tipeQuotation,
-        int $year
-    ): int {
-        // Cari berdasarkan parent + tipe
-        return Quotation::where(function ($q) use ($referensiId) {
-                $q->where('quotation_referensi_id', $referensiId)
-                  ->orWhere('id', $referensiId);
-            })
-            ->where('tipe_quotation', $tipeQuotation)
-            ->whereYear('created_at', $year)
-            ->count() + 1;
+        $existing = Quotation::withTrashed()
+            ->where('nomor', 'like', $prefix . '%')
+            ->pluck('nomor')
+            ->all();
+
+        return DocumentVersionChain::nextSequence($existing, $prefix);
     }
 }

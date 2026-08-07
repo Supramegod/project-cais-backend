@@ -622,7 +622,7 @@ class SpkService
                     continue;
                 }
 
-                $nomorQuotationBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id);
+                $nomorQuotationBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id, $quotationAsal->id);
                 $newQuotation = $this->createNewQuotation($quotationAsal, $nomorQuotationBaru, $alasan);
                 $newQuotations[] = $newQuotation;
 
@@ -1015,10 +1015,15 @@ class SpkService
         return $prefix . $month . $year . "-" . $sequence;
     }
 
-    private function generateNomorQuotation(int $leadsId, ?int $companyId): string
+    /**
+     * Pengajuan ulang menghasilkan REVISI dari quotation asal, bukan dokumen
+     * baru. Sebelumnya tipe di-hardcode 'baru' sehingga quotation revisi
+     * mendapat nomor QUOT/ORG/... dan urutan revisinya tidak terlihat di nomor.
+     */
+    private function generateNomorQuotation(int $leadsId, ?int $companyId, int $referensiId): string
     {
         return app(\App\Services\Quotation\QuotationNumberingService::class)
-            ->generate($leadsId, $companyId ?? 0, 'baru');
+            ->generate($leadsId, $companyId ?? 0, 'revisi', $referensiId);
     }
 
     private function createNewQuotation($quotationAsal, string $nomorQuotationBaru, string $alasan)
@@ -1037,6 +1042,11 @@ class SpkService
         $newQuotationData['revisi'] = ($quotationAsal->revisi ?? 0) + 1;
         $newQuotationData['alasan_revisi'] = $alasan;
         $newQuotationData['quotation_asal_id'] = $quotationAsal->id;
+        // Selaraskan data dengan nomor yang digenerate: dokumen ini adalah
+        // revisi, dan rantai versinya ditelusuri lewat quotation_referensi_id.
+        // Tanpa ini, toArray() akan mewarisi referensi milik quotation asal.
+        $newQuotationData['quotation_referensi_id'] = $quotationAsal->id;
+        $newQuotationData['tipe_quotation'] = 'revisi';
         $newQuotationData['created_at'] = now();
         $newQuotationData['created_by'] = Auth::user()->full_name;
         $newQuotationData['updated_at'] = null;
