@@ -7,6 +7,7 @@ use App\Http\Requests\Role\RoleUpdatePermissionsRequest;
 use App\Models\Role;
 use App\Models\Sysmenu;
 use App\Models\SysmenuRole;
+use App\Services\MenuPermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\DB;
  */
 class RoleController extends Controller
 {
+    public function __construct(private MenuPermissionService $menuPermissions) {}
+
     /**
      * @OA\Get(
      *     path="/api/roles/list",
@@ -300,6 +303,10 @@ class RoleController extends Controller
                 $this->cascadePermissionToChildren($id, $permission);
             }
         });
+
+        // Cache permission dibaca setiap request oleh CheckMenuPermission, jadi
+        // harus dibuang begitu datanya berubah.
+        $this->menuPermissions->forget((int) $id);
 
         return $this->successResponse(null, 'Permissions updated successfully');
     }

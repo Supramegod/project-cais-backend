@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,6 +61,22 @@ class SpkControllerTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Role 2 diberi permission penuh atas menu SPK supaya test ini tetap
+        // menguji perilaku controller, bukan authorization (lihat
+        // SpkMenuPermissionTest untuk jalur penolakannya).
+        DB::table('sysmenu_role')->insert([
+            'sysmenu_id' => config('menu_permissions.spk'),
+            'role_id' => 2,
+            'is_view' => true,
+            'is_add' => true,
+            'is_edit' => true,
+            'is_delete' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Cache::flush();
 
         $this->actingAs(User::query()->findOrFail(1), 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
@@ -215,9 +232,22 @@ class SpkControllerTest extends TestCase
 
     private function rebuildSchema(): void
     {
-        foreach (['m_user', 'sl_leads', 'm_status_spk', 'sl_spk', 'sl_spk_site', 'sl_customer_activity'] as $t) {
+        foreach (['m_user', 'sl_leads', 'm_status_spk', 'sl_spk', 'sl_spk_site', 'sl_customer_activity', 'sysmenu_role'] as $t) {
             Schema::dropIfExists($t);
         }
+
+        Schema::create('sysmenu_role', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('sysmenu_id');
+            $table->unsignedInteger('role_id');
+            $table->boolean('is_view')->default(false);
+            $table->boolean('is_add')->default(false);
+            $table->boolean('is_edit')->default(false);
+            $table->boolean('is_delete')->default(false);
+            $table->unsignedInteger('created_by')->nullable();
+            $table->unsignedInteger('updated_by')->nullable();
+            $table->timestamps();
+        });
 
         Schema::create('m_user', function (Blueprint $table) {
             $table->increments('id');

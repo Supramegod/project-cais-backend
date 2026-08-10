@@ -33,7 +33,6 @@ use App\Http\Controllers\SalesActivityController;
 use App\Http\Controllers\SalesRevenueController;
 use App\Http\Controllers\SalesTargetController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\SpkController;
 use App\Http\Controllers\SubmissionController;
 use App\Http\Controllers\SubmissionV2Controller;
 use App\Http\Controllers\SupplierController;
@@ -360,36 +359,7 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/available', 'availableCustomer')->name('customer.available');
     });
     // SPK Routes
-    Route::prefix('spk')->controller(SpkController::class)->group(function () {
-        // Basic CRUD
-        Route::get('/list', 'list');
-        Route::get('/list-terhapus', 'listTerhapus');
-        Route::get('/view/{id}', 'view');
-        Route::post('/add', 'add');
-        Route::put('/delete-site/{id}', 'deleteSite');
-        Route::delete('/delete/{id}', 'delete');
-
-        // Cetak SPK
-        Route::get('/cetak/{id}', 'cetakSpk');
-
-        // File Upload
-        Route::post('/upload/{id}', 'uploadSpk');
-
-        // Ajukan Ulang Quotation
-        Route::post('/ajukan-ulang/{spkId}', 'ajukanUlangQuotation');
-
-        // Available Resources
-        Route::get('/available-quotation', 'availableQuotation');
-        Route::get('/available-leads', 'availableLeads');
-        Route::get('/available-sites/{leadsId}', 'getSiteAvailableList');
-
-        // Site Management
-        Route::get('/site-list/{id}', 'getSiteList');
-        Route::get('/spk/deleted-sites/{spkId}', 'getDeletedSpkSites');
-
-        // Submit Checklist
-        Route::post('/{id}/submit-checklist', 'submitChecklist');
-    });
+    require __DIR__ . '/modules/spk.php';
     // Role Management
     Route::prefix('roles')->controller(RoleController::class)->group(function () {
         Route::get('/list', 'index');
