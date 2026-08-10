@@ -573,6 +573,7 @@ class QuotationController extends Controller
                 'quotationPics',
                 'quotationDetails',
                 'statusQuotation',
+                'creator.role',
             ]);
 
             $newSitesCount = $quotation->quotationSites->count();
@@ -660,6 +661,7 @@ class QuotationController extends Controller
                 'quotationKerjasamas',
                 'logNotifications',
                 'logApprovals',
+                'creator.role',
         ])->findOrFail($id);
 
         // ✅ BENAR: Melewatkan model Quotation ke Resource (biarkan apa adanya).

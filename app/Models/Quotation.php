@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
@@ -22,6 +23,7 @@ class Quotation extends Model
         'status_quotation_id',
         'total_harga',
         'created_by',
+        'created_by_id',
         'created_by_user_id',
         'updated_by',
         'deleted_by',
@@ -280,6 +282,12 @@ class Quotation extends Model
     public function managementFeeConfig(): HasOne
     {
         return $this->hasOne(QuotationManagementFee::class, 'quotation_id');
+    }
+
+    // Relasi ke User pembuat quotation
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_id');
     }
 
     // Relasi ke QuotationTraining
