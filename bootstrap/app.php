@@ -32,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'token.expiry' => \App\Http\Middleware\CheckTokenExpiry::class,
+            'menu' => \App\Http\Middleware\CheckMenuPermission::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
