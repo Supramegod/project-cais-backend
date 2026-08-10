@@ -490,6 +490,7 @@ class QuotationController extends Controller
             );
 
             $quotationData['created_by'] = $user->full_name;
+            $quotationData['created_by_id'] = $user->id;
             $quotationData['tipe_quotation'] = $tipe_quotation;
 
             $quotation = Quotation::create($quotationData);
