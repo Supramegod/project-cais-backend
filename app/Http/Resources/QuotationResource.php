@@ -374,9 +374,11 @@ class QuotationResource extends JsonResource
             'created_at' => $this->created_at,
             'created_at_formatted' => $this->created_at ? Carbon::parse($this->created_at)->isoFormat('D MMMM Y') : null,
             'created_by' => $this->created_by,
+            'created_by_id' => $this->created_by_id,
+            'created_by_role' => $this->whenLoaded('creator', fn() => $this->creator?->role?->name),
+            'created_by_role_id' => $this->whenLoaded('creator', fn() => $this->creator?->cais_role_id),
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
-
             // Relationships
             'leads' => $this->whenLoaded('leads', function () {
                 return [
