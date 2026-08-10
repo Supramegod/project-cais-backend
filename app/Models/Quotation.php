@@ -23,7 +23,6 @@ class Quotation extends Model
         'status_quotation_id',
         'total_harga',
         'created_by',
-        'created_by_id',
         'created_by_user_id',
         'updated_by',
         'deleted_by',
@@ -287,7 +286,7 @@ class Quotation extends Model
     // Relasi ke User pembuat quotation
     public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by_id');
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     // Relasi ke QuotationTraining
