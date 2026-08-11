@@ -13,12 +13,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Baris yang sudah ditutup tidak pernah dibuka lagi — kekurangannya kembali
  * menjadi sisa yang boleh di-request ulang lewat batch baru.
  *
+ * Satu baris menyentuh DUA batch, dan keduanya harus dibedakan: batch_id adalah
+ * batch pengiriman (diisi saat baris dibuat), received_batch_id adalah batch
+ * penerimaan yang menutupnya. Tanpa pemisahan ini, baris berstatus 'received'
+ * terbaca seolah miliknya batch request — itu sumber kebingungan "sudah diterima
+ * tapi aksinya masih request".
+ *
  * @property int $id
  * @property int $pks_id
  * @property int $site_id
  * @property int $fulfillment_id
- * @property string $batch_id
+ * @property string $batch_id batch PENGIRIMAN — diisi saat baris dibuat
  * @property int|null $batch_ke
+ * @property string|null $received_batch_id batch PENERIMAAN yang menutup baris ini
+ * @property int|null $received_batch_ke
  * @property string $item_type
  * @property int $item_id
  * @property int $qty_request
@@ -52,6 +60,8 @@ class PksItemRequest extends Model
         'fulfillment_id',
         'batch_id',
         'batch_ke',
+        'received_batch_id',
+        'received_batch_ke',
         'item_type',
         'item_id',
         'qty_request',

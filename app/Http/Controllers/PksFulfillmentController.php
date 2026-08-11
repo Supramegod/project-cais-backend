@@ -57,8 +57,12 @@ use Illuminate\Support\Facades\DB;
  *     @OA\Property(property="id", type="integer"),
  *     @OA\Property(property="fulfillment_id", type="integer"),
  *     @OA\Property(property="site_id", type="integer"),
- *     @OA\Property(property="batch_id", type="string", format="uuid"),
- *     @OA\Property(property="batch_ke", type="integer", nullable=true),
+ *     @OA\Property(property="batch_id", type="string", format="uuid", description="DEPRECATED — alias request_batch_id. Isinya batch PENGIRIMAN, bukan penerimaan."),
+ *     @OA\Property(property="batch_ke", type="integer", nullable=true, description="DEPRECATED — alias request_batch_ke"),
+ *     @OA\Property(property="request_batch_id", type="string", format="uuid", description="Batch pengiriman yang membuat baris ini"),
+ *     @OA\Property(property="request_batch_ke", type="integer", nullable=true),
+ *     @OA\Property(property="received_batch_id", type="string", format="uuid", nullable=true, description="Batch penerimaan yang menutup baris ini. NULL selama status masih open, atau bila log lama tidak menyimpan tautannya. Pakai id ini untuk membuka batch detail beraksi 'receive'."),
+ *     @OA\Property(property="received_batch_ke", type="integer", nullable=true),
  *     @OA\Property(property="item_type", type="string"),
  *     @OA\Property(property="item_id", type="integer"),
  *     @OA\Property(property="nama", type="string", nullable=true),
@@ -781,7 +785,9 @@ class PksFulfillmentController extends Controller
      *     path="/api/pks-fulfillment/item-fulfillment/{fulfillment}",
      *     tags={"PKS Fulfillment"},
      *     summary="Edit item fulfillment",
-     *     description="Mengedit quantity dan catatan fulfillment. Hanya untuk role tertentu (cais_role_id 8/10/98).",
+     *     description="Mengoreksi jumlah yang DITERIMA (qty_terpenuhi) dan catatannya. Hanya untuk role tertentu (cais_role_id 8/10/98).
+     *
+     * Koreksi tidak boleh menyerobot barang yang masih menunggu penerimaan: `qty_terpenuhi + qty_request` harus tetap <= `qty_diminta`, kalau tidak 422. Barang yang sudah sampai dicatat lewat endpoint receive, bukan lewat koreksi ini — supaya baris permintaannya ikut ditutup dan riwayat batch-nya utuh.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -915,7 +921,9 @@ class PksFulfillmentController extends Controller
      *     path="/api/pks-fulfillment/{pks}/fulfillment-log",
      *     tags={"PKS Fulfillment"},
      *     summary="Get fulfillment log per PKS (item + visit), dikelompokkan per batch",
-     *     description="Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.",
+     *     description="Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.
+     *
+     * Grup batch pengiriman barang (jenis=item, aksi=request) ikut membawa rekap penerimaannya — `status_penerimaan`, `jumlah_diterima`, `jumlah_menunggu`, `jumlah_kurang`, `jumlah_tanpa_tautan`, `qty_kurang` — dengan arti yang sama seperti di batch detail. Grup lain memakai nilai kosong (`status_penerimaan` null). Pakai field ini untuk badge di daftar; `aksi` tidak pernah berubah jadi 'receive'.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="pks", in="path", required=true, @OA\Schema(type="integer")),
@@ -942,7 +950,11 @@ class PksFulfillmentController extends Controller
      *     path="/api/pks-fulfillment/fulfillment-log/batch/{batchId}",
      *     tags={"PKS Fulfillment"},
      *     summary="Detail satu batch pengiriman",
-     *     description="Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.",
+     *     description="Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.
+     *
+     * `aksi` menyatakan JENIS batch dan tidak pernah berubah — batch pengiriman selamanya `request`, penerimaannya dicatat sebagai batch terpisah beraksi `receive`. Untuk tahu apakah barang batch ini sudah diterima, baca `status_penerimaan` (batch) atau objek `penerimaan` per item, bukan `aksi`.
+     *
+     * Bentuk `items` berbeda per aksi. Batch `receive`: angka sesi itu sendiri, datar (`qty_diterima`, `qty_request_ditutup`, `kurang`, `request_ids`). Batch `request`: angka kirimnya datar (`qty_dikirim`, `boleh_direquest_*`) sementara angka penerimaannya bersarang di objek `penerimaan` (`request_id`, `status`, `qty_diterima`, `kurang`, `received_at`, `batch_id`, `batch_ke`) — `penerimaan` bernilai null bila log lama tidak menyimpan tautan ke baris permintaan. Disarangkan supaya `qty_diterima`/`kurang` tidak bermakna ganda antar jenis batch.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="batchId", in="path", required=true, description="batch_id (UUID) dari response bulk atau dari fulfillment-log", @OA\Schema(type="string", format="uuid")),
@@ -958,8 +970,15 @@ class PksFulfillmentController extends Controller
      *                 @OA\Property(property="batch_id", type="string", format="uuid"),
      *                 @OA\Property(property="batch_ke", type="integer", example=3),
      *                 @OA\Property(property="jenis", type="string", enum={"item","visit"}),
+     *                 @OA\Property(property="aksi", type="string", enum={"request","receive","edit"}, description="Jenis batch, bukan status. Selalu tetap."),
      *                 @OA\Property(property="pks_id", type="integer"),
      *                 @OA\Property(property="jumlah_item", type="integer"),
+     *                 @OA\Property(property="status_penerimaan", type="string", enum={"belum","sebagian","selesai","selesai_kurang"}, nullable=true, description="Hanya terisi untuk batch item beraksi request. `selesai_kurang` = tidak ada lagi yang ditunggu, tapi barangnya kurang. NULL bila tidak relevan atau seluruh lognya lama tanpa tautan ke baris permintaan."),
+     *                 @OA\Property(property="jumlah_diterima", type="integer", description="Baris permintaan yang sudah ditutup (received + short)"),
+     *                 @OA\Property(property="jumlah_menunggu", type="integer", description="Baris permintaan yang masih open"),
+     *                 @OA\Property(property="jumlah_kurang", type="integer", description="Bagian dari jumlah_diterima yang ditutup sebagai short"),
+     *                 @OA\Property(property="jumlah_tanpa_tautan", type="integer", description="Item log lama yang tidak bisa ditautkan ke baris permintaan. jumlah_diterima + jumlah_menunggu + jumlah_tanpa_tautan = jumlah_item."),
+     *                 @OA\Property(property="qty_kurang", type="integer", description="Total unit yang tidak jadi diterima di batch ini"),
      *                 @OA\Property(property="items", type="array", @OA\Items(type="object"))
      *             )
      *         )

@@ -410,16 +410,46 @@ class ItemFulfillmentService
      * (di-check di controller level).
      *
      * Tidak menyentuh qty_request: barang yang masih di jalan urusan penerimaan,
-     * bukan koreksi angka terima.
+     * bukan koreksi angka terima. Justru karena itu koreksinya harus tunduk pada
+     * invarian yang sama dengan jalur request —
+     * qty_terpenuhi + qty_request <= qty_diminta. Tanpa itu, menaikkan
+     * qty_terpenuhi selagi ada barang di jalan membuat penerimaannya nanti
+     * menembus qty_diminta (10 diminta, dikirim 10, dikoreksi jadi 10, lalu
+     * diterima 10 = 20 terpenuhi).
+     *
+     * Barang yang masih menunggu harus dicatat lewat penerimaan, bukan
+     * diselundupkan lewat koreksi — supaya baris permintaannya ikut ditutup dan
+     * riwayat batch-nya tetap utuh.
      */
     public function editFulfillment(PksItemFulfillment $fulfillment, int $newQty, string $catatan, User $user): PksItemFulfillment
     {
         return DB::transaction(function () use ($fulfillment, $newQty, $catatan, $user) {
+            // Dikunci karena koreksi dan penerimaan sama-sama menulis
+            // qty_terpenuhi; tanpa ini keduanya bisa saling menimpa.
+            $fulfillment = PksItemFulfillment::whereKey($fulfillment->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $fulfillment) {
+                throw new \RuntimeException('Data fulfillment tidak ditemukan.');
+            }
+
             $oldQty = $fulfillment->qty_terpenuhi;
             $remainingBefore = $fulfillment->qty_diminta - $fulfillment->qty_terpenuhi;
 
             if ($newQty < 0 || $newQty > $fulfillment->qty_diminta) {
                 throw new \RuntimeException('Qty tidak valid.');
+            }
+
+            $menunggu = (int) $fulfillment->qty_request;
+
+            if ($newQty + $menunggu > (int) $fulfillment->qty_diminta) {
+                $maksimal = (int) $fulfillment->qty_diminta - $menunggu;
+
+                throw new \RuntimeException(
+                    "Qty terlalu besar: {$menunggu} unit masih menunggu penerimaan, ".
+                    "jadi koreksi maksimal {$maksimal}. Catat penerimaannya dulu bila barang sudah sampai."
+                );
             }
 
             $fulfillment->qty_terpenuhi = $newQty;
@@ -463,28 +493,58 @@ class ItemFulfillmentService
 
     public function getFulfillmentLog(int $fulfillmentId): Collection
     {
+        // Dipakai menghitung remaining pada log penerimaan, yang metanya
+        // menyimpan qty_terpenuhi (bukan remaining). qty_diminta tetap sepanjang
+        // hidup baris, jadi aman dipakai untuk log lama sekalipun.
+        $qtyDiminta = (int) PksItemFulfillment::withTrashed()
+            ->whereKey($fulfillmentId)
+            ->value('qty_diminta');
+
         // Flatten meta JSON balik ke top-level supaya bentuk response endpoint
         // tetap sama seperti sebelum log dipindah ke tabel fulfillment.
         return PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillmentId)
             ->select('id', 'site_id', 'reference_id', 'batch_id', 'batch_ke', 'aksi', 'meta', 'catatan', 'created_by', 'created_at')
             ->orderBy('id', 'desc')
             ->get()
-            ->map(function (PksFulfillmentLog $log) {
+            ->map(function (PksFulfillmentLog $log) use ($qtyDiminta) {
                 $meta = $log->meta ?? [];
 
-                return [
+                $baris = [
                     'id' => $log->id,
                     'site_id' => $log->site_id,
                     'fulfillment_id' => $log->reference_id,
                     'batch_id' => $log->batch_id,
                     'batch_ke' => $log->batch_ke,
                     'aksi' => $log->aksi,
-                    'qty_sesi_ini' => $meta['qty_sesi_ini'] ?? 0,
-                    'remaining_sebelum' => $meta['remaining_sebelum'] ?? 0,
-                    'remaining_sesudah' => $meta['remaining_sesudah'] ?? 0,
                     'catatan' => $log->catatan,
                     'created_by' => $log->created_by,
                     'created_at' => $log->created_at,
+                ];
+
+                // Log penerimaan memakai kunci meta sendiri (qty_diterima dkk),
+                // bukan qty_sesi_ini/remaining_*. Tanpa cabang ini seluruh baris
+                // receive terbaca 0 — seolah tidak ada barang yang diterima.
+                if ($log->aksi === PksFulfillmentLog::AKSI_RECEIVE) {
+                    $terpenuhiSebelum = (int) ($meta['qty_terpenuhi_sebelum'] ?? 0);
+                    $terpenuhiSesudah = (int) ($meta['qty_terpenuhi_sesudah'] ?? 0);
+
+                    return $baris + [
+                        // Diisi qty yang diterima supaya klien lama yang membaca
+                        // qty_sesi_ini tetap mendapat angka sesi ini.
+                        'qty_sesi_ini' => (int) ($meta['qty_diterima'] ?? 0),
+                        'remaining_sebelum' => $qtyDiminta - $terpenuhiSebelum,
+                        'remaining_sesudah' => $qtyDiminta - $terpenuhiSesudah,
+                        'qty_diterima' => (int) ($meta['qty_diterima'] ?? 0),
+                        'qty_request_ditutup' => $meta['qty_request_ditutup'] ?? null,
+                        'kurang' => $meta['kurang'] ?? null,
+                        'request_ids' => $meta['request_ids'] ?? [],
+                    ];
+                }
+
+                return $baris + [
+                    'qty_sesi_ini' => $meta['qty_sesi_ini'] ?? 0,
+                    'remaining_sebelum' => $meta['remaining_sebelum'] ?? 0,
+                    'remaining_sesudah' => $meta['remaining_sesudah'] ?? 0,
                 ];
             });
     }

@@ -303,6 +303,8 @@ class ItemFulfillmentServiceTest extends TestCase
             $table->unsignedInteger('fulfillment_id');
             $table->uuid('batch_id');
             $table->unsignedInteger('batch_ke')->nullable();
+            $table->uuid('received_batch_id')->nullable();
+            $table->unsignedInteger('received_batch_ke')->nullable();
             $table->string('item_type', 32);
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_request');
@@ -424,18 +426,121 @@ class ItemFulfillmentServiceTest extends TestCase
         ];
         $fulfillment = $this->service->createFulfillment($data, $this->user);
 
-        // Then edit
-        $this->service->editFulfillment($fulfillment, 8, 'Edit menjadi 8 unit', $this->user);
+        // Then edit. Batasnya 5: sisanya masih di jalan (qty_request 5 dari
+        // qty_diminta 10), dan koreksi tidak boleh menyerobot jatah itu.
+        $this->service->editFulfillment($fulfillment, 5, 'Edit menjadi 5 unit', $this->user);
 
         $editLog = PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillment->id)
             ->where('aksi', PksFulfillmentLog::AKSI_EDIT)->first();
         $this->assertNotNull($editLog);
         // Edit menyetel jumlah DITERIMA secara absolut; qty_terpenuhi masih 0
-        // karena barang belum di-receive, jadi deltanya 8.
-        $this->assertSame(8, $editLog->meta['qty_sesi_ini']);
+        // karena barang belum di-receive, jadi deltanya 5.
+        $this->assertSame(5, $editLog->meta['qty_sesi_ini']);
 
         $logCount = PksFulfillmentLog::forRef(PksFulfillmentLog::JENIS_ITEM, $fulfillment->id)->count();
         $this->assertEquals(2, $logCount, 'Should have request + edit log entries');
+    }
+
+    /**
+     * Celah over-receive: koreksi yang menaikkan qty_terpenuhi selagi ada barang
+     * di jalan membuat penerimaannya nanti menembus qty_diminta.
+     *
+     * @test
+     */
+    public function test_edit_fulfillment_rejects_qty_that_would_over_fulfill(): void
+    {
+        $fulfillment = $this->service->createFulfillment([
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => 1,
+            'qty_diminta' => 10,
+            'qty' => 10,
+            'catatan' => 'Mengirim seluruh kebutuhan',
+        ], $this->user);
+
+        try {
+            $this->service->editFulfillment($fulfillment, 10, 'Koreksi jadi 10 unit', $this->user);
+            $this->fail('Koreksi yang menembus qty_diminta seharusnya ditolak.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('masih menunggu penerimaan', $e->getMessage());
+            $this->assertStringContainsString('maksimal 0', $e->getMessage());
+        }
+
+        $fulfillment->refresh();
+        $this->assertSame(0, (int) $fulfillment->qty_terpenuhi, 'Koreksi yang ditolak tidak boleh menyisakan perubahan');
+
+        // Dan jalur penerimaannya tetap utuh: 10 unit itu masih bisa diterima
+        // secara wajar, berhenti persis di qty_diminta.
+        (new ItemReceivingService)->receive(
+            [['fulfillment_id' => $fulfillment->id, 'qty' => 10]],
+            $this->user
+        );
+
+        $fulfillment->refresh();
+        $this->assertSame(10, (int) $fulfillment->qty_terpenuhi);
+    }
+
+    /** @test */
+    public function test_edit_fulfillment_allows_qty_up_to_the_in_transit_boundary(): void
+    {
+        $fulfillment = $this->service->createFulfillment([
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => 1,
+            'qty_diminta' => 10,
+            'qty' => 4,
+            'catatan' => 'Mengirim 4 dari 10 unit',
+        ], $this->user);
+
+        // 6 + 4 di jalan = 10, persis qty_diminta — masih boleh.
+        $this->service->editFulfillment($fulfillment, 6, 'Koreksi jadi 6 unit', $this->user);
+
+        $fulfillment->refresh();
+        $this->assertSame(6, (int) $fulfillment->qty_terpenuhi);
+        $this->assertSame(4, (int) $fulfillment->qty_request);
+    }
+
+    /**
+     * Baris yang invariannya sudah rusak sebelum penjagaan ini ada tidak boleh
+     * diperparah oleh penerimaan berikutnya.
+     *
+     * @test
+     */
+    public function test_receive_rejects_row_that_is_already_over_fulfilled(): void
+    {
+        $fulfillment = $this->service->createFulfillment([
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => 1,
+            'qty_diminta' => 10,
+            'qty' => 10,
+            'catatan' => 'Mengirim seluruh kebutuhan',
+        ], $this->user);
+
+        // Data warisan: qty_terpenuhi sudah penuh padahal 10 unit masih tercatat
+        // di jalan — bentuk yang dulu bisa dihasilkan editFulfillment.
+        DB::table('sl_pks_item_fulfillment')
+            ->where('id', $fulfillment->id)
+            ->update(['qty_terpenuhi' => 10]);
+
+        try {
+            (new ItemReceivingService)->receive(
+                [['fulfillment_id' => $fulfillment->id, 'qty' => 10]],
+                $this->user
+            );
+            $this->fail('Penerimaan yang menembus qty_diminta seharusnya ditolak.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('melebihi kebutuhan', $e->getMessage());
+        }
+
+        $fulfillment->refresh();
+        $this->assertSame(10, (int) $fulfillment->qty_terpenuhi, 'Tidak boleh menjadi 20');
     }
 
     // ─── TEST 4: editFulfillment validasi qty ────────────────────────
@@ -630,12 +735,13 @@ class ItemFulfillmentServiceTest extends TestCase
             'catatan' => 'Catatan awal pengiriman',
         ], $this->user);
 
-        $this->service->editFulfillment($fulfillment, 8, 'Koreksi jumlah jadi 8 unit', $this->user);
+        // 5 adalah batasnya: 5 unit sisanya masih tercatat di jalan.
+        $this->service->editFulfillment($fulfillment, 5, 'Koreksi jumlah jadi 5 unit', $this->user);
 
         // Catatan edit jadi baris log terbaru.
         $log = $this->service->getFulfillmentLog($fulfillment->id);
         $this->assertSame('edit', $log->first()['aksi']);
-        $this->assertSame('Koreksi jumlah jadi 8 unit', $log->first()['catatan']);
+        $this->assertSame('Koreksi jumlah jadi 5 unit', $log->first()['catatan']);
     }
 
     // --- TEST 6e: getPksLog dikelompokkan per batch, filter jenis ---

@@ -46,10 +46,15 @@ class PksFulfillmentSummaryService
     private function itemSummary(Pks $pks): array
     {
         $perSite = [];
+        // 'requested' lahir bersama alur dua tahap (migration 2026_08_03_000002).
+        // Tanpa embernya di sini, item yang sudah dikirim tapi belum diterima
+        // tidak terhitung di mana pun — total_item jadi tidak sama dengan jumlah
+        // ember statusnya.
         $overall = [
             'total_item' => 0,
             'fully_fulfilled' => 0,
             'partially_fulfilled' => 0,
+            'requested' => 0,
             'not_yet_fulfilled' => 0,
             'total_qty_diminta' => 0,
             'total_qty_terpenuhi' => 0,
@@ -66,6 +71,7 @@ class PksFulfillmentSummaryService
                 'total_item' => count($items),
                 'fully_fulfilled' => 0,
                 'partially_fulfilled' => 0,
+                'requested' => 0,
                 'not_yet_fulfilled' => 0,
                 'total_qty_diminta' => 0,
                 'total_qty_terpenuhi' => 0,
@@ -86,6 +92,7 @@ class PksFulfillmentSummaryService
             $overall['total_item'] += $siteRow['total_item'];
             $overall['fully_fulfilled'] += $siteRow['fully_fulfilled'];
             $overall['partially_fulfilled'] += $siteRow['partially_fulfilled'];
+            $overall['requested'] += $siteRow['requested'];
             $overall['not_yet_fulfilled'] += $siteRow['not_yet_fulfilled'];
             $overall['total_qty_diminta'] += $siteRow['total_qty_diminta'];
             $overall['total_qty_terpenuhi'] += $siteRow['total_qty_terpenuhi'];
