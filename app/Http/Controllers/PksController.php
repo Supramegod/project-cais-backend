@@ -249,6 +249,8 @@ class PksController extends Controller
                     'statusPks:id,nama',
                     'wizardStatus:id,kode,nama',
                     'sites:id,pks_id,nama_site',
+                    'leads:id,branch_id',
+                    'leads.branch:id,name', // jika branch ada di PKS, bukan leads
                 ])
                 // ✅ JOIN leads sekali — dipakai untuk filter branch
                 ->leftJoin('sl_leads', 'sl_pks.leads_id', '=', 'sl_leads.id')
@@ -349,6 +351,10 @@ class PksController extends Controller
                     'status_berlaku' => $pks->getRawOriginal('kontrak_akhir')
                         ? $this->pksService->getStatusBerlaku($pks->getRawOriginal('kontrak_akhir'))
                         : null,
+                    'branch' => $pks->leads?->branch ? [
+                        'id' => $pks->leads->branch->id,
+                        'name' => $pks->leads->branch->name,
+                    ] : null,
                     'created_at' => $pks->getRawOriginal('created_at'),
                     'created_by' => $pks->created_by,
                 ];
@@ -580,7 +586,7 @@ class PksController extends Controller
                 $resourceCache = [];
                 foreach ($siteData as $item) {
                     $qid = $item->quotation_id;
-                    if (! array_key_exists($qid, $resourceCache)) {
+                    if (!array_key_exists($qid, $resourceCache)) {
                         $quotation = $quotations->get($qid);
                         $resourceCache[$qid] = $quotation ? new QuotationResource($quotation) : null;
                     }
@@ -732,7 +738,7 @@ class PksController extends Controller
     public function store(PksStoreRequest $request, $tipe): JsonResponse
     {
         // Guard tipe (validasi field ditangani PksStoreRequest secara dinamis per-tipe)
-        if (! in_array($tipe, ['baru', 'rekontrak', 'addendum'], true)) {
+        if (!in_array($tipe, ['baru', 'rekontrak', 'addendum'], true)) {
             return $this->errorResponse('Invalid tipe. Pilihan: baru, rekontrak, addendum', 400);
         }
 
@@ -1132,9 +1138,9 @@ class PksController extends Controller
      *         description="Nomor halaman",
      *         @OA\Schema(type="integer", example=1)
      *     ),
-      *
-      *     @OA\Response(
-      *         response=200,
+     *
+     *     @OA\Response(
+     *         response=200,
      *         description="Successful operation",
      *
      *         @OA\JsonContent(
