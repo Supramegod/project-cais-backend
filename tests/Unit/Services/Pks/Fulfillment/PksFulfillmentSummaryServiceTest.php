@@ -307,6 +307,33 @@ class PksFulfillmentSummaryServiceTest extends TestCase
         $this->assertSame('operasional', $summary['visit']['upcoming']['role']);
     }
 
+    /**
+     * Status 'requested' lahir bersama alur dua tahap. Sebelum ini embernya
+     * tidak ada di rekap, sehingga item yang sudah dikirim tapi belum diterima
+     * hilang dari hitungan dan total_item tidak lagi sama dengan jumlah ember.
+     *
+     * @test
+     */
+    public function test_summary_counts_requested_items(): void
+    {
+        DB::table('sl_pks_item_fulfillment')
+            ->where('pks_id', $this->pksId)
+            ->where('item_id', 2)
+            ->update(['qty_terpenuhi' => 0, 'qty_request' => 4, 'status' => 'requested']);
+
+        $item = $this->service->build(Pks::findOrFail($this->pksId))['item']['overall'];
+
+        $this->assertSame(1, $item['requested']);
+        $this->assertSame(1, $item['fully_fulfilled']);
+        $this->assertSame(0, $item['partially_fulfilled']);
+        $this->assertSame(1, $item['not_yet_fulfilled']);
+        $this->assertSame(
+            $item['total_item'],
+            $item['fully_fulfilled'] + $item['partially_fulfilled'] + $item['requested'] + $item['not_yet_fulfilled'],
+            'Jumlah seluruh ember status harus sama dengan total_item'
+        );
+    }
+
     protected ?string $tempDbPath = null;
 
     protected function tearDown(): void

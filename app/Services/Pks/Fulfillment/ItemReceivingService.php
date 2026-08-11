@@ -125,6 +125,11 @@ class ItemReceivingService
                 ? PksItemRequest::STATUS_RECEIVED
                 : PksItemRequest::STATUS_SHORT;
             $request->received_at = now();
+            // Tautan balik ke batch penerimaan. Tanpa ini baris yang sudah
+            // 'received' hanya mengenal batch pengirimannya, sehingga dari
+            // daftar permintaan tidak ada jalan menuju batch yang menutupnya.
+            $request->received_batch_id = $batch['batch_id'];
+            $request->received_batch_ke = $batch['batch_ke'];
             $request->updated_by = $user->full_name;
             $request->save();
 
@@ -222,8 +227,15 @@ class ItemReceivingService
                 'id' => $request->id,
                 'fulfillment_id' => $request->fulfillment_id,
                 'site_id' => $request->site_id,
+                // batch_id/batch_ke dipertahankan demi klien lama, tapi namanya
+                // menyesatkan: isinya batch PENGIRIMAN. Pakai pasangan
+                // request_*/received_* di bawah untuk navigasi ke batch detail.
                 'batch_id' => $request->batch_id,
                 'batch_ke' => $request->batch_ke,
+                'request_batch_id' => $request->batch_id,
+                'request_batch_ke' => $request->batch_ke,
+                'received_batch_id' => $request->received_batch_id,
+                'received_batch_ke' => $request->received_batch_ke,
                 'item_type' => $request->item_type,
                 'item_id' => $request->item_id,
                 'nama' => $names[$request->item_type][$request->item_id] ?? null,

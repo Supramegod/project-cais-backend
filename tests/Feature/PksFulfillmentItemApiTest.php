@@ -362,6 +362,8 @@ class PksFulfillmentItemApiTest extends TestCase
             $table->unsignedInteger('fulfillment_id');
             $table->uuid('batch_id');
             $table->unsignedInteger('batch_ke')->nullable();
+            $table->uuid('received_batch_id')->nullable();
+            $table->unsignedInteger('received_batch_ke')->nullable();
             $table->string('item_type', 32);
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_request');
@@ -1237,6 +1239,124 @@ class PksFulfillmentItemApiTest extends TestCase
         // Route model binding returns 404 for non-existent records
         $response->assertStatus(404)
             ->assertJson(['success' => false]);
+    }
+
+    // ─── TEST 12: baris request menyimpan tautan ke batch penerimaan ──
+    /** @test */
+    public function test_received_batch_id_links_request_row_to_receive_batch(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        // Selama belum diterima, tautannya belum ada.
+        $this->getJson("/api/pks-fulfillment/{$this->pksId}/item-request?site_id={$this->siteId}")
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'open')
+            ->assertJsonPath('data.0.received_batch_id', null)
+            ->assertJsonPath('data.0.request_batch_id', fn ($v) => is_string($v) && $v !== '');
+
+        $receiveBatchId = $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 4]],
+            'catatan' => 'Seluruh barang diterima site',
+        ])->assertStatus(201)->json('data.batch_id');
+
+        $row = $this->getJson("/api/pks-fulfillment/{$this->pksId}/item-request?status=received")
+            ->assertOk()
+            ->assertJsonPath('data.0.received_batch_id', $receiveBatchId)
+            ->json('data.0');
+
+        // Inti perbaikan: batch pengiriman dan penerimaan adalah dua batch
+        // berbeda, dan barisnya sekarang mengenal keduanya.
+        $this->assertNotSame($row['request_batch_id'], $row['received_batch_id']);
+
+        // Membuka received_batch_id memberi batch penerimaan, bukan pengiriman.
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$receiveBatchId}")
+            ->assertOk()
+            ->assertJsonPath('data.aksi', 'receive');
+    }
+
+    // ─── TEST 13: batch pengiriman menjawab sudah diterima atau belum ─
+    /** @test */
+    public function test_request_batch_detail_reports_receiving_status(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        $requestBatchId = PksFulfillmentLog::where('reference_id', $fulfillment->id)
+            ->where('aksi', PksFulfillmentLog::AKSI_REQUEST)
+            ->value('batch_id');
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$requestBatchId}")
+            ->assertOk()
+            ->assertJsonPath('data.aksi', 'request')
+            ->assertJsonPath('data.status_penerimaan', 'belum')
+            ->assertJsonPath('data.jumlah_menunggu', 1)
+            ->assertJsonPath('data.items.0.status_penerimaan', 'open')
+            ->assertJsonPath('data.items.0.received_batch_id', null);
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 3]],
+            'catatan' => 'Satu unit rusak saat diterima',
+        ])->assertStatus(201);
+
+        // aksi tetap 'request' — itu jenis batch, bukan status. Yang menjawab
+        // "sudah diterima belum" adalah status_penerimaan.
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$requestBatchId}")
+            ->assertOk()
+            ->assertJsonPath('data.aksi', 'request')
+            ->assertJsonPath('data.status_penerimaan', 'selesai')
+            ->assertJsonPath('data.jumlah_diterima', 1)
+            ->assertJsonPath('data.jumlah_menunggu', 0)
+            ->assertJsonPath('data.items.0.status_penerimaan', 'short')
+            ->assertJsonPath('data.items.0.qty_diterima', 3)
+            ->assertJsonPath('data.items.0.kurang', 1)
+            ->assertJsonPath('data.items.0.received_batch_id', fn ($v) => is_string($v) && $v !== '');
+    }
+
+    // ─── TEST 14: batch penerimaan tidak ikut punya rekap penerimaan ──
+    /** @test */
+    public function test_receive_batch_detail_has_no_receiving_rollup(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        $receiveBatchId = $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 4]],
+            'catatan' => 'Seluruh barang diterima site',
+        ])->assertStatus(201)->json('data.batch_id');
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$receiveBatchId}")
+            ->assertOk()
+            ->assertJsonPath('data.aksi', 'receive')
+            ->assertJsonPath('data.status_penerimaan', null)
+            ->assertJsonPath('data.items.0.qty_diterima', 4);
+    }
+
+    // ─── TEST 15: log per-fulfillment tidak lagi menulis 0 untuk receive ─
+    /** @test */
+    public function test_fulfillment_log_shows_real_numbers_for_receive_action(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap'); // qty_diminta 10
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 3]],
+            'catatan' => 'Satu unit rusak saat diterima',
+        ])->assertStatus(201);
+
+        $logs = $this->getJson("/api/pks-fulfillment/item-fulfillment/{$fulfillment->id}/log")
+            ->assertOk()
+            ->json('data');
+
+        $receive = collect($logs)->firstWhere('aksi', 'receive');
+
+        $this->assertNotNull($receive, 'Log penerimaan harus ada');
+        $this->assertSame(3, $receive['qty_diterima']);
+        $this->assertSame(3, $receive['qty_sesi_ini'], 'qty_sesi_ini tidak boleh 0 untuk aksi receive');
+        $this->assertSame(4, $receive['qty_request_ditutup']);
+        $this->assertSame(1, $receive['kurang']);
+        $this->assertSame(10, $receive['remaining_sebelum']);
+        $this->assertSame(7, $receive['remaining_sesudah']);
     }
 
     protected ?string $tempDbPath = null;

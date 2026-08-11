@@ -4,6 +4,7 @@ namespace App\Services\Pks\Fulfillment;
 
 use App\Models\PksFulfillmentLog;
 use App\Models\PksItemFulfillment;
+use App\Models\PksItemRequest;
 use App\Models\PksVisitRecord;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDevices;
@@ -99,16 +100,27 @@ class FulfillmentLogService
             ? $this->visitItems($logs)
             : $this->fulfillmentItems($logs);
 
+        // Batch pengiriman punya pertanyaan lanjutan yang tidak terjawab oleh
+        // `aksi`: barangnya sudah diterima atau belum. Batch penerimaan dan
+        // visit tidak, jadi rekapnya nol/null di sana.
+        $rekap = $first->jenis === PksFulfillmentLog::JENIS_ITEM && $first->aksi === PksFulfillmentLog::AKSI_REQUEST
+            ? $this->rekapPenerimaan($items)
+            : ['status_penerimaan' => null, 'jumlah_diterima' => 0, 'jumlah_menunggu' => 0];
+
         return [
             'batch_id' => $first->batch_id,
             'batch_ke' => $first->batch_ke,
             'jenis' => $first->jenis,
             // Menentukan arti angka di dalam items: request/receive/edit.
+            // Nilainya melekat pada batch dan tidak pernah berubah — status
+            // penerimaannya dibaca dari status_penerimaan di bawah, bukan dari
+            // sini.
             'aksi' => $first->aksi,
             'pks_id' => $first->pks_id,
             'created_by' => $first->created_by,
             'created_at' => $first->created_at,
             'jumlah_item' => count($items),
+        ] + $rekap + [
             'items' => $items,
         ];
     }
@@ -128,8 +140,9 @@ class FulfillmentLogService
             ->keyBy('id');
 
         $names = self::itemNames($fulfillments);
+        $requests = $this->requestRows($logs);
 
-        return $logs->map(function (PksFulfillmentLog $log) use ($fulfillments, $names) {
+        return $logs->map(function (PksFulfillmentLog $log) use ($fulfillments, $names, $requests) {
             $meta = $log->meta ?? [];
             // Record acuan bisa saja sudah hilang; lognya tetap ditampilkan
             // karena log bersifat append-only.
@@ -165,6 +178,11 @@ class FulfillmentLogService
                 ];
             }
 
+            // Batch pengiriman harus bisa menjawab "sudah diterima belum",
+            // kalau tidak pembacanya menyimpulkan barang masih menggantung
+            // hanya karena aksi log-nya selamanya 'request'.
+            $request = isset($meta['request_id']) ? ($requests[$meta['request_id']] ?? null) : null;
+
             return $baris + [
                 'qty_dikirim' => $meta['qty_sesi_ini'] ?? 0,
                 // remaining_* hanya ada di log lama (alur satu tahap);
@@ -173,8 +191,73 @@ class FulfillmentLogService
                 'remaining_sesudah' => $meta['remaining_sesudah'] ?? null,
                 'boleh_direquest_sebelum' => $meta['boleh_direquest_sebelum'] ?? null,
                 'boleh_direquest_sesudah' => $meta['boleh_direquest_sesudah'] ?? null,
+                // Seluruhnya null untuk log lama yang tidak punya meta.request_id
+                // — "tautan tidak tersedia", bukan "belum diterima".
+                'request_id' => $meta['request_id'] ?? null,
+                'status_penerimaan' => $request?->status,
+                'qty_diterima' => $request ? (int) $request->qty_diterima : null,
+                'kurang' => $request?->kurang,
+                'received_at' => $request?->received_at,
+                'received_batch_id' => $request?->received_batch_id,
+                'received_batch_ke' => $request?->received_batch_ke,
             ];
         })->all();
+    }
+
+    /**
+     * Baris permintaan barang yang dirujuk log pengiriman, satu query untuk
+     * seluruh batch (bukan per baris).
+     *
+     * @param  Collection<int, PksFulfillmentLog>  $logs
+     * @return \Illuminate\Support\Collection<int, PksItemRequest>
+     */
+    private function requestRows(Collection $logs): Collection
+    {
+        $ids = $logs
+            ->map(fn (PksFulfillmentLog $log) => ($log->meta ?? [])['request_id'] ?? null)
+            ->filter()
+            ->unique()
+            ->all();
+
+        if (empty($ids)) {
+            return collect();
+        }
+
+        return PksItemRequest::whereIn('id', $ids)->get()->keyBy('id');
+    }
+
+    /**
+     * Rekap penerimaan satu batch pengiriman, supaya pembacanya tidak perlu
+     * menghitung sendiri dari daftar item.
+     *
+     * null berarti pertanyaannya tidak relevan (batch bukan pengiriman) atau
+     * tidak terjawab (log lama tanpa tautan ke baris permintaan).
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array{status_penerimaan: string|null, jumlah_diterima: int, jumlah_menunggu: int}
+     */
+    private function rekapPenerimaan(array $items): array
+    {
+        $status = array_values(array_filter(
+            array_map(fn (array $item) => $item['status_penerimaan'] ?? null, $items)
+        ));
+
+        if (empty($status)) {
+            return ['status_penerimaan' => null, 'jumlah_diterima' => 0, 'jumlah_menunggu' => 0];
+        }
+
+        $menunggu = count(array_filter($status, fn (string $s) => $s === PksItemRequest::STATUS_OPEN));
+        $diterima = count($status) - $menunggu;
+
+        return [
+            'status_penerimaan' => match (true) {
+                $menunggu === 0 => 'selesai',
+                $diterima === 0 => 'belum',
+                default => 'sebagian',
+            },
+            'jumlah_diterima' => $diterima,
+            'jumlah_menunggu' => $menunggu,
+        ];
     }
 
     /**

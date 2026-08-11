@@ -303,6 +303,8 @@ class ItemFulfillmentServiceTest extends TestCase
             $table->unsignedInteger('fulfillment_id');
             $table->uuid('batch_id');
             $table->unsignedInteger('batch_ke')->nullable();
+            $table->uuid('received_batch_id')->nullable();
+            $table->unsignedInteger('received_batch_ke')->nullable();
             $table->string('item_type', 32);
             $table->unsignedInteger('item_id');
             $table->unsignedInteger('qty_request');
