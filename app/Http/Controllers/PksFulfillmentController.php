@@ -967,9 +967,12 @@ class PksFulfillmentController extends Controller
      *                 @OA\Property(property="aksi", type="string", enum={"request","receive","edit"}, description="Jenis batch, bukan status. Selalu tetap."),
      *                 @OA\Property(property="pks_id", type="integer"),
      *                 @OA\Property(property="jumlah_item", type="integer"),
-     *                 @OA\Property(property="status_penerimaan", type="string", enum={"belum","sebagian","selesai"}, nullable=true, description="Hanya terisi untuk batch item beraksi request. NULL bila tidak relevan atau log lama tidak menyimpan tautan ke baris permintaan."),
-     *                 @OA\Property(property="jumlah_diterima", type="integer"),
-     *                 @OA\Property(property="jumlah_menunggu", type="integer"),
+     *                 @OA\Property(property="status_penerimaan", type="string", enum={"belum","sebagian","selesai","selesai_kurang"}, nullable=true, description="Hanya terisi untuk batch item beraksi request. `selesai_kurang` = tidak ada lagi yang ditunggu, tapi barangnya kurang. NULL bila tidak relevan atau seluruh lognya lama tanpa tautan ke baris permintaan."),
+     *                 @OA\Property(property="jumlah_diterima", type="integer", description="Baris permintaan yang sudah ditutup (received + short)"),
+     *                 @OA\Property(property="jumlah_menunggu", type="integer", description="Baris permintaan yang masih open"),
+     *                 @OA\Property(property="jumlah_kurang", type="integer", description="Bagian dari jumlah_diterima yang ditutup sebagai short"),
+     *                 @OA\Property(property="jumlah_tanpa_tautan", type="integer", description="Item log lama yang tidak bisa ditautkan ke baris permintaan. jumlah_diterima + jumlah_menunggu + jumlah_tanpa_tautan = jumlah_item."),
+     *                 @OA\Property(property="qty_kurang", type="integer", description="Total unit yang tidak jadi diterima di batch ini"),
      *                 @OA\Property(property="items", type="array", @OA\Items(type="object"))
      *             )
      *         )

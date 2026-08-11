@@ -24,6 +24,21 @@ class FulfillmentLogService
     private const TYPE_IDS = ['kaporlap' => 1, 'device' => 2, 'chemical' => 3];
 
     /**
+     * Bentuk rekap saat tidak ada yang bisa dijawab — batch bukan pengiriman,
+     * atau seluruh lognya lama tanpa tautan ke baris permintaan. Dijadikan
+     * konstanta supaya kunci-kuncinya selalu hadir, jadi klien tidak perlu
+     * membedakan "tidak relevan" dari "field-nya hilang".
+     */
+    private const REKAP_KOSONG = [
+        'status_penerimaan' => null,
+        'jumlah_diterima' => 0,
+        'jumlah_menunggu' => 0,
+        'jumlah_kurang' => 0,
+        'jumlah_tanpa_tautan' => 0,
+        'qty_kurang' => 0,
+    ];
+
+    /**
      * Log satu PKS, dikelompokkan per batch, terbaru dulu.
      * Filter opsional per jenis (PksFulfillmentLog::JENIS_ITEM / JENIS_VISIT).
      *
@@ -105,7 +120,7 @@ class FulfillmentLogService
         // visit tidak, jadi rekapnya nol/null di sana.
         $rekap = $first->jenis === PksFulfillmentLog::JENIS_ITEM && $first->aksi === PksFulfillmentLog::AKSI_REQUEST
             ? $this->rekapPenerimaan($items)
-            : ['status_penerimaan' => null, 'jumlah_diterima' => 0, 'jumlah_menunggu' => 0];
+            : self::REKAP_KOSONG;
 
         return [
             'batch_id' => $first->batch_id,
@@ -230,33 +245,65 @@ class FulfillmentLogService
      * Rekap penerimaan satu batch pengiriman, supaya pembacanya tidak perlu
      * menghitung sendiri dari daftar item.
      *
-     * null berarti pertanyaannya tidak relevan (batch bukan pengiriman) atau
-     * tidak terjawab (log lama tanpa tautan ke baris permintaan).
+     * status_penerimaan null berarti pertanyaannya tidak relevan (batch bukan
+     * pengiriman) atau tidak terjawab sama sekali (seluruh lognya lama, tanpa
+     * tautan ke baris permintaan).
+     *
+     * 'selesai' dan 'selesai_kurang' dipisah karena keduanya sama-sama berarti
+     * "tidak ada lagi yang ditunggu", tapi yang kedua barangnya kurang.
+     * Menyatukannya membuat batch yang cuma diterima separuh terbaca beres.
+     *
+     * jumlah_tanpa_tautan menutup selisih: diterima + menunggu + tanpa_tautan
+     * selalu sama dengan jumlah_item, jadi pembaca tidak menyimpulkan ada item
+     * yang hilang saat batchnya bercampur dengan log lama.
      *
      * @param  array<int, array<string, mixed>>  $items
-     * @return array{status_penerimaan: string|null, jumlah_diterima: int, jumlah_menunggu: int}
+     * @return array{status_penerimaan: string|null, jumlah_diterima: int, jumlah_menunggu: int, jumlah_kurang: int, jumlah_tanpa_tautan: int, qty_kurang: int}
      */
     private function rekapPenerimaan(array $items): array
     {
-        $status = array_values(array_filter(
-            array_map(fn (array $item) => $item['status_penerimaan'] ?? null, $items)
+        $tertaut = array_values(array_filter(
+            $items,
+            fn (array $item) => ($item['status_penerimaan'] ?? null) !== null
         ));
 
-        if (empty($status)) {
-            return ['status_penerimaan' => null, 'jumlah_diterima' => 0, 'jumlah_menunggu' => 0];
+        $tanpaTautan = count($items) - count($tertaut);
+
+        if ($tertaut === []) {
+            return ['jumlah_tanpa_tautan' => $tanpaTautan] + self::REKAP_KOSONG;
         }
 
-        $menunggu = count(array_filter($status, fn (string $s) => $s === PksItemRequest::STATUS_OPEN));
-        $diterima = count($status) - $menunggu;
+        $menunggu = 0;
+        $kurang = 0;
+        $qtyKurang = 0;
+
+        foreach ($tertaut as $item) {
+            if ($item['status_penerimaan'] === PksItemRequest::STATUS_OPEN) {
+                $menunggu++;
+
+                continue;
+            }
+
+            if ($item['status_penerimaan'] === PksItemRequest::STATUS_SHORT) {
+                $kurang++;
+                $qtyKurang += (int) ($item['kurang'] ?? 0);
+            }
+        }
+
+        $diterima = count($tertaut) - $menunggu;
 
         return [
             'status_penerimaan' => match (true) {
-                $menunggu === 0 => 'selesai',
                 $diterima === 0 => 'belum',
-                default => 'sebagian',
+                $menunggu > 0 => 'sebagian',
+                $kurang > 0 => 'selesai_kurang',
+                default => 'selesai',
             },
             'jumlah_diterima' => $diterima,
             'jumlah_menunggu' => $menunggu,
+            'jumlah_kurang' => $kurang,
+            'jumlah_tanpa_tautan' => $tanpaTautan,
+            'qty_kurang' => $qtyKurang,
         ];
     }
 

@@ -1304,13 +1304,86 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$requestBatchId}")
             ->assertOk()
             ->assertJsonPath('data.aksi', 'request')
-            ->assertJsonPath('data.status_penerimaan', 'selesai')
+            // Bukan 'selesai': tidak ada lagi yang ditunggu, tapi barangnya kurang 1.
+            ->assertJsonPath('data.status_penerimaan', 'selesai_kurang')
             ->assertJsonPath('data.jumlah_diterima', 1)
             ->assertJsonPath('data.jumlah_menunggu', 0)
+            ->assertJsonPath('data.jumlah_kurang', 1)
+            ->assertJsonPath('data.qty_kurang', 1)
+            ->assertJsonPath('data.jumlah_tanpa_tautan', 0)
             ->assertJsonPath('data.items.0.status_penerimaan', 'short')
             ->assertJsonPath('data.items.0.qty_diterima', 3)
             ->assertJsonPath('data.items.0.kurang', 1)
             ->assertJsonPath('data.items.0.received_batch_id', fn ($v) => is_string($v) && $v !== '');
+    }
+
+    // ─── TEST 13a: batch dengan sebagian item saja yang diterima ─────
+    /** @test */
+    public function test_request_batch_detail_reports_partial_receiving(): void
+    {
+        $this->clearFulfillments();
+
+        $batchId = $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+            'items' => [
+                ['pks_id' => $this->pksId, 'site_id' => $this->siteId, 'item_type_id' => 1, 'item_id' => $this->kaporlapId, 'qty' => 3, 'catatan' => 'Bulk kaporlap batch pertama'],
+                ['pks_id' => $this->pksId, 'site_id' => $this->siteId, 'item_type_id' => 2, 'item_id' => $this->deviceId, 'qty' => 5, 'catatan' => 'Bulk device batch pertama'],
+            ],
+        ])->assertStatus(201)->json('data.batch_id');
+
+        $kaporlap = PksItemFulfillment::where('item_type', 'kaporlap')->firstOrFail();
+
+        // Hanya satu dari dua item yang diterima.
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $kaporlap->id, 'qty' => 3]],
+            'catatan' => 'Kaporlap diterima, device menyusul',
+        ])->assertStatus(201);
+
+        $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$batchId}")
+            ->assertOk()
+            ->assertJsonPath('data.jumlah_item', 2)
+            ->assertJsonPath('data.status_penerimaan', 'sebagian')
+            ->assertJsonPath('data.jumlah_diterima', 1)
+            ->assertJsonPath('data.jumlah_menunggu', 1)
+            ->assertJsonPath('data.jumlah_kurang', 0)
+            ->assertJsonPath('data.qty_kurang', 0);
+    }
+
+    // ─── TEST 13b: rekap tetap konsisten walau ada log lama ──────────
+    /** @test */
+    public function test_rollup_accounts_for_legacy_logs_without_request_link(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        $batchId = PksFulfillmentLog::where('reference_id', $fulfillment->id)
+            ->where('aksi', PksFulfillmentLog::AKSI_REQUEST)
+            ->value('batch_id');
+
+        // Log gaya lama: tidak punya meta.request_id, jadi tidak bisa ditautkan
+        // ke baris permintaan mana pun.
+        PksFulfillmentLog::create([
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'jenis' => PksFulfillmentLog::JENIS_ITEM,
+            'reference_id' => $fulfillment->id,
+            'batch_id' => $batchId,
+            'batch_ke' => 1,
+            'aksi' => PksFulfillmentLog::AKSI_REQUEST,
+            'meta' => ['qty_sesi_ini' => 2],
+            'created_by' => 'Test User',
+        ]);
+
+        $data = $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$batchId}")
+            ->assertOk()
+            ->assertJsonPath('data.jumlah_tanpa_tautan', 1)
+            ->json('data');
+
+        // Inti M3: tidak ada item yang seolah hilang dari hitungan.
+        $this->assertSame(
+            $data['jumlah_item'],
+            $data['jumlah_diterima'] + $data['jumlah_menunggu'] + $data['jumlah_tanpa_tautan'],
+            'Rekap harus menjumlah persis sebanyak item dalam batch'
+        );
     }
 
     // ─── TEST 14: batch penerimaan tidak ikut punya rekap penerimaan ──
