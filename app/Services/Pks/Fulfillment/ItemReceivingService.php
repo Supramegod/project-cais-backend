@@ -100,6 +100,18 @@ class ItemReceivingService
             );
         }
 
+        // Sabuk pengaman untuk baris yang invariannya sudah terlanjur rusak
+        // sebelum editFulfillment dijaga. Data seperti itu tidak boleh diperparah
+        // menjadi qty_terpenuhi > qty_diminta — lebih baik gagal dan diperiksa.
+        $sudahDiterima = (int) $fulfillment->qty_terpenuhi;
+
+        if ($sudahDiterima + $qty > (int) $fulfillment->qty_diminta) {
+            throw new \RuntimeException(
+                "Qty diterima ({$qty}) melebihi kebutuhan: {$fulfillment->qty_diminta} diminta, ".
+                "{$sudahDiterima} sudah diterima."
+            );
+        }
+
         $batch ??= PksFulfillmentLog::newBatch(
             (int) $fulfillment->pks_id,
             PksFulfillmentLog::JENIS_ITEM,

@@ -410,16 +410,46 @@ class ItemFulfillmentService
      * (di-check di controller level).
      *
      * Tidak menyentuh qty_request: barang yang masih di jalan urusan penerimaan,
-     * bukan koreksi angka terima.
+     * bukan koreksi angka terima. Justru karena itu koreksinya harus tunduk pada
+     * invarian yang sama dengan jalur request —
+     * qty_terpenuhi + qty_request <= qty_diminta. Tanpa itu, menaikkan
+     * qty_terpenuhi selagi ada barang di jalan membuat penerimaannya nanti
+     * menembus qty_diminta (10 diminta, dikirim 10, dikoreksi jadi 10, lalu
+     * diterima 10 = 20 terpenuhi).
+     *
+     * Barang yang masih menunggu harus dicatat lewat penerimaan, bukan
+     * diselundupkan lewat koreksi — supaya baris permintaannya ikut ditutup dan
+     * riwayat batch-nya tetap utuh.
      */
     public function editFulfillment(PksItemFulfillment $fulfillment, int $newQty, string $catatan, User $user): PksItemFulfillment
     {
         return DB::transaction(function () use ($fulfillment, $newQty, $catatan, $user) {
+            // Dikunci karena koreksi dan penerimaan sama-sama menulis
+            // qty_terpenuhi; tanpa ini keduanya bisa saling menimpa.
+            $fulfillment = PksItemFulfillment::whereKey($fulfillment->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $fulfillment) {
+                throw new \RuntimeException('Data fulfillment tidak ditemukan.');
+            }
+
             $oldQty = $fulfillment->qty_terpenuhi;
             $remainingBefore = $fulfillment->qty_diminta - $fulfillment->qty_terpenuhi;
 
             if ($newQty < 0 || $newQty > $fulfillment->qty_diminta) {
                 throw new \RuntimeException('Qty tidak valid.');
+            }
+
+            $menunggu = (int) $fulfillment->qty_request;
+
+            if ($newQty + $menunggu > (int) $fulfillment->qty_diminta) {
+                $maksimal = (int) $fulfillment->qty_diminta - $menunggu;
+
+                throw new \RuntimeException(
+                    "Qty terlalu besar: {$menunggu} unit masih menunggu penerimaan, ".
+                    "jadi koreksi maksimal {$maksimal}. Catat penerimaannya dulu bila barang sudah sampai."
+                );
             }
 
             $fulfillment->qty_terpenuhi = $newQty;

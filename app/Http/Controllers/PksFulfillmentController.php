@@ -785,7 +785,9 @@ class PksFulfillmentController extends Controller
      *     path="/api/pks-fulfillment/item-fulfillment/{fulfillment}",
      *     tags={"PKS Fulfillment"},
      *     summary="Edit item fulfillment",
-     *     description="Mengedit quantity dan catatan fulfillment. Hanya untuk role tertentu (cais_role_id 8/10/98).",
+     *     description="Mengoreksi jumlah yang DITERIMA (qty_terpenuhi) dan catatannya. Hanya untuk role tertentu (cais_role_id 8/10/98).
+     *
+     * Koreksi tidak boleh menyerobot barang yang masih menunggu penerimaan: `qty_terpenuhi + qty_request` harus tetap <= `qty_diminta`, kalau tidak 422. Barang yang sudah sampai dicatat lewat endpoint receive, bukan lewat koreksi ini — supaya baris permintaannya ikut ditutup dan riwayat batch-nya utuh.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
