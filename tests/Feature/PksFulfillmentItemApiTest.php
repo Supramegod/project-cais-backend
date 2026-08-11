@@ -1291,8 +1291,8 @@ class PksFulfillmentItemApiTest extends TestCase
             ->assertJsonPath('data.aksi', 'request')
             ->assertJsonPath('data.status_penerimaan', 'belum')
             ->assertJsonPath('data.jumlah_menunggu', 1)
-            ->assertJsonPath('data.items.0.status_penerimaan', 'open')
-            ->assertJsonPath('data.items.0.received_batch_id', null);
+            ->assertJsonPath('data.items.0.penerimaan.status', 'open')
+            ->assertJsonPath('data.items.0.penerimaan.batch_id', null);
 
         $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
             'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 3]],
@@ -1311,10 +1311,10 @@ class PksFulfillmentItemApiTest extends TestCase
             ->assertJsonPath('data.jumlah_kurang', 1)
             ->assertJsonPath('data.qty_kurang', 1)
             ->assertJsonPath('data.jumlah_tanpa_tautan', 0)
-            ->assertJsonPath('data.items.0.status_penerimaan', 'short')
-            ->assertJsonPath('data.items.0.qty_diterima', 3)
-            ->assertJsonPath('data.items.0.kurang', 1)
-            ->assertJsonPath('data.items.0.received_batch_id', fn ($v) => is_string($v) && $v !== '');
+            ->assertJsonPath('data.items.0.penerimaan.status', 'short')
+            ->assertJsonPath('data.items.0.penerimaan.qty_diterima', 3)
+            ->assertJsonPath('data.items.0.penerimaan.kurang', 1)
+            ->assertJsonPath('data.items.0.penerimaan.batch_id', fn ($v) => is_string($v) && $v !== '');
     }
 
     // ─── TEST 13a: batch dengan sebagian item saja yang diterima ─────
@@ -1384,6 +1384,78 @@ class PksFulfillmentItemApiTest extends TestCase
             $data['jumlah_diterima'] + $data['jumlah_menunggu'] + $data['jumlah_tanpa_tautan'],
             'Rekap harus menjumlah persis sebanyak item dalam batch'
         );
+    }
+
+    // ─── TEST 13c: daftar log per PKS membawa rekap penerimaannya ────
+    /** @test */
+    public function test_pks_log_list_carries_receiving_rollup_per_batch(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        $batchId = PksFulfillmentLog::where('reference_id', $fulfillment->id)
+            ->where('aksi', PksFulfillmentLog::AKSI_REQUEST)
+            ->value('batch_id');
+
+        $belum = collect($this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=item")->assertOk()->json('data'))
+            ->firstWhere('batch_id', $batchId);
+
+        $this->assertSame('belum', $belum['status_penerimaan']);
+        $this->assertSame(1, $belum['jumlah_menunggu']);
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 4]],
+            'catatan' => 'Seluruh barang diterima site',
+        ])->assertStatus(201);
+
+        $groups = collect($this->getJson("/api/pks-fulfillment/{$this->pksId}/fulfillment-log?jenis=item")->assertOk()->json('data'));
+
+        // Batch pengiriman kini menunjukkan sudah beres, tanpa perlu dibuka.
+        $kirim = $groups->firstWhere('batch_id', $batchId);
+        $this->assertSame('request', $kirim['aksi']);
+        $this->assertSame('selesai', $kirim['status_penerimaan']);
+        $this->assertSame(1, $kirim['jumlah_diterima']);
+
+        // Batch penerimaannya sendiri tidak ikut punya rekap.
+        $terima = $groups->firstWhere('aksi', 'receive');
+        $this->assertNotNull($terima);
+        $this->assertNull($terima['status_penerimaan']);
+    }
+
+    // ─── TEST 13d: blok penerimaan bersarang, tidak menabrak kunci lain ─
+    /** @test */
+    public function test_receiving_block_is_nested_and_does_not_collide(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(4, 'kaporlap');
+
+        $requestBatchId = PksFulfillmentLog::where('reference_id', $fulfillment->id)
+            ->where('aksi', PksFulfillmentLog::AKSI_REQUEST)
+            ->value('batch_id');
+
+        $receiveBatchId = $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillment->id, 'qty' => 3]],
+            'catatan' => 'Satu unit rusak saat diterima',
+        ])->assertStatus(201)->json('data.batch_id');
+
+        // Batch pengiriman: angka penerimaan hidup di dalam `penerimaan`.
+        $kirim = $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$requestBatchId}")
+            ->assertOk()->json('data.items.0');
+
+        $this->assertSame(4, $kirim['qty_dikirim']);
+        $this->assertArrayNotHasKey('qty_diterima', $kirim, 'qty_diterima tidak boleh datar di batch pengiriman');
+        $this->assertArrayNotHasKey('kurang', $kirim);
+        $this->assertSame(3, $kirim['penerimaan']['qty_diterima']);
+        $this->assertSame(1, $kirim['penerimaan']['kurang']);
+        $this->assertSame($receiveBatchId, $kirim['penerimaan']['batch_id']);
+
+        // Batch penerimaan: angkanya milik sesi itu sendiri, tetap datar.
+        $terima = $this->getJson("/api/pks-fulfillment/fulfillment-log/batch/{$receiveBatchId}")
+            ->assertOk()->json('data.items.0');
+
+        $this->assertSame(3, $terima['qty_diterima']);
+        $this->assertSame(1, $terima['kurang']);
+        $this->assertArrayNotHasKey('penerimaan', $terima);
     }
 
     // ─── TEST 14: batch penerimaan tidak ikut punya rekap penerimaan ──

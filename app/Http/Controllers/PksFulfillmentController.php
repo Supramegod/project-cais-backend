@@ -921,7 +921,9 @@ class PksFulfillmentController extends Controller
      *     path="/api/pks-fulfillment/{pks}/fulfillment-log",
      *     tags={"PKS Fulfillment"},
      *     summary="Get fulfillment log per PKS (item + visit), dikelompokkan per batch",
-     *     description="Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.",
+     *     description="Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.
+     *
+     * Grup batch pengiriman barang (jenis=item, aksi=request) ikut membawa rekap penerimaannya — `status_penerimaan`, `jumlah_diterima`, `jumlah_menunggu`, `jumlah_kurang`, `jumlah_tanpa_tautan`, `qty_kurang` — dengan arti yang sama seperti di batch detail. Grup lain memakai nilai kosong (`status_penerimaan` null). Pakai field ini untuk badge di daftar; `aksi` tidak pernah berubah jadi 'receive'.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="pks", in="path", required=true, @OA\Schema(type="integer")),
@@ -950,7 +952,9 @@ class PksFulfillmentController extends Controller
      *     summary="Detail satu batch pengiriman",
      *     description="Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.
      *
-     * `aksi` menyatakan JENIS batch dan tidak pernah berubah — batch pengiriman selamanya `request`, penerimaannya dicatat sebagai batch terpisah beraksi `receive`. Untuk tahu apakah barang batch ini sudah diterima, baca `status_penerimaan` (batch) atau `status_penerimaan`/`received_batch_id` per item, bukan `aksi`.",
+     * `aksi` menyatakan JENIS batch dan tidak pernah berubah — batch pengiriman selamanya `request`, penerimaannya dicatat sebagai batch terpisah beraksi `receive`. Untuk tahu apakah barang batch ini sudah diterima, baca `status_penerimaan` (batch) atau objek `penerimaan` per item, bukan `aksi`.
+     *
+     * Bentuk `items` berbeda per aksi. Batch `receive`: angka sesi itu sendiri, datar (`qty_diterima`, `qty_request_ditutup`, `kurang`, `request_ids`). Batch `request`: angka kirimnya datar (`qty_dikirim`, `boleh_direquest_*`) sementara angka penerimaannya bersarang di objek `penerimaan` (`request_id`, `status`, `qty_diterima`, `kurang`, `received_at`, `batch_id`, `batch_ke`) — `penerimaan` bernilai null bila log lama tidak menyimpan tautan ke baris permintaan. Disarangkan supaya `qty_diterima`/`kurang` tidak bermakna ganda antar jenis batch.",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="batchId", in="path", required=true, description="batch_id (UUID) dari response bulk atau dari fulfillment-log", @OA\Schema(type="string", format="uuid")),
