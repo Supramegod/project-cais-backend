@@ -2,7 +2,6 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -18,9 +17,9 @@ use Illuminate\Support\Facades\Schema;
  * sl_pks_fulfillment_log.meta->request_ids milik log receive. Dua kolom di sini
  * membuatnya bisa dibaca dua arah.
  *
- * Backfill mengambil tautan lama dari meta tersebut. Baris yang batch
- * penerimaannya tidak bisa ditemukan (log lama tanpa request_ids) sengaja
- * dibiarkan NULL — artinya "tautan tidak tersedia", bukan kesalahan.
+ * Murni skema. Pengisian baris lama ditangani
+ * BackfillItemRequestReceivedBatchSeeder, dijalankan terpisah dan hanya saat
+ * dibutuhkan — supaya deploy produksi tidak ikut menanggung mutasi data.
  */
 return new class extends Migration
 {
@@ -38,8 +37,6 @@ return new class extends Migration
                 $table->index('received_batch_id', 'idx_item_request_received_batch');
             });
         }
-
-        $this->backfill();
     }
 
     public function down(): void
@@ -52,47 +49,16 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('sl_pks_item_request', function (Blueprint $table) {
-            $table->dropIndex('idx_item_request_received_batch');
+        // Kolomnya bisa saja pernah ditambahkan manual di DB dev tanpa index —
+        // rollback tidak boleh gagal hanya karena itu.
+        $adaIndex = Schema::hasIndex('sl_pks_item_request', 'idx_item_request_received_batch');
+
+        Schema::table('sl_pks_item_request', function (Blueprint $table) use ($adaIndex) {
+            if ($adaIndex) {
+                $table->dropIndex('idx_item_request_received_batch');
+            }
+
             $table->dropColumn(['received_batch_id', 'received_batch_ke']);
         });
-    }
-
-    /**
-     * Isi tautan dari log penerimaan yang sudah ada.
-     *
-     * Idempoten: hanya menyentuh baris yang tautannya masih NULL, jadi aman
-     * dijalankan ulang dan tidak menimpa data yang sudah benar.
-     */
-    private function backfill(): void
-    {
-        if (! Schema::hasTable('sl_pks_fulfillment_log')) {
-            return;
-        }
-
-        DB::table('sl_pks_fulfillment_log')
-            ->where('jenis', 'item')
-            ->where('aksi', 'receive')
-            ->whereNotNull('batch_id')
-            ->select('id', 'batch_id', 'batch_ke', 'meta')
-            ->orderBy('id')
-            ->chunk(200, function ($logs) {
-                foreach ($logs as $log) {
-                    $meta = is_string($log->meta) ? json_decode($log->meta, true) : $log->meta;
-                    $requestIds = is_array($meta['request_ids'] ?? null) ? $meta['request_ids'] : [];
-
-                    if (empty($requestIds)) {
-                        continue;
-                    }
-
-                    DB::table('sl_pks_item_request')
-                        ->whereIn('id', $requestIds)
-                        ->whereNull('received_batch_id')
-                        ->update([
-                            'received_batch_id' => $log->batch_id,
-                            'received_batch_ke' => $log->batch_ke,
-                        ]);
-                }
-            });
     }
 };
