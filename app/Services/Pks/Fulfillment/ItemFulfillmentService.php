@@ -491,6 +491,39 @@ class ItemFulfillmentService
         });
     }
 
+    /**
+     * Bentuk response satu baris fulfillment beserta nama barangnya.
+     *
+     * @return array<string, mixed>
+     */
+    public static function withNama(PksItemFulfillment $fulfillment): array
+    {
+        return self::withNamaMany([$fulfillment])[0];
+    }
+
+    /**
+     * Versi banyak baris. Nama barang tidak tersimpan di baris fulfillment —
+     * asalnya tabel quotation — jadi diambil sekali per jenis lewat
+     * FulfillmentLogService::itemNames(), bukan satu query per baris.
+     *
+     * @param  Collection<int, PksItemFulfillment>|array<int, PksItemFulfillment>  $fulfillments
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withNamaMany(Collection|array $fulfillments): array
+    {
+        $rows = $fulfillments instanceof Collection ? $fulfillments : collect($fulfillments);
+        $names = FulfillmentLogService::itemNames($rows);
+
+        return $rows
+            ->map(fn (PksItemFulfillment $f) => $f->toArray() + [
+                // null bila barang quotation-nya sudah tidak ada — mengikuti
+                // getPksRequests/getPksLog, bukan fallback "Kaporlap #12".
+                'nama' => $names[$f->item_type][$f->item_id] ?? null,
+            ])
+            ->values()
+            ->all();
+    }
+
     public function getFulfillmentLog(int $fulfillmentId): Collection
     {
         // Dipakai menghitung remaining pada log penerimaan, yang metanya
