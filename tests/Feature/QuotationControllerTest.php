@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -111,6 +112,95 @@ class QuotationControllerTest extends TestCase
             ->assertJsonPath('pagination.total', 1);
     }
 
+    public function test_index_exposes_status_berlaku_label_per_row(): void
+    {
+        $this->seedQuotationsWithKontrakSelesai();
+
+        $response = $this->getJson('/api/quotations/list?per_page=50');
+
+        $labels = collect($response->assertOk()->json('data'))
+            ->pluck('status_berlaku', 'nomor');
+
+        $this->assertSame('Kontrak Habis', $labels['Q-HABIS']);
+        $this->assertSame('Berakhir dalam 2 bulan', $labels['Q-2BLN']);
+        $this->assertSame('Berakhir dalam 3 bulan', $labels['Q-3BLN']);
+        $this->assertSame('Lebih dari 3 Bulan', $labels['Q-LEBIH']);
+        $this->assertNull($labels['Q-NULL']);
+    }
+
+    #[DataProvider('statusBerlakuFilterProvider')]
+    public function test_index_filters_by_status_berlaku(string $filter, string $expectedNomor): void
+    {
+        $this->seedQuotationsWithKontrakSelesai();
+
+        $response = $this->getJson('/api/quotations/list?per_page=50&status_berlaku='.$filter);
+
+        $response->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.nomor', $expectedNomor);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function statusBerlakuFilterProvider(): array
+    {
+        return [
+            'kontrak habis' => ['kontrak_habis', 'Q-HABIS'],
+            'berakhir 2 bulan' => ['berakhir_2_bulan', 'Q-2BLN'],
+            'berakhir 3 bulan' => ['berakhir_3_bulan', 'Q-3BLN'],
+            'lebih 3 bulan' => ['lebih_3_bulan', 'Q-LEBIH'],
+        ];
+    }
+
+    public function test_index_ignores_unknown_status_berlaku_value(): void
+    {
+        $this->seedQuotationsWithKontrakSelesai();
+
+        $response = $this->getJson('/api/quotations/list?per_page=50&status_berlaku=bogus');
+
+        $response->assertOk()->assertJsonCount(5, 'data');
+    }
+
+    /**
+     * Seeds one quotation per status_berlaku bucket plus one without kontrak_selesai.
+     */
+    private function seedQuotationsWithKontrakSelesai(): void
+    {
+        DB::table('m_status_quotation')->insert(['id' => 1, 'nama' => 'Draft']);
+
+        $rows = [
+            ['Q-HABIS', now()->subDay()->toDateString()],
+            ['Q-2BLN', now()->addDays(30)->toDateString()],
+            ['Q-3BLN', now()->addDays(75)->toDateString()],
+            ['Q-LEBIH', now()->addDays(200)->toDateString()],
+            ['Q-NULL', null],
+        ];
+
+        foreach ($rows as $index => [$nomor, $kontrakSelesai]) {
+            DB::table('sl_quotation')->insert([
+                'id' => $index + 1,
+                'leads_id' => 10,
+                'nomor' => $nomor,
+                'step' => 12,
+                'jumlah_site' => 'Single Site',
+                'company_id' => 5,
+                'company' => 'PT ION',
+                'kebutuhan' => 'Security',
+                'kebutuhan_id' => 3,
+                'nama_perusahaan' => 'PT Example',
+                'tgl_quotation' => now()->toDateString(),
+                'mulai_kontrak' => now()->toDateString(),
+                'kontrak_selesai' => $kontrakSelesai,
+                'status_quotation_id' => 1,
+                'jenis_kontrak' => 'TERPADU',
+                'created_by' => 'Tester',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
     public function test_reference_validation_returns_422_baserequest_shape(): void
     {
         // Missing/invalid tipe_quotation → rejected by QuotationReferenceRequest
@@ -190,6 +280,8 @@ class QuotationControllerTest extends TestCase
             $table->unsignedInteger('kebutuhan_id')->nullable();
             $table->string('nama_perusahaan')->nullable();
             $table->date('tgl_quotation')->nullable();
+            $table->date('mulai_kontrak')->nullable();
+            $table->date('kontrak_selesai')->nullable();
             $table->unsignedInteger('status_quotation_id')->nullable();
             $table->string('jenis_kontrak')->nullable();
             $table->string('created_by')->nullable();

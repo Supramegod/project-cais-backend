@@ -549,7 +549,9 @@ class PksFulfillmentItemApiTest extends TestCase
             ->assertJsonPath('message', 'Fulfillment berhasil disimpan.')
             ->assertJsonPath('data.qty_request', 3)
             ->assertJsonPath('data.qty_terpenuhi', 0)
-            ->assertJsonPath('data.status', 'requested');
+            ->assertJsonPath('data.status', 'requested')
+            // Nama barang ikut, supaya klien tidak perlu memetakan item_id sendiri.
+            ->assertJsonPath('data.nama', 'Seragam Security');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'pks_id' => $this->pksId,
@@ -595,7 +597,10 @@ class PksFulfillmentItemApiTest extends TestCase
         $response->assertStatus(201)
             ->assertJson(['success' => true])
             ->assertJsonPath('message', '2 fulfillment berhasil disimpan.')
-            ->assertJsonCount(2, 'data.fulfillments');
+            ->assertJsonCount(2, 'data.fulfillments')
+            // Nama diambil per jenis barang, bukan per baris.
+            ->assertJsonPath('data.fulfillments.0.nama', 'Seragam Security')
+            ->assertJsonPath('data.fulfillments.1.nama', 'HT Radio');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'pks_id' => $this->pksId,
@@ -1039,7 +1044,8 @@ class PksFulfillmentItemApiTest extends TestCase
         ])->assertStatus(201)
             ->assertJsonPath('data.batch_ke', 1)
             ->assertJsonPath('data.items.0.qty_terpenuhi', 10)
-            ->assertJsonPath('data.items.0.status', 'fully_fulfilled');
+            ->assertJsonPath('data.items.0.status', 'fully_fulfilled')
+            ->assertJsonPath('data.items.0.nama', 'Seragam Security');
 
         $this->assertDatabaseHas('sl_pks_item_fulfillment', [
             'id' => $fulfillmentId,
@@ -1047,6 +1053,52 @@ class PksFulfillmentItemApiTest extends TestCase
             'qty_terpenuhi' => 10,
             'status' => 'fully_fulfilled',
         ]);
+    }
+
+    // ─── nama barang hilang di jalur request ─────────────────────────
+    /** @test */
+    public function test_edit_returns_null_nama_when_quotation_item_is_gone(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(3, 'kaporlap');
+
+        DB::table('sl_quotation_kaporlap')->where('id', $this->kaporlapId)->delete();
+
+        $this->patchJson("/api/pks-fulfillment/item-fulfillment/{$fulfillment->id}", [
+            'new_qty' => 5,
+            'catatan' => 'Koreksi walau barang quotation sudah dihapus',
+        ])->assertOk()
+            ->assertJsonPath('data.qty_terpenuhi', 5)
+            ->assertJsonPath('data.nama', null);
+    }
+
+    // ─── nama barang hilang: response tetap jalan dengan nama null ───
+    /** @test */
+    public function test_receive_returns_null_nama_when_quotation_item_is_gone(): void
+    {
+        $this->clearFulfillments();
+
+        $fulfillmentId = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'leads_id' => $this->leadsId,
+            'item_type' => 'kaporlap',
+            'item_id' => $this->kaporlapId,
+            'qty_diminta' => 10,
+            'qty' => 4,
+            'catatan' => 'Mengirim empat unit kaporlap',
+        ])->assertStatus(201)->json('data.id');
+
+        // Barang quotation-nya lenyap setelah dikirim — log dan penerimaan
+        // bersifat append-only, jadi harus tetap bisa dicatat.
+        DB::table('sl_quotation_kaporlap')->where('id', $this->kaporlapId)->delete();
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillmentId, 'qty' => 4]],
+            'catatan' => 'Diterima walau barang quotation sudah dihapus',
+        ])->assertStatus(201)
+            ->assertJsonPath('data.items.0.qty_diterima', 4)
+            ->assertJsonPath('data.items.0.nama', null);
     }
 
     // ─── TEST 7: diterima kurang, sisanya boleh dikirim lagi ─────────
@@ -1168,7 +1220,9 @@ class PksFulfillmentItemApiTest extends TestCase
 
         $response->assertOk()
             ->assertJson(['success' => true])
-            ->assertJsonPath('data.qty_terpenuhi', 5);
+            ->assertJsonPath('data.qty_terpenuhi', 5)
+            // Nama ikut di sini juga, supaya kontraknya seragam dengan POST.
+            ->assertJsonPath('data.nama', 'Seragam Security');
     }
 
     // ─── TEST 9: PATCH edit fulfillment role lain ────────────────────

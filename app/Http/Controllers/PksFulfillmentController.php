@@ -528,8 +528,12 @@ class PksFulfillmentController extends Controller
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="pks_id", type="integer", example=99),
-     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=5),
-     *                 @OA\Property(property="status", type="string", example="partially_fulfilled")
+     *                 @OA\Property(property="item_type", type="string", example="kaporlap"),
+     *                 @OA\Property(property="item_id", type="integer", example=10),
+     *                 @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
+     *                 @OA\Property(property="qty_request", type="integer", example=5, description="Yang naik di tahap ini adalah qty_request, bukan qty_terpenuhi"),
+     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=0, description="Baru naik saat penerimaan dicatat lewat POST /item-fulfillment/receive"),
+     *                 @OA\Property(property="status", type="string", example="requested")
      *             )
      *         )
      *     ),
@@ -558,7 +562,10 @@ class PksFulfillmentController extends Controller
                 $user
             );
 
-            return $this->createdResponse($fulfillment, 'Fulfillment berhasil disimpan.');
+            return $this->createdResponse(
+                ItemFulfillmentService::withNama($fulfillment),
+                'Fulfillment berhasil disimpan.'
+            );
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -611,7 +618,18 @@ class PksFulfillmentController extends Controller
      *                 @OA\Property(property="batch_id", type="string", format="uuid", description="Penanda satu kelompok pengiriman; dipakai untuk menarik ulang log batch ini"),
      *                 @OA\Property(property="batch_ke", type="integer", nullable=true, example=3, description="Nomor urut batch dalam PKS ini. NULL bila satu batch mencakup lebih dari satu PKS"),
      *                 @OA\Property(property="batch_ke_per_pks", type="object", description="Nomor batch per pks_id,"),
-     *                 @OA\Property(property="fulfillments", type="array", @OA\Items(type="object"))
+     *                 @OA\Property(property="fulfillments", type="array",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="id", type="integer", example=1),
+     *                         @OA\Property(property="item_type", type="string", example="kaporlap"),
+     *                         @OA\Property(property="item_id", type="integer", example=10),
+     *                         @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
+     *                         @OA\Property(property="qty_request", type="integer", example=5),
+     *                         @OA\Property(property="status", type="string", example="requested")
+     *                     )
+     *                 )
      *             )
      *         )
      *     ),
@@ -646,7 +664,7 @@ class PksFulfillmentController extends Controller
                         ? reset($batch['batch_ke'])
                         : null,
                     'batch_ke_per_pks' => $batch['batch_ke'],
-                    'fulfillments' => $batch['items'],
+                    'fulfillments' => ItemFulfillmentService::withNamaMany($batch['items']),
                 ],
                 count($batch['items']).' fulfillment berhasil disimpan.'
             );
@@ -695,7 +713,20 @@ class PksFulfillmentController extends Controller
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="batch_id", type="string", format="uuid"),
      *                 @OA\Property(property="batch_ke", type="integer", example=1, description="Nomor batch penerimaan; deretnya terpisah dari batch pengiriman"),
-     *                 @OA\Property(property="items", type="array", @OA\Items(type="object"))
+     *                 @OA\Property(property="items", type="array",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="fulfillment_id", type="integer", example=12),
+     *                         @OA\Property(property="item_type", type="string", example="kaporlap"),
+     *                         @OA\Property(property="item_id", type="integer", example=10),
+     *                         @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
+     *                         @OA\Property(property="qty_diterima", type="integer", example=4),
+     *                         @OA\Property(property="kurang", type="integer", example=1),
+     *                         @OA\Property(property="qty_terpenuhi", type="integer", example=4),
+     *                         @OA\Property(property="status", type="string", example="partially_fulfilled")
+     *                     )
+     *                 )
      *             )
      *         )
      *     ),
@@ -820,6 +851,9 @@ class PksFulfillmentController extends Controller
      *             @OA\Property(property="message", type="string", example="Fulfillment berhasil diupdate."),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="item_type", type="string", example="kaporlap"),
+     *                 @OA\Property(property="item_id", type="integer", example=10),
+     *                 @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
      *                 @OA\Property(property="qty_terpenuhi", type="integer", example=10),
      *                 @OA\Property(property="status", type="string", example="fully_fulfilled")
      *             )
@@ -863,7 +897,10 @@ class PksFulfillmentController extends Controller
                 $user
             );
 
-            return $this->successResponse($updated, 'Fulfillment berhasil diupdate.');
+            return $this->successResponse(
+                ItemFulfillmentService::withNama($updated),
+                'Fulfillment berhasil diupdate.'
+            );
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

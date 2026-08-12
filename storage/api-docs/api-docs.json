@@ -17604,13 +17604,33 @@
                                                     "type": "integer",
                                                     "example": 99
                                                 },
-                                                "qty_terpenuhi": {
+                                                "item_type": {
+                                                    "type": "string",
+                                                    "example": "kaporlap"
+                                                },
+                                                "item_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "nama": {
+                                                    "description": "Nama barang dari quotation; NULL bila barangnya sudah tidak ada",
+                                                    "type": "string",
+                                                    "example": "Seragam PDL",
+                                                    "nullable": true
+                                                },
+                                                "qty_request": {
+                                                    "description": "Yang naik di tahap ini adalah qty_request, bukan qty_terpenuhi",
                                                     "type": "integer",
                                                     "example": 5
                                                 },
+                                                "qty_terpenuhi": {
+                                                    "description": "Baru naik saat penerimaan dicatat lewat POST /item-fulfillment/receive",
+                                                    "type": "integer",
+                                                    "example": 0
+                                                },
                                                 "status": {
                                                     "type": "string",
-                                                    "example": "partially_fulfilled"
+                                                    "example": "requested"
                                                 }
                                             },
                                             "type": "object"
@@ -17753,6 +17773,34 @@
                                                 "fulfillments": {
                                                     "type": "array",
                                                     "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "item_type": {
+                                                                "type": "string",
+                                                                "example": "kaporlap"
+                                                            },
+                                                            "item_id": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "nama": {
+                                                                "description": "Nama barang dari quotation; NULL bila barangnya sudah tidak ada",
+                                                                "type": "string",
+                                                                "example": "Seragam PDL",
+                                                                "nullable": true
+                                                            },
+                                                            "qty_request": {
+                                                                "type": "integer",
+                                                                "example": 5
+                                                            },
+                                                            "status": {
+                                                                "type": "string",
+                                                                "example": "requested"
+                                                            }
+                                                        },
                                                         "type": "object"
                                                     }
                                                 }
@@ -17869,6 +17917,42 @@
                                                 "items": {
                                                     "type": "array",
                                                     "items": {
+                                                        "properties": {
+                                                            "fulfillment_id": {
+                                                                "type": "integer",
+                                                                "example": 12
+                                                            },
+                                                            "item_type": {
+                                                                "type": "string",
+                                                                "example": "kaporlap"
+                                                            },
+                                                            "item_id": {
+                                                                "type": "integer",
+                                                                "example": 10
+                                                            },
+                                                            "nama": {
+                                                                "description": "Nama barang dari quotation; NULL bila barangnya sudah tidak ada",
+                                                                "type": "string",
+                                                                "example": "Seragam PDL",
+                                                                "nullable": true
+                                                            },
+                                                            "qty_diterima": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "kurang": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "qty_terpenuhi": {
+                                                                "type": "integer",
+                                                                "example": 4
+                                                            },
+                                                            "status": {
+                                                                "type": "string",
+                                                                "example": "partially_fulfilled"
+                                                            }
+                                                        },
                                                         "type": "object"
                                                     }
                                                 }
@@ -17976,7 +18060,7 @@
                     "PKS Fulfillment"
                 ],
                 "summary": "Edit item fulfillment",
-                "description": "Mengedit quantity dan catatan fulfillment. Hanya untuk role tertentu (cais_role_id 8/10/98).",
+                "description": "Mengoreksi jumlah yang DITERIMA (qty_terpenuhi) dan catatannya. Hanya untuk role tertentu (cais_role_id 8/10/98).\n     *\n     * Koreksi tidak boleh menyerobot barang yang masih menunggu penerimaan: `qty_terpenuhi + qty_request` harus tetap <= `qty_diminta`, kalau tidak 422. Barang yang sudah sampai dicatat lewat endpoint receive, bukan lewat koreksi ini — supaya baris permintaannya ikut ditutup dan riwayat batch-nya utuh.",
                 "operationId": "a156d10ea255c5e8655b54d9cf81024d",
                 "parameters": [
                     {
@@ -18035,6 +18119,20 @@
                                                 "id": {
                                                     "type": "integer",
                                                     "example": 1
+                                                },
+                                                "item_type": {
+                                                    "type": "string",
+                                                    "example": "kaporlap"
+                                                },
+                                                "item_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "nama": {
+                                                    "description": "Nama barang dari quotation; NULL bila barangnya sudah tidak ada",
+                                                    "type": "string",
+                                                    "example": "Seragam PDL",
+                                                    "nullable": true
                                                 },
                                                 "qty_terpenuhi": {
                                                     "type": "integer",
@@ -18156,7 +18254,7 @@
                     "PKS Fulfillment"
                 ],
                 "summary": "Get fulfillment log per PKS (item + visit), dikelompokkan per batch",
-                "description": "Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.",
+                "description": "Log seluruh aktivitas fulfillment satu PKS, dikelompokkan per batch pengiriman, terbaru dulu. Tiap grup berisi batch_id, batch_ke, dan daftar log di dalamnya. Log lama sebelum kolom batch ada muncul sebagai grup berisi satu log dengan batch_id null. Filter opsional ?jenis=item|visit.\n     *\n     * Grup batch pengiriman barang (jenis=item, aksi=request) ikut membawa rekap penerimaannya — `status_penerimaan`, `jumlah_diterima`, `jumlah_menunggu`, `jumlah_kurang`, `jumlah_tanpa_tautan`, `qty_kurang` — dengan arti yang sama seperti di batch detail. Grup lain memakai nilai kosong (`status_penerimaan` null). Pakai field ini untuk badge di daftar; `aksi` tidak pernah berubah jadi 'receive'.",
                 "operationId": "67dea37431c24f6c9f098ea005578c31",
                 "parameters": [
                     {
@@ -18201,7 +18299,7 @@
                     "PKS Fulfillment"
                 ],
                 "summary": "Detail satu batch pengiriman",
-                "description": "Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.",
+                "description": "Isi satu batch: barang apa saja yang dikirim beserta qty batch tersebut, sisa sebelum/sesudah, dan catatan. Untuk batch jenis visit yang dikembalikan adalah data kunjungannya.\n     *\n     * `aksi` menyatakan JENIS batch dan tidak pernah berubah — batch pengiriman selamanya `request`, penerimaannya dicatat sebagai batch terpisah beraksi `receive`. Untuk tahu apakah barang batch ini sudah diterima, baca `status_penerimaan` (batch) atau objek `penerimaan` per item, bukan `aksi`.\n     *\n     * Bentuk `items` berbeda per aksi. Batch `receive`: angka sesi itu sendiri, datar (`qty_diterima`, `qty_request_ditutup`, `kurang`, `request_ids`). Batch `request`: angka kirimnya datar (`qty_dikirim`, `boleh_direquest_*`) sementara angka penerimaannya bersarang di objek `penerimaan` (`request_id`, `status`, `qty_diterima`, `kurang`, `received_at`, `batch_id`, `batch_ke`) — `penerimaan` bernilai null bila log lama tidak menyimpan tautan ke baris permintaan. Disarangkan supaya `qty_diterima`/`kurang` tidak bermakna ganda antar jenis batch.",
                 "operationId": "faf52e8f6b8232d64c450e701baa52f2",
                 "parameters": [
                     {
@@ -18243,10 +18341,50 @@
                                                         "visit"
                                                     ]
                                                 },
+                                                "aksi": {
+                                                    "description": "Jenis batch, bukan status. Selalu tetap.",
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "request",
+                                                        "receive",
+                                                        "edit"
+                                                    ]
+                                                },
                                                 "pks_id": {
                                                     "type": "integer"
                                                 },
                                                 "jumlah_item": {
+                                                    "type": "integer"
+                                                },
+                                                "status_penerimaan": {
+                                                    "description": "Hanya terisi untuk batch item beraksi request. `selesai_kurang` = tidak ada lagi yang ditunggu, tapi barangnya kurang. NULL bila tidak relevan atau seluruh lognya lama tanpa tautan ke baris permintaan.",
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "belum",
+                                                        "sebagian",
+                                                        "selesai",
+                                                        "selesai_kurang"
+                                                    ],
+                                                    "nullable": true
+                                                },
+                                                "jumlah_diterima": {
+                                                    "description": "Baris permintaan yang sudah ditutup (received + short)",
+                                                    "type": "integer"
+                                                },
+                                                "jumlah_menunggu": {
+                                                    "description": "Baris permintaan yang masih open",
+                                                    "type": "integer"
+                                                },
+                                                "jumlah_kurang": {
+                                                    "description": "Bagian dari jumlah_diterima yang ditutup sebagai short",
+                                                    "type": "integer"
+                                                },
+                                                "jumlah_tanpa_tautan": {
+                                                    "description": "Item log lama yang tidak bisa ditautkan ke baris permintaan. jumlah_diterima + jumlah_menunggu + jumlah_tanpa_tautan = jumlah_item.",
+                                                    "type": "integer"
+                                                },
+                                                "qty_kurang": {
+                                                    "description": "Total unit yang tidak jadi diterima di batch ini",
                                                     "type": "integer"
                                                 },
                                                 "items": {
@@ -33842,10 +33980,31 @@
                         "type": "integer"
                     },
                     "batch_id": {
+                        "description": "DEPRECATED — alias request_batch_id. Isinya batch PENGIRIMAN, bukan penerimaan.",
                         "type": "string",
                         "format": "uuid"
                     },
                     "batch_ke": {
+                        "description": "DEPRECATED — alias request_batch_ke",
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "request_batch_id": {
+                        "description": "Batch pengiriman yang membuat baris ini",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "request_batch_ke": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "received_batch_id": {
+                        "description": "Batch penerimaan yang menutup baris ini. NULL selama status masih open, atau bila log lama tidak menyimpan tautannya. Pakai id ini untuk membuka batch detail beraksi 'receive'.",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "received_batch_ke": {
                         "type": "integer",
                         "nullable": true
                     },

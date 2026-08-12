@@ -57,10 +57,19 @@ class ItemReceivingService
                 $results[] = $hasil['item'];
             }
 
+            // Nama barang ditempel di sini, bukan di receiveOne(): sekali per
+            // jenis untuk seluruh penerimaan, bukan satu query per item.
+            $names = FulfillmentLogService::itemNames(collect($results));
+
             return [
                 'batch_id' => $batch['batch_id'],
                 'batch_ke' => $batch['batch_ke'],
-                'items' => $results,
+                'items' => array_map(
+                    fn (array $item) => $item + [
+                        'nama' => $names[$item['item_type']][$item['item_id']] ?? null,
+                    ],
+                    $results
+                ),
             ];
         });
     }

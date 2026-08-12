@@ -6,11 +6,9 @@ use App\DTO\QuotationCalculationResult;
 use App\Models\Quotation;
 use App\Models\User;
 use App\Services\Quotation\Calculation\QuotationCalculationService;
-use App\Services\Quotation\Calculation\QuotationItemCalculationService;
 use App\Services\Quotation\Calculation\QuotationFinancialService;
-use App\Services\Quotation\QuotationQueryService;
-use App\Services\Quotation\QuotationApprovalService;
-use App\Services\Quotation\QuotationStoreService;
+use App\Services\Quotation\Calculation\QuotationItemCalculationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
@@ -57,6 +55,16 @@ class QuotationService
     public function getFilteredQuotationsList(Request $request): \Illuminate\Pagination\LengthAwarePaginator
     {
         return $this->queryService->getFilteredQuotationsList($request);
+    }
+
+    public function applyStatusBerlakuFilter(Builder $query, string $statusBerlaku, string $column = 'kontrak_selesai'): Builder
+    {
+        return $this->queryService->applyStatusBerlakuFilter($query, $statusBerlaku, $column);
+    }
+
+    public function getStatusBerlaku(?string $tanggalBerakhir): string
+    {
+        return $this->queryService->getStatusBerlaku($tanggalBerakhir);
     }
 
     public function submitApproval(Quotation $quotation, array $data, User $user): array

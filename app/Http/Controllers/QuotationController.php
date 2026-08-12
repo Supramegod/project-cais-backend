@@ -132,6 +132,17 @@ class QuotationController extends Controller
      *         required=false,
      *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by","jenis_kontrak"}, example="nama_perusahaan")
      *     ),
+     *     @OA\Parameter(
+     *         name="status_berlaku",
+     *         in="query",
+     *         description="Filter status berlaku kontrak (berdasarkan kolom kontrak_selesai)",
+     *         required=false,
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"kontrak_habis", "berakhir_2_bulan", "berakhir_3_bulan", "lebih_3_bulan"},
+     *             example="berakhir_2_bulan"
+     *         )
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Quotations retrieved successfully",
@@ -148,6 +159,9 @@ class QuotationController extends Controller
      *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
      *                     @OA\Property(property="tgl_quotation", type="string", format="date", example="2024-01-01"),
      *                     @OA\Property(property="tgl_quotation_formatted", type="string", example="1 Januari 2024"),
+     *                     @OA\Property(property="mulai_kontrak", type="string", format="date", example="2024-02-01"),
+     *                     @OA\Property(property="kontrak_selesai", type="string", format="date", example="2025-01-31"),
+     *                     @OA\Property(property="status_berlaku", type="string", enum={"Kontrak Habis","Berakhir dalam 2 bulan","Berakhir dalam 3 bulan","Lebih dari 3 Bulan"}, example="Berakhir dalam 2 bulan"),
      *                     @OA\Property(property="sl_quotation_site", type="array",
      *                         @OA\Items(
      *                             @OA\Property(property="nama_site", type="string", example="Head Office Jakarta")
@@ -188,6 +202,8 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
+                'mulai_kontrak',
+                'kontrak_selesai',
                 'status_quotation_id',
                 'jenis_kontrak', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
@@ -228,6 +244,8 @@ class QuotationController extends Controller
                 $query->where('company_id', $request->company);
             if ($request->filled('kebutuhan_id'))
                 $query->where('kebutuhan_id', $request->kebutuhan_id);
+            if ($request->filled('status_berlaku'))
+                $this->quotationService->applyStatusBerlakuFilter($query, $request->status_berlaku);
 
             $data = $query->paginate($request->get('per_page', 15));
 
@@ -242,6 +260,11 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
+                    'mulai_kontrak' => $quotation->mulai_kontrak,
+                    'kontrak_selesai' => $quotation->kontrak_selesai,
+                    'status_berlaku' => $quotation->getRawOriginal('kontrak_selesai')
+                        ? $this->quotationService->getStatusBerlaku($quotation->getRawOriginal('kontrak_selesai'))
+                        : null,
                     'jenis_kontrak' => $quotation->jenis_kontrak,
                     'created_by' => $quotation->created_by,
                     'status_quotation' => $quotation->statusQuotation
