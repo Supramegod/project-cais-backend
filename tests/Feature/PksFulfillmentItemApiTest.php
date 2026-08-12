@@ -1055,6 +1055,23 @@ class PksFulfillmentItemApiTest extends TestCase
         ]);
     }
 
+    // ─── nama barang hilang di jalur request ─────────────────────────
+    /** @test */
+    public function test_edit_returns_null_nama_when_quotation_item_is_gone(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(3, 'kaporlap');
+
+        DB::table('sl_quotation_kaporlap')->where('id', $this->kaporlapId)->delete();
+
+        $this->patchJson("/api/pks-fulfillment/item-fulfillment/{$fulfillment->id}", [
+            'new_qty' => 5,
+            'catatan' => 'Koreksi walau barang quotation sudah dihapus',
+        ])->assertOk()
+            ->assertJsonPath('data.qty_terpenuhi', 5)
+            ->assertJsonPath('data.nama', null);
+    }
+
     // ─── nama barang hilang: response tetap jalan dengan nama null ───
     /** @test */
     public function test_receive_returns_null_nama_when_quotation_item_is_gone(): void
@@ -1203,7 +1220,9 @@ class PksFulfillmentItemApiTest extends TestCase
 
         $response->assertOk()
             ->assertJson(['success' => true])
-            ->assertJsonPath('data.qty_terpenuhi', 5);
+            ->assertJsonPath('data.qty_terpenuhi', 5)
+            // Nama ikut di sini juga, supaya kontraknya seragam dengan POST.
+            ->assertJsonPath('data.nama', 'Seragam Security');
     }
 
     // ─── TEST 9: PATCH edit fulfillment role lain ────────────────────

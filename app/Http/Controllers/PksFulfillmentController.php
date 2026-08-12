@@ -531,8 +531,9 @@ class PksFulfillmentController extends Controller
      *                 @OA\Property(property="item_type", type="string", example="kaporlap"),
      *                 @OA\Property(property="item_id", type="integer", example=10),
      *                 @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
-     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=5),
-     *                 @OA\Property(property="status", type="string", example="partially_fulfilled")
+     *                 @OA\Property(property="qty_request", type="integer", example=5, description="Yang naik di tahap ini adalah qty_request, bukan qty_terpenuhi"),
+     *                 @OA\Property(property="qty_terpenuhi", type="integer", example=0, description="Baru naik saat penerimaan dicatat lewat POST /item-fulfillment/receive"),
+     *                 @OA\Property(property="status", type="string", example="requested")
      *             )
      *         )
      *     ),
@@ -850,6 +851,9 @@ class PksFulfillmentController extends Controller
      *             @OA\Property(property="message", type="string", example="Fulfillment berhasil diupdate."),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="item_type", type="string", example="kaporlap"),
+     *                 @OA\Property(property="item_id", type="integer", example=10),
+     *                 @OA\Property(property="nama", type="string", nullable=true, example="Seragam PDL", description="Nama barang dari quotation; NULL bila barangnya sudah tidak ada"),
      *                 @OA\Property(property="qty_terpenuhi", type="integer", example=10),
      *                 @OA\Property(property="status", type="string", example="fully_fulfilled")
      *             )
@@ -893,7 +897,10 @@ class PksFulfillmentController extends Controller
                 $user
             );
 
-            return $this->successResponse($updated, 'Fulfillment berhasil diupdate.');
+            return $this->successResponse(
+                ItemFulfillmentService::withNama($updated),
+                'Fulfillment berhasil diupdate.'
+            );
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

@@ -17618,13 +17618,19 @@
                                                     "example": "Seragam PDL",
                                                     "nullable": true
                                                 },
-                                                "qty_terpenuhi": {
+                                                "qty_request": {
+                                                    "description": "Yang naik di tahap ini adalah qty_request, bukan qty_terpenuhi",
                                                     "type": "integer",
                                                     "example": 5
                                                 },
+                                                "qty_terpenuhi": {
+                                                    "description": "Baru naik saat penerimaan dicatat lewat POST /item-fulfillment/receive",
+                                                    "type": "integer",
+                                                    "example": 0
+                                                },
                                                 "status": {
                                                     "type": "string",
-                                                    "example": "partially_fulfilled"
+                                                    "example": "requested"
                                                 }
                                             },
                                             "type": "object"
@@ -18113,6 +18119,20 @@
                                                 "id": {
                                                     "type": "integer",
                                                     "example": 1
+                                                },
+                                                "item_type": {
+                                                    "type": "string",
+                                                    "example": "kaporlap"
+                                                },
+                                                "item_id": {
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "nama": {
+                                                    "description": "Nama barang dari quotation; NULL bila barangnya sudah tidak ada",
+                                                    "type": "string",
+                                                    "example": "Seragam PDL",
+                                                    "nullable": true
                                                 },
                                                 "qty_terpenuhi": {
                                                     "type": "integer",
