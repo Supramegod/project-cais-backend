@@ -11,17 +11,15 @@ class ReportDetailService
 
     /**
      * Detail aktivitas sales regular per user_id.
-     *
-     * @return array|null
      */
-    public function activityDetail(int $userId, int $month, int $year, ?int $branchId): ?array
+    public function activityDetail(int $userId, int $month, int $year, ?int $branchId, ?string $jenisActivity = null): ?array
     {
         [$startDate, $endDate] = $this->monthRange($month, $year);
         $periode = $this->buildPeriode($month, $year);
 
         $matched = $this->getSalesNames($branchId)->firstWhere('user_id', $userId);
 
-        if (!$matched) {
+        if (! $matched) {
             return null;
         }
 
@@ -48,6 +46,7 @@ class ReportDetailService
                             });
                     });
             })
+            ->when($jenisActivity, fn ($query) => $query->where('sa.jenis_activity', $jenisActivity))
             ->orderBy('sa.tgl_activity', 'desc')
             ->get();
 
@@ -86,45 +85,51 @@ class ReportDetailService
 
     /**
      * Detail aktivitas telesales (cais_role_id = 30) per user_id.
-     *
-     * @return array|null
      */
-    public function activityDetailTele(int $userId, int $month, int $year, ?int $branchId): ?array
+    public function activityDetailTele(int $userId, int $month, int $year, ?int $branchId, ?string $jenisActivity = null): ?array
     {
         [$startDate, $endDate] = $this->monthRange($month, $year);
         $periode = $this->buildPeriode($month, $year);
 
         $matched = $this->getSalesNamesRole30($branchId)->firstWhere('user_id', $userId);
 
-        if (!$matched) {
+        if (! $matched) {
             return null;
         }
 
-        $customerActivities = DB::table('sl_customer_activity as sa')
-            ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
-            ->select(
-                'sa.id', 'sa.leads_id', 'sa.tgl_activity',
-                DB::raw('sa.tipe as tipe'),
-                DB::raw("COALESCE(sa.notulen, '') AS notulen"),
-                'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
-            )
-            ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
-            ->where('sa.user_id', $userId)
-            ->whereIn('sa.tipe', ['Leads', 'Assignment'])
-            ->get();
+        $customerTipe = $jenisActivity
+            ? array_values(array_intersect(['Leads', 'Assignment'], [$jenisActivity]))
+            : ['Leads', 'Assignment'];
 
-        $appointmentActivities = DB::table('sl_activity_sales as sa')
-            ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
-            ->select(
-                'sa.id', 'sa.leads_id', 'sa.tgl_activity',
-                DB::raw('sa.jenis_activity as tipe'),
-                DB::raw("COALESCE(sa.notulen, '') AS notulen"),
-                'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
-            )
-            ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
-            ->where('sa.created_by_user_id', $userId)
-            ->where('sa.jenis_activity', 'Appointment')
-            ->get();
+        $customerActivities = empty($customerTipe)
+            ? collect()
+            : DB::table('sl_customer_activity as sa')
+                ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+                ->select(
+                    'sa.id', 'sa.leads_id', 'sa.tgl_activity',
+                    DB::raw('sa.tipe as tipe'),
+                    DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                    'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
+                )
+                ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+                ->where('sa.user_id', $userId)
+                ->whereIn('sa.tipe', $customerTipe)
+                ->get();
+
+        $appointmentActivities = ($jenisActivity !== null && $jenisActivity !== 'Appointment')
+            ? collect()
+            : DB::table('sl_activity_sales as sa')
+                ->join('sl_leads as l', 'sa.leads_id', '=', 'l.id')
+                ->select(
+                    'sa.id', 'sa.leads_id', 'sa.tgl_activity',
+                    DB::raw('sa.jenis_activity as tipe'),
+                    DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                    'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
+                )
+                ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+                ->where('sa.created_by_user_id', $userId)
+                ->where('sa.jenis_activity', 'Appointment')
+                ->get();
 
         $activities = $customerActivities
             ->concat($appointmentActivities)
@@ -157,7 +162,7 @@ class ReportDetailService
     {
         return strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
+        ).' - '.$year;
     }
 
     private function formatActivityRow($row, int $index, ?string $tipe, $aksi): array
