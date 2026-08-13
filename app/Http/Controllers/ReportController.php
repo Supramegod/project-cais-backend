@@ -493,7 +493,7 @@ class ReportController extends Controller
      *
      *                     @OA\Property(property="id", type="integer", example=123),
      *                     @OA\Property(property="tgl_activity", type="string", example="2 September 2025"),
-     *                     @OA\Property(property="nomor", type="string", example="CAT/CS/AAB8I-092025-00001"),
+     *                     @OA\Property(property="nomor", type="integer", example=1),
      *                     @OA\Property(property="nama_perusahaan", type="string", example="Universitas Katolik Widya Mandala Surabaya"),
      *                     @OA\Property(
      *                         property="tipe",

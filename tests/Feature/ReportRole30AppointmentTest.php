@@ -117,6 +117,24 @@ class ReportRole30AppointmentTest extends TestCase
         $this->assertSame(1, $row['aggregat']['jumlah_assignment']);
     }
 
+    public function test_monthly_role30_ignores_soft_deleted_customer_activity(): void
+    {
+        DB::table('sl_customer_activity')->insert([
+            ['leads_id' => 10, 'user_id' => $this->teleUserId, 'tipe' => 'Leads', 'tgl_activity' => '2026-07-02', 'created_by' => 'Tele Sales', 'created_at' => '2026-07-02 09:00:00', 'deleted_at' => null],
+            ['leads_id' => 11, 'user_id' => $this->teleUserId, 'tipe' => 'Leads', 'tgl_activity' => '2026-07-03', 'created_by' => 'Tele Sales', 'created_at' => '2026-07-03 09:00:00', 'deleted_at' => '2026-07-10 08:00:00'],
+            ['leads_id' => 12, 'user_id' => $this->teleUserId, 'tipe' => 'Assignment', 'tgl_activity' => '2026-07-04', 'created_by' => 'Tele Sales', 'created_at' => '2026-07-04 09:00:00', 'deleted_at' => '2026-07-10 08:00:00'],
+        ]);
+
+        $response = $this->getJson('/api/sales-report/monthly/tele?month=7&year=2026');
+
+        $response->assertOk();
+        $row = collect($response->json('data'))->firstWhere('user_id', $this->teleUserId);
+
+        $this->assertNotNull($row);
+        $this->assertSame(1, $row['aggregat']['jumlah_leads']);
+        $this->assertSame(0, $row['aggregat']['jumlah_assignment']);
+    }
+
     public function test_monthly_tele_invalid_month_returns_422_baserequest_shape(): void
     {
         // Validation now via ReportPeriodRequiredRequest -> BaseRequest 422 shape.
@@ -190,10 +208,12 @@ class ReportRole30AppointmentTest extends TestCase
             $table->unsignedInteger('user_id')->nullable();
             $table->string('tipe')->nullable();
             $table->date('tgl_activity')->nullable();
+            $table->text('notes')->nullable();
             $table->text('notulen')->nullable();
             $table->string('created_by')->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->softDeletes();
         });
 
         Schema::create('sl_activity_sales', function (Blueprint $table) {
