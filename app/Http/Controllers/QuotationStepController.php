@@ -158,7 +158,63 @@ class QuotationStepController extends Controller
      *     @OA\Parameter(name="step", in="path", required=true, description="Step Number (1-12)", @OA\Schema(type="integer")),
      *     @OA\RequestBody(
      *         required=true,
-     *         description="Payload varies depending on the step number. Select from the examples dropdown.",
+     *         description="Payload varies depending on the step number. Select from the examples dropdown.
+     * 
+     * **Step 1: Data Site (Version 2)**
+     * - `nama_perusahaan`, `kota`, `cabang`, `jenis_perusahaan`, `status_gedung`, `alamat_lengkap`, `hari_operasional` (Required)
+     * - `jenis_perusahaan_id`, `link_maps`, `jumlah_lantai`, `luas_estimasi_area`, `pengaturan_shift_kerja`, `jumlah_hc`, `area_khusus`, `catatan`, `edit` (Optional)
+     * 
+     * **Step 1/2: Jenis Kontrak**
+     * - `jenis_kontrak` (Required: Reguler, Event Gaji Harian, PKHL, Borongan, General Cleaning)
+     * - `edit` (Optional)
+     * 
+     * **Step 2/3: Detail Kontrak**
+     * - `mulai_kontrak`, `kontrak_selesai`, `tgl_penempatan`, `top`, `salary_rule`, `evaluasi_kontrak`, `durasi_kerjasama`, `durasi_karyawan`, `evaluasi_karyawan`, `ada_cuti`, `hari_kerja`, `jam_kerja` (Required)
+     * - `jumlah_hari_invoice`, `tipe_hari_invoice` (Required if top = Lebih Dari 7 Hari)
+     * - `cuti` (Required if ada_cuti = Ada)
+     * - `prorate` (Required if gaji_saat_cuti = Prorate)
+     * - `shift_kerja`, `gaji_saat_cuti`, `edit` (Optional)
+     * 
+     * **Step 3/4: Headcount**
+     * - `headCountData` (Required array of objects: `quotation_site_id`, `position_id`, `jumlah_hc`, `jabatan_kebutuhan`, `nama_site`)
+     * - `edit` (Optional)
+     * 
+     * **Step 4/5: Costing**
+     * - `is_ppn`, `ppn_pph_dipotong`, `management_fee_id`, `persentase` (Required)
+     * - `position_data` (Required array of objects: `quotation_detail_id`, `upah`, `hitungan_upah`, `nominal_upah`, `lembur`, `nominal_lembur`, `jenis_bayar_lembur`, `jam_per_bulan_lembur`, `lembur_ditagihkan`, `kompensasi`, `thr`, `tunjangan_holiday`, `nominal_tunjangan_holiday`, `jenis_bayar_tunjangan_holiday`)
+     * - `edit` (Optional)
+     * 
+     * **Step 5/6: BPJS**
+     * - `jenis-perusahaan`, `bidang-perusahaan`, `resiko`, `program-bpjs` (Required)
+     * - `penjamin`, `jkk`, `jkm`, `jht`, `jp`, `kes`, `nominal_takaful`, `edit` (Optional)
+     * 
+     * **Step 6/7: Aplikasi Pendukung**
+     * - `aplikasi_pendukung` (Optional array of integer)
+     * - `edit` (Optional)
+     * 
+     * **Step 7/8: Kaporlap / APD**
+     * - `kaporlaps` (Optional array of objects: `barang_id`, `quotation_detail_id`, `jumlah`, `harga`)
+     * - `edit` (Optional)
+     * 
+     * **Step 8/9: Devices**
+     * - `devices` (Optional array of objects: `barang_id`, `jumlah`, `harga`)
+     * - `edit` (Optional)
+     * 
+     * **Step 9/10: Chemical / Peralatan**
+     * - `chemicals` (Optional array of objects: `barang_id`, `jumlah`, `masa_pakai`, `harga`)
+     * - `edit` (Optional)
+     * 
+     * **Step 10/11: Operasional**
+     * - `jumlah_kunjungan_operasional`, `bulan_tahun_kunjungan_operasional`, `jumlah_kunjungan_tim_crm`, `bulan_tahun_kunjungan_tim_crm` (Required)
+     * - `keterangan_kunjungan_operasional`, `keterangan_kunjungan_tim_crm`, `ada_training`, `training`, `persen_bunga_bank`, `edit` (Optional)
+     * 
+     * **Step 11/12: Pricing**
+     * - `penagihan` (Required)
+     * - `tunjangan_data` (Optional array of objects: `nama_tunjangan`, `nominal`)
+     * - `edit` (Optional)
+     * 
+     * **Step 12: Finalization**
+     * - `is_draft` (Optional boolean)",
      *         @OA\JsonContent(
      *             @OA\Examples(example="step_1_data_site", summary="Step 1: Data Site (version-2)", value={"nama_perusahaan": "PT Angin Ribut", "kota": "Jakarta", "cabang": "Sudirman", "jenis_perusahaan": "Manufaktur", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri", "alamat_lengkap": "Jl. Sudirman No 1", "link_maps": "https://maps.app.goo.gl/example", "jumlah_lantai": 3, "area_khusus": "Basement", "hari_operasional": "Senin-Jumat", "pengaturan_shift_kerja": "2 Shift", "catatan": "Catatan tambahan", "edit": false}),
      *             @OA\Examples(example="step_1", summary="Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)", value={"jenis_kontrak": "Reguler", "edit": false}),
