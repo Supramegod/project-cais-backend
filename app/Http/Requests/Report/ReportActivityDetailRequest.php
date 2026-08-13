@@ -6,19 +6,18 @@ use SanderMuller\FluentValidation\FluentRule;
 
 /**
  * Validasi periode laporan + filter jenis aktivitas (semua OPSIONAL).
- * Dipakai oleh: activityDetail, activityDetailTele.
+ * Dipakai oleh: activityDetail (sales regular).
  * Kontrak 422: bentuk BaseRequest { message: { field: [...] } }.
  */
 class ReportActivityDetailRequest extends ReportPeriodOptionalRequest
 {
     /**
-     * Gabungan jenis aktivitas sales regular dan telesales.
+     * Jenis aktivitas yang tercatat untuk sales regular.
      *
      * @var list<string>
      */
     public const JENIS_ACTIVITY = [
         'Leads',
-        'Assignment',
         'Appointment',
         'Visit',
         'Quotation',
@@ -33,7 +32,17 @@ class ReportActivityDetailRequest extends ReportPeriodOptionalRequest
     {
         return [
             ...parent::rules(),
-            'jenis_activity' => FluentRule::string()->nullable()->in(self::JENIS_ACTIVITY),
+            'jenis_activity' => FluentRule::string()->nullable()->in($this->allowedJenisActivity()),
         ];
+    }
+
+    /**
+     * Jenis aktivitas yang valid untuk endpoint ini.
+     *
+     * @return list<string>
+     */
+    protected function allowedJenisActivity(): array
+    {
+        return self::JENIS_ACTIVITY;
     }
 }

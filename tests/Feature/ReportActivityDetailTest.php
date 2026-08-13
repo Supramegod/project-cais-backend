@@ -184,14 +184,26 @@ class ReportActivityDetailTest extends TestCase
         $this->assertEqualsCanonicalizing(['Leads', 'Assignment', 'Appointment'], $tipes);
     }
 
-    public function test_tele_filter_not_applicable_to_telesales_returns_empty_data(): void
+    public function test_tele_rejects_jenis_activity_outside_telesales_enum(): void
+    {
+        // Visit valid untuk sales regular, tapi bukan aktivitas telesales.
+        $response = $this->getJson("/api/sales-report/activity-detail/tele/{$this->teleUserId}?month=7&year=2026&jenis_activity=Visit");
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['message' => ['jenis_activity']]);
+    }
+
+    public function test_tele_accepts_assignment_which_regular_detail_rejects(): void
     {
         $this->seedTeleActivities();
 
-        $response = $this->getJson("/api/sales-report/activity-detail/tele/{$this->teleUserId}?month=7&year=2026&jenis_activity=Visit");
+        $this->getJson("/api/sales-report/activity-detail/tele/{$this->teleUserId}?month=7&year=2026&jenis_activity=Assignment")
+            ->assertOk()
+            ->assertJsonPath('data.0.tipe', 'Assignment');
 
-        $response->assertOk()->assertJsonPath('success', true);
-        $this->assertSame([], $response->json('data'));
+        $this->getJson("/api/sales-report/activity-detail/{$this->salesUserId}?month=7&year=2026&jenis_activity=Assignment")
+            ->assertStatus(422)
+            ->assertJsonStructure(['message' => ['jenis_activity']]);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Report\ReportActivityDetailRequest;
+use App\Http\Requests\Report\ReportActivityDetailTeleRequest;
 use App\Http\Requests\Report\ReportPeriodRequiredRequest;
 use App\Services\Report\ReportDetailService;
 use App\Services\Report\ReportRole30Service;
@@ -688,7 +689,7 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function activityDetailTele(ReportActivityDetailRequest $request, int $userId)
+    public function activityDetailTele(ReportActivityDetailTeleRequest $request, int $userId)
     {
         $result = $this->reportDetailService->activityDetailTele(
             $userId,
