@@ -20850,51 +20850,57 @@
                             "schema": {},
                             "examples": {
                                 "step_1_data_site": {
-                                    "summary": "(v2) Step 1: Data Site",
+                                    "summary": "Step 1: Data Site (version-2)",
                                     "value": {
-                                        "nama_perusahaan": "PT Angin Ribut",
-                                        "kota": "Jakarta",
-                                        "cabang": "Sudirman",
-                                        "jenis_perusahaan": "Manufaktur",
+                                        "nama_perusahaan": "PT Angin Ribut (Required)",
+                                        "kota": "Jakarta (Required)",
+                                        "cabang": "Sudirman (Required)",
+                                        "jenis_perusahaan": "Manufaktur (Required)",
                                         "jenis_perusahaan_id": 1,
-                                        "status_gedung": "Milik Sendiri",
-                                        "alamat_lengkap": "Jl. Sudirman No 1",
-                                        "hari_operasional": "Senin-Jumat",
-                                        "pengaturan_shift_kerja": "2 Shift",
+                                        "status_gedung": "Milik Sendiri (Required)",
+                                        "alamat_lengkap": "Jl. Sudirman No 1 (Required)",
+                                        "link_maps": "https://maps.app.goo.gl/example (Optional)",
+                                        "jumlah_lantai": 3,
+                                        "luas_estimasi_area": "1000 m2 (Optional)",
+                                        "area_khusus": "Basement (Optional)",
+                                        "hari_operasional": "Senin-Jumat (Required)",
+                                        "pengaturan_shift_kerja": "2 Shift (Optional)",
+                                        "jumlah_hc": 10,
+                                        "catatan": "Catatan tambahan (Optional)",
                                         "edit": false
                                     }
                                 },
                                 "step_1": {
-                                    "summary": "(v1) Step 1 / (v2) Step 2: Jenis Kontrak",
+                                    "summary": "Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)",
                                     "value": {
-                                        "jenis_kontrak": "Reguler",
+                                        "jenis_kontrak": "Reguler (Required)",
                                         "edit": false
                                     }
                                 },
                                 "step_2": {
-                                    "summary": "(v1) Step 2 / (v2) Step 3: Detail Kontrak",
+                                    "summary": "Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)",
                                     "value": {
-                                        "mulai_kontrak": "2024-01-01",
-                                        "kontrak_selesai": "2024-12-31",
-                                        "tgl_penempatan": "2024-01-01",
-                                        "top": "Lebih Dari 7 Hari",
+                                        "mulai_kontrak": "2024-01-01 (Required)",
+                                        "kontrak_selesai": "2024-12-31 (Required)",
+                                        "tgl_penempatan": "2024-01-01 (Required)",
+                                        "top": "Lebih Dari 7 Hari (Required)",
                                         "salary_rule": 1,
                                         "jumlah_hari_invoice": 14,
-                                        "tipe_hari_invoice": "Kerja",
-                                        "evaluasi_kontrak": "Tahunan",
-                                        "durasi_kerjasama": "12 Bulan",
-                                        "durasi_karyawan": "12 Bulan",
-                                        "evaluasi_karyawan": "Tahunan",
-                                        "ada_cuti": "Ada",
+                                        "tipe_hari_invoice": "Kerja (Required if TOP > 7 Hari)",
+                                        "evaluasi_kontrak": "Tahunan (Required)",
+                                        "durasi_kerjasama": "12 Bulan (Required)",
+                                        "durasi_karyawan": "12 Bulan (Required)",
+                                        "evaluasi_karyawan": "Tahunan (Required)",
+                                        "ada_cuti": "Ada (Required)",
                                         "cuti": [
-                                            "Cuti Tahunan",
+                                            "Cuti Tahunan (Required if Ada)",
                                             "Cuti Menikah"
                                         ],
-                                        "gaji_saat_cuti": "Prorate",
+                                        "gaji_saat_cuti": "Prorate (Optional)",
                                         "prorate": 20,
-                                        "shift_kerja": "Non Shift",
-                                        "hari_kerja": "Senin - Jumat",
-                                        "jam_kerja": "08:00 - 17:00",
+                                        "shift_kerja": "Non Shift (Optional)",
+                                        "hari_kerja": "Senin - Jumat (Required)",
+                                        "jam_kerja": "08:00 - 17:00 (Required)",
                                         "edit": false
                                     }
                                 },
@@ -20906,8 +20912,8 @@
                                                 "quotation_site_id": 1,
                                                 "position_id": 5,
                                                 "jumlah_hc": 10,
-                                                "jabatan_kebutuhan": "Security Guard",
-                                                "nama_site": "Head Office"
+                                                "jabatan_kebutuhan": "Security Guard (Required)",
+                                                "nama_site": "Head Office (Required)"
                                             }
                                         ],
                                         "edit": false
@@ -20917,25 +20923,25 @@
                                     "summary": "Step 4: Costing",
                                     "value": {
                                         "is_ppn": 1,
-                                        "ppn_pph_dipotong": "Total Invoice",
+                                        "ppn_pph_dipotong": "Total Invoice (Required)",
                                         "management_fee_id": 1,
                                         "persentase": 10,
                                         "position_data": [
                                             {
                                                 "quotation_detail_id": 1,
-                                                "upah": "Custom",
-                                                "hitungan_upah": "Per Bulan",
+                                                "upah": "Custom (Required)",
+                                                "hitungan_upah": "Per Bulan (Required if Custom)",
                                                 "nominal_upah": 5000000,
-                                                "lembur": "Flat",
+                                                "lembur": "Flat (Optional)",
                                                 "nominal_lembur": 100000,
-                                                "jenis_bayar_lembur": "Per Jam",
+                                                "jenis_bayar_lembur": "Per Jam (Required if Flat)",
                                                 "jam_per_bulan_lembur": 10,
-                                                "lembur_ditagihkan": "Ditagihkan",
-                                                "kompensasi": "Diprovisikan",
-                                                "thr": "Diprovisikan",
-                                                "tunjangan_holiday": "Flat",
+                                                "lembur_ditagihkan": "Ditagihkan (Required if Flat/Normatif)",
+                                                "kompensasi": "Diprovisikan (Optional)",
+                                                "thr": "Diprovisikan (Optional)",
+                                                "tunjangan_holiday": "Flat (Optional)",
                                                 "nominal_tunjangan_holiday": 150000,
-                                                "jenis_bayar_tunjangan_holiday": "Per Hari"
+                                                "jenis_bayar_tunjangan_holiday": "Per Hari (Required if Flat)"
                                             }
                                         ],
                                         "edit": false
@@ -20944,31 +20950,31 @@
                                 "step_5": {
                                     "summary": "Step 5: BPJS",
                                     "value": {
-                                        "jenis_perusahaan_id": 21,
-                                        "bidang_perusahaan_id": 12,
-                                        "resiko": "Sangat Rendah",
-                                        "program_bpjs": "BPJS Kesehatan",
-                                        "penjamin": [
-                                            "BPJS Kesehatan"
-                                        ],
-                                        "jkk": [
-                                            true
-                                        ],
-                                        "jkm": [
-                                            true
-                                        ],
-                                        "jht": [
-                                            false
-                                        ],
-                                        "jp": [
-                                            false
-                                        ],
-                                        "kes": [
-                                            true
-                                        ],
-                                        "nominal_takaful": [
-                                            0
-                                        ],
+                                        "jenis-perusahaan": 21,
+                                        "bidang-perusahaan": 12,
+                                        "resiko": "Sangat Rendah (Required)",
+                                        "program-bpjs": "BPJS Kesehatan (Required)",
+                                        "penjamin": {
+                                            "1": "BPJS Kesehatan (Optional)"
+                                        },
+                                        "jkk": {
+                                            "1": true
+                                        },
+                                        "jkm": {
+                                            "1": true
+                                        },
+                                        "jht": {
+                                            "1": false
+                                        },
+                                        "jp": {
+                                            "1": false
+                                        },
+                                        "kes": {
+                                            "1": true
+                                        },
+                                        "nominal_takaful": {
+                                            "1": 0
+                                        },
                                         "edit": false
                                     }
                                 },
@@ -20979,6 +20985,33 @@
                                             1,
                                             2,
                                             3
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_7": {
+                                    "summary": "Step 7: Kaporlap / APD",
+                                    "value": {
+                                        "kaporlaps": [
+                                            {
+                                                "barang_id": 1,
+                                                "quotation_detail_id": 1,
+                                                "jumlah": 5,
+                                                "harga": 150000
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_8": {
+                                    "summary": "Step 8: Devices",
+                                    "value": {
+                                        "devices": [
+                                            {
+                                                "barang_id": 10,
+                                                "jumlah": 2,
+                                                "harga": 5000000
+                                            }
                                         ],
                                         "edit": false
                                     }
@@ -21005,13 +21038,13 @@
                                     "summary": "Step 10: Operasional",
                                     "value": {
                                         "jumlah_kunjungan_operasional": 2,
-                                        "bulan_tahun_kunjungan_operasional": "Bulan",
+                                        "bulan_tahun_kunjungan_operasional": "Bulan (Required)",
                                         "jumlah_kunjungan_tim_crm": 1,
-                                        "bulan_tahun_kunjungan_tim_crm": "Tahun",
-                                        "keterangan_kunjungan_operasional": "Kunjungan rutin",
-                                        "keterangan_kunjungan_tim_crm": "Evaluasi tahunan",
-                                        "ada_training": "Ada",
-                                        "training": "Basic Security Training",
+                                        "bulan_tahun_kunjungan_tim_crm": "Tahun (Required)",
+                                        "keterangan_kunjungan_operasional": "Kunjungan rutin (Optional)",
+                                        "keterangan_kunjungan_tim_crm": "Evaluasi tahunan (Optional)",
+                                        "ada_training": "Ada (Optional)",
+                                        "training": "Basic Security Training (Optional)",
                                         "persen_bunga_bank": 5.5,
                                         "edit": false
                                     }
@@ -21019,11 +21052,11 @@
                                 "step_11": {
                                     "summary": "Step 11: Pricing",
                                     "value": {
-                                        "penagihan": "Sesuai BAST",
+                                        "penagihan": "Sesuai BAST (Required)",
                                         "tunjangan_data": [
                                             [
                                                 {
-                                                    "nama_tunjangan": "Tunjangan Makan",
+                                                    "nama_tunjangan": "Tunjangan Makan (Optional)",
                                                     "nominal": 50000
                                                 }
                                             ]
