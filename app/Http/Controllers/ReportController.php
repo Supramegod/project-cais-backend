@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\Report\ReportPeriodOptionalRequest;
+use App\Http\Requests\Report\ReportActivityDetailRequest;
 use App\Http\Requests\Report\ReportPeriodRequiredRequest;
 use App\Services\Report\ReportDetailService;
 use App\Services\Report\ReportRole30Service;
@@ -15,7 +15,6 @@ use OpenApi\Annotations as OA;
  *     description="API Endpoints untuk Dashboard Sales Report"
  * )
  */
-
 class ReportController extends Controller
 {
     public function __construct(
@@ -31,29 +30,40 @@ class ReportController extends Controller
      *     description="Menampilkan laporan bulanan aktivitas sales per orang, membandingkan bulan ini vs bulan lalu...",
      *     tags={"Sales Report"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="month", in="query", required=true,
      *         description="Bulan laporan (1-12)",
+     *
      *         @OA\Schema(type="integer", example=5)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year", in="query", required=true,
      *         description="Tahun laporan (4 digit)",
+     *
      *         @OA\Schema(type="integer", example=2026)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id", in="query", required=false,
      *         description="Filter berdasarkan ID cabang (opsional)",
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Data laporan bulanan berhasil diambil",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="periode", type="string", example="05-2026"),
      *             @OA\Property(
      *                 property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="no", type="integer", example=1),
      *                     @OA\Property(property="nama_sales", type="string", example="Nuryono Hariyadi"),
      *                     @OA\Property(property="cabang", type="string", example="Central 2"),
@@ -93,14 +103,18 @@ class ReportController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation Error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="The month field is required.")
      *         )
      *     ),
+     *
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
@@ -122,29 +136,40 @@ class ReportController extends Controller
      *     description="Menampilkan laporan mingguan aktivitas sales per orang dalam satu bulan...",
      *     tags={"Sales Report"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="month", in="query", required=true,
      *         description="Bulan laporan (1-12)",
+     *
      *         @OA\Schema(type="integer", example=5)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year", in="query", required=true,
      *         description="Tahun laporan (4 digit)",
+     *
      *         @OA\Schema(type="integer", example=2026)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id", in="query", required=false,
      *         description="Filter berdasarkan ID cabang (opsional)",
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Data laporan mingguan berhasil diambil",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="periode", type="string", example="MEI - 2026"),
      *             @OA\Property(
      *                 property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="no", type="integer", example=1),
      *                     @OA\Property(property="nama_sales", type="string", example="Nuryono Hariyadi"),
      *                     @OA\Property(property="cabang", type="string", example="Central 2"),
@@ -184,14 +209,18 @@ class ReportController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation Error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="The month field is required.")
      *         )
      *     ),
+     *
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
@@ -219,30 +248,41 @@ class ReportController extends Controller
      *     Follow Up dan aktivitas lain TIDAK dihitung.",
      *     tags={"Sales Report"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="month", in="query", required=true,
      *         description="Bulan laporan (1-12)",
+     *
      *         @OA\Schema(type="integer", example=5)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year", in="query", required=true,
      *         description="Tahun laporan (4 digit)",
+     *
      *         @OA\Schema(type="integer", example=2026)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id", in="query", required=false,
      *         description="Filter berdasarkan ID cabang (opsional)",
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Data laporan bulanan role-30 berhasil diambil",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="periode", type="string", example="MEI - 2026"),
      *             @OA\Property(property="count", type="integer", example=5),
      *             @OA\Property(
      *                 property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="no", type="integer", example=1),
      *                     @OA\Property(property="user_id", type="integer", example=101),
      *                     @OA\Property(property="nama_sales", type="string", example="Budi Santoso"),
@@ -264,6 +304,7 @@ class ReportController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(response=422, description="Validation Error"),
      *     @OA\Response(response=500, description="Server Error")
      * )
@@ -292,30 +333,41 @@ class ReportController extends Controller
      *     Follow Up dan aktivitas lain TIDAK dihitung.",
      *     tags={"Sales Report"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="month", in="query", required=true,
      *         description="Bulan laporan (1-12)",
+     *
      *         @OA\Schema(type="integer", example=5)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year", in="query", required=true,
      *         description="Tahun laporan (4 digit)",
+     *
      *         @OA\Schema(type="integer", example=2026)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id", in="query", required=false,
      *         description="Filter berdasarkan ID cabang (opsional)",
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Data laporan mingguan role-30 berhasil diambil",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="periode", type="string", example="MEI - 2026"),
      *             @OA\Property(property="count", type="integer", example=5),
      *             @OA\Property(
      *                 property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="no", type="integer", example=1),
      *                     @OA\Property(property="user_id", type="integer", example=101),
      *                     @OA\Property(property="nama_sales", type="string", example="Budi Santoso"),
@@ -348,6 +400,7 @@ class ReportController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(response=422, description="Validation Error"),
      *     @OA\Response(response=500, description="Server Error")
      * )
@@ -376,34 +429,56 @@ class ReportController extends Controller
      *         in="path",
      *         required=true,
      *         description="ID user sales. Harus terdaftar sebagai sales aktif.",
+     *
      *         @OA\Schema(type="integer", example=101)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="month",
      *         in="query",
      *         required=false,
      *         description="Bulan laporan (1–12). Default: bulan berjalan.",
+     *
      *         @OA\Schema(type="integer", minimum=1, maximum=12, example=9)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year",
      *         in="query",
      *         required=false,
      *         description="Tahun laporan (4 digit). Default: tahun berjalan.",
+     *
      *         @OA\Schema(type="integer", example=2025)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id",
      *         in="query",
      *         required=false,
      *         description="Filter berdasarkan ID cabang.",
+     *
      *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="jenis_activity",
+     *         in="query",
+     *         required=false,
+     *         description="Filter berdasarkan jenis aktivitas. Kosongkan untuk menampilkan semua jenis.",
+     *
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"Leads", "Appointment", "Visit", "Quotation", "SPK", "PKS", "Follow Up", "Kirim Berkas", "Email"},
+     *             example="Visit"
+     *         )
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Data detail aktivitas berhasil diambil.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="user_id", type="integer", example=101),
      *             @OA\Property(property="sales_name", type="string", example="S. Wulandari Ayuningdiah"),
@@ -412,7 +487,9 @@ class ReportController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer", example=123),
      *                     @OA\Property(property="tgl_activity", type="string", example="2 September 2025"),
      *                     @OA\Property(property="nomor", type="string", example="CAT/CS/AAB8I-092025-00001"),
@@ -441,7 +518,9 @@ class ReportController extends Controller
      *     @OA\Response(
      *         response=404,
      *         description="user_id tidak ditemukan dalam daftar sales aktif.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User ID tidak ditemukan dalam daftar sales aktif.")
      *         )
@@ -450,7 +529,9 @@ class ReportController extends Controller
      *     @OA\Response(
      *         response=422,
      *         description="Validasi input gagal.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="The month must be between 1 and 12.")
      *         )
@@ -459,13 +540,14 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function activityDetail(ReportPeriodOptionalRequest $request, int $userId)
+    public function activityDetail(ReportActivityDetailRequest $request, int $userId)
     {
         $result = $this->reportDetailService->activityDetail(
             $userId,
             (int) ($request->month ?? now()->month),
             (int) ($request->year ?? now()->year),
-            $request->branch_id
+            $request->branch_id,
+            $request->jenis_activity
         );
 
         if ($result === null) {
@@ -495,34 +577,56 @@ class ReportController extends Controller
      *         in="path",
      *         required=true,
      *         description="ID user telesales. Harus terdaftar sebagai telesales aktif (cais_role_id=30).",
+     *
      *         @OA\Schema(type="integer", example=101)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="month",
      *         in="query",
      *         required=false,
      *         description="Bulan laporan (1–12). Default: bulan berjalan.",
+     *
      *         @OA\Schema(type="integer", minimum=1, maximum=12, example=5)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="year",
      *         in="query",
      *         required=false,
      *         description="Tahun laporan (4 digit). Default: tahun berjalan.",
+     *
      *         @OA\Schema(type="integer", example=2026)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch_id",
      *         in="query",
      *         required=false,
      *         description="Filter berdasarkan ID cabang.",
+     *
      *         @OA\Schema(type="integer", example=1)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="jenis_activity",
+     *         in="query",
+     *         required=false,
+     *         description="Filter berdasarkan jenis aktivitas telesales. Kosongkan untuk menampilkan semua jenis.",
+     *
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"Leads", "Assignment", "Appointment"},
+     *             example="Appointment"
+     *         )
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Data detail aktivitas telesales berhasil diambil.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="user_id", type="integer", example=101),
      *             @OA\Property(property="sales_name", type="string", example="Budi Santoso"),
@@ -531,7 +635,9 @@ class ReportController extends Controller
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer", example=123),
      *                     @OA\Property(property="tgl_activity", type="string", example="5 Mei 2026"),
      *                     @OA\Property(property="nomor", type="integer", example=1),
@@ -560,7 +666,9 @@ class ReportController extends Controller
      *     @OA\Response(
      *         response=404,
      *         description="user_id tidak ditemukan dalam daftar telesales aktif.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User ID tidak ditemukan dalam daftar telesales aktif.")
      *         )
@@ -569,7 +677,9 @@ class ReportController extends Controller
      *     @OA\Response(
      *         response=422,
      *         description="Validasi input gagal.",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="The month must be between 1 and 12.")
      *         )
@@ -578,13 +688,14 @@ class ReportController extends Controller
      *     @OA\Response(response=500, description="Server Error")
      * )
      */
-    public function activityDetailTele(ReportPeriodOptionalRequest $request, int $userId)
+    public function activityDetailTele(ReportActivityDetailRequest $request, int $userId)
     {
         $result = $this->reportDetailService->activityDetailTele(
             $userId,
             (int) ($request->month ?? now()->month),
             (int) ($request->year ?? now()->year),
-            $request->branch_id
+            $request->branch_id,
+            $request->jenis_activity
         );
 
         if ($result === null) {
