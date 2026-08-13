@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Report;
 
 use App\Http\Requests\BaseRequest;
-
 use SanderMuller\FluentValidation\FluentRule;
 
 /**
@@ -21,8 +20,8 @@ class ReportPeriodOptionalRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'month'     => FluentRule::integer()->nullable()->between(1, 12),
-            'year'      => FluentRule::integer()->nullable()->digits(4),
+            'month' => FluentRule::integer()->nullable()->between(1, 12),
+            'year' => FluentRule::integer()->nullable()->digits(4),
             'branch_id' => FluentRule::integer()->nullable()->exists('mysqlhris.m_branch', 'id'),
         ];
     }

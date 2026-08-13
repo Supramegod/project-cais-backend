@@ -5,7 +5,6 @@ namespace App\Services\Spk;
 use App\Models\CustomerActivity;
 use App\Models\Leads;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Shared helper methods for SPK activity logging and number generation.
@@ -26,7 +25,7 @@ trait SpkActivityTrait
                 4 => 'LL/',
                 default => 'NN/',
             };
-            $prefix .= $leads->nomor . '-';
+            $prefix .= $leads->nomor.'-';
         } else {
             $prefix .= 'NN/NNNNN-';
         }
@@ -34,9 +33,9 @@ trait SpkActivityTrait
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $year = $now->year;
 
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . '-%')->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix.$month.$year.'-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . $month . $year . '-' . $sequence;
+        return $prefix.$month.$year.'-'.$sequence;
     }
 }

@@ -23,7 +23,7 @@ class SpkPrintService
         $now = Carbon::now()->isoFormat('DD MMMM Y');
 
         $spk = Spk::with(['quotation', 'leads'])->find($id);
-        if (!$spk) {
+        if (! $spk) {
             return null;
         }
 

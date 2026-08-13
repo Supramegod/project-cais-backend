@@ -26,7 +26,7 @@ class SpkUploadService
         return DB::transaction(function () use ($id, $file) {
             $spk = Spk::find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 throw new \Exception('SPK not found');
             }
 
@@ -40,10 +40,10 @@ class SpkUploadService
 
             // Upload file baru
             $fileName = $this->storeSpkFile($file);
-            $fileUrl = url('document/spk/' . $fileName);
+            $fileUrl = url('document/spk/'.$fileName);
 
-            Log::info('Generated URL: ' . $fileUrl);
-            Log::info('Filename: ' . $fileName);
+            Log::info('Generated URL: '.$fileUrl);
+            Log::info('Filename: '.$fileName);
 
             $spk->update([
                 'status_spk_id' => 2,
@@ -70,7 +70,7 @@ class SpkUploadService
     {
         $fileExtension = $file->getClientOriginalExtension();
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = $originalFileName . date('YmdHis') . rand(10000, 99999) . '.' . $fileExtension;
+        $fileName = $originalFileName.date('YmdHis').rand(10000, 99999).'.'.$fileExtension;
 
         Storage::disk('spk')->put($fileName, file_get_contents($file));
 
@@ -88,7 +88,7 @@ class SpkUploadService
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
+            'notes' => 'SPK dengan nomor : '.$spk->nomor.' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
