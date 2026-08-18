@@ -186,6 +186,22 @@ class QuotationStepRequest extends BaseRequest
                 $rules['persen_bunga_bank'] = FluentRule::numeric()->sometimes()->min(0);
                 break;
 
+            case 'updateDriver':
+                $rules['drivers'] = FluentRule::array()->sometimes()->each([
+                    'status_kendaraan' => FluentRule::string()->sometimes(),
+                    'jenis_kendaraan' => FluentRule::string()->sometimes(),
+                    'nama_kendaraan' => FluentRule::string()->sometimes(),
+                    'kepemilikan_sim' => FluentRule::string()->sometimes(),
+                    'asuransi_mobil' => FluentRule::string()->sometimes(),
+                    'gps_map' => FluentRule::string()->sometimes(),
+                    'tipe_layanan_angkut' => FluentRule::string()->sometimes(),
+                    'area_dihandle' => FluentRule::string()->sometimes(),
+                    'kapasitas_bobot_maksimal' => FluentRule::string()->sometimes(),
+                    'asuransi_barang' => FluentRule::string()->sometimes(),
+                    'biaya_khusus_kecelakaan' => FluentRule::numeric()->sometimes()->min(0),
+                ]);
+                break;
+
             case 'updatePricing':
                 $rules['penagihan'] = FluentRule::string()->required();
                 $rules['tunjangan_data'] = FluentRule::array()->sometimes()->children([

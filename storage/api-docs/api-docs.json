@@ -22994,6 +22994,27 @@
                                         "edit": false
                                     }
                                 },
+                                "step_10_driver": {
+                                    "summary": "Step 10: Driver",
+                                    "value": {
+                                        "drivers": [
+                                            {
+                                                "status_kendaraan": "Milik Sendiri (Optional)",
+                                                "jenis_kendaraan": "Mobil (Optional)",
+                                                "nama_kendaraan": "Avanza (Optional)",
+                                                "kepemilikan_sim": "A (Optional)",
+                                                "asuransi_mobil": "Ada (Optional)",
+                                                "gps_map": "Ada (Optional)",
+                                                "tipe_layanan_angkut": "Barang (Optional)",
+                                                "area_dihandle": "Jabodetabek (Optional)",
+                                                "kapasitas_bobot_maksimal": "1000kg (Optional)",
+                                                "asuransi_barang": "Ada (Optional)",
+                                                "biaya_khusus_kecelakaan": 1500000
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
                                 "step_11": {
                                     "summary": "Step 11: Pricing",
                                     "value": {

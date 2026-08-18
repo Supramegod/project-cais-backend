@@ -256,6 +256,13 @@ class Quotation extends Model
         return $this->hasMany(QuotationChemical::class, 'quotation_id');
     }
 
+    // Relasi ke QuotationDriver
+    public function quotationDrivers()
+    {
+        return $this->hasMany(QuotationDriver::class, 'quotation_id');
+    }
+
+
     // Relasi ke QuotationOhc
     public function quotationOhcs()
     {
