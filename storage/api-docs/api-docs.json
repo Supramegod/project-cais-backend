@@ -21543,6 +21543,22 @@
                             ],
                             "example": "nama_perusahaan"
                         }
+                    },
+                    {
+                        "name": "status_berlaku",
+                        "in": "query",
+                        "description": "Filter status berlaku kontrak (berdasarkan kolom kontrak_selesai)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "kontrak_habis",
+                                "berakhir_2_bulan",
+                                "berakhir_3_bulan",
+                                "lebih_3_bulan"
+                            ],
+                            "example": "berakhir_2_bulan"
+                        }
                     }
                 ],
                 "responses": {
@@ -21596,6 +21612,26 @@
                                                     "tgl_quotation_formatted": {
                                                         "type": "string",
                                                         "example": "1 Januari 2024"
+                                                    },
+                                                    "mulai_kontrak": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-02-01"
+                                                    },
+                                                    "kontrak_selesai": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-31"
+                                                    },
+                                                    "status_berlaku": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Kontrak Habis",
+                                                            "Berakhir dalam 2 bulan",
+                                                            "Berakhir dalam 3 bulan",
+                                                            "Lebih dari 3 Bulan"
+                                                        ],
+                                                        "example": "Berakhir dalam 2 bulan"
                                                     },
                                                     "sl_quotation_site": {
                                                         "type": "array",
@@ -23829,6 +23865,27 @@
                             "type": "integer",
                             "example": 1
                         }
+                    },
+                    {
+                        "name": "jenis_activity",
+                        "in": "query",
+                        "description": "Filter berdasarkan jenis aktivitas. Kosongkan untuk menampilkan semua jenis.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Leads",
+                                "Appointment",
+                                "Visit",
+                                "Quotation",
+                                "SPK",
+                                "PKS",
+                                "Follow Up",
+                                "Kirim Berkas",
+                                "Email"
+                            ],
+                            "example": "Visit"
+                        }
                     }
                 ],
                 "responses": {
@@ -24021,6 +24078,21 @@
                         "schema": {
                             "type": "integer",
                             "example": 1
+                        }
+                    },
+                    {
+                        "name": "jenis_activity",
+                        "in": "query",
+                        "description": "Filter berdasarkan jenis aktivitas telesales. Kosongkan untuk menampilkan semua jenis.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Leads",
+                                "Assignment",
+                                "Appointment"
+                            ],
+                            "example": "Appointment"
                         }
                     }
                 ],
