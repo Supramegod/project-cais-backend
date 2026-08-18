@@ -128,7 +128,8 @@ class Quotation extends Model
         'ot5',
         'is_sandbox',
         'quotation_referensi_id',
-        'tipe_quotation'
+        'tipe_quotation',
+        'version'
     ];
     protected $dates = ['deleted_at'];
 
