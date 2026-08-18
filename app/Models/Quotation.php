@@ -127,7 +127,8 @@ class Quotation extends Model
         'ot5',
         'is_sandbox',
         'quotation_referensi_id',
-        'tipe_quotation'
+        'tipe_quotation',
+        'version'
     ];
     protected $dates = ['deleted_at'];
 
@@ -253,6 +254,13 @@ class Quotation extends Model
     {
         return $this->hasMany(QuotationChemical::class, 'quotation_id');
     }
+
+    // Relasi ke QuotationDriver
+    public function quotationDrivers()
+    {
+        return $this->hasMany(QuotationDriver::class, 'quotation_id');
+    }
+
 
     // Relasi ke QuotationOhc
     public function quotationOhcs()

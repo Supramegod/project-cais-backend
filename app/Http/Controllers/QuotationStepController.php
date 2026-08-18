@@ -116,8 +116,9 @@ class QuotationStepController extends Controller
         try {
             set_time_limit(0);
 
-            $relations = $this->resolveStepRelations($step);
-            $quotation = Quotation::with($relations)->notDeleted()->findOrFail($id);
+            $quotation = Quotation::notDeleted()->findOrFail($id);
+            $relations = $this->resolveStepRelations($quotation, $step);
+            $quotation->load($relations);
 
             if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
                 return $this->errorResponse('Quotation has been finalized and cannot be accessed.', 403);
@@ -171,6 +172,7 @@ class QuotationStepController extends Controller
      *             @OA\Examples(example="step_8", summary="Step 8: Devices", value={"devices": {{"barang_id": 10, "jumlah": 2, "harga": 5000000}}, "edit": false}),
      *             @OA\Examples(example="step_9", summary="Step 9: Chemical / Peralatan", value={"barang_id": 10, "jumlah": 5, "masa_pakai": 12, "harga": 150000, "chemicals": {{"barang_id": 12, "jumlah": 2, "masa_pakai": 6, "harga": 50000}}, "edit": false}),
      *             @OA\Examples(example="step_10", summary="Step 10: Operasional", value={"jumlah_kunjungan_operasional": 2, "bulan_tahun_kunjungan_operasional": "Bulan (Required)", "jumlah_kunjungan_tim_crm": 1, "bulan_tahun_kunjungan_tim_crm": "Tahun (Required)", "keterangan_kunjungan_operasional": "Kunjungan rutin (Optional)", "keterangan_kunjungan_tim_crm": "Evaluasi tahunan (Optional)", "ada_training": "Ada (Optional)", "training": "Basic Security Training (Optional)", "persen_bunga_bank": 5.5, "edit": false}),
+     *             @OA\Examples(example="step_10_driver", summary="Step 10: Driver", value={"drivers": {{"status_kendaraan": "Milik Sendiri (Optional)", "jenis_kendaraan": "Mobil (Optional)", "nama_kendaraan": "Avanza (Optional)", "kepemilikan_sim": "A (Optional)", "asuransi_mobil": "Ada (Optional)", "gps_map": "Ada (Optional)", "tipe_layanan_angkut": "Barang (Optional)", "area_dihandle": "Jabodetabek (Optional)", "kapasitas_bobot_maksimal": "1000kg (Optional)", "asuransi_barang": "Ada (Optional)", "biaya_khusus_kecelakaan": 1500000}}, "edit": false}),
      *             @OA\Examples(example="step_11", summary="Step 11: Pricing", value={"penagihan": "Sesuai BAST (Required)", "tunjangan_data": {{{"nama_tunjangan": "Tunjangan Makan (Optional)", "nominal": 50000}}}, "edit": false}),
      *             @OA\Examples(example="step_12", summary="Step 12: Finalization", value={"is_draft": false})
      *         )
@@ -265,22 +267,35 @@ class QuotationStepController extends Controller
     // PRIVATE — RELATIONS RESOLVER
     // =========================================================================
 
-    private function resolveStepRelations(int $step): array
+    private function resolveStepRelations(Quotation $quotation, int $step): array
     {
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, $step);
+        
+        if ($logicalStepName === 'updateDriver') {
+            return ['quotationDrivers'];
+        }
+
         return self::STEP_RELATIONS[$step] ?? [];
     }
 
     private function prepareStepData(Quotation $quotation, int $step): array
     {
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, $step);
+
         $additionalDataMethod = 'buildAdditionalDataStep'.$step;
         $additionalData = method_exists($this, $additionalDataMethod)
             ? $this->$additionalDataMethod($quotation)
             : [];
 
-        $stepDataMethod = 'buildStepDataStep'.$step;
-        $stepData = method_exists($this, $stepDataMethod)
-            ? $this->$stepDataMethod($quotation, $additionalData)
-            : [];
+        $stepData = [];
+        if ($logicalStepName === 'updateDriver') {
+            $stepData = $this->buildStepDataDriver($quotation, $additionalData);
+        } else {
+            $stepDataMethod = 'buildStepDataStep'.$step;
+            $stepData = method_exists($this, $stepDataMethod)
+                ? $this->$stepDataMethod($quotation, $additionalData)
+                : [];
+        }
 
         $baseData = [
             'id' => $quotation->id,
@@ -1225,6 +1240,34 @@ class QuotationStepController extends Controller
     private function elapsedMs(float $startTime): string
     {
         return round((microtime(true) - $startTime) * 1000, 2).'ms';
+    }
+
+    private function buildStepDataDriver(Quotation $quotation, array $additionalData): array
+    {
+        $drivers = [];
+        if ($quotation->relationLoaded('quotationDrivers')) {
+            $drivers = $quotation->quotationDrivers->map(function ($driver) {
+                return [
+                    'id' => $driver->id,
+                    'status_kendaraan' => $driver->status_kendaraan,
+                    'jenis_kendaraan' => $driver->jenis_kendaraan,
+                    'nama_kendaraan' => $driver->nama_kendaraan,
+                    'kepemilikan_sim' => $driver->kepemilikan_sim,
+                    'asuransi_mobil' => $driver->asuransi_mobil,
+                    'gps_map' => $driver->gps_map,
+                    'tipe_layanan_angkut' => $driver->tipe_layanan_angkut,
+                    'area_dihandle' => $driver->area_dihandle,
+                    'kapasitas_bobot_maksimal' => $driver->kapasitas_bobot_maksimal,
+                    'asuransi_barang' => $driver->asuransi_barang,
+                    'biaya_khusus_kecelakaan' => $driver->biaya_khusus_kecelakaan,
+                ];
+            })->toArray();
+        }
+
+        return [
+            'quotation_drivers' => $drivers,
+            'drivers_total' => count($drivers),
+        ];
     }
 
     private function resolveMfConfig(Quotation $quotation): array

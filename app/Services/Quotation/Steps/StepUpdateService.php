@@ -54,6 +54,7 @@ class StepUpdateService
         Step8Service $step8,
         Step9Service $step9,
         Step10Service $step10,
+        StepDriverService $stepDriver,
         DataSiteService $dataSite
     ) {
         $this->quotationBarangService = $quotationBarangService;
@@ -65,6 +66,7 @@ class StepUpdateService
             1 => $step1, 2 => $step2, 3 => $step3,
             5 => $step5, 6 => $step6, 7 => $step7, 8 => $step8,
             9 => $step9, 10 => $step10,
+            11 => $stepDriver,
         ];
     }
 
@@ -350,6 +352,7 @@ class StepUpdateService
             'updatePeralatan' => 8,
             'updateChemical' => 9,
             'updateOperasional' => 10,
+            'updateDriver' => 11,
         ];
 
         if (isset($handlerMap[$method])) {

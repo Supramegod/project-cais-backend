@@ -491,6 +491,12 @@ class QuotationController extends Controller
 
             $quotationData['created_by'] = $user->full_name;
             $quotationData['tipe_quotation'] = $tipe_quotation;
+            
+            if ($quotationReferensi) {
+                $quotationData['version'] = $quotationReferensi->version ?? 1;
+            } else {
+                $quotationData['version'] = $request->get('version', 2);
+            }
 
             $quotation = Quotation::create($quotationData);
 
