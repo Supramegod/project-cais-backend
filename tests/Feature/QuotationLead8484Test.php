@@ -144,11 +144,11 @@ class QuotationLead8484Test extends TestCase
         ]);
         $responseStep4->assertStatus(200);
 
-        // Simulate passing steps 5-10
-        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['step' => 10]);
+        // Simulate passing steps 5-11
+        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['step' => 11]);
 
-        // 2. Test Step 11 (Pricing)
-        $responseStep11 = $this->postJson('/api/quotations-step/' . self::QUOTATION_ID . '/step/11', [
+        // 2. Test Step 12 (Pricing)
+        $responseStep12_Pricing = $this->postJson('/api/quotations-step/' . self::QUOTATION_ID . '/step/12', [
             'penagihan' => 'Transfer',
             'persentase' => 10,
             'wage_data' => [
@@ -158,13 +158,18 @@ class QuotationLead8484Test extends TestCase
                 1 => ['provisi_peralatan' => 0]
             ]
         ]);
-        $responseStep11->assertStatus(200);
+        if ($responseStep12_Pricing->status() !== 200) {
+            dump($responseStep12_Pricing->json());
+        }
+        $responseStep12_Pricing->assertStatus(200);
 
         // Verify calculation persisted
         $this->assertNotNull(DB::table('sl_quotation')->find(self::QUOTATION_ID)->calculated_at);
 
-        // 3. Test Step 12 (Finalization)
-        $responseStep12 = $this->postJson('/api/quotations-step/' . self::QUOTATION_ID . '/step/12', [
+        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['step' => 12]);
+
+        // 3. Test Step 13 (Finalization)
+        $responseStep13 = $this->postJson('/api/quotations-step/' . self::QUOTATION_ID . '/step/13', [
             'waktu_kerja' => 'Senin - Jumat',
             'waktu_istirahat' => '1 Jam',
             'hari_libur' => 'Sabtu & Minggu',
@@ -174,7 +179,10 @@ class QuotationLead8484Test extends TestCase
             'tempo_pembayaran' => '14 Hari Kerja',
             'is_draft' => true // Don't trigger finalization jobs that need queues/mails
         ]);
-        $responseStep12->assertStatus(200);
+        if ($responseStep13->status() !== 200) {
+            dump($responseStep13->json());
+        }
+        $responseStep13->assertStatus(200);
     }
 
     private function rebuildSchema(): void
@@ -185,7 +193,7 @@ class QuotationLead8484Test extends TestCase
             'sl_quotation_detail_wages', 'sl_quotation_detail_hpp', 'sl_quotation_detail_coss',
             'sl_quotation_detail_tunjangan', 'sl_quotation_kaporlap', 'sl_quotation_devices',
             'sl_quotation_ohc', 'sl_quotation_chemical', 'sl_quotation_management_fee',
-            'm_salary_rule', 'sl_quotation_aplikasi', 'sl_quotation_kerjasama', 'm_umk', 'm_ump', 'm_umsk', 'm_umsp'
+            'm_salary_rule', 'sl_quotation_aplikasi', 'sl_quotation_kerjasama', 'm_umk', 'm_ump', 'm_umsk', 'm_umsp', 'sl_quotation_drivers'
         ] as $table) {
             Schema::dropIfExists($table);
         }
@@ -229,6 +237,29 @@ class QuotationLead8484Test extends TestCase
             $table->string('deleted_by')->nullable();
             $table->softDeletes();
             $table->timestamps();
+        });
+
+        Schema::create('sl_quotation_drivers', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedInteger('quotation_id')->nullable();
+            $table->string('status_kendaraan')->nullable();
+            $table->string('jenis_kendaraan')->nullable();
+            $table->string('nama_kendaraan')->nullable();
+            $table->string('kepemilikan_sim')->nullable();
+            $table->string('asuransi_mobil')->nullable();
+            $table->string('gps_map')->nullable();
+            $table->string('tipe_layanan_angkut')->nullable();
+            $table->string('area_dihandle')->nullable();
+            $table->string('kapasitas_bobot_maksimal')->nullable();
+            $table->string('asuransi_barang')->nullable();
+            $table->decimal('biaya_khusus_kecelakaan', 15, 2)->nullable()->default(0);
+            $table->string('created_by')->nullable();
+            $table->integer('created_by_user_id')->nullable();
+            $table->string('updated_by')->nullable();
+            $table->integer('updated_by_user_id')->nullable();
+            $table->string('deleted_by')->nullable();
+            $table->timestamps();
+            $table->softDeletes();
         });
 
         Schema::create('sl_quotation_kerjasama', function (Blueprint $table) {
