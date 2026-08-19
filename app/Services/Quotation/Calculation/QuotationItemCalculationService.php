@@ -10,6 +10,12 @@ class QuotationItemCalculationService
 {
     private const PKHL_DEFAULT_HARI_KERJA = 25;
 
+    private const GC_CHEMICAL_JENIS_BARANG_MESIN = 13;
+
+    private const GC_CHEMICAL_MASA_PAKAI_MESIN = 36;
+
+    private const GC_CHEMICAL_MASA_PAKAI_DEFAULT = 1;
+
     private array $_site_hc_cache = [];
 
     private QuotationComponentCalculationService $componentService;
@@ -66,8 +72,12 @@ class QuotationItemCalculationService
         $detail->umk = $site->umk ?? 0;
         $detail->ump = $site->ump ?? 0;
 
-        if (! isset($detail->bunga_bank)) $detail->bunga_bank = $hpp->bunga_bank ?? 0;
-        if (! isset($detail->insentif)) $detail->insentif = $hpp->insentif ?? 0;
+        if (! isset($detail->bunga_bank)) {
+            $detail->bunga_bank = $hpp->bunga_bank ?? 0;
+        }
+        if (! isset($detail->insentif)) {
+            $detail->insentif = $hpp->insentif ?? 0;
+        }
 
         $detail->upah = $wage->upah ?? null;
         $detail->hitungan_upah = $wage->hitungan_upah ?? null;
@@ -93,22 +103,26 @@ class QuotationItemCalculationService
         $totalTunjangan = $this->componentService->calculateTunjangan($detail, $daftarTunjangan);
         $this->componentService->calculateBpjs($detail, $quotation, $hpp);
         $this->componentService->calculateExtras($detail, $quotation, $hpp, $coss, $wage, $isGC, $hariKerja);
-        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss, $isGC, $hariKerja);
+        $this->calculateAllItems($detail, $quotation, $jumlahHc, $hpp, $coss, $isGC);
         $this->componentService->calculateFinalTotals($detail, $quotation, $totalTunjangan, $hpp, $coss);
         $this->componentService->populateDetailCalculation($detail, $quotation, $detailCalculation);
     }
 
     // ============================ ITEM CALCULATIONS ============================
 
-    private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss, bool $isGC = false, int $hariKerja = 1): void
+    private function calculateAllItems($detail, $quotation, $totalJumlahHc, $hpp, $coss, bool $isGC = false): void
     {
         if (! isset($this->_site_hc_cache['quotation_id']) || $this->_site_hc_cache['quotation_id'] !== $quotation->id) {
-            $siteHcHpp = []; $siteHcCoss = []; $globalHpp = 0; $globalCoss = 0;
+            $siteHcHpp = [];
+            $siteHcCoss = [];
+            $globalHpp = 0;
+            $globalCoss = 0;
             foreach ($quotation->quotation_detail as $det) {
                 $sid = $det->quotation_site_id;
                 $siteHcHpp[$sid] = ($siteHcHpp[$sid] ?? 0) + $det->jumlah_hc_hpp;
                 $siteHcCoss[$sid] = ($siteHcCoss[$sid] ?? 0) + $det->jumlah_hc_original;
-                $globalHpp += $det->jumlah_hc_hpp; $globalCoss += $det->jumlah_hc_original;
+                $globalHpp += $det->jumlah_hc_hpp;
+                $globalCoss += $det->jumlah_hc_original;
             }
             $firstDetail = $quotation->quotation_detail->first();
             $this->_site_hc_cache = [
@@ -127,20 +141,24 @@ class QuotationItemCalculationService
 
         $items = [
             'kaporlap' => ['hpp_field' => 'provisi_seragam', 'coss_field' => 'provisi_seragam', 'preload_key' => '_kaporlap_items', 'group_by' => 'detail', 'is_general' => false, 'site_specific' => false, 'special' => 'kaporlap'],
-            'devices'  => ['hpp_field' => 'provisi_peralatan', 'coss_field' => 'provisi_peralatan', 'preload_key' => '_devices_items', 'group_by' => 'site', 'is_general' => true, 'site_specific' => true, 'special' => 'device'],
-            'ohc'      => ['hpp_field' => 'provisi_ohc', 'coss_field' => 'provisi_ohc', 'preload_key' => '_ohc_items', 'group_by' => 'site', 'is_general' => true, 'site_specific' => true, 'special' => null],
+            'devices' => ['hpp_field' => 'provisi_peralatan', 'coss_field' => 'provisi_peralatan', 'preload_key' => '_devices_items', 'group_by' => 'site', 'is_general' => true, 'site_specific' => true, 'special' => 'device'],
+            'ohc' => ['hpp_field' => 'provisi_ohc', 'coss_field' => 'provisi_ohc', 'preload_key' => '_ohc_items', 'group_by' => 'site', 'is_general' => true, 'site_specific' => true, 'special' => null],
             'chemical' => ['hpp_field' => 'provisi_chemical', 'coss_field' => 'provisi_chemical', 'preload_key' => '_chemical_items', 'group_by' => 'site', 'is_general' => true, 'site_specific' => true, 'special' => 'chemical'],
         ];
 
         foreach ($items as $key => $config) {
             if ($config['is_general'] && $config['site_specific']) {
-                $hppDivider = $totalJumlahHcHppSite; $cossDivider = $totalJumlahHcCossSite;
+                $hppDivider = $totalJumlahHcHppSite;
+                $cossDivider = $totalJumlahHcCossSite;
             } elseif ($config['is_general']) {
-                $hppDivider = $cache['global_hpp']; $cossDivider = $cache['global_coss'];
+                $hppDivider = $cache['global_hpp'];
+                $cossDivider = $cache['global_coss'];
             } else {
-                $hppDivider = $detail->jumlah_hc_hpp; $cossDivider = $detail->jumlah_hc_original;
+                $hppDivider = $detail->jumlah_hc_hpp;
+                $cossDivider = $detail->jumlah_hc_original;
             }
-            $hppDivider = max($hppDivider, 1); $cossDivider = max($cossDivider, 1);
+            $hppDivider = max($hppDivider, 1);
+            $cossDivider = max($cossDivider, 1);
 
             $hppManualValue = ($hpp && $hpp->{$config['hpp_field']} !== null) ? (float) $hpp->{$config['hpp_field']} : null;
             $cossManualValue = ($coss && $coss->{$config['coss_field']} !== null) ? (float) $coss->{$config['coss_field']} : null;
@@ -148,37 +166,57 @@ class QuotationItemCalculationService
             $includeLegacy = ($detail->id === $primaryDetailId);
             if ($config['group_by'] === 'detail') {
                 $loadedItems = $quotation->{$config['preload_key']}->get($detail->id, collect());
-                if ($includeLegacy) $loadedItems = $loadedItems->merge($quotation->{$config['preload_key']}->get('__legacy__', collect()));
+                if ($includeLegacy) {
+                    $loadedItems = $loadedItems->merge($quotation->{$config['preload_key']}->get('__legacy__', collect()));
+                }
             } else {
                 $loadedItems = $quotation->{$config['preload_key']}->get($currentSiteId, collect());
-                if ($includeLegacy) $loadedItems = $loadedItems->merge($quotation->{$config['preload_key']}->get('__legacy__', collect()));
+                if ($includeLegacy) {
+                    $loadedItems = $loadedItems->merge($quotation->{$config['preload_key']}->get('__legacy__', collect()));
+                }
             }
 
-            $hppValue = $hppManualValue ?? $this->computeItemValue($loadedItems, $config['special'], $hppDivider, $quotation->provisi, $detail->jumlah_hc_hpp);
-            $cossValue = $cossManualValue ?? $this->computeItemValue($loadedItems, $config['special'], $cossDivider, $quotation->provisi, $detail->jumlah_hc_original);
-
-            if ($isGC) { $hppValue /= $hariKerja; $cossValue /= $hariKerja; }
+            $hppValue = $hppManualValue ?? $this->computeItemValue($loadedItems, $config['special'], $hppDivider, $quotation->provisi, $detail->jumlah_hc_hpp, $isGC);
+            $cossValue = $cossManualValue ?? $this->computeItemValue($loadedItems, $config['special'], $cossDivider, $quotation->provisi, $detail->jumlah_hc_original, $isGC);
 
             $detail->{"personil_$key"} = $hppValue;
             $detail->{"personil_{$key}_coss"} = $cossValue;
         }
     }
 
-    private function computeItemValue(Collection $items, ?string $special, int $divider, int $provisi, int $jumlahHc): float
+    private function computeItemValue(Collection $items, ?string $special, int $divider, int $provisi, int $jumlahHc, bool $isGC = false): float
     {
-        if ($items->isEmpty()) return 0.0;
+        if ($items->isEmpty()) {
+            return 0.0;
+        }
         $total = 0.0;
 
         foreach ($items as $item) {
             if ($special === 'chemical') {
-                $total += ($item->jumlah * $item->harga) / $item->masa_pakai / max($divider, 1);
+                $masaPakai = $isGC
+                    ? $this->resolveGcChemicalMasaPakai($item)
+                    : (int) $item->masa_pakai;
+                $total += ($item->jumlah * $item->harga) / max($masaPakai, 1) / max($divider, 1);
             } elseif ($special === 'kaporlap') {
                 $total += ($item->harga * $item->jumlah) / $provisi;
             } else {
                 $total += ($item->harga * $item->jumlah) / $provisi / max($divider, 1);
             }
         }
+
         return $total;
+    }
+
+    /**
+     * Pada kontrak General Cleaning masa pakai chemical tidak diambil dari kolom
+     * masa_pakai, melainkan ditetapkan per jenis barang: mesin diamortisasi 36
+     * bulan, item habis pakai dibebankan penuh (dibagi 1).
+     */
+    private function resolveGcChemicalMasaPakai($item): int
+    {
+        return (int) $item->jenis_barang_id === self::GC_CHEMICAL_JENIS_BARANG_MESIN
+            ? self::GC_CHEMICAL_MASA_PAKAI_MESIN
+            : self::GC_CHEMICAL_MASA_PAKAI_DEFAULT;
     }
 
     // ============================ GROSS UP UPDATE ============================
@@ -217,14 +255,20 @@ class QuotationItemCalculationService
 
     public function calculateProvisi($durasiKerjasama): int
     {
-        if (! $durasiKerjasama) return 12;
+        if (! $durasiKerjasama) {
+            return 12;
+        }
+
         return ! str_contains($durasiKerjasama, 'tahun')
             ? (int) str_replace(' bulan', '', $durasiKerjasama) : 12;
     }
 
     public function parseHariKerja(?string $hariKerja): int
     {
-        if (!$hariKerja) return self::PKHL_DEFAULT_HARI_KERJA;
+        if (! $hariKerja) {
+            return self::PKHL_DEFAULT_HARI_KERJA;
+        }
+
         return max((int) $hariKerja, 1);
     }
 
@@ -236,6 +280,7 @@ class QuotationItemCalculationService
             $detail->nominal_upah_harian = (float) $detail->nominal_upah;
             $detail->hari_kerja_pkhl = $hariKerja;
             $detail->nominal_upah_bulanan = round($detail->nominal_upah_harian * $hariKerja, 2);
+
             return;
         }
         $detail->nominal_upah_bulanan = (float) $detail->nominal_upah;
