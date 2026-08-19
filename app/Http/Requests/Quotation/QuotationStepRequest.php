@@ -64,7 +64,9 @@ class QuotationStepRequest extends BaseRequest
                     $rules['jam_kerja'] = FluentRule::string()->required();
                     $rules['shift_kerja'] = FluentRule::string()->required();
                     $rules['jam_lembur'] = FluentRule::string()->required();
-                    $rules['cuti_izin'] = FluentRule::string()->required();
+                    $rules['cuti_izin'] = FluentRule::array()->required()->children([
+                        '*' => FluentRule::string()->required(),
+                    ]);
                     $rules['status_rekrutmen'] = FluentRule::string()->required();
                     $rules['pendaftaran_pkwt'] = FluentRule::string()->required();
                     $rules['jaminan'] = FluentRule::string()->required();
@@ -199,6 +201,15 @@ class QuotationStepRequest extends BaseRequest
                 $rules['ada_training'] = FluentRule::string()->sometimes()->in(['Ada', 'Tidak Ada']);
                 $rules['training'] = FluentRule::string()->sometimes();
                 $rules['persen_bunga_bank'] = FluentRule::numeric()->sometimes()->min(0);
+                
+                $rules['ohcs'] = FluentRule::array()->sometimes()->each([
+                    'quotation_site_id' => FluentRule::integer()->requiredWith('ohcs')->exists('sl_quotation_site', 'id'),
+                    'barang_id' => FluentRule::integer()->sometimes()->exists('m_barang', 'id'),
+                    'nama' => FluentRule::string()->sometimes(),
+                    'jumlah' => FluentRule::integer()->requiredWith('ohcs')->min(0),
+                    'is_custom' => FluentRule::boolean()->sometimes(),
+                    'harga' => FluentRule::numeric()->sometimes()->min(0),
+                ]);
                 break;
 
             case 'updateDriver':

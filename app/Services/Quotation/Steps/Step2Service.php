@@ -24,13 +24,19 @@ class Step2Service
 
             if ($quotation->version === 2) {
                 $this->validateStep2V2($request);
+                
+                $cutiIzin = $request->cuti_izin;
+                if (is_array($cutiIzin)) {
+                    $cutiIzin = implode(', ', $cutiIzin);
+                }
+                
                 $updateData = [
                     'hari_kerja' => $request->hari_kerja,
                     'hari_off' => $request->hari_off,
                     'jam_kerja' => $request->jam_kerja,
                     'shift_kerja' => $request->shift_kerja,
                     'jam_lembur' => $request->jam_lembur,
-                    'cuti_izin' => $request->cuti_izin,
+                    'cuti_izin' => $cutiIzin,
                     'status_rekrutmen' => $request->status_rekrutmen,
                     'pendaftaran_pkwt' => $request->pendaftaran_pkwt,
                     'jaminan' => $request->jaminan,
@@ -98,7 +104,8 @@ class Step2Service
             'jam_kerja' => 'required|string',
             'shift_kerja' => 'required|string',
             'jam_lembur' => 'required|string',
-            'cuti_izin' => 'required|string',
+            'cuti_izin' => 'required|array',
+            'cuti_izin.*' => 'string',
             'status_rekrutmen' => 'required|string',
             'pendaftaran_pkwt' => 'required|string',
             'jaminan' => 'required|string',
