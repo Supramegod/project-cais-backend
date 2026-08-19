@@ -61,6 +61,6 @@ trait ReportHelperTrait
 
     private function calcPercentage(int $numerator, int $denominator): string
     {
-        return $denominator > 0 ? round(($numerator / $denominator) * 100, 1) . '%' : '0%';
+        return $denominator > 0 ? round(($numerator / $denominator) * 100, 1).'%' : '0%';
     }
 }

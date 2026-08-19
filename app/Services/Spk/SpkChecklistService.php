@@ -49,7 +49,7 @@ class SpkChecklistService
 
             // Tambah PICs jika ada
             $picsAdded = 0;
-            if (!empty($data['pics']) && is_array($data['pics'])) {
+            if (! empty($data['pics']) && is_array($data['pics'])) {
                 foreach ($data['pics'] as $picData) {
                     $this->addDetailPic($quotation, $picData, $currentDateTime);
                     $picsAdded++;

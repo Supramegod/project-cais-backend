@@ -206,6 +206,82 @@ class ReportActivityDetailTest extends TestCase
             ->assertJsonStructure(['message' => ['jenis_activity']]);
     }
 
+    // ── keterbacaan data ─────────────────────────────────────────────────
+
+    public function test_tele_falls_back_to_notes_when_notulen_is_empty(): void
+    {
+        // Penulis customer activity mengisi `notes`, bukan `notulen`.
+        DB::table('sl_customer_activity')->insert([
+            [
+                'leads_id' => 10, 'user_id' => $this->teleUserId, 'tipe' => 'Leads',
+                'tgl_activity' => '2026-07-02', 'notes' => 'dari kolom notes', 'notulen' => null,
+                'created_by' => 'Tele Sales', 'created_at' => '2026-07-02 09:00:00',
+            ],
+            [
+                'leads_id' => 10, 'user_id' => $this->teleUserId, 'tipe' => 'Assignment',
+                'tgl_activity' => '2026-07-03', 'notes' => 'notes diabaikan', 'notulen' => 'notulen menang',
+                'created_by' => 'Tele Sales', 'created_at' => '2026-07-03 09:00:00',
+            ],
+        ]);
+
+        $response = $this->getJson("/api/sales-report/activity-detail/tele/{$this->teleUserId}?month=7&year=2026");
+
+        $response->assertOk();
+        $notes = collect($response->json('data'))->pluck('notes', 'tipe')->all();
+
+        $this->assertSame('dari kolom notes', $notes['Leads']);
+        $this->assertSame('notulen menang', $notes['Assignment']);
+    }
+
+    public function test_tele_excludes_soft_deleted_customer_activity(): void
+    {
+        DB::table('sl_customer_activity')->insert([
+            [
+                'leads_id' => 10, 'user_id' => $this->teleUserId, 'tipe' => 'Leads',
+                'tgl_activity' => '2026-07-02', 'notulen' => 'masih hidup', 'created_by' => 'Tele Sales',
+                'created_at' => '2026-07-02 09:00:00', 'deleted_at' => null,
+            ],
+            [
+                'leads_id' => 10, 'user_id' => $this->teleUserId, 'tipe' => 'Assignment',
+                'tgl_activity' => '2026-07-03', 'notulen' => 'sudah dihapus', 'created_by' => 'Tele Sales',
+                'created_at' => '2026-07-03 09:00:00', 'deleted_at' => '2026-07-04 10:00:00',
+            ],
+        ]);
+
+        $response = $this->getJson("/api/sales-report/activity-detail/tele/{$this->teleUserId}?month=7&year=2026");
+
+        $response->assertOk();
+        $data = $response->json('data');
+
+        $this->assertCount(1, $data);
+        $this->assertSame('masih hidup', $data[0]['notes']);
+    }
+
+    public function test_detail_resolves_aksi_for_lowercase_spk_activity(): void
+    {
+        // Penulis SPK lama menyimpan 'spk' huruf kecil; laporan tetap harus menautkannya.
+        DB::table('sl_activity_sales')->insert([
+            [
+                'leads_id' => 10, 'created_by_user_id' => $this->salesUserId, 'jenis_activity' => 'spk',
+                'spk_id' => 77, 'tgl_activity' => '2026-07-06', 'notulen' => 'spk lowercase',
+                'created_by' => 'Sales Regular', 'created_at' => '2026-07-06 09:00:00',
+            ],
+            [
+                'leads_id' => 10, 'created_by_user_id' => $this->salesUserId, 'jenis_activity' => 'SPK',
+                'spk_id' => 78, 'tgl_activity' => '2026-07-07', 'notulen' => 'spk uppercase',
+                'created_by' => 'Sales Regular', 'created_at' => '2026-07-07 09:00:00',
+            ],
+        ]);
+
+        $response = $this->getJson("/api/sales-report/activity-detail/{$this->salesUserId}?month=7&year=2026");
+
+        $response->assertOk();
+        $aksi = collect($response->json('data'))->pluck('aksi', 'notes')->all();
+
+        $this->assertSame(77, $aksi['spk lowercase']);
+        $this->assertSame(78, $aksi['spk uppercase']);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────
 
     private function seedSalesActivities(): void
@@ -330,10 +406,12 @@ class ReportActivityDetailTest extends TestCase
             $table->unsignedInteger('user_id')->nullable();
             $table->string('tipe')->nullable();
             $table->date('tgl_activity')->nullable();
+            $table->text('notes')->nullable();
             $table->text('notulen')->nullable();
             $table->string('created_by')->nullable();
             $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
+            $table->softDeletes();
         });
 
         Schema::create('sl_activity_sales', function (Blueprint $table) {

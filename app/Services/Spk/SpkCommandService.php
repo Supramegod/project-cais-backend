@@ -22,14 +22,14 @@ class SpkCommandService
     {
         return DB::transaction(function () use ($leadsId, $tanggalSpk, $siteIds) {
             $leads = Leads::whereNull('deleted_at')->find($leadsId);
-            if (!$leads) {
+            if (! $leads) {
                 throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan atau sudah dihapus.");
             }
             if (QuotationSite::whereIn('id', $siteIds)->where('leads_id', '!=', $leadsId)->exists()) {
-                throw new \Exception("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+                throw new \Exception('Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.');
             }
             if (QuotationSite::whereIn('id', $siteIds)->whereHas('spkSite')->exists()) {
-                throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
+                throw new \Exception('Beberapa site yang dipilih sudah memiliki SPK.');
             }
             $firstSite = QuotationSite::find($siteIds[0]);
             $quotationId = $firstSite?->quotation_id;
@@ -50,9 +50,10 @@ class SpkCommandService
                 Quotation::where('id', $quotationId)->where('status_quotation_id', '!=', 100)
                     ->update(['status_quotation_id' => 4, 'updated_by' => Auth::user()->full_name ?? 'System']);
             }
-            if (!in_array($leads->status_leads_id, [99, 100, 101, 102])) {
+            if (! in_array($leads->status_leads_id, [99, 100, 101, 102])) {
                 $leads->update(['status_leads_id' => 3, 'updated_by' => Auth::user()->full_name ?? 'System']);
             }
+
             return $spk->load(['spkSites', 'leads']);
         });
     }
@@ -61,7 +62,9 @@ class SpkCommandService
     {
         DB::transaction(function () use ($id) {
             $spk = Spk::find($id);
-            if (!$spk) throw new \Exception('SPK not found');
+            if (! $spk) {
+                throw new \Exception('SPK not found');
+            }
             SpkSite::where('spk_id', $id)->update(['deleted_at' => now(), 'deleted_by' => Auth::user()->full_name]);
             $spk->update(['deleted_at' => now(), 'deleted_by' => Auth::user()->full_name]);
             $this->createDeleteActivity($spk);
@@ -72,7 +75,9 @@ class SpkCommandService
     {
         DB::transaction(function () use ($siteId) {
             $spkSite = SpkSite::find($siteId);
-            if (!$spkSite) throw new \Exception('SPK site not found');
+            if (! $spkSite) {
+                throw new \Exception('SPK site not found');
+            }
             $spkSite->update(['deleted_at' => now(), 'deleted_by' => Auth::user()->full_name]);
             $remainingSites = SpkSite::where('spk_id', $spkSite->spk_id)->whereNull('deleted_at')->count();
             if ($remainingSites === 0) {
@@ -94,8 +99,12 @@ class SpkCommandService
     {
         foreach ($siteIds as $siteId) {
             $qs = QuotationSite::with('quotation')->find($siteId);
-            if (!$qs) throw new \Exception("Quotation site dengan ID {$siteId} tidak ditemukan.");
-            if ($qs->leads_id != $spk->leads_id) throw new \Exception("Quotation site dengan ID {$siteId} tidak termasuk dalam leads yang dipilih.");
+            if (! $qs) {
+                throw new \Exception("Quotation site dengan ID {$siteId} tidak ditemukan.");
+            }
+            if ($qs->leads_id != $spk->leads_id) {
+                throw new \Exception("Quotation site dengan ID {$siteId} tidak termasuk dalam leads yang dipilih.");
+            }
             SpkSite::create([
                 'spk_id' => $spk->id, 'quotation_id' => $qs->quotation_id, 'quotation_site_id' => $qs->id,
                 'leads_id' => $qs->leads_id, 'nama_site' => $qs->nama_site, 'provinsi_id' => $qs->provinsi_id,
@@ -117,7 +126,7 @@ class SpkCommandService
             CustomerActivity::create([
                 'leads_id' => $leads->id, 'spk_id' => $spk->id, 'branch_id' => $leads->branch_id,
                 'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-                'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
+                'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : '.$spkNomor.' terbentuk',
                 'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name,
                 'created_by_user_id' => Auth::user()->id,
             ]);
@@ -136,7 +145,7 @@ class SpkCommandService
             if (SpkSite::where('spk_id', $spk->id)->where('kebutuhan_id', $lk->kebutuhan_id)->exists()) {
                 SalesActivity::create([
                     'leads_id' => $spk->leads_id, 'leads_kebutuhan_id' => $lk->id, 'spk_id' => $spk->id, 'tgl_activity' => Carbon::now(),
-                    'jenis_activity' => 'spk', 'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$lk->kebutuhan->nama}",
+                    'jenis_activity' => 'SPK', 'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$lk->kebutuhan->nama}",
                     'created_by' => $user->full_name, 'created_by_user_id' => $user->id,
                 ]);
             }
@@ -149,7 +158,7 @@ class SpkCommandService
         CustomerActivity::create([
             'leads_id' => $leads->id, 'spk_id' => $spk->id, 'branch_id' => $leads->branch_id,
             'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-            'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus',
             'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name,
             'created_by_user_id' => Auth::user()->id,
         ]);
@@ -163,4 +172,4 @@ class SpkCommandService
     {
         return app(\App\Services\Spk\SpkNumberingService::class)->generate($leadsId, $companyId);
     }
-  }
+}

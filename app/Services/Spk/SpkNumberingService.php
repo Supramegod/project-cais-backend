@@ -35,24 +35,24 @@ class SpkNumberingService
         $leads = Leads::whereNull('deleted_at')->findOrFail($leadsId);
         $company = Company::find($companyId);
 
-        $base = 'SPK/' . self::TIPE_ORG . '/';
-        $base .= $company ? $company->code . '/' : 'NN/';
-        $base .= ($leads->nomor ?? 'NNNNN') . '-';
+        $base = 'SPK/'.self::TIPE_ORG.'/';
+        $base .= $company ? $company->code.'/' : 'NN/';
+        $base .= ($leads->nomor ?? 'NNNNN').'-';
 
-        $prefix = $base . $monthYear . '-';
+        $prefix = $base.$monthYear.'-';
 
         // SEQ diambil dari nomor tertinggi yang sudah terpakai, atas query
         // `withTrashed()`. Spk memakai SoftDeletes, jadi `count() + 1` akan
         // melewatkan baris terhapus dan memakai ulang nomornya.
         $existing = Spk::withTrashed()
-            ->where('nomor', 'like', $prefix . '%')
+            ->where('nomor', 'like', $prefix.'%')
             ->pluck('nomor')
             ->all();
 
         $seq = DocumentVersionChain::nextSequence($existing, $prefix);
 
         return DocumentVersionChain::assertLength(
-            $prefix . str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
+            $prefix.str_pad((string) $seq, 5, '0', STR_PAD_LEFT)
         );
     }
 }

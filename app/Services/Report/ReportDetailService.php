@@ -67,9 +67,9 @@ class ReportDetailService
                 ->pluck('id');
 
         $data = $activities->map(function ($row, $index) use ($validBaruQuotationIds) {
-            $aksi = match ($row->jenis_activity) {
-                'Leads' => $row->leads_id,
-                'Quotation' => ($row->quotation_id && $validBaruQuotationIds->contains($row->quotation_id))
+            $aksi = match (strtoupper((string) $row->jenis_activity)) {
+                'LEADS' => $row->leads_id,
+                'QUOTATION' => ($row->quotation_id && $validBaruQuotationIds->contains($row->quotation_id))
                     ? $row->quotation_id
                     : null,
                 'SPK' => $row->spk_id,
@@ -108,10 +108,11 @@ class ReportDetailService
                 ->select(
                     'sa.id', 'sa.leads_id', 'sa.tgl_activity',
                     DB::raw('sa.tipe as tipe'),
-                    DB::raw("COALESCE(sa.notulen, '') AS notulen"),
+                    DB::raw("COALESCE(NULLIF(sa.notulen, ''), sa.notes, '') AS notulen"),
                     'sa.created_by', 'sa.created_at', 'l.nama_perusahaan'
                 )
                 ->whereBetween('sa.tgl_activity', [$startDate, $endDate])
+                ->whereNull('sa.deleted_at')
                 ->where('sa.user_id', $userId)
                 ->whereIn('sa.tipe', $customerTipe)
                 ->get();

@@ -23,7 +23,7 @@ class ReportRole30Service
 
         if ($salesData->isEmpty()) {
             return [
-                'periode' => strtoupper(Carbon::createFromDate($year, $month, 1)->locale('id')->monthName) . ' - ' . $year,
+                'periode' => strtoupper(Carbon::createFromDate($year, $month, 1)->locale('id')->monthName).' - '.$year,
                 'data' => [],
                 'count' => 0,
             ];
@@ -60,7 +60,7 @@ class ReportRole30Service
 
         $periode = strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
+        ).' - '.$year;
 
         return [
             'periode' => $periode,
@@ -83,7 +83,7 @@ class ReportRole30Service
 
         if ($salesData->isEmpty()) {
             return [
-                'periode' => strtoupper(Carbon::create()->month($month)->locale('id')->monthName) . ' - ' . $year,
+                'periode' => strtoupper(Carbon::create()->month($month)->locale('id')->monthName).' - '.$year,
                 'data' => [],
                 'count' => 0,
             ];
@@ -97,30 +97,27 @@ class ReportRole30Service
                 'sa.user_id',
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Leads' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN sa.leads_id END) as w1_leads"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN sa.leads_id END) as w1_assignment"),
-                DB::raw("SUM(CASE WHEN sa.tipe = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 1 AND 7 AND EXISTS (SELECT 1 FROM sl_customer_activity sa2 WHERE sa2.leads_id = sa.leads_id AND sa2.tipe = 'Assignment' AND sa2.tgl_activity <= sa.tgl_activity) THEN 1 ELSE 0 END) as w1_appt"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Leads' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN sa.leads_id END) as w2_leads"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN sa.leads_id END) as w2_assignment"),
-                DB::raw("SUM(CASE WHEN sa.tipe = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 8 AND 14 AND EXISTS (SELECT 1 FROM sl_customer_activity sa2 WHERE sa2.leads_id = sa.leads_id AND sa2.tipe = 'Assignment' AND sa2.tgl_activity <= sa.tgl_activity) THEN 1 ELSE 0 END) as w2_appt"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Leads' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN sa.leads_id END) as w3_leads"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN sa.leads_id END) as w3_assignment"),
-                DB::raw("SUM(CASE WHEN sa.tipe = 'Appointment' AND DAY(sa.tgl_activity) BETWEEN 15 AND 21 AND EXISTS (SELECT 1 FROM sl_customer_activity sa2 WHERE sa2.leads_id = sa.leads_id AND sa2.tipe = 'Assignment' AND sa2.tgl_activity <= sa.tgl_activity) THEN 1 ELSE 0 END) as w3_appt"),
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Leads' AND DAY(sa.tgl_activity) >= 22 THEN sa.leads_id END) as w4_leads"),
-                DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' AND DAY(sa.tgl_activity) >= 22 THEN sa.leads_id END) as w4_assignment"),
-                DB::raw("SUM(CASE WHEN sa.tipe = 'Appointment' AND DAY(sa.tgl_activity) >= 22 AND EXISTS (SELECT 1 FROM sl_customer_activity sa2 WHERE sa2.leads_id = sa.leads_id AND sa2.tipe = 'Assignment' AND sa2.tgl_activity <= sa.tgl_activity) THEN 1 ELSE 0 END) as w4_appt")
+                DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' AND DAY(sa.tgl_activity) >= 22 THEN sa.leads_id END) as w4_assignment")
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
+            ->whereNull('sa.deleted_at')
             ->whereIn('sa.user_id', $userIds)
-            ->whereIn('sa.tipe', ['Leads', 'Assignment', 'Appointment'])
+            ->whereIn('sa.tipe', ['Leads', 'Assignment'])
             ->groupBy('sa.user_id')
             ->get();
 
         $apptWeekly = DB::table('sl_activity_sales as sa')
             ->select(
                 'sa.created_by_user_id as user_id',
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt")
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt')
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
             ->whereIn('sa.created_by_user_id', $userIds)
@@ -168,7 +165,7 @@ class ReportRole30Service
 
         $periode = strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
+        ).' - '.$year;
 
         return [
             'periode' => $periode,
@@ -189,6 +186,7 @@ class ReportRole30Service
                 DB::raw("COUNT(DISTINCT CASE WHEN sa.tipe = 'Assignment' THEN sa.leads_id END) as jumlah_assignment")
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
+            ->whereNull('sa.deleted_at')
             ->whereIn('sa.user_id', $userIds)
             ->whereIn('sa.tipe', ['Leads', 'Assignment'])
             ->groupBy('sa.user_id')
@@ -198,7 +196,7 @@ class ReportRole30Service
         $appointment = DB::table('sl_activity_sales as sa')
             ->select(
                 'sa.created_by_user_id as user_id',
-                DB::raw("COUNT(*) as jumlah_appointment")
+                DB::raw('COUNT(*) as jumlah_appointment')
             )
             ->whereBetween('sa.tgl_activity', [$start, $end])
             ->whereIn('sa.created_by_user_id', $userIds)

@@ -2,7 +2,6 @@
 
 namespace App\Services\Spk;
 
-use App\Models\Company;
 use App\Models\CustomerActivity;
 use App\Models\Leads;
 use App\Models\Quotation;
@@ -33,11 +32,17 @@ class SpkResubmissionService
     {
         return DB::transaction(function () use ($spkId, $quotationSiteIds, $alasan) {
             $spk = Spk::with(['spkSites.quotation', 'spkSites.quotationSite'])->find($spkId);
-            if (!$spk) throw new \Exception('SPK not found');
+            if (! $spk) {
+                throw new \Exception('SPK not found');
+            }
             $allSpkSites = $spk->spkSites;
-            if ($allSpkSites->isEmpty()) throw new \Exception('Tidak ada site yang terkait dengan SPK ini.');
+            if ($allSpkSites->isEmpty()) {
+                throw new \Exception('Tidak ada site yang terkait dengan SPK ini.');
+            }
             $spkSitesToResubmit = $allSpkSites->whereIn('quotation_site_id', $quotationSiteIds);
-            if ($spkSitesToResubmit->isEmpty()) throw new \Exception('Tidak ada site yang valid untuk diajukan ulang.');
+            if ($spkSitesToResubmit->isEmpty()) {
+                throw new \Exception('Tidak ada site yang valid untuk diajukan ulang.');
+            }
 
             $quotationGroups = $spkSitesToResubmit->groupBy('quotation_id');
             $newQuotations = [];
@@ -47,7 +52,9 @@ class SpkResubmissionService
 
             foreach ($quotationGroups as $quotationId => $spkSites) {
                 $quotationAsal = $spkSites->first()->quotation;
-                if (!$quotationAsal) continue;
+                if (! $quotationAsal) {
+                    continue;
+                }
                 $nomorBaru = $this->generateNomorQuotation($quotationAsal->leads_id, $quotationAsal->company_id, $quotationAsal->id);
                 $newQuotation = $this->createNewQuotation($quotationAsal, $nomorBaru, $alasan);
                 $newQuotations[] = $newQuotation;
@@ -70,6 +77,7 @@ class SpkResubmissionService
 
             $this->createResubmissionActivities($quotationAsal, $newQuotation ?? null, $spk, $spkDeleted, $deletedSpkSiteIds, $deletedQuotationSiteIds);
             $newQuotation = $newQuotations[0] ?? null;
+
             return [
                 'quotation_baru_id' => $newQuotation?->id, 'quotation_baru_nomor' => $newQuotation?->nomor,
                 'spk_id' => $spk->id, 'spk_dihapus' => $spkDeleted,
@@ -125,6 +133,7 @@ class SpkResubmissionService
         $data['status_quotation_id'] = $statusQuotation;
         $data['is_aktif'] = $isAktif;
         $data['step'] = 1;
+
         return Quotation::create($data);
     }
 
@@ -158,30 +167,30 @@ class SpkResubmissionService
         CustomerActivity::create([
             'leads_id' => $leads->id, 'quotation_id' => $quotationAsal->id, 'branch_id' => $leads->branch_id,
             'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-            'tipe' => 'Quotation', 'notes' => 'Quotation dengan nomor : ' . $quotationAsal->nomor . ' di ajukan ulang',
+            'tipe' => 'Quotation', 'notes' => 'Quotation dengan nomor : '.$quotationAsal->nomor.' di ajukan ulang',
             'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name, 'created_by_user_id' => Auth::user()->id,
         ]);
         if ($newQuotation) {
             CustomerActivity::create([
                 'leads_id' => $leads->id, 'quotation_id' => $newQuotation->id, 'branch_id' => $leads->branch_id,
                 'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-                'tipe' => 'Quotation', 'notes' => 'Quotation dengan nomor : ' . $newQuotation->nomor . ' terbentuk dari ajukan ulang quotation dengan nomor : ' . $quotationAsal->nomor,
+                'tipe' => 'Quotation', 'notes' => 'Quotation dengan nomor : '.$newQuotation->nomor.' terbentuk dari ajukan ulang quotation dengan nomor : '.$quotationAsal->nomor,
                 'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name, 'created_by_user_id' => Auth::user()->id,
             ]);
         }
-        if (!empty($deletedSpkSiteIds)) {
+        if (! empty($deletedSpkSiteIds)) {
             CustomerActivity::create([
                 'leads_id' => $leads->id, 'spk_id' => $spk->id, 'branch_id' => $leads->branch_id,
                 'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-                'tipe' => 'SPK Site', 'notes' => count($deletedSpkSiteIds) . ' SPK site dihapus karena quotation diajukan ulang',
+                'tipe' => 'SPK Site', 'notes' => count($deletedSpkSiteIds).' SPK site dihapus karena quotation diajukan ulang',
                 'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name, 'created_by_user_id' => Auth::user()->id,
             ]);
         }
-        if (!empty($deletedQuotationSiteIds)) {
+        if (! empty($deletedQuotationSiteIds)) {
             CustomerActivity::create([
                 'leads_id' => $leads->id, 'quotation_id' => $quotationAsal->id, 'branch_id' => $leads->branch_id,
                 'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-                'tipe' => 'Quotation Site', 'notes' => count($deletedQuotationSiteIds) . ' Quotation site dihapus karena diajukan ulang',
+                'tipe' => 'Quotation Site', 'notes' => count($deletedQuotationSiteIds).' Quotation site dihapus karena diajukan ulang',
                 'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name, 'created_by_user_id' => Auth::user()->id,
             ]);
         }
@@ -189,7 +198,7 @@ class SpkResubmissionService
             CustomerActivity::create([
                 'leads_id' => $leads->id, 'spk_id' => $spk->id, 'branch_id' => $leads->branch_id,
                 'tgl_activity' => now(), 'nomor' => $this->generateActivityNomor($leads->id),
-                'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus karena semua quotation site diajukan ulang',
+                'tipe' => 'SPK', 'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus karena semua quotation site diajukan ulang',
                 'is_activity' => 0, 'user_id' => Auth::user()->id, 'created_by' => Auth::user()->full_name, 'created_by_user_id' => Auth::user()->id,
             ]);
         }

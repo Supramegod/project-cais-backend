@@ -30,22 +30,22 @@ class SpkQueryService
             ->with(['leads:id,nama_perusahaan', 'statusSpk:id,nama', 'spkSites:id,spk_id,nama_site'])
             ->orderBy('sl_spk.created_at', 'desc');
         $query->leftJoin('sl_leads', 'sl_spk.leads_id', '=', 'sl_leads.id');
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $searchTerm = $filters['search'];
             $searchBy = $filters['search_by'] ?? 'nama_perusahaan';
             if ($searchBy === 'nama_perusahaan') {
-                $searchTerm = str_contains($searchTerm, ' ') ? '"' . $searchTerm . '"' : $searchTerm . '*';
-                $query->whereRaw("MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                $searchTerm = str_contains($searchTerm, ' ') ? '"'.$searchTerm.'"' : $searchTerm.'*';
+                $query->whereRaw('MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
             } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
-                $query->where("sl_spk.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
+                $query->where("sl_spk.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
             }
         } else {
             $query->whereBetween('sl_spk.tgl_spk', [$tglDari, $tglSampai]);
         }
-        if (!empty($filters['branch'])) {
+        if (! empty($filters['branch'])) {
             $query->where('sl_leads.branch_id', $filters['branch']);
         }
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('sl_spk.status_spk_id', $filters['status']);
         }
         $perPage = $filters['per_page'] ?? 15;
@@ -61,6 +61,7 @@ class SpkQueryService
                 'created_by' => $spk->created_by,
             ];
         });
+
         return [
             'list' => $data->items(),
             'pagination' => ['current_page' => $data->currentPage(), 'last_page' => $data->lastPage(), 'total' => $data->total(), 'total_per_page' => $data->count()],
@@ -79,10 +80,10 @@ class SpkQueryService
     {
         return Quotation::with(['leads.timSalesD'])
             ->whereNull('deleted_at')->where('status_quotation_id', 3)->where('is_aktif', 1)
-            ->whereHas('leads.timSalesD', fn($q) => $q->where('user_id', Auth::user()->id))
-            ->whereHas('quotationSites', fn($q) => $q->whereNull('deleted_at')->whereDoesntHave('spkSite'))
+            ->whereHas('leads.timSalesD', fn ($q) => $q->where('user_id', Auth::user()->id))
+            ->whereHas('quotationSites', fn ($q) => $q->whereNull('deleted_at')->whereDoesntHave('spkSite'))
             ->get()
-            ->map(fn($q) => [
+            ->map(fn ($q) => [
                 'id' => $q->id,
                 'nomor' => $q->nomor,
                 'quotation' => $q->nomor,
@@ -97,8 +98,8 @@ class SpkQueryService
     public function availableLeads()
     {
         return Leads::filterByuserRole()
-            ->whereHas('quotations.quotationSites', fn($q) => $q->whereNull('deleted_at')->whereDoesntHave('spkSite', fn($q2) => $q2->whereNull('deleted_at')))
-            ->whereHas('quotations', fn($q) => $q->whereNull('deleted_at')->where('status_quotation_id', 3)->where('is_aktif', 1))
+            ->whereHas('quotations.quotationSites', fn ($q) => $q->whereNull('deleted_at')->whereDoesntHave('spkSite', fn ($q2) => $q2->whereNull('deleted_at')))
+            ->whereHas('quotations', fn ($q) => $q->whereNull('deleted_at')->where('status_quotation_id', 3)->where('is_aktif', 1))
             ->select('id', 'nomor', 'nama_perusahaan', 'provinsi', 'kota')
             ->distinct()->orderBy('id', 'desc')->get();
     }
@@ -112,7 +113,9 @@ class SpkQueryService
             'spkSites.quotation.wage', 'spkSites.quotation.quotationTrainings',
             'spkSites.quotation.salaryRule', 'spkSites.quotation.ruleThr',
         ])->find($id);
-        if (!$spk) return null;
+        if (! $spk) {
+            return null;
+        }
 
         $spkInfo = ['nomor_spk' => $spk->nomor, 'tanggal_spk' => $spk->tgl_spk, 'link_spk_disetujui' => $spk->link_spk_disetujui ?? null, 'status' => $spk->statusSpk?->nama ?? null];
         $leadsInfo = [
@@ -124,7 +127,7 @@ class SpkQueryService
 
         $uniqueQuotations = collect();
         foreach ($spk->spkSites as $spkSite) {
-            if ($spkSite->quotation && !$uniqueQuotations->contains('id', $spkSite->quotation->id)) {
+            if ($spkSite->quotation && ! $uniqueQuotations->contains('id', $spkSite->quotation->id)) {
                 $uniqueQuotations->push($spkSite->quotation);
             }
         }
@@ -134,11 +137,12 @@ class SpkQueryService
             $quotationsInfo[] = $this->buildQuotationViewData($quotation);
         }
 
-        $sitesInfo = $spk->spkSites->map(fn($site) => [
+        $sitesInfo = $spk->spkSites->map(fn ($site) => [
             'id' => $site->id, 'nama_site' => $site->nama_site, 'kota' => $site->kota,
             'penempatan' => $site->penempatan, 'quotation_id' => $site->quotation_id,
         ]);
         unset($uniqueQuotations);
+
         return ['spk' => $spkInfo, 'leads' => $leadsInfo, 'quotations' => $quotationsInfo, 'sites' => $sitesInfo];
     }
 
@@ -148,7 +152,7 @@ class SpkQueryService
         try {
             $calculated = $this->quotationService->calculateQuotation($quotation);
         } catch (\Exception $e) {
-            Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
+            Log::error('Error calculating quotation in SPK view: '.$e->getMessage());
         }
         $bpjs = [];
         if ($calculated && isset($calculated->calculation_summary)) {
@@ -163,7 +167,7 @@ class SpkQueryService
         $company = null;
         if ($quotation->relationLoaded('company') && $quotation->company instanceof Company) {
             $company = $quotation->company;
-        } elseif (!empty($quotation->company_id)) {
+        } elseif (! empty($quotation->company_id)) {
             $company = Company::find($quotation->company_id);
         }
         $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
@@ -193,9 +197,9 @@ class SpkQueryService
             'ada_serikat' => $quotation->status_serikat ? 'Ada' : 'Tidak Ada',
             'salary_rule' => $quotation->salaryRule ? ['id' => $quotation->salaryRule->id, 'nama' => $quotation->salaryRule->nama_salary_rule ?? null, 'cutoff' => $quotation->salaryRule->cutoff ?? null, 'crosscheck' => $quotation->salaryRule->crosscheck_absen ?? null, 'pengiriman_invoice' => $quotation->salaryRule->pengiriman_invoice ?? null, 'perkiraan_invoice_diterima' => $quotation->salaryRule->perkiraan_invoice_diterima ?? null, 'rilis_payroll' => $quotation->salaryRule->rilis_payroll ?? null] : null,
             'rulethr' => $quotation->ruleThr ? ['id' => $quotation->ruleThr->id, 'nama' => $quotation->ruleThr->nama ?? null, 'hari_rilis_thr' => $quotation->ruleThr->hari_rilis_thr ?? null, 'hari_pembayaran_invoice' => $quotation->ruleThr->hari_pembayaran_invoice ?? null, 'hari_penagihan_invoice' => $quotation->ruleThr->hari_penagihan_invoice ?? null] : null,
-            'quotation_details' => $quotation->quotationDetails->map(fn($d) => ['id' => $d->id, 'jabatan_kebutuhan' => $d->jabatan_kebutuhan, 'jumlah_hc' => $d->jumlah_hc]),
-            'quotation_pics' => $quotation->quotationPics->map(fn($p) => ['id' => $p->id, 'nama' => $p->nama, 'jabatan' => $p->jabatan?->nama ?? null, 'no_telp' => $p->no_telp, 'email' => $p->email, 'is_kuasa' => $p->is_kuasa]),
-            'quotation_trainings' => $quotation->quotationTrainings->map(fn($t) => ['id' => $t->id, 'training_id' => $t->training_id, 'nama' => $t->nama]),
+            'quotation_details' => $quotation->quotationDetails->map(fn ($d) => ['id' => $d->id, 'jabatan_kebutuhan' => $d->jabatan_kebutuhan, 'jumlah_hc' => $d->jumlah_hc]),
+            'quotation_pics' => $quotation->quotationPics->map(fn ($p) => ['id' => $p->id, 'nama' => $p->nama, 'jabatan' => $p->jabatan?->nama ?? null, 'no_telp' => $p->no_telp, 'email' => $p->email, 'is_kuasa' => $p->is_kuasa]),
+            'quotation_trainings' => $quotation->quotationTrainings->map(fn ($t) => ['id' => $t->id, 'training_id' => $t->training_id, 'nama' => $t->nama]),
         ];
     }
 
@@ -204,7 +208,7 @@ class SpkQueryService
         return SpkSite::with(['quotation', 'quotationSite'])
             ->where('spk_id', $id)->whereNull('deleted_at')->whereDoesntHave('site')
             ->get()
-            ->map(fn($site, $key) => tap($site, fn($s) => $s->no = $key + 1));
+            ->map(fn ($site, $key) => tap($site, fn ($s) => $s->no = $key + 1));
     }
 
     public function getSiteAvailableList(int $leadsId)
@@ -212,7 +216,7 @@ class SpkQueryService
         return QuotationSite::with(['quotation'])
             ->where('leads_id', $leadsId)->whereNull('deleted_at')->whereDoesntHave('spkSite')
             ->get()
-            ->map(fn($site) => [
+            ->map(fn ($site) => [
                 'id' => $site->id, 'nama_site' => $site->nama_site, 'provinsi' => $site->provinsi,
                 'kota' => $site->kota, 'quotation' => is_object($site->quotation) ? $site->quotation->nomor : $site->quotation,
                 'ump' => $site->ump, 'umk' => $site->umk, 'nominal_upah' => $site->nominal_upah, 'penempatan' => $site->penempatan,
@@ -221,11 +225,12 @@ class SpkQueryService
 
     public function getDeletedSpkSites(int $spkId)
     {
-        if (!Spk::withTrashed()->where('id', $spkId)->exists()) {
+        if (! Spk::withTrashed()->where('id', $spkId)->exists()) {
             throw new \Exception('SPK not found');
         }
+
         return SpkSite::onlyTrashed()->where('spk_id', $spkId)->with(['quotation', 'quotationSite'])->get()
-            ->map(fn($site) => [
+            ->map(fn ($site) => [
                 'id' => $site->id, 'nama_site' => $site->nama_site, 'quotation_site_id' => $site->quotation_site_id,
                 'deleted_at' => $site->deleted_at, 'deleted_by' => $site->deleted_by,
             ]);

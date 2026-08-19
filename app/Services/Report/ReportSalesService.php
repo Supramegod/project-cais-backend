@@ -52,7 +52,7 @@ class ReportSalesService
             Carbon::createFromDate($year, $month, 1)
                 ->locale('id')
                 ->monthName
-        ) . ' - ' . $year;
+        ).' - '.$year;
 
         return [
             'periode' => $periode,
@@ -75,7 +75,7 @@ class ReportSalesService
 
         if ($salesData->isEmpty()) {
             return [
-                'periode' => strtoupper(Carbon::create()->month($month)->locale('id')->monthName) . ' - ' . $year,
+                'periode' => strtoupper(Carbon::create()->month($month)->locale('id')->monthName).' - '.$year,
                 'data' => [],
             ];
         }
@@ -112,10 +112,10 @@ class ReportSalesService
         $weeklyApptDirect = DB::table('sl_activity_sales as sa')
             ->select(
                 'sa.created_by_user_id as user_id',
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt")
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt')
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
             ->whereIn('sa.created_by_user_id', $userIds)
@@ -135,10 +135,10 @@ class ReportSalesService
             })
             ->select(
                 'tsd.user_id',
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt"),
-                DB::raw("SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt")
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 1 AND 7 THEN 1 ELSE 0 END) as w1_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 8 AND 14 THEN 1 ELSE 0 END) as w2_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) BETWEEN 15 AND 21 THEN 1 ELSE 0 END) as w3_appt'),
+                DB::raw('SUM(CASE WHEN DAY(sa.tgl_activity) >= 22 THEN 1 ELSE 0 END) as w4_appt')
             )
             ->whereBetween('sa.tgl_activity', [$startMonth, $endMonth])
             ->where('sa.jenis_activity', 'Appointment')
@@ -205,7 +205,7 @@ class ReportSalesService
 
         $periode = strtoupper(
             Carbon::createFromDate($year, $month, 1)->locale('id')->monthName
-        ) . ' - ' . $year;
+        ).' - '.$year;
 
         return [
             'periode' => $periode,
@@ -294,7 +294,7 @@ class ReportSalesService
 
     private function formatMonthlyCounts($record): array
     {
-        if (!$record) {
+        if (! $record) {
             return [
                 'jumlah_kirim_proposal' => 0,
                 'jumlah_appointment' => 0,
@@ -326,6 +326,7 @@ class ReportSalesService
         $counts['pct_visit_to_quot'] = $this->calcPercentage($counts['jumlah_quotation'], $counts['jumlah_visit']);
         $counts['pct_quot_to_spk'] = $this->calcPercentage($counts['jumlah_spk'], $counts['jumlah_quotation']);
         $counts['pct_spk_to_pks'] = $this->calcPercentage($counts['jumlah_pks'], $counts['jumlah_spk']);
+
         return $counts;
     }
 }

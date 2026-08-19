@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use App\Models\Company;
+use App\Models\CustomerActivity;
+use App\Models\JabatanPic;
+use App\Models\Leads;
 use App\Models\LeadsKebutuhan;
+use App\Models\Quotation;
 use App\Models\QuotationAplikasi;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDetail;
@@ -16,25 +20,21 @@ use App\Models\QuotationKaporlap;
 use App\Models\QuotationKerjasama;
 use App\Models\QuotationOhc;
 use App\Models\QuotationPic;
+use App\Models\QuotationSite;
 use App\Models\QuotationTraining;
 use App\Models\SalesActivity;
+use App\Models\Spk;
+use App\Models\SpkSite;
 use App\Services\Quotation\QuotationService;
+use App\Services\Spk\SpkNumberingService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Carbon\Carbon;
-use App\Models\Spk;
-use App\Models\SpkSite;
-use App\Models\Leads;
-use App\Models\Quotation;
-use App\Models\QuotationSite;
-use App\Models\CustomerActivity;
-use App\Models\JabatanPic;
-use App\Models\Company;
-use App\Services\Spk\SpkNumberingService;
+
 /**
  * @OA\Tag(
  *     name="SPK",
@@ -43,7 +43,6 @@ use App\Services\Spk\SpkNumberingService;
  */
 class SpkController extends Controller
 {
-
     /**
      * @OA\Get(
      *     path="/api/spk/list",
@@ -51,66 +50,85 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data semua SPK yang aktif. Dapat difilter berdasarkan rentang tanggal dan status SPK.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="tgl_dari",
      *         in="query",
      *         description="Tanggal mulai filter (format: Y-m-d). Default: 3 bulan kebelakang dari sekarang",
      *         required=false,
+     *
      *         @OA\Schema(type="string", format="date", example="2024-01-01")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="tgl_sampai",
      *         in="query",
      *         description="Tanggal akhir filter (format: Y-m-d). Default: hari ini",
      *         required=false,
+     *
      *         @OA\Schema(type="string", format="date", example="2024-12-31")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="status",
      *         in="query",
      *         description="Filter berdasarkan status SPK ID",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="branch",
      *         in="query",
      *         description="Filter berdasarkan branch ID dari leads",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="search",
      *         in="query",
      *         description="Keyword pencarian (jika diisi, filter tanggal akan diabaikan)",
      *         required=false,
+     *
      *         @OA\Schema(type="string", example="PT ABC")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="search_by",
      *         in="query",
      *         description="Kolom yang akan dicari (default: nama_perusahaan)",
      *         required=false,
+     *
      *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor", "created_by"}, example="nama_perusahaan")
      *     ),
+     *
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Jumlah data per halaman (default: 15)",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=15)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
      *         description="Nomor halaman (default: 1)",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data SPK",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK data retrieved successfully"),
      *             @OA\Property(
@@ -119,7 +137,9 @@ class SpkController extends Controller
      *                 @OA\Property(
      *                     property="list",
      *                     type="array",
+     *
      *                     @OA\Items(
+     *
      *                         @OA\Property(property="id", type="integer", example=1),
      *                         @OA\Property(property="nomor_spk", type="string", example="SPK/LEAD001-012024-00001"),
      *                         @OA\Property(property="tgl_spk", type="string", example="2024-01-15"),
@@ -140,10 +160,13 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching SPK data")
      *         )
@@ -183,11 +206,11 @@ class SpkController extends Controller
 
                 if ($searchBy === 'nama_perusahaan') {
                     $searchTerm = str_contains($searchTerm, ' ')
-                        ? '"' . $searchTerm . '"'
-                        : $searchTerm . '*';
-                    $query->whereRaw("MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                        ? '"'.$searchTerm.'"'
+                        : $searchTerm.'*';
+                    $query->whereRaw('MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
                 } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
-                    $query->where("sl_spk.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
+                    $query->where("sl_spk.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
                 }
             } else {
                 $query->whereBetween('sl_spk.tgl_spk', [$tglDari, $tglSampai]);
@@ -241,10 +264,13 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data SPK yang telah dihapus (masuk dalam trash).",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data SPK terhapus",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Deleted SPK data retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -284,10 +310,13 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data quotation yang memenuhi syarat untuk dibuat SPK. Hanya quotation milik user yang login dan belum memiliki SPK.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data quotation tersedia",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Available quotations retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -328,7 +357,7 @@ class SpkController extends Controller
                         'nama_perusahaan' => $quotation->nama_perusahaan,
                         'jumlah_site' => $quotation->jumlah_site,
                         'kebutuhan' => $quotation->kebutuhan,
-                        'layanan' => $quotation->kebutuhan
+                        'layanan' => $quotation->kebutuhan,
                     ];
                 });
 
@@ -338,6 +367,7 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching available quotations', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/spk/available-leads",
@@ -345,10 +375,13 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data leads yang memiliki quotation aktif dan belum memiliki SPK untuk semua site-nya.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data leads tersedia",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Available leads retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -360,10 +393,13 @@ class SpkController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching available leads")
      *         )
@@ -394,7 +430,8 @@ class SpkController extends Controller
             return $this->successResponse($data, 'Available leads retrieved successfully');
 
         } catch (\Exception $e) {
-            \Log::error('Error in availableLeads: ' . $e->getMessage());
+            \Log::error('Error in availableLeads: '.$e->getMessage());
+
             return $this->errorResponse('Error fetching available leads', 500, $e->getMessage());
         }
     }
@@ -406,19 +443,25 @@ class SpkController extends Controller
      *     description="Endpoint untuk membuat SPK baru berdasarkan leads dan site yang dipilih.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"leads_id", "tanggal_spk", "site_ids"},
+     *
      *             @OA\Property(property="leads_id", type="integer", example=1, description="ID Leads"),
      *             @OA\Property(property="tanggal_spk", type="string", format="date", example="2024-01-15", description="Tanggal SPK"),
      *             @OA\Property(property="site_ids", type="array", @OA\Items(type="integer"), example={1,2,3}, description="Array ID Quotation Site")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="SPK berhasil dibuat",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK created successfully"),
      *             @OA\Property(property="data", type="object",
@@ -449,7 +492,7 @@ class SpkController extends Controller
             'leads_id' => 'required|exists:sl_leads,id',
             'tanggal_spk' => 'required|date',
             'site_ids' => 'required|array|min:1',
-            'site_ids.*' => 'exists:sl_quotation_site,id'
+            'site_ids.*' => 'exists:sl_quotation_site,id',
         ]);
 
         if ($validator->fails()) {
@@ -461,7 +504,7 @@ class SpkController extends Controller
 
             $leads = Leads::whereNull('deleted_at')->find($request->leads_id);
 
-            if (!$leads) {
+            if (! $leads) {
                 return $this->errorResponse("Leads dengan ID {$request->leads_id} tidak ditemukan atau sudah dihapus.", 500);
             }
 
@@ -471,7 +514,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($invalidSites) {
-                return $this->errorResponse("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.", 500);
+                return $this->errorResponse('Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.', 500);
             }
 
             // Validasi: pastikan site belum memiliki SPK
@@ -480,7 +523,7 @@ class SpkController extends Controller
                 ->exists();
 
             if ($sitesWithSPK) {
-                return $this->errorResponse("Beberapa site yang dipilih sudah memiliki SPK.", 500);
+                return $this->errorResponse('Beberapa site yang dipilih sudah memiliki SPK.', 500);
             }
 
             // Ambil quotation_id dari site pertama (jika diperlukan)
@@ -503,7 +546,7 @@ class SpkController extends Controller
                 'link_spk_disetujui' => null,
                 'status_spk_id' => 1,
                 'created_by' => Auth::user()->full_name ?? 'System',
-                'created_by_user_id' => Auth::id()
+                'created_by_user_id' => Auth::id(),
             ]);
 
             $this->createSpkSites($spk, $siteIds);
@@ -520,7 +563,7 @@ class SpkController extends Controller
 
             // Update status leads ke "SPK / Closing" (id: 3)
             $statusTerminalLeads = [99, 100, 101, 102];
-            if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
+            if (! in_array($leads->status_leads_id, $statusTerminalLeads)) {
                 $leads->update([
                     'status_leads_id' => 3,
                     'updated_by' => Auth::user()->full_name ?? 'System',
@@ -533,6 +576,7 @@ class SpkController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->errorResponse('Error creating SPK', 500, $e->getMessage());
         }
     }
@@ -544,17 +588,22 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data detail SPK termasuk leads, status, dan site-site yang terkait.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID SPK",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil detail SPK",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK details retrieved successfully"),
      *             @OA\Property(property="data", type="object",
@@ -570,18 +619,24 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SPK tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching SPK details")
      *         )
@@ -605,7 +660,7 @@ class SpkController extends Controller
                 'spkSites.quotation.ruleThr',                // Eager load agar tidak lazy load di loop
             ])->find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -635,7 +690,7 @@ class SpkController extends Controller
             $uniqueQuotations = collect();
 
             foreach ($spk->spkSites as $spkSite) {
-                if ($spkSite->quotation && !$uniqueQuotations->contains('id', $spkSite->quotation->id)) {
+                if ($spkSite->quotation && ! $uniqueQuotations->contains('id', $spkSite->quotation->id)) {
                     $uniqueQuotations->push($spkSite->quotation);
                 }
             }
@@ -648,7 +703,7 @@ class SpkController extends Controller
                     // agar tidak membebani memory di endpoint lain yang tidak memerlukannya
                     $calculatedQuotation = app(QuotationService::class)->calculateQuotation($quotation);
                 } catch (\Exception $e) {
-                    \Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
+                    \Log::error('Error calculating quotation in SPK view: '.$e->getMessage());
                 }
 
                 // Get BPJS percentages from calculation summary
@@ -680,7 +735,7 @@ class SpkController extends Controller
                 $companyModel = null;
                 if ($quotation->relationLoaded('company') && $quotation->company instanceof Company) {
                     $companyModel = $quotation->company;
-                } elseif (!empty($quotation->company_id)) {
+                } elseif (! empty($quotation->company_id)) {
                     $companyModel = Company::find($quotation->company_id);
                 }
 
@@ -691,7 +746,7 @@ class SpkController extends Controller
 
                 // Get first detail for BPJS percentages
                 $firstDetail = $quotation->quotationDetails->first();
-                $adatserikat = $quotation->status_serikat ? "Ada" : "Tidak Ada";
+                $adatserikat = $quotation->status_serikat ? 'Ada' : 'Tidak Ada';
 
                 $quotationsInfo[] = [
                     'id' => $quotation->id,
@@ -739,7 +794,7 @@ class SpkController extends Controller
                     'cuti' => $quotation->cuti ?? null,
                     'gaji_saat_cuti' => $quotation->gaji_saat_cuti ?? null,
                     'prorate' => $quotation->prorate ?? null,
-                    'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
+                    'status_serikat' => $quotation->ada_serikat === 'Tidak Ada' ? 'Tidak Ada' : $quotation->status_serikat,
                     'ada_serikat' => $adatserikat,
                     'salary_rule' => $quotation->salaryRule ? [
                         'id' => $quotation->salaryRule->id,
@@ -748,20 +803,20 @@ class SpkController extends Controller
                         'crosscheck' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->crosscheck_absen ?? null) : null,
                         'pengiriman_invoice' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->pengiriman_invoice ?? null) : null,
                         'perkiraan_invoice_diterima' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->perkiraan_invoice_diterima ?? null) : null,
-                        'rilis_payroll' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->rilis_payroll ?? null) : null
+                        'rilis_payroll' => is_object($quotation->salaryRule) ? ($quotation->salaryRule->rilis_payroll ?? null) : null,
                     ] : null,
                     'rulethr' => $quotation->ruleThr ? [
                         'id' => $quotation->ruleThr->id,
                         'nama' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->nama ?? null) : null,
                         'hari_rilis_thr' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_rilis_thr ?? null) : null,
                         'hari_pembayaran_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_pembayaran_invoice ?? null) : null,
-                        'hari_penagihan_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_penagihan_invoice ?? null) : null
+                        'hari_penagihan_invoice' => is_object($quotation->ruleThr) ? ($quotation->ruleThr->hari_penagihan_invoice ?? null) : null,
                     ] : null,
                     'quotation_details' => $quotation->quotationDetails->map(function ($detail) {
                         return [
                             'id' => $detail->id,
                             'jabatan_kebutuhan' => $detail->jabatan_kebutuhan,
-                            'jumlah_hc' => $detail->jumlah_hc
+                            'jumlah_hc' => $detail->jumlah_hc,
                         ];
                     }),
                     'quotation_pics' => $quotation->quotationPics->map(function ($pic) {
@@ -771,7 +826,7 @@ class SpkController extends Controller
                             'jabatan' => is_object($pic->jabatan) ? ($pic->jabatan->nama ?? null) : null,
                             'no_telp' => $pic->no_telp,
                             'email' => $pic->email,
-                            'is_kuasa' => $pic->is_kuasa
+                            'is_kuasa' => $pic->is_kuasa,
                         ];
                     }),
                     'quotation_trainings' => $quotation->quotationTrainings->map(function ($training) {
@@ -780,7 +835,7 @@ class SpkController extends Controller
                             'training_id' => $training->training_id,
                             'nama' => $training->nama,
                         ];
-                    })
+                    }),
                 ];
             }
 
@@ -791,7 +846,7 @@ class SpkController extends Controller
                     'nama_site' => $site->nama_site,
                     'kota' => $site->kota,
                     'penempatan' => $site->penempatan,
-                    'quotation_id' => $site->quotation_id
+                    'quotation_id' => $site->quotation_id,
                 ];
             });
 
@@ -803,15 +858,15 @@ class SpkController extends Controller
                 'spk' => $spkInfo,
                 'leads' => $leadsInfo,
                 'quotations' => $quotationsInfo,
-                'sites' => $sitesInfo
+                'sites' => $sitesInfo,
             ];
 
             return $this->successResponse($responseData, 'SPK details retrieved successfully');
 
         } catch (\Exception $e) {
             // Untuk debugging, tambahkan ini:
-            \Log::error('SPK View Error: ' . $e->getMessage());
-            \Log::error('SPK View Stack Trace: ' . $e->getTraceAsString());
+            \Log::error('SPK View Error: '.$e->getMessage());
+            \Log::error('SPK View Stack Trace: '.$e->getTraceAsString());
 
             return $this->errorResponse('Error fetching SPK details', 500, $e->getMessage());
         }
@@ -824,17 +879,22 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil semua data yang diperlukan untuk proses pencetakan SPK.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID SPK",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data cetak SPK",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK print data retrieved successfully"),
      *             @OA\Property(property="data", type="object",
@@ -847,40 +907,48 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SPK tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=400,
      *         description="Tidak ada site ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="No SPK sites found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching SPK print data")
      *         )
      *     )
      * )
      */
-
     public function cetakSpk($id)
     {
         try {
             $now = Carbon::now()->isoFormat('DD MMMM Y');
 
             $spk = Spk::with(['quotation', 'leads'])->find($id);
-            if (!$spk) {
+            if (! $spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -936,7 +1004,7 @@ class SpkController extends Controller
                 'spk_sites' => $spkSites,
                 'quotation' => $quotation,
                 'leads' => $leads,
-                'company' => $company
+                'company' => $company,
             ];
 
             return $this->successResponse($data, 'SPK print data retrieved successfully');
@@ -953,18 +1021,24 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengupload file SPK yang sudah disetujui dan mengubah status SPK menjadi approved.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID SPK",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\MediaType(
      *             mediaType="multipart/form-data",
+     *
      *             @OA\Schema(
+     *
      *                 @OA\Property(
      *                     property="file",
      *                     type="string",
@@ -974,10 +1048,13 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="File berhasil diupload",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK file uploaded successfully"),
      *             @OA\Property(property="data", type="object",
@@ -988,26 +1065,35 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=400,
      *         description="File tidak valid",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SPK tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error uploading SPK file")
      *         )
@@ -1017,7 +1103,7 @@ class SpkController extends Controller
     public function uploadSpk(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240' // 10MB
+            'file' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240', // 10MB
         ]);
 
         if ($validator->fails()) {
@@ -1029,7 +1115,7 @@ class SpkController extends Controller
 
             $spk = Spk::find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -1048,17 +1134,17 @@ class SpkController extends Controller
             // $fileUrl = Storage::disk('spk')->url($fileName);
 
             // ATAU jika mau manual:
-            $fileUrl = url('document/spk/' . $fileName);
+            $fileUrl = url('document/spk/'.$fileName);
 
-            \Log::info('Generated URL: ' . $fileUrl);
-            \Log::info('Filename: ' . $fileName);
-            \Log::info('File path: ' . Storage::disk('spk')->path($fileName));
-            \Log::info('File exists: ' . (Storage::disk('spk')->exists($fileName) ? 'Yes' : 'No'));
+            \Log::info('Generated URL: '.$fileUrl);
+            \Log::info('Filename: '.$fileName);
+            \Log::info('File path: '.Storage::disk('spk')->path($fileName));
+            \Log::info('File exists: '.(Storage::disk('spk')->exists($fileName) ? 'Yes' : 'No'));
 
             $spk->update([
                 'status_spk_id' => 2,
                 'link_spk_disetujui' => $fileUrl,
-                'updated_by' => Auth::user()->full_name
+                'updated_by' => Auth::user()->full_name,
             ]);
 
             // Catat aktivitas
@@ -1073,7 +1159,7 @@ class SpkController extends Controller
                 'nomor' => $spk->nomor,
                 'status_spk_id' => $spk->status_spk_id,
                 'status' => $spk->statusSpk->nama ?? null,
-                'link_spk_disetujui' => $spk->link_spk_disetujui
+                'link_spk_disetujui' => $spk->link_spk_disetujui,
             ], 'SPK file uploaded successfully');
 
         } catch (\Exception $e) {
@@ -1086,6 +1172,7 @@ class SpkController extends Controller
             return $this->errorResponse('Error uploading SPK file', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Post(
      *     path="/api/spk/ajukan-ulang/{spkId}",
@@ -1093,25 +1180,33 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengajukan ulang quotation yang terkait dengan SPK. Jika hanya sebagian site yang diajukan ulang, SPK tetap dipertahankan. Jika semua site diajukan ulang, SPK akan dihapus.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="spkId",
      *         in="path",
      *         required=true,
      *         description="ID SPK yang akan diajukan ulang",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"alasan", "quotation_site_ids"},
+     *
      *             @OA\Property(property="alasan", type="string", example="Perubahan harga material", description="Alasan pengajuan ulang quotation"),
      *             @OA\Property(property="quotation_site_ids", type="array", @OA\Items(type="integer"), example={1,2,3}, description="Array ID Quotation Site yang akan diajukan ulang")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Quotation berhasil diajukan ulang",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Quotation successfully resubmitted"),
      *             @OA\Property(property="data", type="object",
@@ -1124,10 +1219,13 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=400,
      *         description="Validasi error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error")
      *         )
@@ -1139,7 +1237,7 @@ class SpkController extends Controller
         $validator = Validator::make($request->all(), [
             'alasan' => 'required|string|max:500',
             'quotation_site_ids' => 'required|array|min:1',
-            'quotation_site_ids.*' => 'exists:sl_quotation_site,id'
+            'quotation_site_ids.*' => 'exists:sl_quotation_site,id',
         ]);
 
         if ($validator->fails()) {
@@ -1152,7 +1250,7 @@ class SpkController extends Controller
             // Cari SPK beserta spk_sites dan quotation dari spk_sites
             $spk = Spk::with(['spkSites.quotation', 'spkSites.quotationSite'])->find($spkId);
 
-            if (!$spk) {
+            if (! $spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -1180,7 +1278,7 @@ class SpkController extends Controller
             foreach ($quotationGroups as $quotationId => $spkSites) {
                 $quotationAsal = $spkSites->first()->quotation;
 
-                if (!$quotationAsal) {
+                if (! $quotationAsal) {
                     continue;
                 }
 
@@ -1203,14 +1301,14 @@ class SpkController extends Controller
                 // Soft delete original quotation
                 $quotationAsal->update([
                     'deleted_at' => now(),
-                    'deleted_by' => Auth::user()->full_name
+                    'deleted_by' => Auth::user()->full_name,
                 ]);
 
                 // Soft delete quotation sites yang terkait
                 QuotationSite::whereIn('id', $deletedQuotationSiteIds)
                     ->update([
                         'deleted_at' => now(),
-                        'deleted_by' => Auth::user()->full_name
+                        'deleted_by' => Auth::user()->full_name,
                     ]);
             }
 
@@ -1218,7 +1316,7 @@ class SpkController extends Controller
             SpkSite::whereIn('id', $deletedSpkSiteIds)
                 ->update([
                     'deleted_at' => now(),
-                    'deleted_by' => Auth::user()->full_name
+                    'deleted_by' => Auth::user()->full_name,
                 ]);
 
             // Cek apakah masih ada spk_sites yang aktif di SPK ini
@@ -1234,7 +1332,7 @@ class SpkController extends Controller
                 // Hapus SPK (soft delete) karena semua site sudah diajukan ulang
                 $spk->update([
                     'deleted_at' => now(),
-                    'deleted_by' => Auth::user()->full_name
+                    'deleted_by' => Auth::user()->full_name,
                 ]);
                 $spkDeleted = true;
             }
@@ -1250,7 +1348,7 @@ class SpkController extends Controller
                 'spk_id' => $spk->id,
                 'spk_dihapus' => $spkDeleted,
                 'spk_sites_dihapus' => $deletedSpkSiteIds,
-                'quotation_sites_dihapus' => $deletedQuotationSiteIds
+                'quotation_sites_dihapus' => $deletedQuotationSiteIds,
             ];
 
             $message = $spkDeleted
@@ -1261,12 +1359,10 @@ class SpkController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->errorResponse('Error resubmitting quotation', 500, $e->getMessage());
         }
     }
-
-
-
 
     /**
      * @OA\Get(
@@ -1275,17 +1371,22 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data SPK sites yang telah dihapus (soft delete) berdasarkan ID SPK.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="spkId",
      *         in="path",
      *         required=true,
      *         description="ID SPK",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil data SPK sites yang dihapus",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Deleted SPK sites retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -1297,18 +1398,24 @@ class SpkController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SPK tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching deleted SPK sites")
      *         )
@@ -1321,7 +1428,7 @@ class SpkController extends Controller
             // Validasi apakah SPK exists (termasuk yang sudah dihapus)
             $spkExists = Spk::withTrashed()->where('id', $spkId)->exists();
 
-            if (!$spkExists) {
+            if (! $spkExists) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -1335,7 +1442,7 @@ class SpkController extends Controller
                         'nama_site' => $site->nama_site,
                         'quotation_site_id' => $site->quotation_site_id,
                         'deleted_at' => $site->deleted_at,
-                        'deleted_by' => $site->deleted_by
+                        'deleted_by' => $site->deleted_by,
                     ];
                 });
 
@@ -1345,6 +1452,7 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching deleted SPK sites', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Get(
      *     path="/api/spk/site-list/{id}",
@@ -1352,17 +1460,22 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data site yang terkait dengan SPK dan belum digunakan untuk pembuatan site.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID SPK",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil daftar site",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Site list retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -1377,10 +1490,13 @@ class SpkController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching site list")
      *         )
@@ -1397,6 +1513,7 @@ class SpkController extends Controller
                 ->get()
                 ->map(function ($site, $key) {
                     $site->no = $key + 1;
+
                     return $site;
                 });
 
@@ -1414,17 +1531,22 @@ class SpkController extends Controller
      *     description="Endpoint untuk mengambil data quotation site yang tersedia (belum memiliki SPK) untuk leads tertentu.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="leadsId",
      *         in="path",
      *         required=true,
      *         description="ID Leads",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Sukses mengambil daftar site tersedia",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Available sites retrieved successfully"),
      *             @OA\Property(property="data", type="array", @OA\Items(
@@ -1440,10 +1562,13 @@ class SpkController extends Controller
      *             ))
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error fetching available sites")
      *         )
@@ -1468,7 +1593,7 @@ class SpkController extends Controller
                         'ump' => $site->ump,
                         'umk' => $site->umk,
                         'nominal_upah' => $site->nominal_upah,
-                        'penempatan' => $site->penempatan
+                        'penempatan' => $site->penempatan,
                     ];
                 });
 
@@ -1478,6 +1603,7 @@ class SpkController extends Controller
             return $this->errorResponse('Error fetching available sites', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Delete(
      *     path="/api/spk/delete/{id}",
@@ -1485,33 +1611,44 @@ class SpkController extends Controller
      *     description="Endpoint untuk menghapus SPK. Penghapusan dilakukan secara soft delete, sehingga data tidak benar-benar dihapus dari database.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="ID SPK yang akan dihapus",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="SPK berhasil dihapus",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK deleted successfully")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SPK tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error deleting SPK")
      *         )
@@ -1525,7 +1662,7 @@ class SpkController extends Controller
 
             $spk = Spk::find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 return $this->notFoundResponse('SPK not found');
             }
 
@@ -1533,13 +1670,13 @@ class SpkController extends Controller
             SpkSite::where('spk_id', $id)
                 ->update([
                     'deleted_at' => now(),
-                    'deleted_by' => Auth::user()->full_name
+                    'deleted_by' => Auth::user()->full_name,
                 ]);
 
             // Soft delete SPK
             $spk->update([
                 'deleted_at' => now(),
-                'deleted_by' => Auth::user()->full_name
+                'deleted_by' => Auth::user()->full_name,
             ]);
 
             // Catat aktivitas
@@ -1551,9 +1688,11 @@ class SpkController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->errorResponse('Error deleting SPK', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Delete(
      *     path="/api/spk/delete-site/{siteId}",
@@ -1561,33 +1700,44 @@ class SpkController extends Controller
      *     description="Endpoint untuk menghapus SpkSite individual. Penghapusan dilakukan secara soft delete.",
      *     tags={"SPK"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="siteId",
      *         in="path",
      *         required=true,
      *         description="ID SpkSite yang akan dihapus",
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="SpkSite berhasil dihapus",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="SPK site deleted successfully")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="SpkSite tidak ditemukan",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="SPK site not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error server",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error deleting SPK site")
      *         )
@@ -1601,14 +1751,14 @@ class SpkController extends Controller
 
             $spkSite = SpkSite::find($siteId);
 
-            if (!$spkSite) {
+            if (! $spkSite) {
                 return $this->notFoundResponse('SPK site not found');
             }
 
             // Soft delete SpkSite
             $spkSite->update([
                 'deleted_at' => now(),
-                'deleted_by' => Auth::user()->full_name
+                'deleted_by' => Auth::user()->full_name,
             ]);
 
             // Cek apakah SPK masih memiliki site aktif
@@ -1622,7 +1772,7 @@ class SpkController extends Controller
                 if ($spk) {
                     $spk->update([
                         'deleted_at' => now(),
-                        'deleted_by' => Auth::user()->full_name
+                        'deleted_by' => Auth::user()->full_name,
                     ]);
 
                     $this->createDeleteActivity($spk);
@@ -1640,9 +1790,11 @@ class SpkController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
             return $this->errorResponse('Error deleting SPK site', 500, $e->getMessage());
         }
     }
+
     /**
      * @OA\Post(
      *     path="/api/spk/{id}/submit-checklist",
@@ -1650,18 +1802,23 @@ class SpkController extends Controller
      *     summary="Submit SPK checklist",
      *     description="Submits checklist data for SPK including NPWP, invoice, and other administrative details",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         description="Quotation ID",
      *         required=true,
+     *
      *         @OA\Schema(type="integer", example=1)
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Checklist data",
+     *
      *         @OA\JsonContent(
      *             required={"npwp", "alamat_npwp", "pic_invoice", "telp_pic_invoice", "email_pic_invoice", "materai", "joker_reliever", "syarat_invoice", "alamat_penagihan_invoice", "status_serikat"},
+     *
      *             @OA\Property(property="npwp", type="string", description="NPWP number", example="123456789012345"),
      *             @OA\Property(property="alamat_npwp", type="string", description="NPWP address", example="Jl. Sudirman No. 123, Jakarta"),
      *             @OA\Property(property="pic_invoice", type="string", description="PIC for invoice", example="John Doe"),
@@ -1678,9 +1835,11 @@ class SpkController extends Controller
      *                 property="pics",
      *                 type="array",
      *                 description="Array of PIC data",
+     *
      *                 @OA\Items(
      *                     type="object",
      *                     required={"nama", "jabatan", "no_telp", "email"},
+     *
      *                     @OA\Property(property="nama", type="string", example="Jane Doe"),
      *                     @OA\Property(property="jabatan", type="integer", example=1),
      *                     @OA\Property(property="no_telp", type="string", example="081234567890"),
@@ -1689,10 +1848,13 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Checklist submitted successfully",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Checklist submitted successfully"),
      *             @OA\Property(property="data", type="object",
@@ -1703,27 +1865,36 @@ class SpkController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Quotation not found",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Quotation not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Validation error"),
      *             @OA\Property(property="errors", type="object")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Internal server error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Failed to submit checklist"),
      *             @OA\Property(property="error", type="string", example="Error details")
@@ -1754,13 +1925,13 @@ class SpkController extends Controller
                 'pics.*.nama' => 'required_if:pics,!=,null|string|max:100',
                 'pics.*.jabatan' => 'nullable:pics,!=,null|integer|exists:m_jabatan_pic,id',
                 'pics.*.no_telp' => 'nullable:pics,!=,null|string|max:20',
-                'pics.*.email' => 'nullable:pics,!=,null|email|max:100'
+                'pics.*.email' => 'nullable:pics,!=,null|email|max:100',
             ]);
 
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
-                    'message' => $validator->errors()
+                    'message' => $validator->errors(),
                 ], 422);
             }
 
@@ -1769,8 +1940,8 @@ class SpkController extends Controller
 
             // Logika untuk status serikat
             $statusSerikat = $request->status_serikat;
-            if ($request->ada_serikat === "Tidak Ada") {
-                $statusSerikat = "Tidak Ada";
+            if ($request->ada_serikat === 'Tidak Ada') {
+                $statusSerikat = 'Tidak Ada';
             }
 
             // Update quotation data
@@ -1787,7 +1958,7 @@ class SpkController extends Controller
                 'catatan_site' => $request->catatan_site,
                 'status_serikat' => $statusSerikat,
                 'updated_at' => $current_date_time,
-                'updated_by' => $user->full_name
+                'updated_by' => $user->full_name,
             ]);
 
             // Tambah PICs jika ada
@@ -1808,35 +1979,33 @@ class SpkController extends Controller
                     'id' => $quotation->id,
                     'npwp' => $quotation->npwp,
                     'pic_invoice' => $quotation->pic_invoice,
-                    'pics_added' => $picsAdded
-                ]
+                    'pics_added' => $picsAdded,
+                ],
             ]);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Failed to submit checklist: ' . $e->getMessage());
+            \Log::error('Failed to submit checklist: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to submit checklist',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
-
 
     /**
      * =============================================
      * PRIVATE HELPER METHODS
      * =============================================
      */
-
     private function createSpkSites(Spk $spk, $siteIds): void
     {
         foreach ($siteIds as $siteId) {
             $quotationSite = QuotationSite::with('quotation')->find($siteId);
 
-            if (!$quotationSite) {
+            if (! $quotationSite) {
                 throw new \Exception("Quotation site dengan ID {$siteId} tidak ditemukan.");
             }
 
@@ -1864,7 +2033,7 @@ class SpkController extends Controller
                 'jenis_site' => $quotationSite->quotation->jumlah_site,
                 'nomor_quotation' => $quotationSite->quotation->nomor,
                 'created_by' => Auth::user()->full_name ?? 'System',
-                'created_by_user_id' => Auth::id()
+                'created_by_user_id' => Auth::id(),
             ]);
         }
     }
@@ -1886,11 +2055,11 @@ class SpkController extends Controller
                 'tgl_activity' => now(),
                 'nomor' => $nomorActivity,
                 'tipe' => 'SPK',
-                'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
+                'notes' => 'SPK dengan nomor : '.$spkNomor.' terbentuk',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::user()->id
+                'created_by_user_id' => Auth::user()->id,
             ]);
         }
         if ($leads) {
@@ -1921,10 +2090,10 @@ class SpkController extends Controller
                     'leads_kebutuhan_id' => $leadsKebutuhan->id,
                     'spk_id' => $spk->id,
                     'tgl_activity' => Carbon::now(),
-                    'jenis_activity' => 'spk',
+                    'jenis_activity' => 'SPK',
                     'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
                     'created_by' => $user->full_name,
-                    'created_by_user_id' => $user->id
+                    'created_by_user_id' => $user->id,
                 ]);
             }
         }
@@ -1934,7 +2103,7 @@ class SpkController extends Controller
     {
         $fileExtension = $file->getClientOriginalExtension();
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+        $fileName = $originalFileName.date('YmdHis').rand(10000, 99999).'.'.$fileExtension;
 
         // ✅ Simpan file ke disk 'spk' yang sudah dikonfigurasi
         Storage::disk('spk')->put($fileName, file_get_contents($file));
@@ -1947,27 +2116,27 @@ class SpkController extends Controller
         $now = Carbon::now();
         $leads = Leads::find($leadsId);
 
-        $prefix = "CAT/";
+        $prefix = 'CAT/';
         if ($leads) {
             $prefix .= match ($leads->kebutuhan_id) {
-                1 => "SG/",
-                2 => "LS/",
-                3 => "CS/",
-                4 => "LL/",
-                default => "NN/"
+                1 => 'SG/',
+                2 => 'LS/',
+                3 => 'CS/',
+                4 => 'LL/',
+                default => 'NN/'
             };
-            $prefix .= $leads->nomor . "-";
+            $prefix .= $leads->nomor.'-';
         } else {
-            $prefix .= "NN/NNNNN-";
+            $prefix .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $year = $now->year;
 
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix.$month.$year.'-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . $month . $year . "-" . $sequence;
+        return $prefix.$month.$year.'-'.$sequence;
     }
 
     private function getQuotationDetails($quotationId)
@@ -1993,21 +2162,21 @@ class SpkController extends Controller
         $leads = Leads::find($leadsId);
         $company = Company::find($companyId);
 
-        $nomor = "QUOT/";
+        $nomor = 'QUOT/';
 
         if ($company) {
-            $nomor .= $company->code . "/";
-            $nomor .= $leads->nomor . "-";
+            $nomor .= $company->code.'/';
+            $nomor .= $leads->nomor.'-';
         } else {
-            $nomor .= "NN/NNNNN-";
+            $nomor .= 'NN/NNNNN-';
         }
 
-        $month = $now->month < 10 ? "0" . $now->month : $now->month;
+        $month = $now->month < 10 ? '0'.$now->month : $now->month;
 
-        $count = Quotation::where('nomor', 'like', $nomor . $month . $now->year . "-%")->count();
-        $sequence = sprintf("%05d", $count + 1);
+        $count = Quotation::where('nomor', 'like', $nomor.$month.$now->year.'-%')->count();
+        $sequence = sprintf('%05d', $count + 1);
 
-        return $nomor . $month . $now->year . "-" . $sequence;
+        return $nomor.$month.$now->year.'-'.$sequence;
     }
 
     private function createNewQuotation($quotationAsal, $nomorQuotationBaru, $alasan)
@@ -2041,12 +2210,11 @@ class SpkController extends Controller
         $newQuotationData['tgl_quotation'] = now()->format('Y-m-d');
         $newQuotationData['tgl_penempatan'] = null; // atau now()->format('Y-m-d')
 
-
         // Determine status based on conditions - SESUAI CONTROLLER LAMA
         $isAktif = 1;
         $statusQuotation = 1;
 
-        if ($quotationAsal->top == "Lebih Dari 7 Hari") {
+        if ($quotationAsal->top == 'Lebih Dari 7 Hari') {
             $isAktif = 0;
             $statusQuotation = 2;
         }
@@ -2062,6 +2230,7 @@ class SpkController extends Controller
 
         return Quotation::create($newQuotationData);
     }
+
     private function copyQuotationRelatedData($quotationAsalId, $quotationBaruId): void
     {
         $models = [
@@ -2078,7 +2247,7 @@ class SpkController extends Controller
             QuotationAplikasi::class,
             QuotationKerjasama::class,
             QuotationPic::class,
-            QuotationTraining::class
+            QuotationTraining::class,
         ];
 
         foreach ($models as $model) {
@@ -2100,6 +2269,7 @@ class SpkController extends Controller
             $newRecord->save();
         }
     }
+
     /**
      * Update method createResubmissionActivities untuk menangani kedua kondisi dan mencatat SPK sites & quotation sites yang dihapus
      */
@@ -2115,11 +2285,11 @@ class SpkController extends Controller
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'Quotation',
-            'notes' => 'Quotation dengan nomor : ' . $quotationAsal->nomor . ' di ajukan ulang',
+            'notes' => 'Quotation dengan nomor : '.$quotationAsal->nomor.' di ajukan ulang',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
-            'created_by_user_id' => Auth::user()->id
+            'created_by_user_id' => Auth::user()->id,
         ]);
 
         // Activity for new quotation creation
@@ -2130,15 +2300,15 @@ class SpkController extends Controller
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'Quotation',
-            'notes' => 'Quotation dengan nomor : ' . $newQuotation->nomor . ' terbentuk dari ajukan ulang quotation dengan nomor : ' . $quotationAsal->nomor,
+            'notes' => 'Quotation dengan nomor : '.$newQuotation->nomor.' terbentuk dari ajukan ulang quotation dengan nomor : '.$quotationAsal->nomor,
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
-            'created_by_user_id' => Auth::user()->id
+            'created_by_user_id' => Auth::user()->id,
         ]);
 
         // Activity untuk SPK sites yang dihapus
-        if (!empty($deletedSpkSiteIds)) {
+        if (! empty($deletedSpkSiteIds)) {
             $spkSiteCount = count($deletedSpkSiteIds);
             CustomerActivity::create([
                 'leads_id' => $leads->id,
@@ -2147,16 +2317,16 @@ class SpkController extends Controller
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'SPK Site',
-                'notes' => $spkSiteCount . ' SPK site dihapus karena quotation diajukan ulang',
+                'notes' => $spkSiteCount.' SPK site dihapus karena quotation diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::user()->id
+                'created_by_user_id' => Auth::user()->id,
             ]);
         }
 
         // Activity untuk Quotation sites yang dihapus
-        if (!empty($deletedQuotationSiteIds)) {
+        if (! empty($deletedQuotationSiteIds)) {
             $quotationSiteCount = count($deletedQuotationSiteIds);
             CustomerActivity::create([
                 'leads_id' => $leads->id,
@@ -2165,11 +2335,11 @@ class SpkController extends Controller
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'Quotation Site',
-                'notes' => $quotationSiteCount . ' Quotation site dihapus karena diajukan ulang',
+                'notes' => $quotationSiteCount.' Quotation site dihapus karena diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::user()->id
+                'created_by_user_id' => Auth::user()->id,
             ]);
         }
 
@@ -2182,11 +2352,11 @@ class SpkController extends Controller
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'SPK',
-                'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus karena semua quotation site diajukan ulang',
+                'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus karena semua quotation site diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
-                'created_by_user_id' => Auth::user()->id
+                'created_by_user_id' => Auth::user()->id,
             ]);
         }
         if ($leads) {
@@ -2214,17 +2384,18 @@ class SpkController extends Controller
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
-            'created_by_user_id' => Auth::user()->id
+            'created_by_user_id' => Auth::user()->id,
         ]);
         if ($leads) {
             $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
             $leads->save();
         }
     }
+
     /**
      * Helper method untuk membuat aktivitas upload SPK
      */
@@ -2239,11 +2410,11 @@ class SpkController extends Controller
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
+            'notes' => 'SPK dengan nomor : '.$spk->nomor.' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
-            'created_by_user_id' => Auth::user()->id
+            'created_by_user_id' => Auth::user()->id,
         ]);
         if ($leads) {
             $leads->tgl_leads = Carbon::now()->toDateString();  // Set ke tanggal activity terbaru
@@ -2254,9 +2425,9 @@ class SpkController extends Controller
     /**
      * Unified validation error response
      * Digunakan untuk semua jenis error (validation, not found, server error, dll)
-     * 
-     * @param mixed $errors - Bisa berupa string, array, atau MessageBag dari validator
-     * @param int $status - HTTP status code
+     *
+     * @param  mixed  $errors  - Bisa berupa string, array, atau MessageBag dari validator
+     * @param  int  $status  - HTTP status code
      */
     private function validationError($errors, int $status = 400)
     {
@@ -2267,9 +2438,10 @@ class SpkController extends Controller
 
         return response()->json([
             'success' => false,
-            'message' => $errors
+            'message' => $errors,
         ], $status);
     }
+
     private function addDetailPic($quotation, $picData, $currentDateTime)
     {
         $user = Auth::user();
@@ -2284,7 +2456,7 @@ class SpkController extends Controller
             'is_kuasa' => 0, // Default tidak kuasa
             'created_at' => $currentDateTime,
             'created_by' => $user->full_name,
-            'created_by_user_id' => $user->id
+            'created_by_user_id' => $user->id,
         ]);
     }
 }

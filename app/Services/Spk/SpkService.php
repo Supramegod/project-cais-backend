@@ -2,6 +2,7 @@
 
 namespace App\Services\Spk;
 
+use App\Models\Company;
 use App\Models\CustomerActivity;
 use App\Models\JabatanPic;
 use App\Models\Leads;
@@ -22,7 +23,6 @@ use App\Models\QuotationPic;
 use App\Models\QuotationSite;
 use App\Models\QuotationTraining;
 use App\Models\SalesActivity;
-use App\Models\Company;
 use App\Models\Spk;
 use App\Models\SpkSite;
 use Carbon\Carbon;
@@ -68,27 +68,27 @@ class SpkService
         $query->leftJoin('sl_leads', 'sl_spk.leads_id', '=', 'sl_leads.id');
 
         // Search
-        if (!empty($filters['search'])) {
+        if (! empty($filters['search'])) {
             $searchTerm = $filters['search'];
             $searchBy = $filters['search_by'] ?? 'nama_perusahaan';
 
             if ($searchBy === 'nama_perusahaan') {
                 $searchTerm = str_contains($searchTerm, ' ')
-                    ? '"' . $searchTerm . '"'
-                    : $searchTerm . '*';
-                $query->whereRaw("MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)", [$searchTerm]);
+                    ? '"'.$searchTerm.'"'
+                    : $searchTerm.'*';
+                $query->whereRaw('MATCH(sl_spk.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
             } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
-                $query->where("sl_spk.{$searchBy}", 'LIKE', '%' . $searchTerm . '%');
+                $query->where("sl_spk.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
             }
         } else {
             $query->whereBetween('sl_spk.tgl_spk', [$tglDari, $tglSampai]);
         }
 
-        if (!empty($filters['branch'])) {
+        if (! empty($filters['branch'])) {
             $query->where('sl_leads.branch_id', $filters['branch']);
         }
 
-        if (!empty($filters['status'])) {
+        if (! empty($filters['status'])) {
             $query->where('sl_spk.status_spk_id', $filters['status']);
         }
 
@@ -197,7 +197,7 @@ class SpkService
         return DB::transaction(function () use ($leadsId, $tanggalSpk, $siteIds) {
             $leads = Leads::whereNull('deleted_at')->find($leadsId);
 
-            if (!$leads) {
+            if (! $leads) {
                 throw new \Exception("Leads dengan ID {$leadsId} tidak ditemukan atau sudah dihapus.");
             }
 
@@ -207,7 +207,7 @@ class SpkService
                 ->exists();
 
             if ($invalidSites) {
-                throw new \Exception("Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.");
+                throw new \Exception('Beberapa site yang dipilih tidak termasuk dalam leads yang dipilih.');
             }
 
             // Validasi: pastikan site belum memiliki SPK
@@ -216,7 +216,7 @@ class SpkService
                 ->exists();
 
             if ($sitesWithSPK) {
-                throw new \Exception("Beberapa site yang dipilih sudah memiliki SPK.");
+                throw new \Exception('Beberapa site yang dipilih sudah memiliki SPK.');
             }
 
             // Ambil quotation_id dari site pertama
@@ -256,7 +256,7 @@ class SpkService
 
             // Update status leads ke "SPK / Closing" (id: 3)
             $statusTerminalLeads = [99, 100, 101, 102];
-            if (!in_array($leads->status_leads_id, $statusTerminalLeads)) {
+            if (! in_array($leads->status_leads_id, $statusTerminalLeads)) {
                 $leads->update([
                     'status_leads_id' => 3,
                     'updated_by' => Auth::user()->full_name ?? 'System',
@@ -286,7 +286,7 @@ class SpkService
             'spkSites.quotation.ruleThr',
         ])->find($id);
 
-        if (!$spk) {
+        if (! $spk) {
             return null;
         }
 
@@ -315,7 +315,7 @@ class SpkService
         $uniqueQuotations = collect();
 
         foreach ($spk->spkSites as $spkSite) {
-            if ($spkSite->quotation && !$uniqueQuotations->contains('id', $spkSite->quotation->id)) {
+            if ($spkSite->quotation && ! $uniqueQuotations->contains('id', $spkSite->quotation->id)) {
                 $uniqueQuotations->push($spkSite->quotation);
             }
         }
@@ -325,7 +325,7 @@ class SpkService
             try {
                 $calculatedQuotation = $this->quotationService->calculateQuotation($quotation);
             } catch (\Exception $e) {
-                Log::error("Error calculating quotation in SPK view: " . $e->getMessage());
+                Log::error('Error calculating quotation in SPK view: '.$e->getMessage());
             }
 
             $persenBpjsBreakdown = [];
@@ -353,14 +353,14 @@ class SpkService
             $companyModel = null;
             if ($quotation->relationLoaded('company') && $quotation->company instanceof Company) {
                 $companyModel = $quotation->company;
-            } elseif (!empty($quotation->company_id)) {
+            } elseif (! empty($quotation->company_id)) {
                 $companyModel = Company::find($quotation->company_id);
             }
 
             $totalHc = $quotation->quotationDetails->sum('jumlah_hc');
             $wagedata = $quotation->wage->first();
             $firstDetail = $quotation->quotationDetails->first();
-            $adatserikat = $quotation->status_serikat ? "Ada" : "Tidak Ada";
+            $adatserikat = $quotation->status_serikat ? 'Ada' : 'Tidak Ada';
 
             $quotationsInfo[] = [
                 'id' => $quotation->id,
@@ -408,7 +408,7 @@ class SpkService
                 'cuti' => $quotation->cuti ?? null,
                 'gaji_saat_cuti' => $quotation->gaji_saat_cuti ?? null,
                 'prorate' => $quotation->prorate ?? null,
-                'status_serikat' => $quotation->ada_serikat === "Tidak Ada" ? "Tidak Ada" : $quotation->status_serikat,
+                'status_serikat' => $quotation->ada_serikat === 'Tidak Ada' ? 'Tidak Ada' : $quotation->status_serikat,
                 'ada_serikat' => $adatserikat,
                 'salary_rule' => $quotation->salaryRule ? [
                     'id' => $quotation->salaryRule->id,
@@ -482,7 +482,7 @@ class SpkService
         $now = Carbon::now()->isoFormat('DD MMMM Y');
 
         $spk = Spk::with(['quotation', 'leads'])->find($id);
-        if (!$spk) {
+        if (! $spk) {
             return null;
         }
 
@@ -544,7 +544,7 @@ class SpkService
         return DB::transaction(function () use ($id, $file) {
             $spk = Spk::find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 throw new \Exception('SPK not found');
             }
 
@@ -558,10 +558,10 @@ class SpkService
 
             // Upload file baru
             $fileName = $this->storeSpkFile($file);
-            $fileUrl = url('document/spk/' . $fileName);
+            $fileUrl = url('document/spk/'.$fileName);
 
-            Log::info('Generated URL: ' . $fileUrl);
-            Log::info('Filename: ' . $fileName);
+            Log::info('Generated URL: '.$fileUrl);
+            Log::info('Filename: '.$fileName);
 
             $spk->update([
                 'status_spk_id' => 2,
@@ -592,7 +592,7 @@ class SpkService
         return DB::transaction(function () use ($spkId, $quotationSiteIds, $alasan) {
             $spk = Spk::with(['spkSites.quotation', 'spkSites.quotationSite'])->find($spkId);
 
-            if (!$spk) {
+            if (! $spk) {
                 throw new \Exception('SPK not found');
             }
 
@@ -618,7 +618,7 @@ class SpkService
             foreach ($quotationGroups as $quotationId => $spkSites) {
                 $quotationAsal = $spkSites->first()->quotation;
 
-                if (!$quotationAsal) {
+                if (! $quotationAsal) {
                     continue;
                 }
 
@@ -690,7 +690,7 @@ class SpkService
     {
         $spkExists = Spk::withTrashed()->where('id', $spkId)->exists();
 
-        if (!$spkExists) {
+        if (! $spkExists) {
             throw new \Exception('SPK not found');
         }
 
@@ -721,6 +721,7 @@ class SpkService
             ->get()
             ->map(function ($site, $key) {
                 $site->no = $key + 1;
+
                 return $site;
             });
     }
@@ -758,7 +759,7 @@ class SpkService
         DB::transaction(function () use ($id) {
             $spk = Spk::find($id);
 
-            if (!$spk) {
+            if (! $spk) {
                 throw new \Exception('SPK not found');
             }
 
@@ -787,7 +788,7 @@ class SpkService
         DB::transaction(function () use ($siteId) {
             $spkSite = SpkSite::find($siteId);
 
-            if (!$spkSite) {
+            if (! $spkSite) {
                 throw new \Exception('SPK site not found');
             }
 
@@ -834,8 +835,8 @@ class SpkService
 
             // Logika untuk status serikat
             $statusSerikat = $data['status_serikat'];
-            if (($data['ada_serikat'] ?? null) === "Tidak Ada") {
-                $statusSerikat = "Tidak Ada";
+            if (($data['ada_serikat'] ?? null) === 'Tidak Ada') {
+                $statusSerikat = 'Tidak Ada';
             }
 
             // Update quotation data
@@ -857,7 +858,7 @@ class SpkService
 
             // Tambah PICs jika ada
             $picsAdded = 0;
-            if (!empty($data['pics']) && is_array($data['pics'])) {
+            if (! empty($data['pics']) && is_array($data['pics'])) {
                 foreach ($data['pics'] as $picData) {
                     $this->addDetailPic($quotation, $picData, $currentDateTime);
                     $picsAdded++;
@@ -882,7 +883,7 @@ class SpkService
         foreach ($siteIds as $siteId) {
             $quotationSite = QuotationSite::with('quotation')->find($siteId);
 
-            if (!$quotationSite) {
+            if (! $quotationSite) {
                 throw new \Exception("Quotation site dengan ID {$siteId} tidak ditemukan.");
             }
 
@@ -929,7 +930,7 @@ class SpkService
                 'tgl_activity' => now(),
                 'nomor' => $nomorActivity,
                 'tipe' => 'SPK',
-                'notes' => 'SPK dengan nomor : ' . $spkNomor . ' terbentuk',
+                'notes' => 'SPK dengan nomor : '.$spkNomor.' terbentuk',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
@@ -962,7 +963,7 @@ class SpkService
                     'leads_kebutuhan_id' => $leadsKebutuhan->id,
                     'spk_id' => $spk->id,
                     'tgl_activity' => Carbon::now(),
-                    'jenis_activity' => 'spk',
+                    'jenis_activity' => 'SPK',
                     'notulen' => "SPK baru {$spk->nomor} dibuat untuk kebutuhan {$leadsKebutuhan->kebutuhan->nama}",
                     'created_by' => $user->full_name,
                     'created_by_user_id' => $user->id,
@@ -975,7 +976,7 @@ class SpkService
     {
         $fileExtension = $file->getClientOriginalExtension();
         $originalFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $fileName = $originalFileName . date("YmdHis") . rand(10000, 99999) . "." . $fileExtension;
+        $fileName = $originalFileName.date('YmdHis').rand(10000, 99999).'.'.$fileExtension;
 
         Storage::disk('spk')->put($fileName, file_get_contents($file));
 
@@ -992,27 +993,27 @@ class SpkService
         $now = Carbon::now();
         $leads = Leads::find($leadsId);
 
-        $prefix = "CAT/";
+        $prefix = 'CAT/';
         if ($leads) {
             $prefix .= match ($leads->kebutuhan_id) {
-                1 => "SG/",
-                2 => "LS/",
-                3 => "CS/",
-                4 => "LL/",
-                default => "NN/",
+                1 => 'SG/',
+                2 => 'LS/',
+                3 => 'CS/',
+                4 => 'LL/',
+                default => 'NN/',
             };
-            $prefix .= $leads->nomor . "-";
+            $prefix .= $leads->nomor.'-';
         } else {
-            $prefix .= "NN/NNNNN-";
+            $prefix .= 'NN/NNNNN-';
         }
 
         $month = str_pad($now->month, 2, '0', STR_PAD_LEFT);
         $year = $now->year;
 
-        $count = CustomerActivity::where('nomor', 'like', $prefix . $month . $year . "-%")->count();
+        $count = CustomerActivity::where('nomor', 'like', $prefix.$month.$year.'-%')->count();
         $sequence = str_pad($count + 1, 5, '0', STR_PAD_LEFT);
 
-        return $prefix . $month . $year . "-" . $sequence;
+        return $prefix.$month.$year.'-'.$sequence;
     }
 
     /**
@@ -1061,7 +1062,7 @@ class SpkService
         $isAktif = 1;
         $statusQuotation = 1;
 
-        if ($quotationAsal->top == "Lebih Dari 7 Hari") {
+        if ($quotationAsal->top == 'Lebih Dari 7 Hari') {
             $isAktif = 0;
             $statusQuotation = 2;
         }
@@ -1128,7 +1129,7 @@ class SpkService
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'Quotation',
-            'notes' => 'Quotation dengan nomor : ' . $quotationAsal->nomor . ' di ajukan ulang',
+            'notes' => 'Quotation dengan nomor : '.$quotationAsal->nomor.' di ajukan ulang',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
@@ -1143,7 +1144,7 @@ class SpkService
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'Quotation',
-                'notes' => 'Quotation dengan nomor : ' . $newQuotation->nomor . ' terbentuk dari ajukan ulang quotation dengan nomor : ' . $quotationAsal->nomor,
+                'notes' => 'Quotation dengan nomor : '.$newQuotation->nomor.' terbentuk dari ajukan ulang quotation dengan nomor : '.$quotationAsal->nomor,
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
@@ -1151,7 +1152,7 @@ class SpkService
             ]);
         }
 
-        if (!empty($deletedSpkSiteIds)) {
+        if (! empty($deletedSpkSiteIds)) {
             $spkSiteCount = count($deletedSpkSiteIds);
             CustomerActivity::create([
                 'leads_id' => $leads->id,
@@ -1160,7 +1161,7 @@ class SpkService
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'SPK Site',
-                'notes' => $spkSiteCount . ' SPK site dihapus karena quotation diajukan ulang',
+                'notes' => $spkSiteCount.' SPK site dihapus karena quotation diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
@@ -1168,7 +1169,7 @@ class SpkService
             ]);
         }
 
-        if (!empty($deletedQuotationSiteIds)) {
+        if (! empty($deletedQuotationSiteIds)) {
             $quotationSiteCount = count($deletedQuotationSiteIds);
             CustomerActivity::create([
                 'leads_id' => $leads->id,
@@ -1177,7 +1178,7 @@ class SpkService
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'Quotation Site',
-                'notes' => $quotationSiteCount . ' Quotation site dihapus karena diajukan ulang',
+                'notes' => $quotationSiteCount.' Quotation site dihapus karena diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
@@ -1193,7 +1194,7 @@ class SpkService
                 'tgl_activity' => now(),
                 'nomor' => $this->generateActivityNomor($leads->id),
                 'tipe' => 'SPK',
-                'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus karena semua quotation site diajukan ulang',
+                'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus karena semua quotation site diajukan ulang',
                 'is_activity' => 0,
                 'user_id' => Auth::user()->id,
                 'created_by' => Auth::user()->full_name,
@@ -1218,7 +1219,7 @@ class SpkService
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' dihapus',
+            'notes' => 'SPK dengan nomor : '.$spk->nomor.' dihapus',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
@@ -1242,7 +1243,7 @@ class SpkService
             'tgl_activity' => now(),
             'nomor' => $this->generateActivityNomor($leads->id),
             'tipe' => 'SPK',
-            'notes' => 'SPK dengan nomor : ' . $spk->nomor . ' telah diupload dan disetujui',
+            'notes' => 'SPK dengan nomor : '.$spk->nomor.' telah diupload dan disetujui',
             'is_activity' => 0,
             'user_id' => Auth::user()->id,
             'created_by' => Auth::user()->full_name,
