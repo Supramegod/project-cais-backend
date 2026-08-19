@@ -56,7 +56,7 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 'updateDetailKontrak':
-                $isV2 = ($this->route('quotation')?->version === 2);
+                $isV2 = ($quotation?->version === 2);
                 
                 if ($isV2) {
                     $rules['hari_kerja'] = FluentRule::string()->required();
