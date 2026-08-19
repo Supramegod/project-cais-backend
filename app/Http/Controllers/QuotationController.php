@@ -519,7 +519,7 @@ class QuotationController extends Controller
             if ($quotationReferensi) {
                 $quotationData['version'] = $quotationReferensi->version ?? 1;
             } else {
-                $quotationData['version'] = $request->get('version', 2);
+                $quotationData['version'] = $request->get('version', 1);
             }
 
             $quotation = Quotation::create($quotationData);
