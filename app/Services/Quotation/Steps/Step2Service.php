@@ -16,39 +16,58 @@ class Step2Service
     {
         DB::beginTransaction();
         try {
-            Log::info('Starting updateStep2', [
+            Log::info('Starting updateDetailKontrak (Step2Service)', [
                 'quotation_id' => $quotation->id,
+                'version' => $quotation->version,
                 'request_data' => $request->all(),
             ]);
 
-            $this->validateStep2($request);
+            if ($quotation->version === 2) {
+                $this->validateStep2V2($request);
+                $updateData = [
+                    'hari_kerja' => $request->hari_kerja,
+                    'hari_off' => $request->hari_off,
+                    'jam_kerja' => $request->jam_kerja,
+                    'shift_kerja' => $request->shift_kerja,
+                    'jam_lembur' => $request->jam_lembur,
+                    'cuti_izin' => $request->cuti_izin,
+                    'status_rekrutmen' => $request->status_rekrutmen,
+                    'pendaftaran_pkwt' => $request->pendaftaran_pkwt,
+                    'jaminan' => $request->jaminan,
+                    'penanggung_jawab_aset' => $request->penanggung_jawab_aset,
+                    'detail_penanggung_jawab_aset' => $request->detail_penanggung_jawab_aset,
+                    'calculated_at' => null,
+                    'updated_by' => Auth::user()->full_name,
+                ];
+            } else {
+                $this->validateStep2V1($request);
 
-            $cutiData = $this->prepareCutiData($request);
+                $cutiData = $this->prepareCutiData($request);
 
-            $top = Top::where('nama', $request->jumlah_hari_invoice)->first();
+                $top = Top::where('nama', $request->jumlah_hari_invoice)->first();
+                $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
 
-            $persenBungaBank = $top ? ($top->persentase ?? 0) : 0;
-
-            $updateData = array_merge([
-                'mulai_kontrak' => $request->mulai_kontrak,
-                'kontrak_selesai' => $request->kontrak_selesai,
-                'tgl_penempatan' => $request->tgl_penempatan,
-                'salary_rule_id' => $request->salary_rule,
-                'pengiriman_invoice' => $request->pengiriman_invoice,
-                'top' => $request->top,
-                'jumlah_hari_invoice' => $request->jumlah_hari_invoice,
-                'tipe_hari_invoice' => $request->tipe_hari_invoice,
-                'evaluasi_kontrak' => $request->evaluasi_kontrak,
-                'durasi_kerjasama' => $request->durasi_kerjasama,
-                'durasi_karyawan' => $request->durasi_karyawan,
-                'evaluasi_karyawan' => $request->evaluasi_karyawan,
-                'hari_kerja' => $request->hari_kerja,
-                'shift_kerja' => $request->shift_kerja,
-                'jam_kerja' => $request->jam_kerja,
-                'persen_bunga_bank' => $persenBungaBank,
-                'calculated_at' => null,
-                'updated_by' => Auth::user()->full_name,
-            ], $cutiData);
+                $updateData = array_merge([
+                    'mulai_kontrak' => $request->mulai_kontrak,
+                    'kontrak_selesai' => $request->kontrak_selesai,
+                    'tgl_penempatan' => $request->tgl_penempatan,
+                    'salary_rule_id' => $request->salary_rule,
+                    'pengiriman_invoice' => $request->pengiriman_invoice,
+                    'top' => $request->top,
+                    'jumlah_hari_invoice' => $request->jumlah_hari_invoice,
+                    'tipe_hari_invoice' => $request->tipe_hari_invoice,
+                    'evaluasi_kontrak' => $request->evaluasi_kontrak,
+                    'durasi_kerjasama' => $request->durasi_kerjasama,
+                    'durasi_karyawan' => $request->durasi_karyawan,
+                    'evaluasi_karyawan' => $request->evaluasi_karyawan,
+                    'hari_kerja' => $request->hari_kerja,
+                    'shift_kerja' => $request->shift_kerja,
+                    'jam_kerja' => $request->jam_kerja,
+                    'persen_bunga_bank' => $persenBungaBank,
+                    'calculated_at' => null,
+                    'updated_by' => Auth::user()->full_name,
+                ], $cutiData);
+            }
 
             Log::debug('Final data to update quotation:', $updateData);
 
@@ -58,7 +77,6 @@ class Step2Service
 
             Log::info('Step 2 updated successfully', [
                 'quotation_id' => $quotation->id,
-                'cuti_data' => $cutiData,
             ]);
 
         } catch (\Exception $e) {
@@ -72,7 +90,28 @@ class Step2Service
         }
     }
 
-    private function validateStep2(Request $request): void
+    private function validateStep2V2(Request $request): void
+    {
+        $validator = Validator::make($request->all(), [
+            'hari_kerja' => 'required|string',
+            'hari_off' => 'required|string',
+            'jam_kerja' => 'required|string',
+            'shift_kerja' => 'required|string',
+            'jam_lembur' => 'required|string',
+            'cuti_izin' => 'required|string',
+            'status_rekrutmen' => 'required|string',
+            'pendaftaran_pkwt' => 'required|string',
+            'jaminan' => 'required|string',
+            'penanggung_jawab_aset' => 'required|string',
+            'detail_penanggung_jawab_aset' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+    }
+
+    private function validateStep2V1(Request $request): void
     {
         $validator = Validator::make($request->all(), [
             'mulai_kontrak' => 'required|date',
