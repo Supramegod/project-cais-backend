@@ -23,6 +23,7 @@ class StepMapper
                 10 => 'updateOperasional',
                 11 => 'updatePricing',
                 12 => 'updateFinalization',
+                13 => 'updateFinalization',
                 default => 'notFound',
             };
         }
