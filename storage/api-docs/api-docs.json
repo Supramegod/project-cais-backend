@@ -20902,7 +20902,10 @@
                                         "jam_kerja": "08:00 - 17:00 (Required v1/v2)",
                                         "hari_off": "Sabtu - Minggu (Required v2)",
                                         "jam_lembur": "2 Jam (Required v2)",
-                                        "cuti_izin": "Cuti Tahunan (Required v2)",
+                                        "cuti_izin": [
+                                            "Cuti Tahunan (Required v2)",
+                                            "Izin Sakit"
+                                        ],
                                         "status_rekrutmen": "Internal (Required v2)",
                                         "pendaftaran_pkwt": "Ya (Required v2)",
                                         "jaminan": "BPJS (Required v2)",
@@ -21053,6 +21056,20 @@
                                         "ada_training": "Ada (Optional)",
                                         "training": "Basic Security Training (Optional)",
                                         "persen_bunga_bank": 5.5,
+                                        "ohcs": [
+                                            {
+                                                "quotation_site_id": 1,
+                                                "barang_id": 5,
+                                                "jumlah": 2
+                                            },
+                                            {
+                                                "quotation_site_id": 1,
+                                                "is_custom": true,
+                                                "nama": "Barang Custom OHC",
+                                                "jumlah": 1,
+                                                "harga": 50000
+                                            }
+                                        ],
                                         "edit": false
                                     }
                                 },
