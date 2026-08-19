@@ -21,9 +21,8 @@ class StepMapper
                 8 => 'updatePeralatan',
                 9 => 'updateChemical',
                 10 => 'updateOperasional',
-                11 => 'updateDriver',
-                12 => 'updatePricing',
-                13 => 'updateFinalization',
+                11 => 'updatePricing',
+                12 => 'updateFinalization',
                 default => 'notFound',
             };
         }
