@@ -1011,7 +1011,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep6(Quotation $quotation): array
     {
         return [
-            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'link_icon')->get(),
+            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'link_icon', 'harga')->get(),
         ];
     }
 
@@ -1021,7 +1021,7 @@ class QuotationStepController extends Controller
         $listJenis = JenisBarang::whereIn('id', $arrKaporlap)->select('id', 'nama')->get();
 
         $listKaporlap = Barang::whereIn('jenis_barang_id', $arrKaporlap)
-            ->select('id', 'nama', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id', 'harga')
             ->ordered()
             ->get();
         $barangIds = $listKaporlap->pluck('id')->toArray();
@@ -1082,7 +1082,7 @@ class QuotationStepController extends Controller
             ->get();
 
         $listDevices = Barang::whereIn('jenis_barang_id', [8, 9, 10, 11, 12, 17])
-            ->select('id', 'nama', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id', 'harga')
             ->ordered()
             ->get();
 
@@ -1142,7 +1142,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep9(Quotation $quotation): array
     {
         $chemicalList = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->select('id', 'nama')
+            ->select('id', 'nama', 'harga', 'masa_pakai')
             ->ordered()
             ->get()
             ->map(function ($chemical) {
@@ -1201,7 +1201,7 @@ class QuotationStepController extends Controller
 
         return [
             'ohc_list' => Barang::whereIn('jenis_barang_id', [6, 7, 8])
-                ->select('id', 'nama', 'jenis_barang_id', 'urutan')
+                ->select('id', 'nama', 'jenis_barang_id', 'urutan', 'harga')
                 ->orderBy('urutan', 'asc')
                 ->orderBy('nama', 'asc')
                 ->get(),
