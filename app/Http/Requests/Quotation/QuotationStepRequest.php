@@ -56,44 +56,59 @@ class QuotationStepRequest extends BaseRequest
                 break;
 
             case 'updateDetailKontrak':
-                $excludedRoles = [53, 54, 55, 56, 2];
-                /** @var \App\Models\User|null $user */
-                $user = \Illuminate\Support\Facades\Auth::user();
-                $userRole = $user?->cais_role_id;
+                $isV2 = ($this->route('quotation')?->version === 2);
+                
+                if ($isV2) {
+                    $rules['hari_kerja'] = FluentRule::string()->required();
+                    $rules['hari_off'] = FluentRule::string()->required();
+                    $rules['jam_kerja'] = FluentRule::string()->required();
+                    $rules['shift_kerja'] = FluentRule::string()->required();
+                    $rules['jam_lembur'] = FluentRule::string()->required();
+                    $rules['cuti_izin'] = FluentRule::string()->required();
+                    $rules['status_rekrutmen'] = FluentRule::string()->required();
+                    $rules['pendaftaran_pkwt'] = FluentRule::string()->required();
+                    $rules['jaminan'] = FluentRule::string()->required();
+                    $rules['penanggung_jawab_aset'] = FluentRule::string()->required();
+                    $rules['detail_penanggung_jawab_aset'] = FluentRule::string()->required();
+                } else {
+                    $excludedRoles = [53, 54, 55, 56, 2];
+                    /** @var \App\Models\User|null $user */
+                    $user = \Illuminate\Support\Facades\Auth::user();
+                    $userRole = $user?->cais_role_id;
 
-                // Aturan dasar selalu: date (jika ada input)
-                $rules['mulai_kontrak'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
-                $rules['kontrak_selesai'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
-                $rules['tgl_penempatan'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
+                    $rules['mulai_kontrak'] = FluentRule::date()
+                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
+                    $rules['kontrak_selesai'] = FluentRule::date()
+                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
+                    $rules['tgl_penempatan'] = FluentRule::date()
+                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
 
-                $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
-                $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
-                $rules['jumlah_hari_invoice'] = FluentRule::integer()->requiredIf('top', 'Lebih Dari 7 Hari')->min(1);
-                $rules['tipe_hari_invoice'] = FluentRule::string()->requiredIf('top', 'Lebih Dari 7 Hari')->in(['Kerja', 'Kalender']);
-                $rules['evaluasi_kontrak'] = FluentRule::string()->required();
-                $rules['durasi_kerjasama'] = FluentRule::string()->required();
-                $rules['durasi_karyawan'] = FluentRule::string()->required();
-                $rules['evaluasi_karyawan'] = FluentRule::string()->required();
-                $rules['ada_cuti'] = FluentRule::string()->required()->in(['Ada', 'Tidak Ada']);
-                $rules['cuti'] = FluentRule::array()->requiredIf('ada_cuti', 'Ada')->children([
-                    '*' => FluentRule::string()->sometimes()->in([
-                        'Cuti Tahunan',
-                        'Cuti Melahirkan',
-                        'Cuti Kematian',
-                        'Istri Melahirkan',
-                        'Cuti Menikah',
-                        'Cuti Roster',
-                        'Tidak Ada'
-                    ]),
-                ]);
-                $rules['gaji_saat_cuti'] = FluentRule::string()->sometimes()->in(['No Work No Pay', 'Prorate']);
-                $rules['prorate'] = FluentRule::integer()->requiredIf('gaji_saat_cuti', 'Prorate')->min(0);
-                $rules['shift_kerja'] = FluentRule::string()->sometimes();
-                $rules['hari_kerja'] = FluentRule::string()->required();
-                $rules['jam_kerja'] = FluentRule::string()->required();
+                    $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
+                    $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
+                    $rules['jumlah_hari_invoice'] = FluentRule::integer()->requiredIf('top', 'Lebih Dari 7 Hari')->min(1);
+                    $rules['tipe_hari_invoice'] = FluentRule::string()->requiredIf('top', 'Lebih Dari 7 Hari')->in(['Kerja', 'Kalender']);
+                    $rules['evaluasi_kontrak'] = FluentRule::string()->required();
+                    $rules['durasi_kerjasama'] = FluentRule::string()->required();
+                    $rules['durasi_karyawan'] = FluentRule::string()->required();
+                    $rules['evaluasi_karyawan'] = FluentRule::string()->required();
+                    $rules['ada_cuti'] = FluentRule::string()->required()->in(['Ada', 'Tidak Ada']);
+                    $rules['cuti'] = FluentRule::array()->requiredIf('ada_cuti', 'Ada')->children([
+                        '*' => FluentRule::string()->sometimes()->in([
+                            'Cuti Tahunan',
+                            'Cuti Melahirkan',
+                            'Cuti Kematian',
+                            'Istri Melahirkan',
+                            'Cuti Menikah',
+                            'Cuti Roster',
+                            'Tidak Ada'
+                        ]),
+                    ]);
+                    $rules['gaji_saat_cuti'] = FluentRule::string()->sometimes()->in(['No Work No Pay', 'Prorate']);
+                    $rules['prorate'] = FluentRule::integer()->requiredIf('gaji_saat_cuti', 'Prorate')->min(0);
+                    $rules['shift_kerja'] = FluentRule::string()->sometimes();
+                    $rules['hari_kerja'] = FluentRule::string()->required();
+                    $rules['jam_kerja'] = FluentRule::string()->required();
+                }
                 break;
 
             case 'updateHeadcount':
