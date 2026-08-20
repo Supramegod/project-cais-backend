@@ -30,6 +30,9 @@ class Step5Request extends BaseRequest
             'jp' => FluentRule::array()->sometimes()->children([
                 '*' => FluentRule::boolean()->sometimes(),
             ]),
+            'kes' => FluentRule::array()->sometimes()->children([
+                '*' => FluentRule::boolean()->sometimes(),
+            ]),
             'nominal_takaful' => FluentRule::array()->sometimes()->children([
                 '*' => FluentRule::numeric()->sometimes()->min(0),
             ]),
@@ -50,6 +53,7 @@ class Step5Request extends BaseRequest
             'jkm.*.boolean' => 'JKM harus berupa boolean (true/false)',
             'jht.*.boolean' => 'JHT harus berupa boolean (true/false)',
             'jp.*.boolean' => 'JP harus berupa boolean (true/false)',
+            'kes.*.boolean' => 'BPJS Kesehatan harus berupa boolean (true/false)',
             'nominal_takaful.*.min' => 'Nominal takaful tidak boleh kurang dari 0',
         ];
     }

@@ -19,6 +19,7 @@ class QuotationComponentCalculationService
 
             if ($dtTunjangan && in_array($dtTunjangan->jenis, ['Normatif', 'Ditagihkan'])) {
                 $detail->{$tunjangan->nama} = 0;
+
                 continue;
             }
 
@@ -31,11 +32,22 @@ class QuotationComponentCalculationService
         }
         $detail->total_tunjangan = $totalTunjangan;
         $detail->total_tunjangan_coss = $totalTunjanganCoss;
+
         return ['total' => $totalTunjangan, 'total_coss' => $totalTunjanganCoss];
     }
 
+    /**
+     * Pada General Cleaning basis iuran BPJS Ketenagakerjaan memakai batas bawah
+     * UMK, bukan UMP seperti kontrak lain, karena upah GC minimal setara UMK.
+     * BPJS Kesehatan tidak dipaksa nol: pada GC dan PKHL opt-out is_bpjs_kes
+     * dihormati walau penjamin BPJS, sehingga sales yang menentukan lewat step 5.
+     */
     public function calculateBpjs($detail, $quotation, $hpp): void
     {
+        $jenisKontrak = strtoupper($quotation->jenis_kontrak ?? '');
+        $isGC = ($jenisKontrak === 'GENERAL CLEANING');
+        $isBpjsKesOpsional = ($isGC || $jenisKontrak === 'PKHL');
+
         $isBpu = ($detail->penjamin_kesehatan === 'BPU');
         if ($isBpu) {
             $detail->bpjs_kes = 0;
@@ -52,6 +64,7 @@ class QuotationComponentCalculationService
             $detail->persen_bpjs_ketenagakerjaan = 0;
             $detail->bpjs_kesehatan = 0;
             $detail->persen_bpjs_kesehatan = 0;
+
             return;
         }
 
@@ -59,10 +72,12 @@ class QuotationComponentCalculationService
         $umk = $detail->umk ?? 0;
         $ump = $detail->ump ?? 0;
 
-        $baseKetenagakerjaan = ($nominalUpah < $ump) ? $ump : $nominalUpah;
+        $baseKetenagakerjaan = $isGC
+            ? (($nominalUpah < $umk) ? $umk : $nominalUpah)
+            : (($nominalUpah < $ump) ? $ump : $nominalUpah);
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
         $bpjsConfig = [
-            'jkk' => ['field' => 'bpjs_jkk', 'hpp_field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => fn() => $this->getJkkPercent($quotation->resiko), 'base' => $baseKetenagakerjaan],
+            'jkk' => ['field' => 'bpjs_jkk', 'hpp_field' => 'bpjs_jkk', 'percent' => 'persen_bpjs_jkk', 'default' => fn () => $this->getJkkPercent($quotation->resiko), 'base' => $baseKetenagakerjaan],
             'jkm' => ['field' => 'bpjs_jkm', 'hpp_field' => 'bpjs_jkm', 'percent' => 'persen_bpjs_jkm', 'default' => 0.30, 'base' => $baseKetenagakerjaan],
             'jht' => ['field' => 'bpjs_jht', 'hpp_field' => 'bpjs_jht', 'percent' => 'persen_bpjs_jht', 'default' => 3.70, 'base' => $baseKetenagakerjaan],
             'jp' => ['field' => 'bpjs_jp', 'hpp_field' => 'bpjs_jp', 'percent' => 'persen_bpjs_jp', 'default' => 2.00, 'base' => $baseKetenagakerjaan],
@@ -92,7 +107,7 @@ class QuotationComponentCalculationService
                 if (
                     ($optValue === '0' || $optValue === 0 || $optValue === false ||
                         (is_string($optValue) && strtolower(trim($optValue)) === 'tidak'))
-                    && ! ($key === 'kes' && $detail->penjamin_kesehatan === 'BPJS')
+                    && ! ($key === 'kes' && $detail->penjamin_kesehatan === 'BPJS' && ! $isBpjsKesOpsional)
                 ) {
                     $isOptOut = true;
                 }
@@ -192,7 +207,9 @@ class QuotationComponentCalculationService
         }
 
         $potonganBpu = $detail->penjamin_kesehatan === 'BPU' ? 16800 : 0;
-        if ($potonganBpu) $detail->potongan_bpu = $potonganBpu;
+        if ($potonganBpu) {
+            $detail->potongan_bpu = $potonganBpu;
+        }
 
         $nominalUpah = (float) ($detail->nominal_upah_bulanan ?? $detail->nominal_upah ?? 0);
         $bpjsJkk = (float) ($detail->bpjs_jkk ?? 0);
@@ -285,12 +302,15 @@ class QuotationComponentCalculationService
     {
         $data = ['quotation_detail_id' => $detail->id, 'quotation_id' => $quotation->id,
             'leads_id' => $quotation->leads_id, 'position_id' => $detail->position_id];
-        foreach (['jumlah_hc','gaji_pokok','total_tunjangan','total_base_manpower','tunjangan_hari_raya',
-            'kompensasi','tunjangan_hari_libur_nasional','lembur','bpjs_jkk','bpjs_jkm','bpjs_jht','bpjs_jp','bpjs_ks',
-            'persen_bpjs_jkk','persen_bpjs_jkm','persen_bpjs_jht','persen_bpjs_jp','persen_bpjs_ks',
-            'provisi_seragam','provisi_peralatan','provisi_chemical','provisi_ohc',
-            'total_personil_coss','sub_total_personil_coss','total_exclude_base_manpower',
-            'bunga_bank','insentif','potongan_bpu'] as $k) { $data[$k] = 0; }
+        foreach (['jumlah_hc', 'gaji_pokok', 'total_tunjangan', 'total_base_manpower', 'tunjangan_hari_raya',
+            'kompensasi', 'tunjangan_hari_libur_nasional', 'lembur', 'bpjs_jkk', 'bpjs_jkm', 'bpjs_jht', 'bpjs_jp', 'bpjs_ks',
+            'persen_bpjs_jkk', 'persen_bpjs_jkm', 'persen_bpjs_jht', 'persen_bpjs_jp', 'persen_bpjs_ks',
+            'provisi_seragam', 'provisi_peralatan', 'provisi_chemical', 'provisi_ohc',
+            'total_personil_coss', 'sub_total_personil_coss', 'total_exclude_base_manpower',
+            'bunga_bank', 'insentif', 'potongan_bpu'] as $k) {
+            $data[$k] = 0;
+        }
+
         return $data;
     }
 
@@ -345,25 +365,45 @@ class QuotationComponentCalculationService
     public function makeEmptyWageObject(): \stdClass
     {
         $w = new \stdClass;
-        $w->upah = null; $w->hitungan_upah = null; $w->lembur = 'Tidak'; $w->nominal_lembur = 0;
-        $w->jenis_bayar_lembur = null; $w->jam_per_bulan_lembur = 0;
-        $w->lembur_ditagihkan = 'Tidak Ditagihkan'; $w->kompensasi = 'Tidak'; $w->thr = 'Tidak';
-        $w->tunjangan_holiday = 'Tidak'; $w->nominal_tunjangan_holiday = 0;
-        $w->jenis_bayar_tunjangan_holiday = null; return $w;
+        $w->upah = null;
+        $w->hitungan_upah = null;
+        $w->lembur = 'Tidak';
+        $w->nominal_lembur = 0;
+        $w->jenis_bayar_lembur = null;
+        $w->jam_per_bulan_lembur = 0;
+        $w->lembur_ditagihkan = 'Tidak Ditagihkan';
+        $w->kompensasi = 'Tidak';
+        $w->thr = 'Tidak';
+        $w->tunjangan_holiday = 'Tidak';
+        $w->nominal_tunjangan_holiday = 0;
+        $w->jenis_bayar_tunjangan_holiday = null;
+
+        return $w;
     }
 
-    public function isRo($detail): bool { return ($detail->position_id ?? null) === 224; }
+    public function isRo($detail): bool
+    {
+        return ($detail->position_id ?? null) === 224;
+    }
 
     private function calculateTunjanganHolidayFromWage($wage): float
     {
-        if (!$wage || !str_contains(strtolower(trim($wage->tunjangan_holiday ?? 'Tidak')), 'flat')) return 0.0;
+        if (! $wage || ! str_contains(strtolower(trim($wage->tunjangan_holiday ?? 'Tidak')), 'flat')) {
+            return 0.0;
+        }
+
         return round((float) str_replace(['.', ','], ['', '.'], (string) ($wage->nominal_tunjangan_holiday ?? 0)), 2);
     }
 
     private function calculateLemburFromWage($wage): float
     {
-        if (!$wage || !str_contains(strtolower(trim($wage->lembur ?? 'Tidak')), 'flat')) return 0.0;
-        if (str_contains(strtolower($wage->lembur_ditagihkan ?? ''), 'terpisah')) return 0.0;
+        if (! $wage || ! str_contains(strtolower(trim($wage->lembur ?? 'Tidak')), 'flat')) {
+            return 0.0;
+        }
+        if (str_contains(strtolower($wage->lembur_ditagihkan ?? ''), 'terpisah')) {
+            return 0.0;
+        }
+
         return round((float) str_replace(['.', ','], ['', '.'], (string) ($wage->nominal_lembur ?? 0)), 2);
     }
 }

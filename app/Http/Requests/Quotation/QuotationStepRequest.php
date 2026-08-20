@@ -3,14 +3,12 @@
 namespace App\Http\Requests\Quotation;
 
 use App\Http\Requests\BaseRequest;
-
 use App\Models\Position;
 use App\Models\Quotation;
 use App\Models\QuotationDetail;
 use App\Models\QuotationSite;
 use App\Models\Umk;
 use SanderMuller\FluentValidation\FluentRule;
-use SanderMuller\FluentValidation\HasFluentRules;
 
 class QuotationStepRequest extends BaseRequest
 {
@@ -27,7 +25,7 @@ class QuotationStepRequest extends BaseRequest
 
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
             $quotation?->version ?? 1,
-            (int)$step
+            (int) $step
         );
 
         $rules = [
@@ -51,7 +49,7 @@ class QuotationStepRequest extends BaseRequest
                     'Event Gaji Harian',
                     'PKHL',
                     'Borongan',
-                    'General Cleaning'
+                    'General Cleaning',
                 ]);
                 break;
 
@@ -63,11 +61,11 @@ class QuotationStepRequest extends BaseRequest
 
                 // Aturan dasar selalu: date (jika ada input)
                 $rules['mulai_kontrak'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
+                    ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required()->rule('after_or_equal:today'));
                 $rules['kontrak_selesai'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
+                    ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
                 $rules['tgl_penempatan'] = FluentRule::date()
-                    ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
+                    ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required());
 
                 $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
                 $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
@@ -86,7 +84,7 @@ class QuotationStepRequest extends BaseRequest
                         'Istri Melahirkan',
                         'Cuti Menikah',
                         'Cuti Roster',
-                        'Tidak Ada'
+                        'Tidak Ada',
                     ]),
                 ]);
                 $rules['gaji_saat_cuti'] = FluentRule::string()->sometimes()->in(['No Work No Pay', 'Prorate']);
@@ -121,7 +119,7 @@ class QuotationStepRequest extends BaseRequest
                     'jenis_bayar_lembur' => FluentRule::string()->requiredIf('lembur', 'Flat')->in(['Per Bulan', 'Per Hari', 'Per Jam']),
                     'jam_per_bulan_lembur' => FluentRule::integer()->requiredIf('jenis_bayar_lembur', 'Per Jam')->min(0),
                     'lembur_ditagihkan' => FluentRule::string()->rule('required_if:lembur,Flat,Normatif')->in(['Ditagihkan', 'Ditagihkan Terpisah']),
-                    'kompensasi' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Diberikan Langsung','Ditagihkan', 'Tidak Ada']),
+                    'kompensasi' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Diberikan Langsung', 'Ditagihkan', 'Tidak Ada']),
                     'thr' => FluentRule::string()->sometimes()->in(['Diprovisikan', 'Ditagihkan', 'Diberikan Langsung', 'Tidak Ada']),
                     'tunjangan_holiday' => FluentRule::string()->sometimes()->in(['Flat', 'Tidak Ada', 'Normatif']),
                     'nominal_tunjangan_holiday' => FluentRule::numeric()->requiredIf('tunjangan_holiday', 'Flat')->min(0),
@@ -147,6 +145,9 @@ class QuotationStepRequest extends BaseRequest
                     '*' => FluentRule::boolean()->sometimes(),
                 ]);
                 $rules['jp'] = FluentRule::array()->sometimes()->children([
+                    '*' => FluentRule::boolean()->sometimes(),
+                ]);
+                $rules['kes'] = FluentRule::array()->sometimes()->children([
                     '*' => FluentRule::boolean()->sometimes(),
                 ]);
                 $rules['nominal_takaful'] = FluentRule::array()->sometimes()->children([
@@ -202,7 +203,6 @@ class QuotationStepRequest extends BaseRequest
 
         return $rules;
     }
-
 
     public function messages(): array
     {
@@ -329,6 +329,8 @@ class QuotationStepRequest extends BaseRequest
             'penjamin.*.string' => 'Penjamin harus berupa teks',
             'jkk.array' => 'JKK harus berupa array',
             'jkk.*.boolean' => 'JKK harus berupa boolean (true/false)',
+            'kes.array' => 'BPJS Kesehatan harus berupa array',
+            'kes.*.boolean' => 'BPJS Kesehatan harus berupa boolean (true/false)',
             'jkm.array' => 'JKM harus berupa array',
             'jkm.*.boolean' => 'JKM harus berupa boolean (true/false)',
             'jht.array' => 'JHT harus berupa array',
@@ -407,7 +409,7 @@ class QuotationStepRequest extends BaseRequest
             $quotation = \App\Models\Quotation::find($id);
             $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
                 $quotation?->version ?? 1,
-                (int)$step
+                (int) $step
             );
 
             // Validasi custom untuk updateDetailKontrak
@@ -421,7 +423,7 @@ class QuotationStepRequest extends BaseRequest
                 $userRole = $user->cais_role_id ?? null;
 
                 // Hanya jalankan validasi jika role_id TIDAK ada di dalam list pengecualian
-                if (!in_array($userRole, $excludedRoles)) {
+                if (! in_array($userRole, $excludedRoles)) {
                     if ($this->mulai_kontrak && $this->kontrak_selesai) {
                         if ($this->mulai_kontrak > $this->kontrak_selesai) {
                             $validator->errors()->add('mulai_kontrak', 'Mulai Kontrak tidak boleh lebih dari Kontrak Selesai');
@@ -451,7 +453,7 @@ class QuotationStepRequest extends BaseRequest
                     'all_route_parameters' => $this->route()->parameters(),
                     'step' => $step,
                     'has_headCountData' => $this->has('headCountData'),
-                    'headCountData_count' => is_array($this->headCountData) ? count($this->headCountData) : 0
+                    'headCountData_count' => is_array($this->headCountData) ? count($this->headCountData) : 0,
                 ]);
 
                 // CARA 1: Coba ambil quotation_id dari berbagai kemungkinan nama parameter
@@ -471,7 +473,7 @@ class QuotationStepRequest extends BaseRequest
                 }
 
                 // Jika masih null, coba ambil dari URL segment
-                if (!$quotationId) {
+                if (! $quotationId) {
                     // Pattern: /api/quotation/{id}/step/{step}
                     $path = $this->path();
                     \Log::info('Request path:', ['path' => $path]);
@@ -483,8 +485,9 @@ class QuotationStepRequest extends BaseRequest
                     }
                 }
 
-                if (!$quotationId) {
+                if (! $quotationId) {
                     \Log::error('Cannot determine quotation ID for validation');
+
                     // Skip validasi custom jika tidak bisa dapat quotation ID
                     return;
                 }
@@ -493,9 +496,10 @@ class QuotationStepRequest extends BaseRequest
 
                 $quotation = Quotation::with('quotationSites')->find($quotationId);
 
-                if (!$quotation) {
+                if (! $quotation) {
                     \Log::warning('Quotation not found', ['quotation_id' => $quotationId]);
                     $validator->errors()->add('headCountData', 'Quotation tidak ditemukan.');
+
                     return;
                 }
 
@@ -503,7 +507,7 @@ class QuotationStepRequest extends BaseRequest
                     'quotation_id' => $quotation->id,
                     'site_count' => $quotation->quotationSites->count(),
                     'site_ids' => $quotation->quotationSites->pluck('id')->toArray(),
-                    'site_names' => $quotation->quotationSites->pluck('nama_site')->toArray()
+                    'site_names' => $quotation->quotationSites->pluck('nama_site')->toArray(),
                 ]);
 
                 // Validasi 1: Setiap site di quotation harus ada di headCountData
@@ -519,17 +523,17 @@ class QuotationStepRequest extends BaseRequest
 
                 \Log::info('Site comparison', [
                     'siteIdsInQuotation' => $siteIdsInQuotation,
-                    'siteIdsInRequest' => $siteIdsInRequest
+                    'siteIdsInRequest' => $siteIdsInRequest,
                 ]);
 
                 $missingSites = array_diff($siteIdsInQuotation, $siteIdsInRequest);
 
                 \Log::info('Missing sites calculation', [
                     'missingSites' => $missingSites,
-                    'count' => count($missingSites)
+                    'count' => count($missingSites),
                 ]);
 
-                if (!empty($missingSites)) {
+                if (! empty($missingSites)) {
                     $missingSiteNames = $quotation->quotationSites
                         ->whereIn('id', $missingSites)
                         ->pluck('nama_site')
@@ -539,7 +543,7 @@ class QuotationStepRequest extends BaseRequest
 
                     $validator->errors()->add(
                         'headCountData.missing_sites',
-                        'Setiap site harus memiliki minimal satu headcount. Site berikut belum memiliki headcount: ' .
+                        'Setiap site harus memiliki minimal satu headcount. Site berikut belum memiliki headcount: '.
                         implode(', ', $missingSiteNames)
                     );
                 } else {
@@ -548,10 +552,10 @@ class QuotationStepRequest extends BaseRequest
 
                 // Validasi 2: Setiap site_id di request harus ada di quotation
                 $invalidSites = array_diff($siteIdsInRequest, $siteIdsInQuotation);
-                if (!empty($invalidSites)) {
+                if (! empty($invalidSites)) {
                     $validator->errors()->add(
                         'headCountData.invalid_sites',
-                        'Site dengan ID berikut tidak valid untuk quotation ini: ' .
+                        'Site dengan ID berikut tidak valid untuk quotation ini: '.
                         implode(', ', $invalidSites)
                     );
                 }
@@ -564,21 +568,21 @@ class QuotationStepRequest extends BaseRequest
 
                     \Log::info('Position validation', [
                         'kebutuhan_id' => $quotation->kebutuhan_id,
-                        'validPositionIds' => $validPositionIds
+                        'validPositionIds' => $validPositionIds,
                     ]);
 
                     $invalidPositions = [];
 
                     foreach ($this->headCountData as $index => $data) {
-                        if (!in_array($data['position_id'], $validPositionIds)) {
+                        if (! in_array($data['position_id'], $validPositionIds)) {
                             $invalidPositions[] = $data['position_id'];
                         }
                     }
 
-                    if (!empty($invalidPositions)) {
+                    if (! empty($invalidPositions)) {
                         $validator->errors()->add(
                             'headCountData.invalid_positions',
-                            'Position ID: ' . implode(', ', array_unique($invalidPositions)) .
+                            'Position ID: '.implode(', ', array_unique($invalidPositions)).
                             ' tidak valid untuk layanan ini.'
                         );
                     }
@@ -678,12 +682,12 @@ class QuotationStepRequest extends BaseRequest
         $quotation = \App\Models\Quotation::find($id);
         $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod(
             $quotation->version ?? 1,
-            (int)$step
+            (int) $step
         );
 
         if ($logicalStepName === 'updateCosting' && $this->has('manajemen_fee')) {
             $this->merge([
-                'management_fee_id' => $this->manajemen_fee
+                'management_fee_id' => $this->manajemen_fee,
             ]);
         }
 
@@ -691,7 +695,7 @@ class QuotationStepRequest extends BaseRequest
         if ($logicalStepName === 'updateBpjs') {
             $this->merge([
                 'jenis_perusahaan_id' => $this->input('jenis-perusahaan'),
-                'bidang_perusahaan_id' => $this->input('bidang-perusahaan')
+                'bidang_perusahaan_id' => $this->input('bidang-perusahaan'),
             ]);
         }
 

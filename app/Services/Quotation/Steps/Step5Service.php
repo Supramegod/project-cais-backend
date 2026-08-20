@@ -7,7 +7,6 @@ use App\Models\JenisPerusahaan;
 use App\Models\Quotation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 
 class Step5Service
 {
@@ -15,8 +14,21 @@ class Step5Service
         protected StepHelperService $helper,
     ) {}
 
+    /**
+     * Pada General Cleaning dan PKHL, BPJS Kesehatan tidak selalu dibebankan
+     * karena pekerjaannya sekali jalan dan berdurasi pendek, jadi defaultnya
+     * mati. Sales tetap bisa menyalakannya lewat input kes pada step ini.
+     */
+    private const KONTRAK_BPJS_KES_DEFAULT_MATI = ['GENERAL CLEANING', 'PKHL'];
+
     public function execute(Quotation $quotation, Request $request): void
     {
+        $defaultBpjsKes = ! in_array(
+            strtoupper($quotation->jenis_kontrak ?? ''),
+            self::KONTRAK_BPJS_KES_DEFAULT_MATI,
+            true
+        );
+
         foreach ($quotation->quotationDetails as $detail) {
             $detailId = $detail->id;
             $penjamin = $request->penjamin[$detailId] ?? null;
@@ -40,8 +52,8 @@ class Step5Service
                 'is_bpjs_jkk' => $isBpu ? 0 : ($this->helper->toBoolean($request->jkk[$detailId] ?? false) ? 1 : 0),
                 'is_bpjs_jkm' => $isBpu ? 0 : ($this->helper->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0),
                 'is_bpjs_jht' => $isBpu ? 0 : ($this->helper->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0),
-                'is_bpjs_jp'  => $isBpu ? 0 : ($this->helper->toBoolean($request->jp[$detailId]  ?? false) ? 1 : 0),
-                'is_bpjs_kes' => $this->helper->toBoolean($request->kes[$detailId] ?? true) ? 1 : 0,
+                'is_bpjs_jp' => $isBpu ? 0 : ($this->helper->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0),
+                'is_bpjs_kes' => $this->helper->toBoolean($request->kes[$detailId] ?? $defaultBpjsKes) ? 1 : 0,
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name,
             ]);

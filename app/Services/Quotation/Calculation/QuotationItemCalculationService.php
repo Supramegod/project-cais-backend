@@ -16,6 +16,10 @@ class QuotationItemCalculationService
 
     private const GC_CHEMICAL_MASA_PAKAI_DEFAULT = 1;
 
+    private const GC_KAPORLAP_PROVISI = 12;
+
+    private const GC_PROVISI_SEKALI_PAKAI = 1;
+
     private array $_site_hc_cache = [];
 
     private QuotationComponentCalculationService $componentService;
@@ -184,6 +188,11 @@ class QuotationItemCalculationService
         }
     }
 
+    /**
+     * Pada General Cleaning provisi tidak mengikuti durasi kerjasama: kaporlap
+     * selalu dibagi 12 karena memakai stok seragam bekas layak pakai, sedangkan
+     * devices dan OHC dibebankan penuh (provisi 1) karena sifatnya sekali kerja.
+     */
     private function computeItemValue(Collection $items, ?string $special, int $divider, int $provisi, int $jumlahHc, bool $isGC = false): float
     {
         if ($items->isEmpty()) {
@@ -198,9 +207,11 @@ class QuotationItemCalculationService
                     : (int) $item->masa_pakai;
                 $total += ($item->jumlah * $item->harga) / max($masaPakai, 1) / max($divider, 1);
             } elseif ($special === 'kaporlap') {
-                $total += ($item->harga * $item->jumlah) / $provisi;
+                $provisiKaporlap = $isGC ? self::GC_KAPORLAP_PROVISI : $provisi;
+                $total += ($item->harga * $item->jumlah) / max($provisiKaporlap, 1);
             } else {
-                $total += ($item->harga * $item->jumlah) / $provisi / max($divider, 1);
+                $provisiItem = $isGC ? self::GC_PROVISI_SEKALI_PAKAI : $provisi;
+                $total += ($item->harga * $item->jumlah) / max($provisiItem, 1) / max($divider, 1);
             }
         }
 
