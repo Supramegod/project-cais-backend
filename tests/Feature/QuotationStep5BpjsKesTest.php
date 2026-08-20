@@ -40,7 +40,31 @@ class QuotationStep5BpjsKesTest extends TestCase
 
         $this->runStep5();
 
+        // Detail baru bernilai 0 dari default kolom, lalu dipertahankan —
+        // persis jalur yang ditempuh produksi, bukan jalur fallback NULL.
         $this->assertSame(['0', '0'], $this->storedBpjsKes());
+    }
+
+    public function test_gc_falls_back_to_contract_default_when_value_is_null(): void
+    {
+        $this->seedQuotation('General Cleaning', ['is_aktif' => 1]);
+        DB::table('sl_quotation_detail')->update(['is_bpjs_kes' => null]);
+
+        $this->runStep5();
+
+        // Baris warisan yang benar-benar NULL: satu-satunya kondisi yang memakai
+        // fallback default per jenis kontrak di Step5Service.
+        $this->assertSame(['0', '0'], $this->storedBpjsKes());
+    }
+
+    public function test_reguler_falls_back_to_on_when_value_is_null(): void
+    {
+        $this->seedQuotation('Reguler', ['is_aktif' => 1]);
+        DB::table('sl_quotation_detail')->update(['is_bpjs_kes' => null]);
+
+        $this->runStep5();
+
+        $this->assertSame(['1', '1'], $this->storedBpjsKes());
     }
 
     public function test_pkhl_defaults_bpjs_kes_to_off_when_field_is_absent(): void

@@ -76,7 +76,7 @@ class QuotationGeneralCleaningProvisiTest extends TestCase
 
     public function test_non_gc_chemical_still_uses_masa_pakai_column(): void
     {
-        $this->seedQuotation('TERPADU');
+        $this->seedQuotation('Reguler');
         $this->seedChemical(13, 2, 3_600_000, 12);
         $this->seedChemical(14, 1, 300_000, 12);
 
@@ -88,7 +88,7 @@ class QuotationGeneralCleaningProvisiTest extends TestCase
 
     public function test_non_gc_chemical_with_null_masa_pakai_does_not_blow_up(): void
     {
-        $this->seedQuotation('TERPADU');
+        $this->seedQuotation('Reguler');
         $this->seedChemical(14, 1, 300_000, null);
 
         $hpp = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
@@ -108,7 +108,7 @@ class QuotationGeneralCleaningProvisiTest extends TestCase
 
         $gc = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
-        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['jenis_kontrak' => 'TERPADU']);
+        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['jenis_kontrak' => 'Reguler']);
         $nonGc = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
         // GC: 2 * 60.000 / 12 = 10.000
@@ -126,7 +126,7 @@ class QuotationGeneralCleaningProvisiTest extends TestCase
 
         $gc = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
-        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['jenis_kontrak' => 'TERPADU']);
+        DB::table('sl_quotation')->where('id', self::QUOTATION_ID)->update(['jenis_kontrak' => 'Reguler']);
         $nonGc = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
         // GC: 2 * 600.000 / 1 / 3 HC = 400.000 dan 1 * 360.000 / 1 / 3 HC = 120.000

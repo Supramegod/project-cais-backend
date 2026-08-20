@@ -49,19 +49,18 @@ trait QuotationCalculationHarness
 
         $this->rebuildSchema();
         $this->actingAs($this->seedUser());
-    }
 
-    protected function tearDown(): void
-    {
-        if ($this->tempDbPath !== null) {
+        $this->beforeApplicationDestroyed(function (): void {
+            if ($this->tempDbPath === null) {
+                return;
+            }
+
             DB::purge('sqlite');
             DB::purge('mysqlhris');
             DB::purge('mysql');
             @unlink($this->tempDbPath);
             $this->tempDbPath = null;
-        }
-
-        parent::tearDown();
+        });
     }
 
     protected function calculate(): \App\DTO\QuotationCalculationResult
@@ -132,9 +131,17 @@ trait QuotationCalculationHarness
             'created_at' => now(), 'updated_at' => now(),
         ], $siteOverrides));
 
+        /*
+         * Flag BPJS Ketenagakerjaan sengaja diisi 1 karena kalkulasi selalu
+         * berjalan SETELAH step 5 menetapkannya. is_bpjs_kes sengaja TIDAK
+         * diisi supaya jatuh ke default kolom 0 — itulah kondisi nyata sebuah
+         * detail yang baru dibuat dan belum disentuh sales.
+         */
+        $bpjsTkAktif = ['is_bpjs_jkk' => 1, 'is_bpjs_jkm' => 1, 'is_bpjs_jht' => 1, 'is_bpjs_jp' => 1];
+
         DB::table('sl_quotation_detail')->insert([
-            array_merge(['id' => self::DETAIL_1, 'quotation_id' => self::QUOTATION_ID, 'quotation_site_id' => self::SITE_A, 'nama_site' => 'Site A', 'position_id' => 10, 'jabatan_kebutuhan' => 'Cleaner', 'jumlah_hc' => 2, 'nominal_upah' => 200000, 'penjamin_kesehatan' => 'BPJS', 'created_at' => now(), 'updated_at' => now()], $detailOverrides),
-            array_merge(['id' => self::DETAIL_2, 'quotation_id' => self::QUOTATION_ID, 'quotation_site_id' => self::SITE_A, 'nama_site' => 'Site A', 'position_id' => 11, 'jabatan_kebutuhan' => 'Supervisor', 'jumlah_hc' => 1, 'nominal_upah' => 220000, 'penjamin_kesehatan' => 'BPJS', 'created_at' => now(), 'updated_at' => now()], $detailOverrides),
+            array_merge(['id' => self::DETAIL_1, 'quotation_id' => self::QUOTATION_ID, 'quotation_site_id' => self::SITE_A, 'nama_site' => 'Site A', 'position_id' => 10, 'jabatan_kebutuhan' => 'Cleaner', 'jumlah_hc' => 2, 'nominal_upah' => 200000, 'penjamin_kesehatan' => 'BPJS', 'created_at' => now(), 'updated_at' => now()], $bpjsTkAktif, $detailOverrides),
+            array_merge(['id' => self::DETAIL_2, 'quotation_id' => self::QUOTATION_ID, 'quotation_site_id' => self::SITE_A, 'nama_site' => 'Site A', 'position_id' => 11, 'jabatan_kebutuhan' => 'Supervisor', 'jumlah_hc' => 1, 'nominal_upah' => 220000, 'penjamin_kesehatan' => 'BPJS', 'created_at' => now(), 'updated_at' => now()], $bpjsTkAktif, $detailOverrides),
         ]);
 
         foreach ([self::DETAIL_1, self::DETAIL_2] as $detailId) {
@@ -326,11 +333,17 @@ trait QuotationCalculationHarness
             $table->integer('jumlah_hc')->nullable();
             $table->decimal('nominal_upah', 20, 2)->nullable();
             $table->string('penjamin_kesehatan')->nullable();
-            $table->string('is_bpjs_jkk')->nullable();
-            $table->string('is_bpjs_jkm')->nullable();
-            $table->string('is_bpjs_jht')->nullable();
-            $table->string('is_bpjs_jp')->nullable();
-            $table->string('is_bpjs_kes')->nullable();
+            /*
+             * Produksi: tinyint(1) NULL DEFAULT '0'. Default 0 ini penting —
+             * detail yang baru dibuat sudah bernilai 0, bukan NULL, sehingga
+             * jalur "pertahankan nilai tersimpan" di Step5Service yang aktif,
+             * bukan jalur fallback NULL.
+             */
+            $table->tinyInteger('is_bpjs_jkk')->nullable()->default(0);
+            $table->tinyInteger('is_bpjs_jkm')->nullable()->default(0);
+            $table->tinyInteger('is_bpjs_jht')->nullable()->default(0);
+            $table->tinyInteger('is_bpjs_jp')->nullable()->default(0);
+            $table->tinyInteger('is_bpjs_kes')->nullable()->default(0);
             $table->decimal('persen_bpjs_jkk', 15, 4)->nullable();
             $table->decimal('persen_bpjs_jkm', 15, 4)->nullable();
             $table->decimal('persen_bpjs_jht', 15, 4)->nullable();

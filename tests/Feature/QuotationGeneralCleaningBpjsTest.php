@@ -50,7 +50,7 @@ class QuotationGeneralCleaningBpjsTest extends TestCase
 
     public function test_non_gc_bpjs_tk_still_uses_ump_as_floor(): void
     {
-        $this->seedQuotation('TERPADU', [], [], self::UPAH_DI_BAWAH_UMK);
+        $this->seedQuotation('Borongan', [], [], self::UPAH_DI_BAWAH_UMK);
 
         $hpp = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 

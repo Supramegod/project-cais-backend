@@ -54,8 +54,27 @@ class JenisKontrakTest extends TestCase
         $this->assertSame($expected, JenisKontrak::isBpjsKesOpsional($jenisKontrak));
     }
 
-    #[DataProvider('bpjsKesOpsionalProvider')]
-    public function test_is_upah_harian_covers_the_same_contracts_today(?string $jenisKontrak, bool $expected): void
+    /**
+     * Provider sendiri, tidak menumpang bpjsKesOpsionalProvider. Kedua aturan
+     * kebetulan mencakup kontrak yang sama hari ini tapi dasarnya berbeda, jadi
+     * ketika salah satunya berubah kegagalannya harus muncul di test yang tepat.
+     */
+    public static function upahHarianProvider(): array
+    {
+        return [
+            'general cleaning' => ['General Cleaning', true],
+            'pkhl' => ['PKHL', true],
+            'pkhl huruf kecil' => ['pkhl', true],
+            'reguler' => ['Reguler', false],
+            'borongan' => ['Borongan', false],
+            'event gaji harian' => ['Event Gaji Harian', false],
+            'nilai warisan' => ['TERPADU', false],
+            'null' => [null, false],
+        ];
+    }
+
+    #[DataProvider('upahHarianProvider')]
+    public function test_is_upah_harian(?string $jenisKontrak, bool $expected): void
     {
         $this->assertSame($expected, JenisKontrak::isUpahHarian($jenisKontrak));
     }

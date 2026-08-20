@@ -16,16 +16,26 @@ class Step5Service
     ) {}
 
     /**
-     * Pada General Cleaning dan PKHL, BPJS Kesehatan tidak selalu dibebankan
-     * karena pekerjaannya sekali jalan dan berdurasi pendek, jadi defaultnya
-     * mati. Sales tetap bisa menyalakannya lewat input kes pada step ini.
+     * Aturan is_bpjs_kes, berurutan:
      *
-     * Ketika field kes absen, hanya kontrak GC/PKHL yang mempertahankan nilai
-     * lamanya — default mati berlaku untuk detail baru saja, supaya quotation
-     * GC/PKHL lama tidak berubah harga diam-diam saat disimpan ulang dari
-     * frontend yang belum mengirim field kes. Kontrak lain sengaja tetap
-     * dipaksa aktif seperti sebelumnya, karena BPJS Kesehatan wajib di sana dan
-     * nilai 0 warisan harus tetap dinormalkan.
+     * 1. Kalau frontend mengirim kes[detailId], itu yang menang.
+     * 2. Kalau absen dan kontraknya GC/PKHL, nilai tersimpan dipertahankan.
+     * 3. Kalau absen dan kontraknya selain itu, dipaksa aktif.
+     *
+     * Butir 2 yang membuat BPJS Kesehatan default mati pada GC/PKHL, tapi
+     * mekanismenya ada di DATABASE, bukan di sini: sl_quotation_detail
+     * .is_bpjs_kes bertipe tinyint(1) NULL DEFAULT 0, jadi detail yang baru
+     * dibuat sudah bernilai 0 dan tinggal dipertahankan. Konsekuensinya nilai 0
+     * "bawaan" tidak bisa dibedakan dari opt-out yang disengaja — dan memang
+     * tidak perlu, karena keduanya berarti sama: jangan dibebankan.
+     *
+     * Butir 2 juga yang melindungi quotation GC/PKHL lama dari perubahan harga
+     * diam-diam ketika frontend belum mengirim field kes. Butir 3 sengaja
+     * dipertahankan seperti perilaku lama karena di luar GC/PKHL BPJS Kesehatan
+     * wajib, sehingga nilai 0 warisan harus tetap dinormalkan.
+     *
+     * ?? false di bawah hanya penjaga untuk baris warisan yang benar-benar
+     * NULL (sudah sangat langka sejak kolomnya punya default).
      */
     public function execute(Quotation $quotation, Request $request): void
     {
