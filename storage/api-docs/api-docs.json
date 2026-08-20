@@ -21543,6 +21543,22 @@
                             ],
                             "example": "nama_perusahaan"
                         }
+                    },
+                    {
+                        "name": "status_berlaku",
+                        "in": "query",
+                        "description": "Filter status berlaku kontrak (berdasarkan kolom kontrak_selesai)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "kontrak_habis",
+                                "berakhir_2_bulan",
+                                "berakhir_3_bulan",
+                                "lebih_3_bulan"
+                            ],
+                            "example": "berakhir_2_bulan"
+                        }
                     }
                 ],
                 "responses": {
@@ -21596,6 +21612,26 @@
                                                     "tgl_quotation_formatted": {
                                                         "type": "string",
                                                         "example": "1 Januari 2024"
+                                                    },
+                                                    "mulai_kontrak": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2024-02-01"
+                                                    },
+                                                    "kontrak_selesai": {
+                                                        "type": "string",
+                                                        "format": "date",
+                                                        "example": "2025-01-31"
+                                                    },
+                                                    "status_berlaku": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "Kontrak Habis",
+                                                            "Berakhir dalam 2 bulan",
+                                                            "Berakhir dalam 3 bulan",
+                                                            "Lebih dari 3 Bulan"
+                                                        ],
+                                                        "example": "Berakhir dalam 2 bulan"
                                                     },
                                                     "sl_quotation_site": {
                                                         "type": "array",
@@ -22761,49 +22797,65 @@
                                 "step_1_data_site": {
                                     "summary": "Step 1: Data Site (version-2)",
                                     "value": {
-                                        "nama_perusahaan": "PT Angin Ribut",
-                                        "kota": "Jakarta",
-                                        "cabang": "Sudirman",
-                                        "jenis_perusahaan": "Manufaktur",
+                                        "nama_perusahaan": "PT Angin Ribut (Required)",
+                                        "kota": "Jakarta (Required)",
+                                        "cabang": "Sudirman (Required)",
+                                        "jenis_perusahaan": "Manufaktur (Required)",
                                         "jenis_perusahaan_id": 1,
-                                        "status_gedung": "Milik Sendiri",
-                                        "alamat_lengkap": "Jl. Sudirman No 1",
-                                        "hari_operasional": "Senin-Jumat",
-                                        "pengaturan_shift_kerja": "2 Shift",
+                                        "status_gedung": "Milik Sendiri (Required)",
+                                        "alamat_lengkap": "Jl. Sudirman No 1 (Required)",
+                                        "link_maps": "https://maps.app.goo.gl/example (Optional)",
+                                        "jumlah_lantai": 3,
+                                        "luas_estimasi_area": "1000 m2 (Optional)",
+                                        "area_khusus": "Basement (Optional)",
+                                        "hari_operasional": "Senin-Jumat (Required)",
+                                        "pengaturan_shift_kerja": "2 Shift (Optional)",
+                                        "jumlah_hc": 10,
+                                        "catatan": "Catatan tambahan (Optional)",
                                         "edit": false
                                     }
                                 },
                                 "step_1": {
                                     "summary": "Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)",
                                     "value": {
-                                        "jenis_kontrak": "Reguler",
+                                        "jenis_kontrak": "Reguler (Required)",
                                         "edit": false
                                     }
                                 },
                                 "step_2": {
-                                    "summary": "Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)",
+                                    "summary": "Step 2 (version-1) / Step 3 (version-2): Detail Kontrak",
                                     "value": {
-                                        "mulai_kontrak": "2024-01-01",
-                                        "kontrak_selesai": "2024-12-31",
-                                        "tgl_penempatan": "2024-01-01",
-                                        "top": "Lebih Dari 7 Hari",
+                                        "mulai_kontrak": "2024-01-01 (Required v1)",
+                                        "kontrak_selesai": "2024-12-31 (Required v1)",
+                                        "tgl_penempatan": "2024-01-01 (Required v1)",
+                                        "top": "Lebih Dari 7 Hari (Required v1)",
                                         "salary_rule": 1,
                                         "jumlah_hari_invoice": 14,
-                                        "tipe_hari_invoice": "Kerja",
-                                        "evaluasi_kontrak": "Tahunan",
-                                        "durasi_kerjasama": "12 Bulan",
-                                        "durasi_karyawan": "12 Bulan",
-                                        "evaluasi_karyawan": "Tahunan",
-                                        "ada_cuti": "Ada",
+                                        "tipe_hari_invoice": "Kerja (Required v1)",
+                                        "evaluasi_kontrak": "Tahunan (Required v1)",
+                                        "durasi_kerjasama": "12 Bulan (Required v1)",
+                                        "durasi_karyawan": "12 Bulan (Required v1)",
+                                        "evaluasi_karyawan": "Tahunan (Required v1)",
+                                        "ada_cuti": "Ada (Required v1)",
                                         "cuti": [
-                                            "Cuti Tahunan",
-                                            "Cuti Menikah"
+                                            "Cuti Tahunan (Required v1)"
                                         ],
-                                        "gaji_saat_cuti": "Prorate",
+                                        "gaji_saat_cuti": "Prorate (Optional v1)",
                                         "prorate": 20,
-                                        "shift_kerja": "Non Shift",
-                                        "hari_kerja": "Senin - Jumat",
-                                        "jam_kerja": "08:00 - 17:00",
+                                        "hari_kerja": "Senin - Jumat (Required v1/v2)",
+                                        "shift_kerja": "Non Shift (Required v2)",
+                                        "jam_kerja": "08:00 - 17:00 (Required v1/v2)",
+                                        "hari_off": "Sabtu - Minggu (Required v2)",
+                                        "jam_lembur": "2 Jam (Required v2)",
+                                        "cuti_izin": [
+                                            "Cuti Tahunan (Required v2)",
+                                            "Izin Sakit"
+                                        ],
+                                        "status_rekrutmen": "Internal (Required v2)",
+                                        "pendaftaran_pkwt": "Ya (Required v2)",
+                                        "jaminan": "BPJS (Required v2)",
+                                        "penanggung_jawab_aset": "Manager (Required v2)",
+                                        "detail_penanggung_jawab_aset": "Detail aset... (Required v2)",
                                         "edit": false
                                     }
                                 },
@@ -22815,8 +22867,8 @@
                                                 "quotation_site_id": 1,
                                                 "position_id": 5,
                                                 "jumlah_hc": 10,
-                                                "jabatan_kebutuhan": "Security Guard",
-                                                "nama_site": "Head Office"
+                                                "jabatan_kebutuhan": "Security Guard (Required)",
+                                                "nama_site": "Head Office (Required)"
                                             }
                                         ],
                                         "edit": false
@@ -22826,25 +22878,25 @@
                                     "summary": "Step 4: Costing",
                                     "value": {
                                         "is_ppn": 1,
-                                        "ppn_pph_dipotong": "Total Invoice",
+                                        "ppn_pph_dipotong": "Total Invoice (Required)",
                                         "management_fee_id": 1,
                                         "persentase": 10,
                                         "position_data": [
                                             {
                                                 "quotation_detail_id": 1,
-                                                "upah": "Custom",
-                                                "hitungan_upah": "Per Bulan",
+                                                "upah": "Custom (Required)",
+                                                "hitungan_upah": "Per Bulan (Required if Custom)",
                                                 "nominal_upah": 5000000,
-                                                "lembur": "Flat",
+                                                "lembur": "Flat (Optional)",
                                                 "nominal_lembur": 100000,
-                                                "jenis_bayar_lembur": "Per Jam",
+                                                "jenis_bayar_lembur": "Per Jam (Required if Flat)",
                                                 "jam_per_bulan_lembur": 10,
-                                                "lembur_ditagihkan": "Ditagihkan",
-                                                "kompensasi": "Diprovisikan",
-                                                "thr": "Diprovisikan",
-                                                "tunjangan_holiday": "Flat",
+                                                "lembur_ditagihkan": "Ditagihkan (Required if Flat/Normatif)",
+                                                "kompensasi": "Diprovisikan (Optional)",
+                                                "thr": "Diprovisikan (Optional)",
+                                                "tunjangan_holiday": "Flat (Optional)",
                                                 "nominal_tunjangan_holiday": 150000,
-                                                "jenis_bayar_tunjangan_holiday": "Per Hari"
+                                                "jenis_bayar_tunjangan_holiday": "Per Hari (Required if Flat)"
                                             }
                                         ],
                                         "edit": false
@@ -22853,31 +22905,31 @@
                                 "step_5": {
                                     "summary": "Step 5: BPJS",
                                     "value": {
-                                        "jenis_perusahaan_id": 21,
-                                        "bidang_perusahaan_id": 12,
-                                        "resiko": "Sangat Rendah",
-                                        "program_bpjs": "BPJS Kesehatan",
-                                        "penjamin": [
-                                            "BPJS Kesehatan"
-                                        ],
-                                        "jkk": [
-                                            true
-                                        ],
-                                        "jkm": [
-                                            true
-                                        ],
-                                        "jht": [
-                                            false
-                                        ],
-                                        "jp": [
-                                            false
-                                        ],
-                                        "kes": [
-                                            true
-                                        ],
-                                        "nominal_takaful": [
-                                            0
-                                        ],
+                                        "jenis-perusahaan": 21,
+                                        "bidang-perusahaan": 12,
+                                        "resiko": "Sangat Rendah (Required)",
+                                        "program-bpjs": "BPJS Kesehatan (Required)",
+                                        "penjamin": {
+                                            "1": "BPJS Kesehatan (Optional)"
+                                        },
+                                        "jkk": {
+                                            "1": true
+                                        },
+                                        "jkm": {
+                                            "1": true
+                                        },
+                                        "jht": {
+                                            "1": false
+                                        },
+                                        "jp": {
+                                            "1": false
+                                        },
+                                        "kes": {
+                                            "1": true
+                                        },
+                                        "nominal_takaful": {
+                                            "1": 0
+                                        },
                                         "edit": false
                                     }
                                 },
@@ -22888,6 +22940,33 @@
                                             1,
                                             2,
                                             3
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_7": {
+                                    "summary": "Step 7: Kaporlap / APD",
+                                    "value": {
+                                        "kaporlaps": [
+                                            {
+                                                "barang_id": 1,
+                                                "quotation_detail_id": 1,
+                                                "jumlah": 5,
+                                                "harga": 150000
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_8": {
+                                    "summary": "Step 8: Devices",
+                                    "value": {
+                                        "devices": [
+                                            {
+                                                "barang_id": 10,
+                                                "jumlah": 2,
+                                                "harga": 5000000
+                                            }
                                         ],
                                         "edit": false
                                     }
@@ -22914,25 +22993,60 @@
                                     "summary": "Step 10: Operasional",
                                     "value": {
                                         "jumlah_kunjungan_operasional": 2,
-                                        "bulan_tahun_kunjungan_operasional": "Bulan",
+                                        "bulan_tahun_kunjungan_operasional": "Bulan (Required)",
                                         "jumlah_kunjungan_tim_crm": 1,
-                                        "bulan_tahun_kunjungan_tim_crm": "Tahun",
-                                        "keterangan_kunjungan_operasional": "Kunjungan rutin",
-                                        "keterangan_kunjungan_tim_crm": "Evaluasi tahunan",
-                                        "ada_training": "Ada",
-                                        "training": "Basic Security Training",
+                                        "bulan_tahun_kunjungan_tim_crm": "Tahun (Required)",
+                                        "keterangan_kunjungan_operasional": "Kunjungan rutin (Optional)",
+                                        "keterangan_kunjungan_tim_crm": "Evaluasi tahunan (Optional)",
+                                        "ada_training": "Ada (Optional)",
+                                        "training": "Basic Security Training (Optional)",
                                         "persen_bunga_bank": 5.5,
+                                        "ohcs": [
+                                            {
+                                                "quotation_site_id": 1,
+                                                "barang_id": 5,
+                                                "jumlah": 2
+                                            },
+                                            {
+                                                "quotation_site_id": 1,
+                                                "is_custom": true,
+                                                "nama": "Barang Custom OHC",
+                                                "jumlah": 1,
+                                                "harga": 50000
+                                            }
+                                        ],
+                                        "edit": false
+                                    }
+                                },
+                                "step_10_driver": {
+                                    "summary": "Step 10: Driver",
+                                    "value": {
+                                        "drivers": [
+                                            {
+                                                "status_kendaraan": "Milik Sendiri (Optional)",
+                                                "jenis_kendaraan": "Mobil (Optional)",
+                                                "nama_kendaraan": "Avanza (Optional)",
+                                                "kepemilikan_sim": "A (Optional)",
+                                                "asuransi_mobil": "Ada (Optional)",
+                                                "gps_map": "Ada (Optional)",
+                                                "tipe_layanan_angkut": "Barang (Optional)",
+                                                "area_dihandle": "Jabodetabek (Optional)",
+                                                "kapasitas_bobot_maksimal": "1000kg (Optional)",
+                                                "asuransi_barang": "Ada (Optional)",
+                                                "biaya_khusus_kecelakaan": 1500000
+                                            }
+                                        ],
                                         "edit": false
                                     }
                                 },
                                 "step_11": {
                                     "summary": "Step 11: Pricing",
                                     "value": {
-                                        "penagihan": "Sesuai BAST",
+                                        "penagihan": "Sesuai BAST (Required)",
                                         "tunjangan_data": [
                                             [
                                                 {
-                                                    "nama_tunjangan": "Tunjangan Makan",
+                                                    "nama_tunjangan": "Tunjangan Makan (Optional)",
                                                     "nominal": 50000
                                                 }
                                             ]
@@ -23796,6 +23910,27 @@
                             "type": "integer",
                             "example": 1
                         }
+                    },
+                    {
+                        "name": "jenis_activity",
+                        "in": "query",
+                        "description": "Filter berdasarkan jenis aktivitas. Kosongkan untuk menampilkan semua jenis.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Leads",
+                                "Appointment",
+                                "Visit",
+                                "Quotation",
+                                "SPK",
+                                "PKS",
+                                "Follow Up",
+                                "Kirim Berkas",
+                                "Email"
+                            ],
+                            "example": "Visit"
+                        }
                     }
                 ],
                 "responses": {
@@ -23988,6 +24123,21 @@
                         "schema": {
                             "type": "integer",
                             "example": 1
+                        }
+                    },
+                    {
+                        "name": "jenis_activity",
+                        "in": "query",
+                        "description": "Filter berdasarkan jenis aktivitas telesales. Kosongkan untuk menampilkan semua jenis.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "Leads",
+                                "Assignment",
+                                "Appointment"
+                            ],
+                            "example": "Appointment"
                         }
                     }
                 ],

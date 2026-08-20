@@ -118,8 +118,9 @@ class QuotationStepController extends Controller
         try {
             set_time_limit(0);
 
-            $relations = $this->resolveStepRelations($step);
-            $quotation = Quotation::with($relations)->notDeleted()->findOrFail($id);
+            $quotation = Quotation::notDeleted()->findOrFail($id);
+            $relations = $this->resolveStepRelations($quotation, $step);
+            $quotation->load($relations);
 
             if ($quotation->step == 100 && $quotation->status_quotation_id != 1 && Auth::user()->cais_role_id != 2) {
                 return $this->errorResponse('Quotation has been finalized and cannot be accessed.', 403);
@@ -165,17 +166,19 @@ class QuotationStepController extends Controller
      *         description="Payload varies depending on the step number. Select from the examples dropdown.",
      *
      *         @OA\JsonContent(
-     *
-     *             @OA\Examples(example="step_1_data_site", summary="Step 1: Data Site (version-2)", value={"nama_perusahaan": "PT Angin Ribut", "kota": "Jakarta", "cabang": "Sudirman", "jenis_perusahaan": "Manufaktur", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri", "alamat_lengkap": "Jl. Sudirman No 1", "hari_operasional": "Senin-Jumat", "pengaturan_shift_kerja": "2 Shift", "edit": false}),
-     *             @OA\Examples(example="step_1", summary="Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)", value={"jenis_kontrak": "Reguler", "edit": false}),
-     *             @OA\Examples(example="step_2", summary="Step 2 (version-1)/ Step 3: Detail Kontrak (version-2)", value={"mulai_kontrak": "2024-01-01", "kontrak_selesai": "2024-12-31", "tgl_penempatan": "2024-01-01", "top": "Lebih Dari 7 Hari", "salary_rule": 1, "jumlah_hari_invoice": 14, "tipe_hari_invoice": "Kerja", "evaluasi_kontrak": "Tahunan", "durasi_kerjasama": "12 Bulan", "durasi_karyawan": "12 Bulan", "evaluasi_karyawan": "Tahunan", "ada_cuti": "Ada", "cuti": {"Cuti Tahunan", "Cuti Menikah"}, "gaji_saat_cuti": "Prorate", "prorate": 20, "shift_kerja": "Non Shift", "hari_kerja": "Senin - Jumat", "jam_kerja": "08:00 - 17:00", "edit": false}),
-     *             @OA\Examples(example="step_3", summary="Step 3: Headcount", value={"headCountData": {{"quotation_site_id": 1, "position_id": 5, "jumlah_hc": 10, "jabatan_kebutuhan": "Security Guard", "nama_site": "Head Office"}}, "edit": false}),
-     *             @OA\Examples(example="step_4", summary="Step 4: Costing", value={"is_ppn": 1, "ppn_pph_dipotong": "Total Invoice", "management_fee_id": 1, "persentase": 10, "position_data": {{"quotation_detail_id": 1, "upah": "Custom", "hitungan_upah": "Per Bulan", "nominal_upah": 5000000, "lembur": "Flat", "nominal_lembur": 100000, "jenis_bayar_lembur": "Per Jam", "jam_per_bulan_lembur": 10, "lembur_ditagihkan": "Ditagihkan", "kompensasi": "Diprovisikan", "thr": "Diprovisikan", "tunjangan_holiday": "Flat", "nominal_tunjangan_holiday": 150000, "jenis_bayar_tunjangan_holiday": "Per Hari"}}, "edit": false}),
-     *             @OA\Examples(example="step_5", summary="Step 5: BPJS", value={"jenis_perusahaan_id": 21, "bidang_perusahaan_id": 12, "resiko": "Sangat Rendah", "program_bpjs": "BPJS Kesehatan", "penjamin": {"BPJS Kesehatan"}, "jkk": {true}, "jkm": {true}, "jht": {false}, "jp": {false}, "kes": {true}, "nominal_takaful": {0}, "edit": false}),
+     *             @OA\Examples(example="step_1_data_site", summary="Step 1: Data Site (version-2)", value={"nama_perusahaan": "PT Angin Ribut (Required)", "kota": "Jakarta (Required)", "cabang": "Sudirman (Required)", "jenis_perusahaan": "Manufaktur (Required)", "jenis_perusahaan_id": 1, "status_gedung": "Milik Sendiri (Required)", "alamat_lengkap": "Jl. Sudirman No 1 (Required)", "link_maps": "https://maps.app.goo.gl/example (Optional)", "jumlah_lantai": 3, "luas_estimasi_area": "1000 m2 (Optional)", "area_khusus": "Basement (Optional)", "hari_operasional": "Senin-Jumat (Required)", "pengaturan_shift_kerja": "2 Shift (Optional)", "jumlah_hc": 10, "catatan": "Catatan tambahan (Optional)", "edit": false}),
+     *             @OA\Examples(example="step_1", summary="Step 1 (version-1)/ Step 2: Jenis Kontrak (version-2)", value={"jenis_kontrak": "Reguler (Required)", "edit": false}),
+     *             @OA\Examples(example="step_2", summary="Step 2 (version-1) / Step 3 (version-2): Detail Kontrak", value={"mulai_kontrak": "2024-01-01 (Required v1)", "kontrak_selesai": "2024-12-31 (Required v1)", "tgl_penempatan": "2024-01-01 (Required v1)", "top": "Lebih Dari 7 Hari (Required v1)", "salary_rule": 1, "jumlah_hari_invoice": 14, "tipe_hari_invoice": "Kerja (Required v1)", "evaluasi_kontrak": "Tahunan (Required v1)", "durasi_kerjasama": "12 Bulan (Required v1)", "durasi_karyawan": "12 Bulan (Required v1)", "evaluasi_karyawan": "Tahunan (Required v1)", "ada_cuti": "Ada (Required v1)", "cuti": {"Cuti Tahunan (Required v1)"}, "gaji_saat_cuti": "Prorate (Optional v1)", "prorate": 20, "hari_kerja": "Senin - Jumat (Required v1/v2)", "shift_kerja": "Non Shift (Required v2)", "jam_kerja": "08:00 - 17:00 (Required v1/v2)", "hari_off": "Sabtu - Minggu (Required v2)", "jam_lembur": "2 Jam (Required v2)", "cuti_izin": {"Cuti Tahunan (Required v2)", "Izin Sakit"}, "status_rekrutmen": "Internal (Required v2)", "pendaftaran_pkwt": "Ya (Required v2)", "jaminan": "BPJS (Required v2)", "penanggung_jawab_aset": "Manager (Required v2)", "detail_penanggung_jawab_aset": "Detail aset... (Required v2)", "edit": false}),
+     *             @OA\Examples(example="step_3", summary="Step 3: Headcount", value={"headCountData": {{"quotation_site_id": 1, "position_id": 5, "jumlah_hc": 10, "jabatan_kebutuhan": "Security Guard (Required)", "nama_site": "Head Office (Required)"}}, "edit": false}),
+     *             @OA\Examples(example="step_4", summary="Step 4: Costing", value={"is_ppn": 1, "ppn_pph_dipotong": "Total Invoice (Required)", "management_fee_id": 1, "persentase": 10, "position_data": {{"quotation_detail_id": 1, "upah": "Custom (Required)", "hitungan_upah": "Per Bulan (Required if Custom)", "nominal_upah": 5000000, "lembur": "Flat (Optional)", "nominal_lembur": 100000, "jenis_bayar_lembur": "Per Jam (Required if Flat)", "jam_per_bulan_lembur": 10, "lembur_ditagihkan": "Ditagihkan (Required if Flat/Normatif)", "kompensasi": "Diprovisikan (Optional)", "thr": "Diprovisikan (Optional)", "tunjangan_holiday": "Flat (Optional)", "nominal_tunjangan_holiday": 150000, "jenis_bayar_tunjangan_holiday": "Per Hari (Required if Flat)"}}, "edit": false}),
+     *             @OA\Examples(example="step_5", summary="Step 5: BPJS", value={"jenis-perusahaan": 21, "bidang-perusahaan": 12, "resiko": "Sangat Rendah (Required)", "program-bpjs": "BPJS Kesehatan (Required)", "penjamin": {"1": "BPJS Kesehatan (Optional)"}, "jkk": {"1": true}, "jkm": {"1": true}, "jht": {"1": false}, "jp": {"1": false}, "kes": {"1": true}, "nominal_takaful": {"1": 0}, "edit": false}),
      *             @OA\Examples(example="step_6", summary="Step 6: Aplikasi Pendukung", value={"aplikasi_pendukung": {1, 2, 3}, "edit": false}),
+     *             @OA\Examples(example="step_7", summary="Step 7: Kaporlap / APD", value={"kaporlaps": {{"barang_id": 1, "quotation_detail_id": 1, "jumlah": 5, "harga": 150000}}, "edit": false}),
+     *             @OA\Examples(example="step_8", summary="Step 8: Devices", value={"devices": {{"barang_id": 10, "jumlah": 2, "harga": 5000000}}, "edit": false}),
      *             @OA\Examples(example="step_9", summary="Step 9: Chemical / Peralatan", value={"barang_id": 10, "jumlah": 5, "masa_pakai": 12, "harga": 150000, "chemicals": {{"barang_id": 12, "jumlah": 2, "masa_pakai": 6, "harga": 50000}}, "edit": false}),
-     *             @OA\Examples(example="step_10", summary="Step 10: Operasional", value={"jumlah_kunjungan_operasional": 2, "bulan_tahun_kunjungan_operasional": "Bulan", "jumlah_kunjungan_tim_crm": 1, "bulan_tahun_kunjungan_tim_crm": "Tahun", "keterangan_kunjungan_operasional": "Kunjungan rutin", "keterangan_kunjungan_tim_crm": "Evaluasi tahunan", "ada_training": "Ada", "training": "Basic Security Training", "persen_bunga_bank": 5.5, "edit": false}),
-     *             @OA\Examples(example="step_11", summary="Step 11: Pricing", value={"penagihan": "Sesuai BAST", "tunjangan_data": {{{"nama_tunjangan": "Tunjangan Makan", "nominal": 50000}}}, "edit": false}),
+     *             @OA\Examples(example="step_10", summary="Step 10: Operasional", value={"jumlah_kunjungan_operasional": 2, "bulan_tahun_kunjungan_operasional": "Bulan (Required)", "jumlah_kunjungan_tim_crm": 1, "bulan_tahun_kunjungan_tim_crm": "Tahun (Required)", "keterangan_kunjungan_operasional": "Kunjungan rutin (Optional)", "keterangan_kunjungan_tim_crm": "Evaluasi tahunan (Optional)", "ada_training": "Ada (Optional)", "training": "Basic Security Training (Optional)", "persen_bunga_bank": 5.5, "ohcs": {{"quotation_site_id": 1, "barang_id": 5, "jumlah": 2}, {"quotation_site_id": 1, "is_custom": true, "nama": "Barang Custom OHC", "jumlah": 1, "harga": 50000}}, "edit": false}),
+     *             @OA\Examples(example="step_10_driver", summary="Step 10: Driver", value={"drivers": {{"status_kendaraan": "Milik Sendiri (Optional)", "jenis_kendaraan": "Mobil (Optional)", "nama_kendaraan": "Avanza (Optional)", "kepemilikan_sim": "A (Optional)", "asuransi_mobil": "Ada (Optional)", "gps_map": "Ada (Optional)", "tipe_layanan_angkut": "Barang (Optional)", "area_dihandle": "Jabodetabek (Optional)", "kapasitas_bobot_maksimal": "1000kg (Optional)", "asuransi_barang": "Ada (Optional)", "biaya_khusus_kecelakaan": 1500000}}, "edit": false}),
+     *             @OA\Examples(example="step_11", summary="Step 11: Pricing", value={"penagihan": "Sesuai BAST (Required)", "tunjangan_data": {{{"nama_tunjangan": "Tunjangan Makan (Optional)", "nominal": 50000}}}, "edit": false}),
      *             @OA\Examples(example="step_12", summary="Step 12: Finalization", value={"is_draft": false})
      *         )
      *     ),
@@ -273,22 +276,35 @@ class QuotationStepController extends Controller
     // PRIVATE — RELATIONS RESOLVER
     // =========================================================================
 
-    private function resolveStepRelations(int $step): array
+    private function resolveStepRelations(Quotation $quotation, int $step): array
     {
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, $step);
+
+        if ($logicalStepName === 'updateDriver') {
+            return ['quotationDrivers'];
+        }
+
         return self::STEP_RELATIONS[$step] ?? [];
     }
 
     private function prepareStepData(Quotation $quotation, int $step): array
     {
+        $logicalStepName = \App\Services\Quotation\Steps\StepMapper::resolveUpdateMethod($quotation->version ?? 1, $step);
+
         $additionalDataMethod = 'buildAdditionalDataStep'.$step;
         $additionalData = method_exists($this, $additionalDataMethod)
             ? $this->$additionalDataMethod($quotation)
             : [];
 
-        $stepDataMethod = 'buildStepDataStep'.$step;
-        $stepData = method_exists($this, $stepDataMethod)
-            ? $this->$stepDataMethod($quotation, $additionalData)
-            : [];
+        $stepData = [];
+        if ($logicalStepName === 'updateDriver') {
+            $stepData = $this->buildStepDataDriver($quotation, $additionalData);
+        } else {
+            $stepDataMethod = 'buildStepDataStep'.$step;
+            $stepData = method_exists($this, $stepDataMethod)
+                ? $this->$stepDataMethod($quotation, $additionalData)
+                : [];
+        }
 
         $baseData = [
             'id' => $quotation->id,
@@ -915,9 +931,13 @@ class QuotationStepController extends Controller
         $umspList = Umsp::whereIn('province_id', $provinsiIds)->active()->get()->keyBy('province_id');
 
         foreach ($sites as $site) {
+            /** @var \App\Models\Umk|null $umk */
             $umk = $umkList->get($site->kota_id);
+            /** @var \App\Models\Ump|null $ump */
             $ump = $umpList->get($site->provinsi_id);
+            /** @var \App\Models\Umsk|null $umsk */
             $umsk = $umskList->get($site->kota_id);
+            /** @var \App\Models\Umsp|null $umsp */
             $umsp = $umspList->get($site->provinsi_id);
 
             $umpPerSite[] = [
@@ -926,7 +946,7 @@ class QuotationStepController extends Controller
                 'province_id' => $site->provinsi_id,
                 'province_name' => $site->provinsi,
                 'ump_value' => $ump?->ump ?? 0,
-                'formatted_ump' => $ump ? $ump->formatUmp() : 'UMP : Rp. 0',
+                'formatted_ump' => $ump ? $ump->formatump() : 'UMP : Rp. 0',
             ];
             $umspPerSite[] = [
                 'site_id' => $site->id,
@@ -934,7 +954,7 @@ class QuotationStepController extends Controller
                 'province_id' => $site->provinsi_id,
                 'province_name' => $site->provinsi,
                 'umsp_value' => $umsp?->umsp ?? 0,
-                'formatted_umsp' => $umsp ? $umsp->formatUmsp() : 'UMSP : Rp. 0',
+                'formatted_umsp' => $umsp ? $umsp->formatumsp() : 'UMSP : Rp. 0',
             ];
 
             $umkPerSite[] = [
@@ -943,16 +963,15 @@ class QuotationStepController extends Controller
                 'city_id' => $site->kota_id,
                 'city_name' => $site->kota,
                 'umk_value' => $umk?->umk ?? 0,
-                'formatted_umk' => $umk ? $umk->formatUmk() : 'UMK : Rp. 0',
+                'formatted_umk' => $umk ? $umk->formatumk() : 'UMK : Rp. 0',
             ];
-
             $umskPerSite[] = [
                 'site_id' => $site->id,
                 'site_name' => $site->nama_site,
                 'city_id' => $site->kota_id,
                 'city_name' => $site->kota,
                 'umsk_value' => $umsk?->umsk ?? 0,
-                'formatted_umsk' => $umsk ? $umsk->formatUmsk() : 'UMSK : Rp. 0',
+                'formatted_umsk' => $umsk ? $umsk->formatumsk() : 'UMSK : Rp. 0',
             ];
         }
 
@@ -1001,7 +1020,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep6(Quotation $quotation): array
     {
         return [
-            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'link_icon')->get(),
+            'aplikasi_pendukung_list' => AplikasiPendukung::select('id', 'nama', 'link_icon', 'harga')->get(),
         ];
     }
 
@@ -1011,7 +1030,7 @@ class QuotationStepController extends Controller
         $listJenis = JenisBarang::whereIn('id', $arrKaporlap)->select('id', 'nama')->get();
 
         $listKaporlap = Barang::whereIn('jenis_barang_id', $arrKaporlap)
-            ->select('id', 'nama', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id', 'harga')
             ->ordered()
             ->get();
         $barangIds = $listKaporlap->pluck('id')->toArray();
@@ -1072,7 +1091,7 @@ class QuotationStepController extends Controller
             ->get();
 
         $listDevices = Barang::whereIn('jenis_barang_id', [8, 9, 10, 11, 12, 17])
-            ->select('id', 'nama', 'jenis_barang_id')
+            ->select('id', 'nama', 'jenis_barang_id', 'harga')
             ->ordered()
             ->get();
 
@@ -1132,7 +1151,7 @@ class QuotationStepController extends Controller
     private function buildAdditionalDataStep9(Quotation $quotation): array
     {
         $chemicalList = Barang::whereIn('jenis_barang_id', [13, 14, 15, 16, 18, 19])
-            ->select('id', 'nama')
+            ->select('id', 'nama', 'harga', 'masa_pakai')
             ->ordered()
             ->get()
             ->map(function ($chemical) {
@@ -1191,7 +1210,7 @@ class QuotationStepController extends Controller
 
         return [
             'ohc_list' => Barang::whereIn('jenis_barang_id', [6, 7, 8])
-                ->select('id', 'nama', 'jenis_barang_id', 'urutan')
+                ->select('id', 'nama', 'jenis_barang_id', 'urutan', 'harga')
                 ->orderBy('urutan', 'asc')
                 ->orderBy('nama', 'asc')
                 ->get(),
@@ -1242,6 +1261,34 @@ class QuotationStepController extends Controller
     private function isRo($detail): bool
     {
         return ($detail->position_id ?? null) === 224;
+    }
+
+    private function buildStepDataDriver(Quotation $quotation, array $additionalData): array
+    {
+        $drivers = [];
+        if ($quotation->relationLoaded('quotationDrivers')) {
+            $drivers = $quotation->quotationDrivers->map(function ($driver) {
+                return [
+                    'id' => $driver->id,
+                    'status_kendaraan' => $driver->status_kendaraan,
+                    'jenis_kendaraan' => $driver->jenis_kendaraan,
+                    'nama_kendaraan' => $driver->nama_kendaraan,
+                    'kepemilikan_sim' => $driver->kepemilikan_sim,
+                    'asuransi_mobil' => $driver->asuransi_mobil,
+                    'gps_map' => $driver->gps_map,
+                    'tipe_layanan_angkut' => $driver->tipe_layanan_angkut,
+                    'area_dihandle' => $driver->area_dihandle,
+                    'kapasitas_bobot_maksimal' => $driver->kapasitas_bobot_maksimal,
+                    'asuransi_barang' => $driver->asuransi_barang,
+                    'biaya_khusus_kecelakaan' => $driver->biaya_khusus_kecelakaan,
+                ];
+            })->toArray();
+        }
+
+        return [
+            'quotation_drivers' => $drivers,
+            'drivers_total' => count($drivers),
+        ];
     }
 
     private function resolveMfConfig(Quotation $quotation): array

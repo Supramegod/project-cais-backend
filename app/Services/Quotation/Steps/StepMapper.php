@@ -23,11 +23,12 @@ class StepMapper
                 10 => 'updateOperasional',
                 11 => 'updatePricing',
                 12 => 'updateFinalization',
+                13 => 'updateFinalization',
                 default => 'notFound',
             };
         }
 
-        // Version 2 (13 steps)
+        // Version 2 (13 steps) -> now 14 steps
         return match ($uiStep) {
             1 => 'updateDataSite',
             2 => 'updateJenisKontrak',
@@ -40,8 +41,9 @@ class StepMapper
             9 => 'updateChemical',
             10 => 'updateOperasional',
             11 => 'updateCosting',
-            12 => 'updatePricing',
-            13 => 'updateFinalization',
+            12 => 'updateDriver',
+            13 => 'updatePricing',
+            14 => 'updateFinalization',
             default => 'notFound',
         };
     }
