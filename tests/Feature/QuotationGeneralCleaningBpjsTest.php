@@ -10,8 +10,8 @@ use Tests\TestCase;
  * Mengunci aturan BPJS untuk jenis_kontrak = GENERAL CLEANING.
  *
  * Dua aturan yang diuji di sini:
- * 1. Basis iuran BPJS Ketenagakerjaan memakai batas bawah UMK pada GC, sedangkan
- *    kontrak lain tetap memakai UMP.
+ * 1. Basis iuran BPJS Ketenagakerjaan pada GC SELALU UMK — bukan batas bawah,
+ *    jadi upah di atas UMK pun tidak dipakai. Kontrak lain tetap batas bawah UMP.
  * 2. BPJS Kesehatan tidak pernah dipaksa nol. Bedanya, pada GC dan PKHL opt-out
  *    is_bpjs_kes dihormati walau penjamin BPJS — pada kontrak reguler tidak.
  *
@@ -34,13 +34,13 @@ class QuotationGeneralCleaningBpjsTest extends TestCase
 
     // ============================ TESTS ============================
 
-    public function test_gc_bpjs_tk_uses_umk_as_floor(): void
+    public function test_gc_bpjs_tk_uses_umk_when_wage_is_below_it(): void
     {
         $this->seedQuotation('GENERAL CLEANING', [], [], self::UPAH_DI_BAWAH_UMK);
 
         $hpp = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
-        // Upah bulanan 3.750.000 < UMK 4.000.000, jadi basis naik ke UMK.
+        // Basis = UMK 4.000.000.
         // Resiko "Rendah" -> JKK 0,54%; JKM 0,30%; JHT 3,70%; JP 2,00%.
         $this->assertEqualsWithDelta(21600.0, (float) $hpp['bpjs_jkk'], 0.01);
         $this->assertEqualsWithDelta(12000.0, (float) $hpp['bpjs_jkm'], 0.01);
@@ -61,15 +61,28 @@ class QuotationGeneralCleaningBpjsTest extends TestCase
         $this->assertEqualsWithDelta(76000.0, (float) $hpp['bpjs_jp'], 0.01);
     }
 
-    public function test_gc_bpjs_tk_uses_actual_wage_when_above_umk(): void
+    public function test_gc_bpjs_tk_still_uses_umk_when_wage_is_above_it(): void
     {
         // Upah bawaan 200.000 x 25 = 5.000.000, di atas UMK maupun UMP.
         $this->seedQuotation('GENERAL CLEANING');
 
         $hpp = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
 
-        // 5.000.000 * 3,70% = 185.000 — batas bawah tidak aktif.
-        $this->assertEqualsWithDelta(185000.0, (float) $hpp['bpjs_jht'], 0.01);
+        // Basis tetap UMK 4.000.000, bukan upah 5.000.000: 4.000.000 * 3,70%.
+        // Inilah bedanya dengan batas bawah — upah tinggi tidak menaikkan iuran.
+        $this->assertEqualsWithDelta(148000.0, (float) $hpp['bpjs_jht'], 0.01);
+        $this->assertEqualsWithDelta(21600.0, (float) $hpp['bpjs_jkk'], 0.01);
+    }
+
+    public function test_non_gc_still_uses_actual_wage_when_above_ump(): void
+    {
+        // Kontrak selain GC tidak berubah: upah di atas UMP tetap jadi basis.
+        $this->seedQuotation('Borongan', [], [], ['nominal_upah' => 6_000_000]);
+
+        $hpp = $this->calculate()->detail_calculations[self::DETAIL_1]->hpp_data;
+
+        // 6.000.000 * 3,70% = 222.000.
+        $this->assertEqualsWithDelta(222000.0, (float) $hpp['bpjs_jht'], 0.01);
     }
 
     public function test_gc_honours_bpjs_kes_opt_out_even_when_penjamin_is_bpjs(): void

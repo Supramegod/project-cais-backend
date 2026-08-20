@@ -38,8 +38,15 @@ class QuotationComponentCalculationService
     }
 
     /**
-     * Pada General Cleaning basis iuran BPJS Ketenagakerjaan memakai batas bawah
-     * UMK, bukan UMP seperti kontrak lain, karena upah GC minimal setara UMK.
+     * Pada General Cleaning basis iuran BPJS Ketenagakerjaan SELALU UMK, bukan
+     * upah dan bukan batas bawah. Upah GC adalah nilai borongan per pekerjaan,
+     * bukan gaji bulanan, sehingga memakainya sebagai basis iuran menghasilkan
+     * angka yang tidak masuk akal. Kontrak lain tetap memakai batas bawah UMP.
+     *
+     * Basis BPJS Kesehatan sengaja TIDAK ikut aturan ini: tetap batas bawah UMK
+     * untuk semua jenis kontrak, GC termasuk. Ini keputusan sadar, bukan
+     * kelupaan — jangan diseragamkan tanpa konfirmasi bisnis.
+     *
      * BPJS Kesehatan tidak dipaksa nol: pada GC dan PKHL opt-out is_bpjs_kes
      * dihormati walau penjamin BPJS, sehingga sales yang menentukan lewat step 5.
      */
@@ -73,7 +80,7 @@ class QuotationComponentCalculationService
         $ump = $detail->ump ?? 0;
 
         $baseKetenagakerjaan = $isGC
-            ? (($nominalUpah < $umk) ? $umk : $nominalUpah)
+            ? $umk
             : (($nominalUpah < $ump) ? $ump : $nominalUpah);
         $baseKesehatan = ($nominalUpah < $umk) ? $umk : $nominalUpah;
         $bpjsConfig = [
