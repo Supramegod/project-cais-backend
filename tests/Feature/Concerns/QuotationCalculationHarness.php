@@ -28,9 +28,11 @@ trait QuotationCalculationHarness
 
     protected const DETAIL_2 = 701; // HC 1, polos
 
+    protected ?string $tempDbPath = null;
+
     protected function bootQuotationHarness(): void
     {
-        $databasePath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
+        $databasePath = $this->tempDbPath = storage_path('framework/testing-'.Str::random(8).'.sqlite');
         touch($databasePath);
 
         Config::set('database.default', 'sqlite');
@@ -47,6 +49,19 @@ trait QuotationCalculationHarness
 
         $this->rebuildSchema();
         $this->actingAs($this->seedUser());
+    }
+
+    protected function tearDown(): void
+    {
+        if ($this->tempDbPath !== null) {
+            DB::purge('sqlite');
+            DB::purge('mysqlhris');
+            DB::purge('mysql');
+            @unlink($this->tempDbPath);
+            $this->tempDbPath = null;
+        }
+
+        parent::tearDown();
     }
 
     protected function calculate(): \App\DTO\QuotationCalculationResult
@@ -73,9 +88,8 @@ trait QuotationCalculationHarness
     }
 
     /**
-     * One site, two details (HC 2 + 1 = 3), no provisi items yet.
-     */
-    /**
+     * Satu site, dua detail (HC 2 + 1 = 3), belum ada item provisi.
+     *
      * @param  array<string, mixed>  $quotationOverrides
      * @param  array<string, mixed>  $siteOverrides
      * @param  array<string, mixed>  $detailOverrides

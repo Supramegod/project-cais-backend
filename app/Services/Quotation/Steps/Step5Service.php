@@ -2,6 +2,7 @@
 
 namespace App\Services\Quotation\Steps;
 
+use App\Enums\JenisKontrak;
 use App\Models\BidangPerusahaan;
 use App\Models\JenisPerusahaan;
 use App\Models\Quotation;
@@ -18,16 +19,17 @@ class Step5Service
      * Pada General Cleaning dan PKHL, BPJS Kesehatan tidak selalu dibebankan
      * karena pekerjaannya sekali jalan dan berdurasi pendek, jadi defaultnya
      * mati. Sales tetap bisa menyalakannya lewat input kes pada step ini.
+     *
+     * Ketika field kes absen, hanya kontrak GC/PKHL yang mempertahankan nilai
+     * lamanya — default mati berlaku untuk detail baru saja, supaya quotation
+     * GC/PKHL lama tidak berubah harga diam-diam saat disimpan ulang dari
+     * frontend yang belum mengirim field kes. Kontrak lain sengaja tetap
+     * dipaksa aktif seperti sebelumnya, karena BPJS Kesehatan wajib di sana dan
+     * nilai 0 warisan harus tetap dinormalkan.
      */
-    private const KONTRAK_BPJS_KES_DEFAULT_MATI = ['GENERAL CLEANING', 'PKHL'];
-
     public function execute(Quotation $quotation, Request $request): void
     {
-        $defaultBpjsKes = ! in_array(
-            strtoupper($quotation->jenis_kontrak ?? ''),
-            self::KONTRAK_BPJS_KES_DEFAULT_MATI,
-            true
-        );
+        $isBpjsKesOpsional = JenisKontrak::isBpjsKesOpsional($quotation->jenis_kontrak);
 
         foreach ($quotation->quotationDetails as $detail) {
             $detailId = $detail->id;
@@ -46,6 +48,7 @@ class Step5Service
             }
 
             $isBpu = ($penjamin === 'BPU');
+            $fallbackBpjsKes = $isBpjsKesOpsional ? ($detail->is_bpjs_kes ?? false) : true;
 
             $detail->update([
                 'penjamin_kesehatan' => $penjamin,
@@ -53,7 +56,9 @@ class Step5Service
                 'is_bpjs_jkm' => $isBpu ? 0 : ($this->helper->toBoolean($request->jkm[$detailId] ?? false) ? 1 : 0),
                 'is_bpjs_jht' => $isBpu ? 0 : ($this->helper->toBoolean($request->jht[$detailId] ?? false) ? 1 : 0),
                 'is_bpjs_jp' => $isBpu ? 0 : ($this->helper->toBoolean($request->jp[$detailId] ?? false) ? 1 : 0),
-                'is_bpjs_kes' => $this->helper->toBoolean($request->kes[$detailId] ?? $defaultBpjsKes) ? 1 : 0,
+                'is_bpjs_kes' => $this->helper->toBoolean(
+                    $request->kes[$detailId] ?? $fallbackBpjsKes
+                ) ? 1 : 0,
                 'nominal_takaful' => $nominalTakaful,
                 'updated_by' => Auth::user()->full_name,
             ]);

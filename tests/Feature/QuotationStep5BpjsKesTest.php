@@ -79,6 +79,40 @@ class QuotationStep5BpjsKesTest extends TestCase
         $this->assertSame(['0', '0'], $this->storedBpjsKes());
     }
 
+    public function test_gc_keeps_existing_bpjs_kes_on_when_field_is_absent(): void
+    {
+        $this->seedQuotation('General Cleaning', ['is_aktif' => 1]);
+        DB::table('sl_quotation_detail')->update(['is_bpjs_kes' => 1]);
+
+        $this->runStep5();
+
+        // Quotation GC lama tidak boleh berubah harga hanya karena FE belum
+        // mengirim field kes — nilai yang sudah ditetapkan dipertahankan.
+        $this->assertSame(['1', '1'], $this->storedBpjsKes());
+    }
+
+    public function test_gc_keeps_existing_bpjs_kes_off_when_field_is_absent(): void
+    {
+        $this->seedQuotation('General Cleaning', ['is_aktif' => 1]);
+        DB::table('sl_quotation_detail')->update(['is_bpjs_kes' => 0]);
+
+        $this->runStep5();
+
+        $this->assertSame(['0', '0'], $this->storedBpjsKes());
+    }
+
+    public function test_reguler_still_normalises_legacy_zero_back_to_on(): void
+    {
+        $this->seedQuotation('Reguler', ['is_aktif' => 1]);
+        DB::table('sl_quotation_detail')->update(['is_bpjs_kes' => 0]);
+
+        $this->runStep5();
+
+        // Di luar GC/PKHL, BPJS Kesehatan wajib, jadi nilai 0 warisan tetap
+        // dinormalkan seperti perilaku sebelumnya — bukan dipertahankan.
+        $this->assertSame(['1', '1'], $this->storedBpjsKes());
+    }
+
     public function test_step5_request_validates_kes_like_the_other_bpjs_flags(): void
     {
         // Endpoint updateStep memakai QuotationStepRequest, bukan Step5Request.

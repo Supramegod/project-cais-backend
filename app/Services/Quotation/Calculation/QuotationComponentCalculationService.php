@@ -3,6 +3,7 @@
 namespace App\Services\Quotation\Calculation;
 
 use App\DTO\DetailCalculation;
+use App\Enums\JenisKontrak;
 
 class QuotationComponentCalculationService
 {
@@ -44,9 +45,8 @@ class QuotationComponentCalculationService
      */
     public function calculateBpjs($detail, $quotation, $hpp): void
     {
-        $jenisKontrak = strtoupper($quotation->jenis_kontrak ?? '');
-        $isGC = ($jenisKontrak === 'GENERAL CLEANING');
-        $isBpjsKesOpsional = ($isGC || $jenisKontrak === 'PKHL');
+        $isGC = JenisKontrak::isGeneralCleaning($quotation->jenis_kontrak);
+        $isBpjsKesOpsional = JenisKontrak::isBpjsKesOpsional($quotation->jenis_kontrak);
 
         $isBpu = ($detail->penjamin_kesehatan === 'BPU');
         if ($isBpu) {
@@ -90,8 +90,6 @@ class QuotationComponentCalculationService
             $optOutField = 'is_bpjs_'.$key;
             $hppField = $config['hpp_field'];
             $defaultPercent = is_callable($config['default']) ? $config['default']() : $config['default'];
-            $hppField = $config['hpp_field'];
-            $defaultPercent = is_callable($config['default']) ? $config['default']() : $config['default'];
 
             if (isset($detail->{$config['percent']}) && (float) $detail->{$config['percent']} != 0) {
                 $persentase = (float) $detail->{$config['percent']};
@@ -118,8 +116,6 @@ class QuotationComponentCalculationService
                 $detail->{$config['percent']} = 0;
             } elseif ($key === 'kes' && in_array($detail->penjamin_kesehatan, ['Asuransi Swasta', 'Takaful'])) {
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
-                $detail->{$config['percent']} = 0;
-            } elseif ($key === 'kes' && $isBpu) {
                 $detail->{$config['percent']} = 0;
             } elseif ($hpp && $hpp->{$hppField} !== null) {
                 $detail->{$config['field']} = (float) $hpp->{$hppField};

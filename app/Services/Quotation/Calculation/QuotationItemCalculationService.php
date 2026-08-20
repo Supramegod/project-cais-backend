@@ -4,6 +4,7 @@ namespace App\Services\Quotation\Calculation;
 
 use App\DTO\DetailCalculation;
 use App\DTO\QuotationCalculationResult;
+use App\Enums\JenisKontrak;
 use Illuminate\Support\Collection;
 
 class QuotationItemCalculationService
@@ -101,7 +102,7 @@ class QuotationItemCalculationService
 
     private function calculateDetailComponents($detail, $quotation, $daftarTunjangan, $jumlahHc, $hpp, $coss, $wage, DetailCalculation $detailCalculation): void
     {
-        $isGC = (strtoupper($quotation->jenis_kontrak ?? '') === 'GENERAL CLEANING');
+        $isGC = JenisKontrak::isGeneralCleaning($quotation->jenis_kontrak);
         $hariKerja = $isGC ? max(1, $this->parseHariKerja($quotation->hari_kerja)) : 1;
 
         $totalTunjangan = $this->componentService->calculateTunjangan($detail, $daftarTunjangan);
@@ -285,8 +286,7 @@ class QuotationItemCalculationService
 
     public function normalizeUpahForKontrak($detail, $quotation): void
     {
-        $jenisKontrak = strtoupper($quotation->jenis_kontrak ?? '');
-        if ($jenisKontrak === 'PKHL' || $jenisKontrak === 'GENERAL CLEANING') {
+        if (JenisKontrak::isUpahHarian($quotation->jenis_kontrak)) {
             $hariKerja = max(1, $this->parseHariKerja($quotation->hari_kerja));
             $detail->nominal_upah_harian = (float) $detail->nominal_upah;
             $detail->hari_kerja_pkhl = $hariKerja;
