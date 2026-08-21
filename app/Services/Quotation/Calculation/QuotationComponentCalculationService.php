@@ -49,14 +49,6 @@ class QuotationComponentCalculationService
      *
      * BPJS Kesehatan tidak dipaksa nol: pada GC dan PKHL opt-out is_bpjs_kes
      * dihormati walau penjamin BPJS, sehingga sales yang menentukan lewat step 5.
-     *
-     * Nilai 0 pada baris HPP diperlakukan sebagai "belum dihitung", bukan
-     * override manual — sama seperti perlakuan pada kolom persentase di atas.
-     * Alasannya: satu-satunya cara sah menihilkan iuran adalah flag is_bpjs_*,
-     * dan flag itu sudah diproses lebih dulu di cabang opt-out. Tanpa aturan ini
-     * baris HPP yang sempat tersimpan 0 (misal dihitung sebelum step 5
-     * menyalakan flag) akan menempel selamanya di jalur baca, karena reset ke
-     * NULL hanya terjadi di jalur simpan lewat PricingService.
      */
     public function calculateBpjs($detail, $quotation, $hpp): void
     {
@@ -132,7 +124,7 @@ class QuotationComponentCalculationService
             } elseif ($key === 'kes' && in_array($detail->penjamin_kesehatan, ['Asuransi Swasta', 'Takaful'])) {
                 $detail->{$config['field']} = $detail->nominal_takaful ?? 0;
                 $detail->{$config['percent']} = 0;
-            } elseif ($hpp && $hpp->{$hppField} !== null && (float) $hpp->{$hppField} != 0) {
+            } elseif ($hpp && $hpp->{$hppField} !== null) {
                 $detail->{$config['field']} = (float) $hpp->{$hppField};
                 $detail->{$config['percent']} = $persentase;
             } else {
