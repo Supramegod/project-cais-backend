@@ -13,12 +13,12 @@ class Step9Request extends BaseRequest
             'edit' => FluentRule::boolean()->sometimes(),
             'barang_id' => FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang', 'id'),
             'jumlah' => FluentRule::integer()->sometimes()->requiredWithout('chemicals')->min(0),
-            'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
+            'masa_pakai' => FluentRule::integer()->sometimes()->nullable()->min(1),
             'harga' => FluentRule::numeric()->sometimes()->min(0),
             'chemicals' => FluentRule::array()->sometimes()->each([
                 'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang', 'id'),
                 'jumlah' => FluentRule::integer()->requiredWith('chemicals')->min(0),
-                'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
+                'masa_pakai' => FluentRule::integer()->sometimes()->nullable()->min(1),
                 'harga' => FluentRule::numeric()->sometimes()->min(0),
             ]),
         ];

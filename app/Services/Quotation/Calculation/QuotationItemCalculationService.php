@@ -11,11 +11,11 @@ class QuotationItemCalculationService
 {
     private const PKHL_DEFAULT_HARI_KERJA = 25;
 
-    private const GC_CHEMICAL_JENIS_BARANG_MESIN = 13;
+    public const GC_CHEMICAL_JENIS_BARANG_MESIN = 13;
 
-    private const GC_CHEMICAL_MASA_PAKAI_MESIN = 36;
+    public const GC_CHEMICAL_MASA_PAKAI_MESIN = 36;
 
-    private const GC_CHEMICAL_MASA_PAKAI_DEFAULT = 1;
+    public const GC_CHEMICAL_MASA_PAKAI_DEFAULT = 1;
 
     private const GC_KAPORLAP_PROVISI = 12;
 
@@ -204,7 +204,7 @@ class QuotationItemCalculationService
         foreach ($items as $item) {
             if ($special === 'chemical') {
                 $masaPakai = $isGC
-                    ? $this->resolveGcChemicalMasaPakai($item)
+                    ? self::resolveGcChemicalMasaPakai($item)
                     : (int) $item->masa_pakai;
                 $total += ($item->jumlah * $item->harga) / max($masaPakai, 1) / max($divider, 1);
             } elseif ($special === 'kaporlap') {
@@ -223,8 +223,11 @@ class QuotationItemCalculationService
      * Pada kontrak General Cleaning masa pakai chemical tidak diambil dari kolom
      * masa_pakai, melainkan ditetapkan per jenis barang: mesin diamortisasi 36
      * bulan, item habis pakai dibebankan penuh (dibagi 1).
+     *
+     * Dipublikkan supaya QuotationBarangService memakai divisor yang sama saat
+     * menyusun response step 9 — angka di layar harus cocok dengan costing.
      */
-    private function resolveGcChemicalMasaPakai($item): int
+    public static function resolveGcChemicalMasaPakai($item): int
     {
         return (int) $item->jenis_barang_id === self::GC_CHEMICAL_JENIS_BARANG_MESIN
             ? self::GC_CHEMICAL_MASA_PAKAI_MESIN

@@ -55,7 +55,7 @@ class QuotationStepRequest extends BaseRequest
 
             case 'updateDetailKontrak':
                 $isV2 = ($quotation?->version === 2);
-                
+
                 if ($isV2) {
                     $rules['hari_kerja'] = FluentRule::string()->required();
                     $rules['hari_off'] = FluentRule::string()->required();
@@ -77,11 +77,11 @@ class QuotationStepRequest extends BaseRequest
                     $userRole = $user?->cais_role_id;
 
                     $rules['mulai_kontrak'] = FluentRule::date()
-                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:today'));
+                        ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required()->rule('after_or_equal:today'));
                     $rules['kontrak_selesai'] = FluentRule::date()
-                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
+                        ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required()->rule('after_or_equal:mulai_kontrak'));
                     $rules['tgl_penempatan'] = FluentRule::date()
-                        ->when(!in_array($userRole, $excludedRoles), fn($r) => $r->required());
+                        ->when(! in_array($userRole, $excludedRoles), fn ($r) => $r->required());
 
                     $rules['top'] = FluentRule::string()->required()->in(['Non TOP', 'Kurang Dari 7 Hari', 'Lebih Dari 7 Hari']);
                     $rules['salary_rule'] = FluentRule::integer()->required()->exists('m_salary_rule', 'id');
@@ -100,7 +100,7 @@ class QuotationStepRequest extends BaseRequest
                             'Istri Melahirkan',
                             'Cuti Menikah',
                             'Cuti Roster',
-                            'Tidak Ada'
+                            'Tidak Ada',
                         ]),
                     ]);
                     $rules['gaji_saat_cuti'] = FluentRule::string()->sometimes()->in(['No Work No Pay', 'Prorate']);
@@ -181,13 +181,13 @@ class QuotationStepRequest extends BaseRequest
             case 'updateChemical':
                 $rules['barang_id'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->exists('m_barang', 'id');
                 $rules['jumlah'] = FluentRule::integer()->sometimes()->requiredWithout('chemicals')->min(0);
-                $rules['masa_pakai'] = FluentRule::integer()->sometimes()->min(1);
+                $rules['masa_pakai'] = FluentRule::integer()->sometimes()->nullable()->min(1);
                 $rules['harga'] = FluentRule::numeric()->sometimes()->min(0);
 
                 $rules['chemicals'] = FluentRule::array()->sometimes()->each([
                     'barang_id' => FluentRule::integer()->requiredWith('chemicals')->exists('m_barang', 'id'),
                     'jumlah' => FluentRule::integer()->requiredWith('chemicals')->min(0),
-                    'masa_pakai' => FluentRule::integer()->sometimes()->min(1),
+                    'masa_pakai' => FluentRule::integer()->sometimes()->nullable()->min(1),
                     'harga' => FluentRule::numeric()->sometimes()->min(0),
                 ]);
                 break;
@@ -202,7 +202,7 @@ class QuotationStepRequest extends BaseRequest
                 $rules['ada_training'] = FluentRule::string()->sometimes()->in(['Ada', 'Tidak Ada']);
                 $rules['training'] = FluentRule::string()->sometimes();
                 $rules['persen_bunga_bank'] = FluentRule::numeric()->sometimes()->min(0);
-                
+
                 $rules['ohcs'] = FluentRule::array()->sometimes()->each([
                     'quotation_site_id' => FluentRule::integer()->requiredWith('ohcs')->exists('sl_quotation_site', 'id'),
                     'barang_id' => FluentRule::integer()->sometimes()->exists('m_barang', 'id'),
