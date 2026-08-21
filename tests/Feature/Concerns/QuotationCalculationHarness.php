@@ -209,6 +209,34 @@ trait QuotationCalculationHarness
         ]);
     }
 
+    /**
+     * Kolom dan tabel tambahan yang hanya dibutuhkan alur step 5 (is_aktif,
+     * data perusahaan, dan sl_leads yang ikut di-update Step5Service).
+     */
+    protected function extendSchemaForStep5(): void
+    {
+        Schema::table('sl_quotation', function (Blueprint $table) {
+            $table->unsignedInteger('jenis_perusahaan_id')->nullable();
+            $table->unsignedInteger('bidang_perusahaan_id')->nullable();
+            $table->string('jenis_perusahaan')->nullable();
+            $table->string('bidang_perusahaan')->nullable();
+            $table->unsignedInteger('is_aktif')->nullable();
+        });
+
+        Schema::dropIfExists('sl_leads');
+        Schema::create('sl_leads', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('nama_perusahaan')->nullable();
+            $table->unsignedInteger('jenis_perusahaan_id')->nullable();
+            $table->unsignedInteger('bidang_perusahaan_id')->nullable();
+            $table->string('jenis_perusahaan')->nullable();
+            $table->string('bidang_perusahaan')->nullable();
+            $table->string('resiko')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+    }
+
     protected function rebuildSchema(): void
     {
         foreach ([

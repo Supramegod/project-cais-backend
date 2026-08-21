@@ -5,11 +5,9 @@ namespace Tests\Feature;
 use App\Http\Requests\Quotation\QuotationStepRequest;
 use App\Models\Quotation;
 use App\Services\Quotation\Steps\Step5Service;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Tests\Feature\Concerns\QuotationCalculationHarness;
 use Tests\TestCase;
 
@@ -185,29 +183,5 @@ class QuotationStep5BpjsKesTest extends TestCase
             ->pluck('is_bpjs_kes')
             ->map(fn ($value) => (string) $value)
             ->all();
-    }
-
-    private function extendSchemaForStep5(): void
-    {
-        Schema::table('sl_quotation', function (Blueprint $table) {
-            $table->unsignedInteger('jenis_perusahaan_id')->nullable();
-            $table->unsignedInteger('bidang_perusahaan_id')->nullable();
-            $table->string('jenis_perusahaan')->nullable();
-            $table->string('bidang_perusahaan')->nullable();
-            $table->unsignedInteger('is_aktif')->nullable();
-        });
-
-        Schema::dropIfExists('sl_leads');
-        Schema::create('sl_leads', function (Blueprint $table) {
-            $table->increments('id');
-            $table->string('nama_perusahaan')->nullable();
-            $table->unsignedInteger('jenis_perusahaan_id')->nullable();
-            $table->unsignedInteger('bidang_perusahaan_id')->nullable();
-            $table->string('jenis_perusahaan')->nullable();
-            $table->string('bidang_perusahaan')->nullable();
-            $table->string('resiko')->nullable();
-            $table->softDeletes();
-            $table->timestamps();
-        });
     }
 }
