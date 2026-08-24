@@ -6,6 +6,7 @@ use App\Http\Requests\BaseRequest;
 use App\Models\Pks;
 use App\Models\PksItemFulfillment;
 use App\Services\Pks\Fulfillment\ItemFulfillmentService;
+use App\Traits\ValidatesPksAktif;
 use Illuminate\Contracts\Validation\Validator;
 use SanderMuller\FluentValidation\FluentRule;
 
@@ -21,6 +22,8 @@ use SanderMuller\FluentValidation\FluentRule;
  */
 class ItemFulfillmentBulkStoreRequest extends BaseRequest
 {
+    use ValidatesPksAktif;
+
     public const MAX_ITEMS = 100;
 
     private const TYPE_MAP = [1 => 'kaporlap', 2 => 'device', 3 => 'chemical'];
@@ -142,6 +145,12 @@ class ItemFulfillmentBulkStoreRequest extends BaseRequest
 
                 if (! $pks || ! $pks->quotation_id) {
                     $validator->errors()->add("items.{$i}.pks_id", 'PKS tidak valid atau belum memiliki quotation.');
+
+                    continue;
+                }
+
+                if ($this->pksBelumAktif($pks)) {
+                    $validator->errors()->add("items.{$i}.pks_id", self::PESAN_PKS_BELUM_AKTIF);
 
                     continue;
                 }

@@ -6,11 +6,14 @@ use App\Http\Requests\BaseRequest;
 use App\Models\Pks;
 use App\Models\PksItemFulfillment;
 use App\Services\Pks\Fulfillment\ItemFulfillmentService;
+use App\Traits\ValidatesPksAktif;
 use Illuminate\Contracts\Validation\Validator;
 use SanderMuller\FluentValidation\FluentRule;
 
 class ItemFulfillmentStoreRequest extends BaseRequest
 {
+    use ValidatesPksAktif;
+
     public function authorize(): bool
     {
         return true;
@@ -98,6 +101,12 @@ class ItemFulfillmentStoreRequest extends BaseRequest
 
             if (! $pks || ! $pks->quotation_id) {
                 $validator->errors()->add('pks_id', 'PKS tidak valid atau belum memiliki quotation.');
+
+                return;
+            }
+
+            if ($this->pksBelumAktif($pks)) {
+                $validator->errors()->add('pks_id', self::PESAN_PKS_BELUM_AKTIF);
 
                 return;
             }

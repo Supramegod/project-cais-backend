@@ -18950,6 +18950,176 @@
                 ]
             }
         },
+        "/api/pks-fulfillment/item-dashboard": {
+            "get": {
+                "tags": [
+                    "PKS Fulfillment"
+                ],
+                "summary": "Dashboard item fulfillment PKS",
+                "description": "Daftar PKS aktif beserta jumlah item request & receive, plus empat angka agregat.\n     *\n     * Semantik yang dipakai adalah JUMLAH BARIS, bukan kuantitas:\n     * - jumlah_request  : baris sl_pks_item_request berstatus open — barang sedang di jalan, turun saat penerimaan dicatat\n     * - jumlah_receive  : baris sl_pks_item_fulfillment dengan qty_terpenuhi > 0 — jenis item yang sudah pernah sampai di site\n     * - total_fulfilled : baris sl_pks_item_fulfillment berstatus fully_fulfilled\n     * - total_remaining : semesta item quotation dikurangi yang fully_fulfilled, minimum 0\n     *\n     * Blok `summary` dihitung atas SELURUH PKS yang cocok filter, bukan hanya halaman aktif.",
+                "operationId": "18bab5c6584df8255583fe883b38b907",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search_by",
+                        "in": "query",
+                        "description": "nama_perusahaan | nomor | created_by",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "branch",
+                        "in": "query",
+                        "description": "Filter branch (sl_leads.branch_id)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "tgl_dari",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "tgl_sampai",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Success",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "PKS item fulfillment dashboard retrieved successfully"
+                                        },
+                                        "summary": {
+                                            "properties": {
+                                                "total_request": {
+                                                    "type": "integer"
+                                                },
+                                                "total_receive": {
+                                                    "type": "integer"
+                                                },
+                                                "total_fulfilled": {
+                                                    "type": "integer"
+                                                },
+                                                "total_remaining": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "nomor": {
+                                                        "type": "string"
+                                                    },
+                                                    "nama_perusahaan": {
+                                                        "type": "string"
+                                                    },
+                                                    "jumlah_request": {
+                                                        "type": "integer"
+                                                    },
+                                                    "jumlah_receive": {
+                                                        "type": "integer"
+                                                    },
+                                                    "created_by": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                },
+                                                "total_per_page": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "tgl_dari": {
+                                                    "type": "string"
+                                                },
+                                                "tgl_sampai": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/pks-wizard/initialize/{tipe}": {
             "post": {
                 "tags": [
@@ -23973,8 +24143,8 @@
                                                         "example": "2 September 2025"
                                                     },
                                                     "nomor": {
-                                                        "type": "string",
-                                                        "example": "CAT/CS/AAB8I-092025-00001"
+                                                        "type": "integer",
+                                                        "example": 1
                                                     },
                                                     "nama_perusahaan": {
                                                         "type": "string",

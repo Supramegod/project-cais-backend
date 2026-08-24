@@ -22,6 +22,7 @@ use App\Http\Controllers\OhcController;
 use App\Http\Controllers\OptionController;
 use App\Http\Controllers\PksController;
 use App\Http\Controllers\PksFulfillmentController;
+use App\Http\Controllers\PksItemFulfillmentDashboardController;
 use App\Http\Controllers\PksWizardController;
 use App\Http\Controllers\PositionController;
 use App\Http\Controllers\QuotationController;
@@ -554,6 +555,11 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/activity-detail/tele/{user_id}', 'activityDetailTele');
 
     });
+
+    // Dashboard item fulfillment — daftar PKS + 4 angka agregat. Didaftarkan di
+    // luar grup di bawah (controller berbeda) dan sebelum rute /{pks}/... supaya
+    // tidak tertangkap route binding PKS.
+    Route::get('pks-fulfillment/item-dashboard', [PksItemFulfillmentDashboardController::class, 'itemDashboard']);
 
     // PKS Fulfillment
     Route::prefix('pks-fulfillment')->controller(PksFulfillmentController::class)->group(function () {

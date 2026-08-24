@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
@@ -1556,6 +1557,125 @@ class PksFulfillmentItemApiTest extends TestCase
         $this->assertSame(1, $receive['kurang']);
         $this->assertSame(10, $receive['remaining_sebelum']);
         $this->assertSame(7, $receive['remaining_sesudah']);
+    }
+
+    // ─── Gerbang status PKS: aksi tulis item butuh Kontrak Aktif ─────
+    private function nonAktifkanPks(int $status = 5): void
+    {
+        DB::table('sl_pks')->where('id', $this->pksId)->update(['status_pks_id' => $status]);
+    }
+
+    /**
+     * BaseRequest membungkus error validasi sebagai {"message": {field: [...]}},
+     * bukan envelope "errors" bawaan Laravel — dan key bulk mengandung titik,
+     * jadi tidak bisa diakses lewat dot notation.
+     */
+    private function assertTolakanPksBelumAktif(TestResponse $response, string $key): void
+    {
+        $errors = $response->assertStatus(422)->json('message');
+
+        $this->assertArrayHasKey($key, $errors);
+        $this->assertStringContainsString('Kontrak Aktif', $errors[$key][0]);
+    }
+
+    /** @test */
+    public function test_request_ditolak_saat_pks_belum_aktif(): void
+    {
+        $this->clearFulfillments();
+        $this->nonAktifkanPks();
+
+        $this->assertTolakanPksBelumAktif(
+            $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+                'pks_id' => $this->pksId,
+                'site_id' => $this->siteId,
+                'item_type_id' => 1,
+                'item_id' => $this->kaporlapId,
+                'qty' => 3,
+                'catatan' => 'Mencoba kirim saat PKS belum aktif',
+            ]),
+            'pks_id'
+        );
+
+        $this->assertDatabaseCount('sl_pks_item_fulfillment', 0);
+    }
+
+    /** @test */
+    public function test_bulk_ditolak_saat_pks_belum_aktif(): void
+    {
+        $this->clearFulfillments();
+        $this->nonAktifkanPks();
+
+        $this->assertTolakanPksBelumAktif(
+            $this->postJson('/api/pks-fulfillment/item-fulfillment/bulk', [
+                'items' => [[
+                    'pks_id' => $this->pksId,
+                    'site_id' => $this->siteId,
+                    'item_type_id' => 1,
+                    'item_id' => $this->kaporlapId,
+                    'qty' => 3,
+                    'catatan' => 'Mencoba kirim batch saat PKS belum aktif',
+                ]],
+            ]),
+            'items.0.pks_id'
+        );
+
+        $this->assertDatabaseCount('sl_pks_item_fulfillment', 0);
+    }
+
+    /** @test */
+    public function test_edit_ditolak_saat_pks_belum_aktif(): void
+    {
+        $this->clearFulfillments();
+        $fulfillment = $this->createTestFulfillment(3, 'kaporlap');
+
+        $this->nonAktifkanPks();
+
+        $this->assertTolakanPksBelumAktif(
+            $this->patchJson("/api/pks-fulfillment/item-fulfillment/{$fulfillment->id}", [
+                'new_qty' => 5,
+                'catatan' => 'Mencoba koreksi saat PKS belum aktif',
+            ]),
+            'pks_id'
+        );
+
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'id' => $fulfillment->id,
+            'qty_terpenuhi' => $fulfillment->qty_terpenuhi,
+        ]);
+    }
+
+    /**
+     * Barang yang sudah terlanjur dikirim harus tetap bisa dibukukan walau
+     * PKS-nya turun status — kalau tidak, barang fisik di site menggantung
+     * tanpa jalan penyelesaian.
+     *
+     * @test
+     */
+    public function test_receive_tetap_boleh_saat_pks_belum_aktif(): void
+    {
+        $this->clearFulfillments();
+
+        $fulfillmentId = $this->postJson('/api/pks-fulfillment/item-fulfillment', [
+            'pks_id' => $this->pksId,
+            'site_id' => $this->siteId,
+            'item_type_id' => 1,
+            'item_id' => $this->kaporlapId,
+            'qty' => 4,
+            'catatan' => 'Kirim barang selagi PKS masih aktif',
+        ])->assertStatus(201)->json('data.id');
+
+        $this->nonAktifkanPks();
+
+        $this->postJson('/api/pks-fulfillment/item-fulfillment/receive', [
+            'items' => [['fulfillment_id' => $fulfillmentId, 'qty' => 4]],
+            'catatan' => 'Barang sampai walau PKS turun status',
+        ])->assertStatus(201);
+
+        $this->assertDatabaseHas('sl_pks_item_fulfillment', [
+            'id' => $fulfillmentId,
+            'qty_terpenuhi' => 4,
+            'qty_request' => 0,
+        ]);
     }
 
     protected ?string $tempDbPath = null;

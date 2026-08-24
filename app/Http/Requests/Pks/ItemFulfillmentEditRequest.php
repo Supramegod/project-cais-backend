@@ -4,11 +4,14 @@ namespace App\Http\Requests\Pks;
 
 use App\Http\Requests\BaseRequest;
 use App\Models\PksItemFulfillment;
+use App\Traits\ValidatesPksAktif;
 use Illuminate\Contracts\Validation\Validator;
 use SanderMuller\FluentValidation\FluentRule;
 
 class ItemFulfillmentEditRequest extends BaseRequest
 {
+    use ValidatesPksAktif;
+
     public function authorize(): bool
     {
         return true;
@@ -26,9 +29,9 @@ class ItemFulfillmentEditRequest extends BaseRequest
     {
         return [
             'new_qty.required' => 'Qty baru wajib diisi.',
-            'new_qty.min'      => 'Qty baru minimal 0.',
+            'new_qty.min' => 'Qty baru minimal 0.',
             'catatan.required' => 'Catatan wajib diisi.',
-            'catatan.min'      => 'Catatan minimal 10 karakter.',
+            'catatan.min' => 'Catatan minimal 10 karakter.',
         ];
     }
 
@@ -45,7 +48,13 @@ class ItemFulfillmentEditRequest extends BaseRequest
         $validator->after(function (Validator $validator) {
             $fulfillment = $this->route('fulfillment');
 
-            if (!$fulfillment instanceof PksItemFulfillment) {
+            if (! $fulfillment instanceof PksItemFulfillment) {
+                return;
+            }
+
+            if ($this->pksBelumAktif($fulfillment->pks)) {
+                $validator->errors()->add('pks_id', self::PESAN_PKS_BELUM_AKTIF);
+
                 return;
             }
 

@@ -5,15 +5,19 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Pks extends Model
 {
     use SoftDeletes;
 
+    /** m_status_pks id 7 = "Kontrak Aktif Oleh Manager CRM". */
+    public const STATUS_AKTIF = 7;
+
     protected $table = 'sl_pks';
+
     protected $primaryKey = 'id';
 
     protected $fillable = [
@@ -113,7 +117,7 @@ class Pks extends Model
         'item_fulfillment_reminded_at',
         'created_by',
         'updated_by',
-        'created_by_user_id'
+        'created_by_user_id',
     ];
 
     protected $dates = ['tgl_pks', 'kontrak_awal', 'kontrak_akhir', 'deleted_at'];
@@ -178,60 +182,79 @@ class Pks extends Model
     {
         return $this->hasMany(CustomerActivity::class, 'pks_id');
     }
+
+    public function isAktif(): bool
+    {
+        return (int) $this->status_pks_id === self::STATUS_AKTIF;
+    }
+
     // Tambahkan di bagian relasi (di dalam class Pks)
     public function ruleThr(): BelongsTo
     {
         return $this->belongsTo(RuleThr::class, 'rule_thr_id');
     }
+
     public function quotations(): BelongsTo
     {
         return $this->belongsTo(Quotation::class, 'quotation_id');
     }
+
     public function spk(): BelongsTo
     {
         return $this->belongsTo(Spk::class, 'spk_id');
     }
+
     public function salaryRule(): BelongsTo
     {
         return $this->belongsTo(SalaryRule::class, 'salary_rule_id');
     }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class, 'branch_id');
     }
+
     public function bidangPerusahaan(): BelongsTo
     {
         return $this->belongsTo(BidangPerusahaan::class, 'bidang_usaha_id');
     }
+
     public function provinsi(): BelongsTo
     {
         return $this->belongsTo(Province::class, 'provinsi_id');
     }
+
     public function jenisPerusahaan(): BelongsTo
     {
         return $this->belongsTo(JenisPerusahaan::class, 'jenis_perusahaan_id');
     }
+
     public function kebutuhan(): BelongsTo
     {
         return $this->belongsTo(Kebutuhan::class, 'layanan_id');
     }
-      // Relasi untuk company_id
+
+    // Relasi untuk company_id
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class, 'company_id');
     }
+
     public function pksInduk(): BelongsTo
     {
         return $this->belongsTo(Pks::class, 'pks_induk_id');
     }
+
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+
     public function getUpdatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+
     /**
      * SCOPE: Mendapatkan SPK berdasarkan leads_id
      * Logika filter ada di sini (DI MODEL SPK)
@@ -264,6 +287,7 @@ class Pks extends Model
     public function scopeOngoing(Builder $query)
     {
         $now = now()->toDateString();
+
         return $query->where('kontrak_awal', '<=', $now)
             ->where('kontrak_akhir', '>=', $now);
     }
@@ -276,6 +300,7 @@ class Pks extends Model
         $total = self::where('leads_id', $leadsId)->count();
         $active = self::where('leads_id', $leadsId)->active()->count();
         $ongoing = self::where('leads_id', $leadsId)->ongoing()->count();
+
         return [
             'total' => $total,
             'active' => $active,
@@ -283,6 +308,7 @@ class Pks extends Model
             'inactive' => $total - $active,
         ];
     }
+
     public function getNamaStatusAttribute()
     {
         if ($this->relationLoaded('statusPks') && $this->statusPks) {
@@ -291,11 +317,12 @@ class Pks extends Model
 
         return $this->statusPks?->nama;
     }
+
     public function getTglPksAttribute($value)
     {
         $carbonDate = Carbon::parse($value);
         $carbonDate->setLocale('id');
+
         return $carbonDate->isoFormat('D MMMM Y');
     }
-
 }
