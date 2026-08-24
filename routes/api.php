@@ -46,6 +46,7 @@ use App\Http\Controllers\TunjanganController;
 use App\Http\Controllers\UmkController;
 use App\Http\Controllers\UmpController;
 use App\Http\Controllers\UpahController;
+use App\Http\Controllers\UserController;
 use App\Http\Controllers\UserEmailConfigController;
 
 Route::post('/auth/login', [AuthController::class, 'login']);
@@ -360,13 +361,20 @@ Route::middleware(['auth:sanctum,web', 'token.expiry'])->group(function () {
         Route::get('/available', 'availableCustomer')->name('customer.available');
     });
     // SPK Routes
-    require __DIR__ . '/modules/spk.php';
+    require __DIR__.'/modules/spk.php';
     // Role Management
     Route::prefix('roles')->controller(RoleController::class)->group(function () {
         Route::get('/list', 'index');
         Route::get('/view/{id}', 'show');
         Route::get('/permissions', 'menuPermissions');
         Route::post('/{id}/update-permissions', 'updatePermissions');
+    });
+
+    Route::prefix('users')->controller(UserController::class)->group(function () {
+        Route::get('/list', 'index');
+        Route::get('/by-role/{roleId}', 'byRole')->whereNumber('roleId');
+        Route::get('/by-branch/{branchId}', 'byBranch')->whereNumber('branchId');
+        Route::get('/view/{id}', 'show')->whereNumber('id');
     });
     // PKS Management - TAMBAHKAN BLOK INI
     Route::prefix('pks')->controller(PksController::class)->group(function () {
