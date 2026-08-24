@@ -7,11 +7,10 @@ use App\Services\Pks\Fulfillment\PksDashboardFilterBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class PksItemFulfillmentDashboardController extends Controller
 {
-    private const PER_PAGE_DEFAULT = 15;
-
     public function __construct(
         private PksDashboardFilterBuilder $filterBuilder,
         private ItemFulfillmentDashboardService $dashboardService,
@@ -38,8 +37,20 @@ class PksItemFulfillmentDashboardController extends Controller
      *     @OA\Parameter(name="branch", in="query", required=false, description="Filter branch (sl_leads.branch_id)", @OA\Schema(type="integer")),
      *     @OA\Parameter(name="tgl_dari", in="query", required=false, @OA\Schema(type="string", format="date")),
      *     @OA\Parameter(name="tgl_sampai", in="query", required=false, @OA\Schema(type="string", format="date")),
-     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer")),
+     *     @OA\Parameter(name="per_page", in="query", required=false, description="Default 15, maksimum 100. Nilai non-numerik atau di bawah 1 memakai default.", @OA\Schema(type="integer", minimum=1, maximum=100, default=15)),
      *     @OA\Parameter(name="page", in="query", required=false, @OA\Schema(type="integer")),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="search_by di luar daftar yang diizinkan",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="object",
+     *                 @OA\Property(property="search_by", type="array", @OA\Items(type="string"))
+     *             )
+     *         )
+     *     ),
      *
      *     @OA\Response(
      *         response=200,
@@ -89,12 +100,10 @@ class PksItemFulfillmentDashboardController extends Controller
 
             $base = $this->filterBuilder->build($request, $tglDari, $tglSampai);
 
-            // Rekap dihitung sekali atas seluruh himpunan terfilter lalu dipetakan
-            // ke baris halaman aktif — supaya jumlah query tetap konstan terhadap
-            // per_page maupun jumlah PKS.
-            $quotationIdByPksId = (clone $base)->pluck('sl_pks.quotation_id', 'sl_pks.id')->all();
-            $perPks = $this->dashboardService->perPks($quotationIdByPksId);
-            $summary = $this->dashboardService->summaryFor($perPks);
+            // Summary dihitung streaming atas seluruh himpunan terfilter (memori
+            // datar), sedangkan rekap per baris hanya untuk halaman aktif — jumlah
+            // query tetap konstan terhadap per_page.
+            $summary = $this->dashboardService->summaryForQuery($base);
 
             $pksList = (clone $base)
                 ->select([
@@ -102,9 +111,14 @@ class PksItemFulfillmentDashboardController extends Controller
                     'sl_pks.nomor',
                     'sl_pks.nama_perusahaan',
                     'sl_pks.created_by',
+                    'sl_pks.quotation_id',
                 ])
                 ->orderBy('sl_pks.created_at', 'desc')
-                ->paginate((int) $request->input('per_page', self::PER_PAGE_DEFAULT));
+                ->paginate($this->filterBuilder->perPage($request));
+
+            $perPks = $this->dashboardService->perPks(
+                $pksList->getCollection()->pluck('quotation_id', 'id')->all()
+            );
 
             $pksList->getCollection()->transform(function ($pks) use ($perPks) {
                 $rekap = $perPks[$pks->id] ?? null;
@@ -132,10 +146,16 @@ class PksItemFulfillmentDashboardController extends Controller
                 ],
                 'meta' => ['tgl_dari' => $tglDari, 'tgl_sampai' => $tglSampai],
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
-            Log::error('Error in PksItemFulfillmentDashboardController@itemDashboard: '.$e->getMessage());
+            Log::error('Error in PksItemFulfillmentDashboardController@itemDashboard: '.$e->getMessage(), [
+                'exception' => $e,
+            ]);
 
-            return $this->serverErrorResponse($e->getMessage());
+            // Pesan exception TIDAK dikirim ke client: QueryException membawa SQL
+            // lengkap beserta host, port, dan nama database.
+            return $this->serverErrorResponse();
         }
     }
 }

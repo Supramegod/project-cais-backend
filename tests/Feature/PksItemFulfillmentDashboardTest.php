@@ -321,6 +321,80 @@ class PksItemFulfillmentDashboardTest extends TestCase
         $this->assertSame($satuBaris, $hitung(self::ENDPOINT.'?per_page=50'));
     }
 
+    /** @test */
+    public function test_per_page_negatif_tidak_melewati_pagination(): void
+    {
+        // Sebelum dijepit, per_page negatif membuat Builder::limit() diabaikan
+        // sehingga query jadi "offset 0" tanpa limit — MySQL menolak, dan pesan
+        // error-nya membawa host serta nama database.
+        $response = $this->getJson(self::ENDPOINT.'?per_page=-1');
+
+        $response->assertOk();
+        $this->assertSame(
+            $this->getJson(self::ENDPOINT)->json('pagination'),
+            $response->json('pagination')
+        );
+    }
+
+    /** @test */
+    public function test_per_page_non_numerik_jatuh_ke_default(): void
+    {
+        $this->getJson(self::ENDPOINT.'?per_page=banyak')->assertOk();
+    }
+
+    /** @test */
+    public function test_search_by_tak_dikenal_ditolak(): void
+    {
+        // Diabaikan diam-diam berarti tidak ada predikat sama sekali sementara
+        // filter tanggal juga sudah dilewati — seluruh PKS aktif ikut terkirim.
+        // Envelope validasi aplikasi ini: { message: { field: [...] } }
+        $this->getJson(self::ENDPOINT.'?search=apa+saja&search_by=ngawur')
+            ->assertStatus(422)
+            ->assertJsonStructure(['message' => ['search_by']]);
+    }
+
+    /** @test */
+    public function test_default_rentang_tanggal_menyaring_pks_lama(): void
+    {
+        DB::table('sl_pks')->insert([
+            'id' => 4,
+            'leads_id' => 1,
+            'quotation_id' => 44,
+            'nomor' => 'PKS-004',
+            'nama_perusahaan' => 'PT Lawas',
+            'tgl_pks' => now()->subYears(2)->toDateString(),
+            'initialized_at' => now()->subYears(2),
+            'status_pks_id' => 7,
+            'created_by' => 'Sales Lama',
+            'created_by_user_id' => 1,
+            'deleted_at' => null,
+            'created_at' => now()->subYears(2),
+            'updated_at' => now()->subYears(2),
+        ]);
+
+        $default = collect($this->getJson(self::ENDPOINT)->json('data'))->pluck('nomor')->all();
+        $this->assertNotContains('PKS-004', $default);
+
+        $lebar = collect(
+            $this->getJson(self::ENDPOINT.'?tgl_dari='.now()->subYears(3)->toDateString())->json('data')
+        )->pluck('nomor')->all();
+        $this->assertContains('PKS-004', $lebar);
+    }
+
+    /** @test */
+    public function test_item_quotation_terhapus_tidak_ikut_dihitung(): void
+    {
+        $sebelum = $this->getJson(self::ENDPOINT)->json('summary.total_remaining');
+        $this->assertSame(4, $sebelum);
+
+        DB::table('sl_quotation_kaporlap')
+            ->where('quotation_id', 11)
+            ->limit(1)
+            ->update(['deleted_at' => now()]);
+
+        $this->assertSame(3, $this->getJson(self::ENDPOINT)->json('summary.total_remaining'));
+    }
+
     protected function tearDown(): void
     {
         foreach (['sqlite', 'mysqlhris', 'mysql'] as $connection) {

@@ -18,6 +18,7 @@ use App\Services\Pks\Fulfillment\FulfillmentLogService;
 use App\Services\Pks\Fulfillment\HcFulfillmentService;
 use App\Services\Pks\Fulfillment\ItemFulfillmentService;
 use App\Services\Pks\Fulfillment\ItemReceivingService;
+use App\Services\Pks\Fulfillment\PksDashboardFilterBuilder;
 use App\Services\Pks\Fulfillment\PksFulfillmentDashboardService;
 use App\Services\Pks\Fulfillment\PksFulfillmentSummaryService;
 use App\Services\Pks\Fulfillment\VisitFulfillmentService;
@@ -26,7 +27,8 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * @OA\Tag(
@@ -216,40 +218,15 @@ class PksFulfillmentController extends Controller
      *     )
      * )
      */
-    public function dashboard(Request $request, PksFulfillmentDashboardService $dashboardService): JsonResponse
+    public function dashboard(Request $request, PksFulfillmentDashboardService $dashboardService, PksDashboardFilterBuilder $filterBuilder): JsonResponse
     {
         try {
-            $tglDari = $request->tgl_dari ?? Carbon::now()->startOfMonth()->subMonths(6)->toDateString();
-            $tglSampai = $request->tgl_sampai ?? Carbon::now()->toDateString();
+            $tglDari = $request->tgl_dari ?? $filterBuilder->defaultTglDari();
+            $tglSampai = $request->tgl_sampai ?? $filterBuilder->defaultTglSampai();
 
-            // Base query + filter (dipakai untuk summary keseluruhan & list paginated).
-            $base = Pks::query()
-                ->leftJoin('sl_leads', 'sl_pks.leads_id', '=', 'sl_leads.id')
-                ->where('sl_pks.status_pks_id', 7); // hanya PKS aktif
-
-            // Search — pola yang sama dengan PksController@index.
-            if ($request->filled('search')) {
-                $searchTerm = $request->search;
-                $searchBy = $request->get('search_by', 'nama_perusahaan');
-
-                if ($searchBy === 'nama_perusahaan') {
-                    $searchTerm = str_contains($searchTerm, ' ')
-                        ? '"'.$searchTerm.'"'
-                        : $searchTerm.'*';
-                    $base->whereRaw('MATCH(sl_pks.nama_perusahaan) AGAINST(? IN BOOLEAN MODE)', [$searchTerm]);
-                } elseif (in_array($searchBy, ['nomor', 'created_by'])) {
-                    $base->where("sl_pks.{$searchBy}", 'LIKE', '%'.$searchTerm.'%');
-                }
-            } else {
-                $base->whereBetween(
-                    DB::raw('DATE(COALESCE(sl_pks.tgl_pks, sl_pks.initialized_at, sl_pks.created_at))'),
-                    [$tglDari, $tglSampai]
-                );
-            }
-
-            if ($request->filled('branch')) {
-                $base->where('sl_leads.branch_id', $request->branch);
-            }
+            // Filter (status aktif, search_by, branch, rentang tanggal) hidup di
+            // PksDashboardFilterBuilder, dipakai bersama dashboard item fulfillment.
+            $base = $filterBuilder->build($request, $tglDari, $tglSampai);
 
             // Rekap atas SELURUH PKS yang cocok filter — dihitung sekali,
             // dipakai untuk summary fulfillment agregat & enrich list.
@@ -279,7 +256,7 @@ class PksFulfillmentController extends Controller
                     'sites:id,pks_id,nama_site',
                 ])
                 ->orderBy('sl_pks.created_at', 'desc')
-                ->paginate($request->get('per_page', 15));
+                ->paginate($filterBuilder->perPage($request));
 
             $pksList->getCollection()->transform(function ($pks) use ($recap) {
                 $r = $recap[$pks->id] ?? null;
@@ -313,10 +290,14 @@ class PksFulfillmentController extends Controller
                 ],
                 'meta' => ['tgl_dari' => $tglDari, 'tgl_sampai' => $tglSampai],
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
-            \Log::error('Error in PksFulfillmentController@dashboard: '.$e->getMessage());
+            Log::error('Error in PksFulfillmentController@dashboard: '.$e->getMessage(), ['exception' => $e]);
 
-            return $this->serverErrorResponse($e->getMessage());
+            // Pesan exception TIDAK dikirim ke client: QueryException membawa SQL
+            // lengkap beserta host, port, dan nama database.
+            return $this->serverErrorResponse();
         }
     }
 

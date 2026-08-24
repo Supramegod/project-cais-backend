@@ -7,6 +7,7 @@ use App\Models\PksItemRequest;
 use App\Models\QuotationChemical;
 use App\Models\QuotationDevices;
 use App\Models\QuotationKaporlap;
+use Illuminate\Database\Eloquent\Builder;
 
 class ItemFulfillmentDashboardService
 {
@@ -59,6 +60,38 @@ class ItemFulfillmentDashboardService
         }
 
         return $hasil;
+    }
+
+    /**
+     * Agregat atas SELURUH himpunan terfilter tanpa memuat semua id sekaligus:
+     * baris dibaca per chunk lalu langsung dijumlahkan, sehingga memori tetap
+     * datar berapa pun banyaknya PKS aktif.
+     *
+     * @return array{total_request:int, total_receive:int, total_fulfilled:int, total_remaining:int}
+     */
+    public function summaryForQuery(Builder $base): array
+    {
+        $summary = [
+            'total_request' => 0,
+            'total_receive' => 0,
+            'total_fulfilled' => 0,
+            'total_remaining' => 0,
+        ];
+
+        (clone $base)
+            ->select(['sl_pks.id', 'sl_pks.quotation_id'])
+            ->orderBy('sl_pks.id')
+            ->chunk(self::CHUNK, function ($rows) use (&$summary): void {
+                $sebagian = $this->summaryFor(
+                    $this->perPks($rows->pluck('quotation_id', 'id')->all())
+                );
+
+                foreach ($summary as $kunci => $nilai) {
+                    $summary[$kunci] = $nilai + $sebagian[$kunci];
+                }
+            });
+
+        return $summary;
     }
 
     /**

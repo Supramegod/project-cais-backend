@@ -19006,9 +19006,13 @@
                     {
                         "name": "per_page",
                         "in": "query",
+                        "description": "Default 15, maksimum 100. Nilai non-numerik atau di bawah 1 memakai default.",
                         "required": false,
                         "schema": {
-                            "type": "integer"
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1
                         }
                     },
                     {
@@ -19021,6 +19025,29 @@
                     }
                 ],
                 "responses": {
+                    "422": {
+                        "description": "search_by di luar daftar yang diizinkan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "properties": {
+                                                "search_by": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "200": {
                         "description": "Success",
                         "content": {
