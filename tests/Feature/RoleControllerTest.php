@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Http\Middleware\CheckTokenExpiry;
 use App\Models\User;
+use App\Services\MenuPermissionService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -399,6 +401,52 @@ class RoleControllerTest extends TestCase
             'sysmenu_id' => 2,
             'is_view' => 0,
         ]);
+    }
+
+    public function test_update_permissions_role_membuang_cache_override_user(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_view' => false]);
+
+        $this->assertFalse($this->app->make(MenuPermissionService::class)->overridesForUser(2, 1)[1]['is_view']);
+        $this->assertTrue(Cache::has('menu-perm:role:2:user:1'));
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertFalse(Cache::has('menu-perm:role:2:user:1'));
+        $this->assertTrue($this->app->make(MenuPermissionService::class)->overridesForUser(2, 1)[1]['is_view']);
+    }
+
+    public function test_update_permissions_user_membuang_cache_user_tersebut(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, 1, ['is_view' => false]);
+
+        $this->app->make(MenuPermissionService::class)->overridesForUser(2, 1);
+        $this->assertTrue(Cache::has('menu-perm:role:2:user:1'));
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 1,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertFalse(Cache::has('menu-perm:role:2:user:1'));
+    }
+
+    public function test_update_permissions_sysmenu_id_tidak_dikenal_ditolak(): void
+    {
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 9999, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertStatus(422);
     }
 
     public function test_menu_permissions_memakai_override_user(): void

@@ -23,6 +23,8 @@ class SpkMenuPermissionTest extends TestCase
 {
     private const ROLE_ID = 2;
 
+    private const PARENT_MENU_ID = 900;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,6 +58,15 @@ class SpkMenuPermissionTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        DB::table('sysmenu')->insert([
+            ['id' => self::PARENT_MENU_ID, 'nama' => 'Sales', 'parent_id' => null],
+            ['id' => (int) config('menu_permissions.spk'), 'nama' => 'SPK', 'parent_id' => self::PARENT_MENU_ID],
+        ]);
+
+        // Menu anak menuntut is_view pada leluhurnya, jadi parent dibuka dulu
+        // supaya tiap test bisa fokus ke menu SPK-nya sendiri.
+        $this->grant(['is_view' => true], self::PARENT_MENU_ID);
 
         Cache::flush();
 
@@ -194,6 +205,32 @@ class SpkMenuPermissionTest extends TestCase
         $this->getJson('/api/spk/list')->assertOk();
     }
 
+    public function test_menu_ditolak_ketika_parent_tidak_boleh_dilihat(): void
+    {
+        $this->grant(['is_view' => true]);
+        $this->revokeParentView();
+
+        $this->getJson('/api/spk/list')->assertStatus(403);
+    }
+
+    public function test_menu_ditolak_ketika_override_user_menutup_parent(): void
+    {
+        $this->grant(['is_view' => true]);
+        $this->grantUser(1, ['is_view' => false], self::PARENT_MENU_ID);
+
+        $this->getJson('/api/spk/list')->assertStatus(403);
+    }
+
+    private function revokeParentView(): void
+    {
+        DB::table('sysmenu_role')
+            ->where('sysmenu_id', self::PARENT_MENU_ID)
+            ->whereNull('user_id')
+            ->update(['is_view' => false]);
+
+        Cache::flush();
+    }
+
     /**
      * @param  array<string, bool>  $flags
      */
@@ -216,9 +253,16 @@ class SpkMenuPermissionTest extends TestCase
 
     private function rebuildSchema(): void
     {
-        foreach (['m_user', 'sysmenu_role', 'sl_spk', 'sl_leads', 'm_status_spk'] as $table) {
+        foreach (['m_user', 'sysmenu', 'sysmenu_role', 'sl_spk', 'sl_leads', 'm_status_spk'] as $table) {
             Schema::dropIfExists($table);
         }
+
+        Schema::create('sysmenu', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('nama')->nullable();
+            $table->unsignedInteger('parent_id')->nullable();
+            $table->timestamp('deleted_at')->nullable();
+        });
 
         Schema::create('m_user', function (Blueprint $table) {
             $table->increments('id');

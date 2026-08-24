@@ -8,6 +8,7 @@ use App\Http\Requests\Menu\MenuStoreRequest;
 use App\Http\Requests\Menu\MenuUpdateRequest;
 use App\Models\Sysmenu;
 use App\Models\SysmenuGroup;
+use App\Services\MenuPermissionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class MenuController extends Controller
 {
+    public function __construct(private MenuPermissionService $menuPermissions) {}
+
     /**
      * @OA\Get(
      *     path="/api/menu/list",
@@ -192,6 +195,10 @@ class MenuController extends Controller
             'created_by_user_id' => Auth::id(),
         ]);
 
+        // Peta parent dipakai untuk menegakkan is_view leluhur, jadi harus
+        // dibuang begitu struktur menu berubah.
+        $this->menuPermissions->forgetMenuTree();
+
         return $this->successResponse($menu, 'Data Berhasil Disimpan', 201);
     }
 
@@ -306,6 +313,8 @@ class MenuController extends Controller
             'deleted_at' => Carbon::now()->toDateTimeString(),
             'deleted_by' => Auth::user()->full_name,
         ]);
+
+        $this->menuPermissions->forgetMenuTree();
 
         return $this->messageResponse('Data Berhasil Dihapus');
     }

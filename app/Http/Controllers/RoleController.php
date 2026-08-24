@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
  */
 class RoleController extends Controller
 {
+    /** @var array<int, list<int>>|null */
+    private ?array $childrenByParent = null;
+
     public function __construct(private MenuPermissionService $menuPermissions) {}
 
     /**
@@ -73,7 +76,7 @@ class RoleController extends Controller
      *         name="user_id",
      *         in="query",
      *         required=false,
-     *         description="Kalau diisi, tiap menu ikut membawa objek `override` berisi nilai khusus user tersebut. User wajib anggota role ini, kalau bukan akan 422.",
+     *         description="Kalau diisi, permission tiap menu dihitung untuk user tersebut: baris user meng-override baris role per menu, dan menu tanpa baris user tetap mengikuti role. Response ikut membawa `has_override` dan objek `override`. User wajib anggota role ini, kalau bukan akan 422.",
      *
      *         @OA\Schema(type="integer")
      *     ),
@@ -101,6 +104,13 @@ class RoleController extends Controller
      *                         @OA\Property(property="is_add", type="boolean", example=true),
      *                         @OA\Property(property="is_edit", type="boolean", example=true),
      *                         @OA\Property(property="is_delete", type="boolean", example=false),
+     *                         @OA\Property(property="has_override", type="boolean", example=true, description="Hanya saat `user_id` diisi. True kalau user punya baris khusus untuk menu ini, artinya nilai efektif di atas berasal dari baris user, bukan dari role."),
+     *                         @OA\Property(property="override", type="object", description="Hanya saat `user_id` diisi. Nilai mentah baris user; abaikan kalau `has_override` false.",
+     *                             @OA\Property(property="is_view", type="boolean", example=true),
+     *                             @OA\Property(property="is_add", type="boolean", example=false),
+     *                             @OA\Property(property="is_edit", type="boolean", example=false),
+     *                             @OA\Property(property="is_delete", type="boolean", example=false)
+     *                         ),
      *                         @OA\Property(property="children", type="array",
      *
      *                             @OA\Items(
@@ -352,19 +362,23 @@ class RoleController extends Controller
         $permissions = $request->input('akses', []);
         $userId = $request->input('user_id') !== null ? (int) $request->input('user_id') : null;
 
+        $roleId = (int) $id;
         $resyncedUserIds = [];
 
-        DB::transaction(function () use ($permissions, $id, $userId, &$resyncedUserIds) {
+        DB::transaction(function () use ($permissions, $roleId, $userId, &$resyncedUserIds) {
             foreach ($permissions as $permission) {
-                $this->updateOrCreatePermission($id, $permission, $userId);
+                $menuId = (int) $permission['sysmenu_id'];
+                $childMenuIds = $this->getAllChildMenuIds($menuId);
+
+                $this->updateOrCreatePermission($roleId, $permission, $userId);
 
                 // Jika yang diupdate adalah menu parent, update juga semua child menus
-                $this->cascadePermissionToChildren($id, $permission, $userId);
+                $this->cascadePermissionToChildren($roleId, $permission, $childMenuIds, $userId);
 
                 if ($userId === null) {
                     $resyncedUserIds = array_merge(
                         $resyncedUserIds,
-                        $this->resyncUserOverrides($id, $permission)
+                        $this->resyncUserOverrides($roleId, $permission, array_merge([$menuId], $childMenuIds))
                     );
                 }
             }
@@ -373,13 +387,13 @@ class RoleController extends Controller
         // Cache permission dibaca setiap request oleh CheckMenuPermission, jadi
         // harus dibuang begitu datanya berubah.
         if ($userId === null) {
-            $this->menuPermissions->forget((int) $id);
+            $this->menuPermissions->forget($roleId);
 
             foreach (array_unique($resyncedUserIds) as $resyncedUserId) {
-                $this->menuPermissions->forgetUser((int) $id, (int) $resyncedUserId);
+                $this->menuPermissions->forgetUser($roleId, $resyncedUserId);
             }
         } else {
-            $this->menuPermissions->forgetUser((int) $id, $userId);
+            $this->menuPermissions->forgetUser($roleId, $userId);
         }
 
         return $this->successResponse(null, 'Permissions updated successfully');
@@ -388,14 +402,14 @@ class RoleController extends Controller
     /**
      * Update permission untuk menu parent dan cascade ke semua child menus
      * untuk semua field: is_view, is_add, is_edit, is_delete
+     *
+     * @param  array{sysmenu_id: int|string, field: string, value: bool}  $parentPermission
+     * @param  list<int>  $childMenuIds
      */
-    private function cascadePermissionToChildren($roleId, $parentPermission, ?int $userId = null): void
+    private function cascadePermissionToChildren(int $roleId, array $parentPermission, array $childMenuIds, ?int $userId = null): void
     {
-        $parentMenuId = $parentPermission['sysmenu_id'];
         $field = $parentPermission['field'];
         $value = $parentPermission['value'];
-
-        $childMenuIds = $this->getAllChildMenuIds($parentMenuId);
 
         if (! empty($childMenuIds)) {
             // Batch update existing records
@@ -455,15 +469,12 @@ class RoleController extends Controller
      * user untuk menu yang sama ikut disamakan supaya tidak ada user yang
      * tertinggal memakai nilai lama.
      *
+     * @param  array{sysmenu_id: int|string, field: string, value: bool}  $permission
+     * @param  list<int>  $menuIds
      * @return list<int> user_id yang barisnya ikut berubah
      */
-    private function resyncUserOverrides($roleId, $permission): array
+    private function resyncUserOverrides(int $roleId, array $permission, array $menuIds): array
     {
-        $menuIds = array_merge(
-            [$permission['sysmenu_id']],
-            $this->getAllChildMenuIds($permission['sysmenu_id'])
-        );
-
         $query = SysmenuRole::where('role_id', $roleId)
             ->whereIn('sysmenu_id', $menuIds)
             ->whereNotNull('user_id');
@@ -483,27 +494,57 @@ class RoleController extends Controller
     }
 
     /**
-     * Dapatkan semua child menu IDs secara recursive
+     * Semua descendant menu, ditelusuri dari peta parent yang dibaca sekali per
+     * request. Aman terhadap parent_id yang membentuk siklus.
+     *
+     * @return list<int>
      */
-    private function getAllChildMenuIds($parentId): array
+    private function getAllChildMenuIds(int $parentId): array
     {
-        $childIds = [];
+        $childrenByParent = $this->childrenByParent();
+        $descendants = [];
+        $seen = [$parentId => true];
+        $queue = [$parentId];
 
-        // Dapatkan direct children
-        $directChildren = Sysmenu::where('parent_id', $parentId)->get();
+        while ($queue !== []) {
+            $current = array_shift($queue);
 
-        foreach ($directChildren as $child) {
-            $childIds[] = $child->id;
+            foreach ($childrenByParent[$current] ?? [] as $childId) {
+                if (isset($seen[$childId])) {
+                    continue;
+                }
 
-            // Dapatkan grandchildren recursively
-            $grandChildren = $this->getAllChildMenuIds($child->id);
-            $childIds = array_merge($childIds, $grandChildren);
+                $seen[$childId] = true;
+                $descendants[] = $childId;
+                $queue[] = $childId;
+            }
         }
 
-        return $childIds;
+        return $descendants;
     }
 
-    private function updateOrCreatePermission($roleId, $permission, ?int $userId = null): void
+    /**
+     * @return array<int, list<int>>
+     */
+    private function childrenByParent(): array
+    {
+        if ($this->childrenByParent !== null) {
+            return $this->childrenByParent;
+        }
+
+        $map = [];
+
+        foreach (Sysmenu::query()->whereNotNull('parent_id')->pluck('parent_id', 'id') as $id => $parentId) {
+            $map[(int) $parentId][] = (int) $id;
+        }
+
+        return $this->childrenByParent = $map;
+    }
+
+    /**
+     * @param  array{sysmenu_id: int|string, field: string, value: bool}  $permission
+     */
+    private function updateOrCreatePermission(int $roleId, array $permission, ?int $userId = null): void
     {
         $record = SysmenuRole::where('role_id', $roleId)
             ->where('sysmenu_id', $permission['sysmenu_id'])
@@ -546,7 +587,7 @@ class RoleController extends Controller
      * @param  list<int>  $menuIds
      * @return array<int, array<string, bool>>
      */
-    private function baselineFlags($roleId, array $menuIds, ?int $userId): array
+    private function baselineFlags(int $roleId, array $menuIds, ?int $userId): array
     {
         $empty = array_fill_keys(MenuPermissionService::FIELDS, false);
         $baseline = array_fill_keys($menuIds, $empty);

@@ -24544,7 +24544,7 @@
                     {
                         "name": "user_id",
                         "in": "query",
-                        "description": "Kalau diisi, tiap menu ikut membawa objek `override` berisi nilai khusus user tersebut. User wajib anggota role ini, kalau bukan akan 422.",
+                        "description": "Kalau diisi, permission tiap menu dihitung untuk user tersebut: baris user meng-override baris role per menu, dan menu tanpa baris user tetap mengikuti role. Response ikut membawa `has_override` dan objek `override`. User wajib anggota role ini, kalau bukan akan 422.",
                         "required": false,
                         "schema": {
                             "type": "integer"
@@ -24611,6 +24611,33 @@
                                                             "is_delete": {
                                                                 "type": "boolean",
                                                                 "example": false
+                                                            },
+                                                            "has_override": {
+                                                                "description": "Hanya saat `user_id` diisi. True kalau user punya baris khusus untuk menu ini, artinya nilai efektif di atas berasal dari baris user, bukan dari role.",
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "override": {
+                                                                "description": "Hanya saat `user_id` diisi. Nilai mentah baris user; abaikan kalau `has_override` false.",
+                                                                "properties": {
+                                                                    "is_view": {
+                                                                        "type": "boolean",
+                                                                        "example": true
+                                                                    },
+                                                                    "is_add": {
+                                                                        "type": "boolean",
+                                                                        "example": false
+                                                                    },
+                                                                    "is_edit": {
+                                                                        "type": "boolean",
+                                                                        "example": false
+                                                                    },
+                                                                    "is_delete": {
+                                                                        "type": "boolean",
+                                                                        "example": false
+                                                                    }
+                                                                },
+                                                                "type": "object"
                                                             },
                                                             "children": {
                                                                 "type": "array",
