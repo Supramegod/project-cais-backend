@@ -5,17 +5,16 @@ namespace App\Http\Controllers;
 
 use App\Enums\ProvinceDetailType;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\StoreUmkRequest;
-use App\Http\Requests\StoreUmpRequest;
-use App\Http\Requests\StoreUmskRequest;
-use App\Http\Requests\StoreUmspRequest;
+use App\Http\Requests\Upah\StoreUmkRequest;
+use App\Http\Requests\Upah\StoreUmpRequest;
+use App\Http\Requests\Upah\StoreUmskRequest;
+use App\Http\Requests\Upah\StoreUmspRequest;
 use App\Models\Province;
-use App\Services\UpahService;
+use App\Services\Upah\UpahService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -92,10 +91,8 @@ class UpahController extends Controller
                 'message'    => 'Data provinsi berhasil diambil',
             ]);
 
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('listProvinsi', $e);
         } catch (\Throwable $e) {
-            return $this->unexpectedError('listProvinsi', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -129,10 +126,10 @@ class UpahController extends Controller
         $type = $request->query('type');
 
         if (!in_array($type, ProvinceDetailType::values())) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Parameter type tidak valid. Harus salah satu: ' . implode(', ', ProvinceDetailType::values()),
-            ], 400);
+            return $this->errorResponse(
+                'Parameter type tidak valid. Harus salah satu: ' . implode(', ', ProvinceDetailType::values()),
+                400,
+            );
         }
 
         try {
@@ -177,11 +174,9 @@ class UpahController extends Controller
             ]);
 
         } catch (ModelNotFoundException) {
-            return $this->notFound("Provinsi dengan ID {$provinceId} tidak ditemukan.");
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('getProvinceDetail', $e);
+            return $this->notFoundResponse("Provinsi dengan ID {$provinceId} tidak ditemukan.");
         } catch (\Throwable $e) {
-            return $this->unexpectedError('getProvinceDetail', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -245,14 +240,12 @@ class UpahController extends Controller
         try {
             $data = $this->service->getDetailKota($cityId);
 
-            return $this->success($data);
+            return $this->successResponse($data, 'OK');
 
         } catch (ModelNotFoundException) {
-            return $this->notFound("Kota dengan ID {$cityId} tidak ditemukan.");
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('detailKota', $e);
+            return $this->notFoundResponse("Kota dengan ID {$cityId} tidak ditemukan.");
         } catch (\Throwable $e) {
-            return $this->unexpectedError('detailKota', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -306,18 +299,12 @@ class UpahController extends Controller
         try {
             $data = $this->service->getUmspById($id);
 
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-                'message' => 'Data UMSP berhasil diambil',
-            ]);
+            return $this->successResponse($data, 'Data UMSP berhasil diambil');
 
         } catch (ModelNotFoundException) {
-            return $this->notFound("UMSP dengan ID {$id} tidak ditemukan.");
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('showUmsp', $e);
+            return $this->notFoundResponse("UMSP dengan ID {$id} tidak ditemukan.");
         } catch (\Throwable $e) {
-            return $this->unexpectedError('showUmsp', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -371,18 +358,12 @@ class UpahController extends Controller
         try {
             $data = $this->service->getUmskById($id);
 
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-                'message' => 'Data UMSK berhasil diambil',
-            ]);
+            return $this->successResponse($data, 'Data UMSK berhasil diambil');
 
         } catch (ModelNotFoundException) {
-            return $this->notFound("UMSK dengan ID {$id} tidak ditemukan.");
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('showUmsk', $e);
+            return $this->notFoundResponse("UMSK dengan ID {$id} tidak ditemukan.");
         } catch (\Throwable $e) {
-            return $this->unexpectedError('showUmsk', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -415,12 +396,10 @@ class UpahController extends Controller
         try {
             $ump = $this->service->storeUmp($request->validated(), $this->actor());
 
-            return $this->created('Data UMP berhasil ditambahkan', $ump);
+            return $this->createdResponse($ump, 'Data UMP berhasil ditambahkan');
 
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('storeUmp', $e);
         } catch (\Throwable $e) {
-            return $this->unexpectedError('storeUmp', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -454,12 +433,10 @@ class UpahController extends Controller
         try {
             $umsp = $this->service->storeUmsp($request->validated(), $this->actor());
 
-            return $this->created('Data UMSP berhasil ditambahkan', $umsp);
+            return $this->createdResponse($umsp, 'Data UMSP berhasil ditambahkan');
 
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('storeUmsp', $e);
         } catch (\Throwable $e) {
-            return $this->unexpectedError('storeUmsp', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -492,12 +469,10 @@ class UpahController extends Controller
         try {
             $umk = $this->service->storeUmk($request->validated(), $this->actor());
 
-            return $this->created('Data UMK berhasil ditambahkan', $umk);
+            return $this->createdResponse($umk, 'Data UMK berhasil ditambahkan');
 
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('storeUmk', $e);
         } catch (\Throwable $e) {
-            return $this->unexpectedError('storeUmk', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
@@ -531,56 +506,14 @@ class UpahController extends Controller
         try {
             $umsk = $this->service->storeUmsk($request->validated(), $this->actor());
 
-            return $this->created('Data UMSK berhasil ditambahkan', $umsk);
+            return $this->createdResponse($umsk, 'Data UMSK berhasil ditambahkan');
 
-        } catch (\RuntimeException $e) {
-            return $this->serviceError('storeUmsk', $e);
         } catch (\Throwable $e) {
-            return $this->unexpectedError('storeUmsk', $e);
+            return $this->serverErrorResponse($e->getMessage());
         }
     }
 
     // ── Response Helpers ──────────────────────────────────────────────────────
-
-    private function success(mixed $data, int $status = 200): JsonResponse
-    {
-        return response()->json(['success' => true, 'data' => $data, 'message' => 'OK'], $status);
-    }
-
-    private function created(string $message, mixed $data): JsonResponse
-    {
-        return response()->json(['success' => true, 'message' => $message, 'data' => $data], 201);
-    }
-
-    private function notFound(string $message): JsonResponse
-    {
-        return response()->json(['success' => false, 'message' => $message, 'data' => null], 404);
-    }
-
-    private function serviceError(string $context, \RuntimeException $e): JsonResponse
-    {
-        Log::warning("[UpahController::{$context}] Service error", [
-            'message' => $e->getMessage(),
-        ]);
-
-        return response()->json(['success' => false, 'message' => $e->getMessage(), 'data' => null], 500);
-    }
-
-    private function unexpectedError(string $context, \Throwable $e): JsonResponse
-    {
-        Log::critical("[UpahController::{$context}] Unexpected error", [
-            'message' => $e->getMessage(),
-            'file'    => $e->getFile(),
-            'line'    => $e->getLine(),
-            'trace'   => $e->getTraceAsString(),
-        ]);
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Terjadi kesalahan pada server. Silakan hubungi administrator.',
-            'data'    => null,
-        ], 500);
-    }
 
     private function paginationMeta(\Illuminate\Pagination\LengthAwarePaginator $paginator): array
     {

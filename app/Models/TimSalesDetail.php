@@ -23,6 +23,7 @@ class TimSalesDetail extends Model
         'is_leader',
         'is_active',
         'created_by',
+        'created_by_user_id',
         'deleted_by',
         'updated_by',
     ];

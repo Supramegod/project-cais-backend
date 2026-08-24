@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SystemAnnouncement\SystemAnnouncementImageRequest;
+use App\Http\Requests\SystemAnnouncement\SystemAnnouncementV2Request;
 use App\Models\SystemAnnouncement;
 use App\Models\SystemAnnouncementFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -32,41 +34,30 @@ class SystemAnnouncementV2Controller extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $query = SystemAnnouncement::with('files');
+        $query = SystemAnnouncement::with('files');
 
-            if ($request->filled('category') && $request->category !== 'Semua') {
-                $query->where('category', $request->category);
-            }
-
-            if ($request->has('is_active') && $request->is_active !== '') {
-                $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
-            }
-
-            if ($request->filled('search')) {
-                $keyword = '%' . $request->search . '%';
-                $query->where(function ($q) use ($keyword) {
-                    $q->where('title', 'like', $keyword)
-                      ->orWhere('description', 'like', $keyword);
-                });
-            }
-
-            $perPage = $request->input('per_page', 15);
-            $data = $query->orderBy('release_date', 'desc')
-                          ->orderBy('created_at', 'desc')
-                          ->paginate($perPage);
-
-            return response()->json([
-                'success' => true,
-                'data'    => $data,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
+        if ($request->filled('category') && $request->category !== 'Semua') {
+            $query->where('category', $request->category);
         }
+
+        if ($request->has('is_active') && $request->is_active !== '') {
+            $query->where('is_active', filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN));
+        }
+
+        if ($request->filled('search')) {
+            $keyword = '%' . $request->search . '%';
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', $keyword)
+                  ->orWhere('description', 'like', $keyword);
+            });
+        }
+
+        $perPage = $request->input('per_page', 15);
+        $data = $query->orderBy('release_date', 'desc')
+                      ->orderBy('created_at', 'desc')
+                      ->paginate($perPage);
+
+        return $this->successResponse($data);
     }
 
     /**
@@ -81,27 +72,13 @@ class SystemAnnouncementV2Controller extends Controller
      */
     public function view($id)
     {
-        try {
-            $announcement = SystemAnnouncement::with('files')->find($id);
+        $announcement = SystemAnnouncement::with('files')->find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan',
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data'    => $announcement,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
         }
+
+        return $this->successResponse($announcement);
     }
 
     /**
@@ -130,36 +107,16 @@ class SystemAnnouncementV2Controller extends Controller
      *     )
      * )
      */
-    public function uploadImage(Request $request)
+    public function uploadImage(SystemAnnouncementImageRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'image' => 'required|image|mimes:jpg,jpeg,png,gif,webp|max:5120',
-            ]);
+        $file     = $request->file('image');
+        $fileName = $this->generateFileName($file);
+        Storage::disk('announcement-images')->put($fileName, file_get_contents($file));
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors'  => $validator->errors(),
-                ], 422);
-            }
-
-            $file     = $request->file('image');
-            $fileName = $this->generateFileName($file);
-            Storage::disk('announcement-images')->put($fileName, file_get_contents($file));
-
-            return response()->json([
-                'success' => true,
-                'url'     => url('document/announcement-images/' . $fileName),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'url'     => url('document/announcement-images/' . $fileName),
+        ]);
     }
 
     /**
@@ -188,29 +145,9 @@ class SystemAnnouncementV2Controller extends Controller
      *     @OA\Response(response=201, description="Announcement created successfully")
      * )
      */
-    public function add(Request $request)
+    public function add(SystemAnnouncementV2Request $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'category'       => 'required|in:Fitur Baru,Bug Fix,Aturan,Update',
-                'title'          => 'required|string|max:255',
-                'version'        => 'nullable|string|max:50',
-                'release_date'   => 'nullable|date',
-                'description'    => 'nullable|string',
-                'details'        => 'nullable|string',
-                'is_active'      => 'nullable|in:0,1,true,false',
-                'attachments'    => 'nullable|array',
-                'attachments.*'  => 'nullable|file|max:10240',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors'  => $validator->errors(),
-                ], 422);
-            }
-
+        $announcement = DB::transaction(function () use ($request) {
             $announcement = SystemAnnouncement::create([
                 'category'     => $request->category,
                 'title'        => $request->title,
@@ -228,18 +165,10 @@ class SystemAnnouncementV2Controller extends Controller
                 }
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil dibuat',
-                'data'    => $announcement->load('files'),
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+            return $announcement;
+        });
+
+        return $this->successResponse($announcement->load('files'), 'Announcement berhasil dibuat', 201);
     }
 
     /**
@@ -269,38 +198,15 @@ class SystemAnnouncementV2Controller extends Controller
      *     @OA\Response(response=200, description="Announcement updated successfully")
      * )
      */
-    public function update(Request $request, $id)
+    public function update(SystemAnnouncementV2Request $request, $id)
     {
-        try {
-            $announcement = SystemAnnouncement::find($id);
+        $announcement = SystemAnnouncement::find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan',
-                ], 404);
-            }
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
+        }
 
-            $validator = Validator::make($request->all(), [
-                'category'       => 'required|in:Fitur Baru,Bug Fix,Aturan,Update',
-                'title'          => 'required|string|max:255',
-                'version'        => 'nullable|string|max:50',
-                'release_date'   => 'nullable|date',
-                'description'    => 'nullable|string',
-                'details'        => 'nullable|string',
-                'is_active'      => 'nullable|in:0,1,true,false',
-                'attachments'    => 'nullable|array',
-                'attachments.*'  => 'nullable|file|max:10240',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors'  => $validator->errors(),
-                ], 422);
-            }
-
+        DB::transaction(function () use ($request, $announcement) {
             $announcement->update([
                 'category'     => $request->category,
                 'title'        => $request->title,
@@ -316,19 +222,9 @@ class SystemAnnouncementV2Controller extends Controller
                     $this->storeAttachment($announcement->id, $file);
                 }
             }
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil diupdate',
-                'data'    => $announcement->fresh()->load('files'),
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+        return $this->successResponse($announcement->fresh()->load('files'), 'Announcement berhasil diupdate');
     }
 
     /**
@@ -343,34 +239,22 @@ class SystemAnnouncementV2Controller extends Controller
      */
     public function delete($id)
     {
-        try {
-            $announcement = SystemAnnouncement::with('files')->find($id);
+        $announcement = SystemAnnouncement::with('files')->find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan',
-                ], 404);
-            }
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
+        }
 
+        DB::transaction(function () use ($announcement) {
             foreach ($announcement->files as $file) {
                 $this->deleteFileFromDisk($file->url_file);
                 $file->delete();
             }
 
             $announcement->delete();
+        });
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil dihapus',
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
-        }
+        return $this->messageResponse('Announcement berhasil dihapus');
     }
 
     /**
@@ -385,30 +269,16 @@ class SystemAnnouncementV2Controller extends Controller
      */
     public function deleteFile($fileId)
     {
-        try {
-            $file = SystemAnnouncementFile::find($fileId);
+        $file = SystemAnnouncementFile::find($fileId);
 
-            if (!$file) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'File tidak ditemukan',
-                ], 404);
-            }
-
-            $this->deleteFileFromDisk($file->url_file);
-            $file->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'File berhasil dihapus',
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error'   => $e->getMessage(),
-            ], 500);
+        if (!$file) {
+            return $this->notFoundResponse('File tidak ditemukan');
         }
+
+        $this->deleteFileFromDisk($file->url_file);
+        $file->delete();
+
+        return $this->messageResponse('File berhasil dihapus');
     }
 
     private function storeAttachment(int $announcementId, $file): void

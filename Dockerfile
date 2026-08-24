@@ -11,6 +11,13 @@ RUN apt-get update && apt-get install -y \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd pdo pdo_mysql
 
+# Override PHP upload limits (default upload_max_filesize=2M, post_max_size=8M)
+RUN { \
+        echo "upload_max_filesize = 10M"; \
+        echo "post_max_size = 12M"; \
+        echo "memory_limit = 256M"; \
+    } > /usr/local/etc/php/conf.d/uploads.ini
+
 # Set working directory
 WORKDIR /var/www/laravel
 
@@ -21,7 +28,7 @@ COPY . .
  COPY .env.example .env
 
 # Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 # Install dependencies Laravel
 RUN composer install

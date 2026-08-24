@@ -2,55 +2,56 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Master\BentukUsahaRequest;
 use App\Models\BentukUsaha;
-use Illuminate\Http\Request;
 
 class BentukUsahaController extends Controller
 {
     public function list()
     {
         $data = BentukUsaha::whereNull('deleted_at')->orderBy('nama')->get();
-        return response()->json(['success' => true, 'data' => $data]);
+
+        return $this->successResponse($data);
     }
 
     public function view($id)
     {
         $data = BentukUsaha::find($id);
-        if (!$data) {
-            return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+        if (! $data) {
+            return $this->notFoundResponse();
         }
-        return response()->json(['success' => true, 'data' => $data]);
+
+        return $this->successResponse($data);
     }
 
-    public function save(Request $request)
+    public function save(BentukUsahaRequest $request)
     {
-        $request->validate(['nama' => 'required|string|max:100']);
-
         $data = BentukUsaha::create(['nama' => $request->nama]);
-        return response()->json(['success' => true, 'message' => 'Berhasil ditambahkan', 'data' => $data], 201);
+
+        return $this->successResponse($data, 'Berhasil ditambahkan', 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(BentukUsahaRequest $request, $id)
     {
-        $request->validate(['nama' => 'required|string|max:100']);
-
         $data = BentukUsaha::find($id);
-        if (!$data) {
-            return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+        if (! $data) {
+            return $this->notFoundResponse();
         }
 
         $data->update(['nama' => $request->nama]);
-        return response()->json(['success' => true, 'message' => 'Berhasil diperbarui', 'data' => $data]);
+
+        return $this->successResponse($data, 'Berhasil diperbarui');
     }
 
     public function delete($id)
     {
         $data = BentukUsaha::find($id);
-        if (!$data) {
-            return response()->json(['success' => false, 'message' => 'Data tidak ditemukan'], 404);
+        if (! $data) {
+            return $this->notFoundResponse();
         }
 
         $data->delete();
-        return response()->json(['success' => true, 'message' => 'Berhasil dihapus']);
+
+        return $this->messageResponse('Berhasil dihapus');
     }
 }

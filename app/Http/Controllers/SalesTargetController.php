@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\SalesTarget;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Sales\SalesTargetRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 
 /**
  * @OA\Tag(
@@ -47,9 +46,9 @@ class SalesTargetController extends Controller
      *     @OA\Response(response=409, description="Target sudah ada")
      * )
      */
-    public function store(Request $request): JsonResponse
+    public function store(SalesTargetRequest $request): JsonResponse
     {
-        $validated = $request->validate($this->rules());
+        $validated = $request->validated();
 
         // Cek duplikasi sebelum insert agar pesan error lebih jelas
         if ($this->isDuplicate($validated)) {
@@ -59,11 +58,7 @@ class SalesTargetController extends Controller
         $target = SalesTarget::create($validated);
         $target->load(['user', 'branch']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Target berhasil dibuat.',
-            'data'    => $this->transform($target),
-        ], 201);
+        return $this->createdResponse($this->transform($target), 'Target berhasil dibuat.');
     }
 
     // ─── READ (list) ──────────────────────────────────────────────────────────
@@ -106,10 +101,7 @@ class SalesTargetController extends Controller
             ->orderBy('month', 'desc')
             ->paginate($perPage);
 
-        return response()->json([
-            'success' => true,
-            'data'    => $targets->through(fn ($t) => $this->transform($t)),
-        ]);
+        return $this->successResponse($targets->through(fn ($t) => $this->transform($t)));
     }
 
     // ─── READ (single) ────────────────────────────────────────────────────────
@@ -133,10 +125,7 @@ class SalesTargetController extends Controller
             return $this->errorResponse('Target tidak ditemukan.', 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'data'    => $this->transform($target),
-        ]);
+        return $this->successResponse($this->transform($target));
     }
 
     // ─── UPDATE ───────────────────────────────────────────────────────────────
@@ -157,7 +146,7 @@ class SalesTargetController extends Controller
      *     @OA\Response(response=404, description="Not found")
      * )
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(SalesTargetRequest $request, int $id): JsonResponse
     {
         $target = SalesTarget::find($id);
 
@@ -165,8 +154,7 @@ class SalesTargetController extends Controller
             return $this->errorResponse('Target tidak ditemukan.', 404);
         }
 
-        // Saat update, ignore unique constraint untuk record yang sama
-        $validated = $request->validate($this->rules($target->id));
+        $validated = $request->validated();
 
         // Cek duplikasi hanya jika key fields berubah
         $keyChanged = collect(['type', 'user_id', 'branch_id', 'year', 'month', 'period_type'])
@@ -180,11 +168,7 @@ class SalesTargetController extends Controller
         $target->update($validated);
         $target->load(['user:id,full_name', 'branch:id,name']);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Target berhasil diupdate.',
-            'data'    => $this->transform($target),
-        ]);
+        return $this->successResponse($this->transform($target), 'Target berhasil diupdate.');
     }
 
     // ─── DELETE ───────────────────────────────────────────────────────────────
@@ -210,62 +194,10 @@ class SalesTargetController extends Controller
 
         $target->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Target berhasil dihapus.',
-        ]);
+        return $this->messageResponse('Target berhasil dihapus.');
     }
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
-
-    /**
-     * Aturan validasi, reusable untuk store & update.
-     * $ignoreId digunakan untuk update (skip unique pada record sendiri).
-     */
-    private function rules(?int $ignoreId = null): array
-    {
-        return [
-            'type' => [
-                $ignoreId ? 'sometimes' : 'required',
-                Rule::in(['personal', 'branch', 'company']),
-            ],
-            'period_type' => [
-                $ignoreId ? 'sometimes' : 'required',
-                Rule::in(['monthly', 'yearly']),
-            ],
-            'year' => [
-                $ignoreId ? 'sometimes' : 'required',
-                'integer',
-                'min:2000',
-                'max:2100',
-            ],
-            'month' => [
-                'nullable',
-                'integer',
-                'between:1,12',
-                // Wajib jika period_type = monthly
-                'required_if:period_type,monthly',
-            ],
-            'user_id' => [
-                'nullable',
-                'string',
-                // Wajib jika type = personal
-                'required_if:type,personal',
-            ],
-            'branch_id' => [
-                'nullable',
-                'integer',
-                'exists:m_branch,id',
-                // Wajib jika type = branch
-                'required_if:type,branch',
-            ],
-            'target_amount' => [
-                $ignoreId ? 'sometimes' : 'required',
-                'numeric',
-                'min:1',
-            ],
-        ];
-    }
 
     /**
      * Cek apakah sudah ada target dengan key yang sama.
@@ -310,10 +242,5 @@ class SalesTargetController extends Controller
             'created_at' => $target->created_at?->toDateTimeString(),
             'updated_at' => $target->updated_at?->toDateTimeString(),
         ];
-    }
-
-    private function errorResponse(string $message, int $status): JsonResponse
-    {
-        return response()->json(['success' => false, 'message' => $message], $status);
     }
 }

@@ -5,28 +5,37 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
-    // database/migrations/xxxx_add_unique_to_hpp_coss.php
-    public function up()
+    public function up(): void
     {
-        Schema::table('sl_quotation_detail_hpp', function (Blueprint $table) {
-            $table->unique('quotation_detail_id', 'uq_hpp_detail_id');
-        });
+        $this->addUniqueIfMissing('sl_quotation_detail_hpp', 'quotation_detail_id', 'uq_hpp_detail_id');
+        $this->addUniqueIfMissing('sl_quotation_detail_coss', 'quotation_detail_id', 'uq_coss_detail_id');
+    }
 
-        Schema::table('sl_quotation_detail_coss', function (Blueprint $table) {
-            $table->unique('quotation_detail_id', 'uq_coss_detail_id');
+    public function down(): void
+    {
+        $this->dropIndexIfExists('sl_quotation_detail_hpp', 'uq_hpp_detail_id');
+        $this->dropIndexIfExists('sl_quotation_detail_coss', 'uq_coss_detail_id');
+    }
+
+    private function addUniqueIfMissing(string $table, string $column, string $index): void
+    {
+        if (! Schema::hasTable($table) || Schema::hasIndex($table, $index)) {
+            return;
+        }
+
+        Schema::table($table, function (Blueprint $t) use ($column, $index) {
+            $t->unique($column, $index);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
-    public function down(): void
+    private function dropIndexIfExists(string $table, string $index): void
     {
-        Schema::table('hpp_coss', function (Blueprint $table) {
-            //
+        if (! Schema::hasTable($table) || ! Schema::hasIndex($table, $index)) {
+            return;
+        }
+
+        Schema::table($table, function (Blueprint $t) use ($index) {
+            $t->dropUnique($index);
         });
     }
 };

@@ -4,8 +4,8 @@ namespace App\Listeners;
 
 use App\Events\QuotationCreated;
 use App\Models\Quotation;
-use App\Services\QuotationDuplicationService;
-use App\Services\QuotationBusinessService;
+use App\Services\Quotation\QuotationDuplicationService;
+use App\Services\Quotation\QuotationBusinessService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
@@ -13,6 +13,15 @@ use Illuminate\Support\Facades\Log;
 class ProcessQuotationDuplication implements ShouldQueue
 {
     use InteractsWithQueue;
+
+    /**
+     * Duplikasi tidak boleh diulang: satu run parsial pun akan menggandakan detail & barang.
+     * retry_after queue database default 90 detik, jauh lebih pendek dari durasi duplikasi
+     * quotation besar — timeout dinaikkan agar job tidak diambil worker kedua.
+     */
+    public $tries = 1;
+
+    public $timeout = 900;
 
     protected $quotationDuplicationService;
     protected $quotationBusinessService;
@@ -50,7 +59,7 @@ class ProcessQuotationDuplication implements ShouldQueue
 
             // Jika belum ada site, buat dari request
             if ($existingSitesCount === 0) {
-                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name);
+                $this->quotationBusinessService->createQuotationSites($quotation, $request, $user->full_name, $user->id);
 
                 Log::info('Sites created from request', [
                     'created_count' => $quotation->quotationSites()->count(),
@@ -94,6 +103,17 @@ class ProcessQuotationDuplication implements ShouldQueue
      */
     private function handleWithReference($quotation, $request, $tipeQuotation, $quotationReferensi, $user): void
     {
+        // Guard idempotensi: kalau job ini sudah pernah jalan (retry / diambil worker kedua),
+        // detail sudah ada. Menjalankan ulang akan menggandakan detail beserta seluruh barangnya.
+        if ($quotation->quotationDetails()->exists()) {
+            Log::warning('Duplikasi dilewati, quotation sudah punya detail (kemungkinan job diulang)', [
+                'quotation_id' => $quotation->id,
+                'referensi_id' => $quotationReferensi->id,
+            ]);
+
+            return;
+        }
+
         // Ambil nama site referensi dan quotation baru
         $referensiSiteNames = $quotationReferensi->quotationSites->pluck('nama_site');
         $currentSiteNames = $quotation->quotationSites->pluck('nama_site');
@@ -131,7 +151,7 @@ class ProcessQuotationDuplication implements ShouldQueue
         ]);
 
         try {
-            $this->quotationBusinessService->createInitialPic($quotation, $user->full_name);
+            $this->quotationBusinessService->createInitialPic($quotation, $user->full_name, $user->id);
             Log::info('Created initial PIC for new quotation');
         } catch (\Exception $e) {
             Log::warning('Failed to create initial PIC, continuing', ['error' => $e->getMessage()]);

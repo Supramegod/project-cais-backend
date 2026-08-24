@@ -114,6 +114,7 @@ class TunjanganPosisi extends Model
         static::creating(function ($model) {
             if (auth()->check()) {
                 $model->created_by = auth()->user()->full_name ?? auth()->user()->name;
+                $model->created_by_user_id = auth()->id();
             }
         });
 

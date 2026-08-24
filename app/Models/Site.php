@@ -35,12 +35,17 @@ class Site extends Model
         'kebutuhan',
         'nomor_quotation',
         'status_site_id',
+        'is_visit_anchor',
         'created_by',
         'updated_by',
         'deleted_by'
     ];
 
     protected $dates = ['deleted_at'];
+
+    protected $casts = [
+        'is_visit_anchor' => 'boolean',
+    ];
 
     // ✅ TAMBAHKAN RELASI INI
     public function quotation()
@@ -78,6 +83,11 @@ class Site extends Model
     public function statusSite()
     {
         return $this->belongsTo(StatusSite::class, 'status_site_id');
+    }
+
+    public function visitSchedules()
+    {
+        return $this->hasMany(PksVisitSchedule::class, 'site_id');
     }
 
     public function getCreatedAtAttribute($value)

@@ -4,19 +4,24 @@ namespace App\Http\Controllers;
 
 use App\Events\QuotationCreated;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\QuotationApproveRequest;
+use App\Http\Requests\Quotation\QuotationApproveRequest;
+use App\Http\Requests\Quotation\QuotationReferenceRequest;
 use App\Jobs\EscalateQuotationJob;
 use App\Models\Branch;
 use App\Models\LeadsKebutuhan;
 use App\Models\LogApproval;
 use App\Models\LogNotification;
+use App\Models\Pks;
 use App\Models\QuotationDetailHpp;
 use App\Models\QuotationSite;
+use App\Models\Site;
+use App\Models\Spk;
+use App\Models\SpkSite;
 use App\Models\TimSalesDetail;
 use App\Models\User;
-use App\Services\AddendumService;
-use App\Services\QuotationDuplicationService;
-use App\Services\QuotationNotificationService;
+use App\Services\Pks\AddendumService;
+use App\Services\Quotation\QuotationDuplicationService;
+use App\Services\Quotation\QuotationNotificationService;
 use App\Services\RekontrakService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -27,9 +32,9 @@ use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use App\Models\Quotation;
 use App\Models\Leads;
-use App\Services\QuotationService;
-use App\Services\QuotationBusinessService;
-use App\Http\Requests\QuotationStoreRequest;
+use App\Services\Quotation\QuotationService;
+use App\Services\Quotation\QuotationBusinessService;
+use App\Http\Requests\Quotation\QuotationStoreRequest;
 use App\Http\Resources\QuotationResource;
 use App\Http\Resources\QuotationCollection;
 
@@ -44,6 +49,7 @@ class QuotationController extends Controller
     protected $quotationService;
     protected $quotationBusinessService;
     protected $quotationDuplicationService;
+    protected $quotationNotificationService;
     public function __construct(
         QuotationService $quotationService,
         QuotationBusinessService $quotationBusinessService,
@@ -126,6 +132,17 @@ class QuotationController extends Controller
      *         required=false,
      *         @OA\Schema(type="string", enum={"nama_perusahaan", "nomor","kebutuhan","created_by","jenis_kontrak"}, example="nama_perusahaan")
      *     ),
+     *     @OA\Parameter(
+     *         name="status_berlaku",
+     *         in="query",
+     *         description="Filter status berlaku kontrak (berdasarkan kolom kontrak_selesai)",
+     *         required=false,
+     *         @OA\Schema(
+     *             type="string",
+     *             enum={"kontrak_habis", "berakhir_2_bulan", "berakhir_3_bulan", "lebih_3_bulan"},
+     *             example="berakhir_2_bulan"
+     *         )
+     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Quotations retrieved successfully",
@@ -142,6 +159,9 @@ class QuotationController extends Controller
      *                     @OA\Property(property="nama_perusahaan", type="string", example="PT Example Company"),
      *                     @OA\Property(property="tgl_quotation", type="string", format="date", example="2024-01-01"),
      *                     @OA\Property(property="tgl_quotation_formatted", type="string", example="1 Januari 2024"),
+     *                     @OA\Property(property="mulai_kontrak", type="string", format="date", example="2024-02-01"),
+     *                     @OA\Property(property="kontrak_selesai", type="string", format="date", example="2025-01-31"),
+     *                     @OA\Property(property="status_berlaku", type="string", enum={"Kontrak Habis","Berakhir dalam 2 bulan","Berakhir dalam 3 bulan","Lebih dari 3 Bulan"}, example="Berakhir dalam 2 bulan"),
      *                     @OA\Property(property="sl_quotation_site", type="array",
      *                         @OA\Items(
      *                             @OA\Property(property="nama_site", type="string", example="Head Office Jakarta")
@@ -171,8 +191,7 @@ class QuotationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $query = Quotation::select([
+        $query = Quotation::select([
                 'id',
                 'leads_id',            // ✅ WAJIB — untuk byUserRole dan eager load
                 'nomor',
@@ -183,6 +202,8 @@ class QuotationController extends Controller
                 'kebutuhan',
                 'nama_perusahaan',
                 'tgl_quotation',
+                'mulai_kontrak',
+                'kontrak_selesai',
                 'status_quotation_id',
                 'jenis_kontrak', // ✅ sudah ada, untuk eager load statusQuotation
                 'created_at',
@@ -223,6 +244,8 @@ class QuotationController extends Controller
                 $query->where('company_id', $request->company);
             if ($request->filled('kebutuhan_id'))
                 $query->where('kebutuhan_id', $request->kebutuhan_id);
+            if ($request->filled('status_berlaku'))
+                $this->quotationService->applyStatusBerlakuFilter($query, $request->status_berlaku);
 
             $data = $query->paginate($request->get('per_page', 15));
 
@@ -237,6 +260,11 @@ class QuotationController extends Controller
                     'kebutuhan' => $quotation->kebutuhan,
                     'nama_perusahaan' => $quotation->nama_perusahaan,
                     'tgl_quotation' => $quotation->getRawOriginal('tgl_quotation'),
+                    'mulai_kontrak' => $quotation->mulai_kontrak,
+                    'kontrak_selesai' => $quotation->kontrak_selesai,
+                    'status_berlaku' => $quotation->getRawOriginal('kontrak_selesai')
+                        ? $this->quotationService->getStatusBerlaku($quotation->getRawOriginal('kontrak_selesai'))
+                        : null,
                     'jenis_kontrak' => $quotation->jenis_kontrak,
                     'created_by' => $quotation->created_by,
                     'status_quotation' => $quotation->statusQuotation
@@ -248,25 +276,18 @@ class QuotationController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $data->items(),
-                'pagination' => [
-                    'current_page' => $data->currentPage(),
-                    'last_page' => $data->lastPage(),
-                    'total' => $data->total(),
-                    'total_per_page' => $data->count(),
-                ],
-                'message' => 'Quotations retrieved successfully',
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotations',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        // Bespoke pagination shape (dijaga apa adanya — bukan bentuk `meta` trait).
+        return response()->json([
+            'success' => true,
+            'data' => $data->items(),
+            'pagination' => [
+                'current_page' => $data->currentPage(),
+                'last_page' => $data->lastPage(),
+                'total' => $data->total(),
+                'total_per_page' => $data->count(),
+            ],
+            'message' => 'Quotations retrieved successfully',
+        ]);
     }
 
 
@@ -294,34 +315,34 @@ class QuotationController extends Controller
      *             @OA\Property(property="layanan", type="integer", description="ID layanan/kebutuhan", example=1),
      *             @OA\Property(property="jumlah_site", type="string", enum={"Single Site","Multi Site"}, description="Tipe penempatan site", example="Single Site"),
      *             @OA\Property(property="quotation_referensi_id", type="integer", description="ID quotation referensi untuk revisi/rekontrak", example=1),
-     *             
+     *
      *             @OA\Property(
-     *                 property="nama_site", 
-     *                 type="string", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="nama_site",
+     *                 type="string",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example="Head Office Jakarta",
      *                 maxLength=255
      *             ),
      *             @OA\Property(
-     *                 property="provinsi", 
-     *                 type="integer", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="provinsi",
+     *                 type="integer",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example=1
      *             ),
      *             @OA\Property(
-     *                 property="kota", 
-     *                 type="integer", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="kota",
+     *                 type="integer",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example=1
      *             ),
      *             @OA\Property(
-     *                 property="penempatan", 
-     *                 type="string", 
-     *                 description="Wajib diisi jika jumlah_site = Single Site", 
+     *                 property="penempatan",
+     *                 type="string",
+     *                 description="Wajib diisi jika jumlah_site = Single Site",
      *                 example="Jakarta Pusat",
      *                 maxLength=255
      *             ),
-     *             
+     *
      *             @OA\Property(
      *                 property="multisite",
      *                 type="array",
@@ -364,7 +385,7 @@ class QuotationController extends Controller
      *                 ),
      *                 example={"Jakarta", "Bandung"}
      *             ),
-     *             
+     *
      *             @OA\Property(
      *                 property="tipe",
      *                 type="string",
@@ -404,7 +425,14 @@ class QuotationController extends Controller
      *                     )
      *                 )
      *             ),
-     *             @OA\Property(property="message", type="string", example="Quotation created successfully")
+     *             @OA\Property(property="message", type="string", example="Quotation created successfully"),
+     *             @OA\Property(property="metadata", type="object",
+     *                 @OA\Property(property="sites_created", type="integer", example=1),
+     *                 @OA\Property(property="tipe_quotation", type="string", example="baru"),
+     *                 @OA\Property(property="survey_ids", type="array",
+     *                     @OA\Items(type="integer", example=1)
+     *                 )
+     *             )
      *         )
      *     ),
      *     @OA\Response(
@@ -485,9 +513,17 @@ class QuotationController extends Controller
             );
 
             $quotationData['created_by'] = $user->full_name;
+            $quotationData['created_by_user_id'] = $user->id;
             $quotationData['tipe_quotation'] = $tipe_quotation;
+            
+            if ($quotationReferensi) {
+                $quotationData['version'] = $quotationReferensi->version ?? 1;
+            } else {
+                $quotationData['version'] = $request->get('version', 1);
+            }
 
             $quotation = Quotation::create($quotationData);
+
 
             Log::info('New Quotation created', [
                 'id' => $quotation->id,
@@ -500,7 +536,8 @@ class QuotationController extends Controller
                 $this->quotationBusinessService->createQuotationSites(
                     $quotation,
                     $request,
-                    $user->full_name
+                    $user->full_name,
+                    $user->id
                 );
 
                 Log::info('Sites created synchronously', [
@@ -511,6 +548,52 @@ class QuotationController extends Controller
 
             QuotationCreated::dispatch($quotation, $request->all(), $tipe_quotation, $quotationReferensi, $user);
 
+            if ($tipe_quotation === 'revisi' && $quotationReferensi) {
+                $this->updateRevisionStatuses($quotationReferensi);
+            }
+
+            // Create corresponding SdtSurvey records for all sites
+            $company = \App\Models\Company::find($quotation->company_id);
+            $divisionCode = $company ? $company->code : 'UKN';
+            $year = \Carbon\Carbon::now()->year;
+
+            $lastSequence = DB::table('sdt_survey')
+                ->where('doc_division', $divisionCode)
+                ->where('doc_year', $year)
+                ->lockForUpdate()
+                ->max('doc_sequence');
+
+            $currentSequence = $lastSequence ? $lastSequence + 1 : 1;
+            
+            $sites = \App\Models\QuotationSite::where('quotation_id', $quotation->id)->get();
+            $surveyIds = [];
+
+            foreach ($sites as $site) {
+                $docNumber = sprintf('%03d/%s/%s/%d', $currentSequence, 'SURVEY', $divisionCode, $year);
+                
+                $surveyId = DB::table('sdt_survey')->insertGetId([
+                    'quotation_id' => $quotation->id,
+                    'leads_id' => $quotation->leads_id,
+                    'company_id' => $quotation->company_id,
+                    'company' => $quotation->company,
+                    'nama_perusahaan' => $quotation->nama_perusahaan,
+                    'kebutuhan' => $quotation->kebutuhan,
+                    'kebutuhan_id' => $quotation->kebutuhan_id,
+                    'site_id' => $site->id,
+                    'doc_sequence' => $currentSequence,
+                    'doc_division' => $divisionCode,
+                    'doc_year' => $year,
+                    'document_number' => $docNumber,
+                    'status' => 'draft',
+                    'created_by' => $user->id ?? null,
+                    'created_by_name' => $user->full_name ?? null,
+                    'created_at' => \Carbon\Carbon::now(),
+                    'updated_at' => \Carbon\Carbon::now(),
+                ]);
+                $surveyIds[] = $surveyId;
+                $currentSequence++;
+            }
+
             DB::commit();
 
             // Reload untuk response
@@ -519,6 +602,7 @@ class QuotationController extends Controller
                 'quotationPics',
                 'quotationDetails',
                 'statusQuotation',
+                'creator.role',
             ]);
 
             $newSitesCount = $quotation->quotationSites->count();
@@ -530,6 +614,7 @@ class QuotationController extends Controller
                 'metadata' => [
                     'sites_created' => $newSitesCount,
                     'tipe_quotation' => $tipe_quotation,
+                    'survey_ids' => $surveyIds,
                 ],
             ], 201);
 
@@ -585,9 +670,8 @@ class QuotationController extends Controller
     public function show($id)
     {
         set_time_limit(0);
-        try {
-            // Load semua relasi yang diperlukan
-            $quotation = Quotation::with([
+        // Load semua relasi yang diperlukan
+        $quotation = Quotation::with([
                 'quotationDetails.quotationDetailHpps',
                 'quotationDetails.quotationDetailCosses',
                 'quotationDetails.wage',
@@ -606,19 +690,11 @@ class QuotationController extends Controller
                 'quotationKerjasamas',
                 'logNotifications',
                 'logApprovals',
-            ])->findOrFail($id);
+                'creator.role',
+        ])->findOrFail($id);
 
-            // ✅ BENAR: Melewatkan model Quotation ke Resource
-            return new QuotationResource($quotation);
-
-        } catch (\Exception $e) {
-            \Log::error("Error in quotation show: " . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        // ✅ BENAR: Melewatkan model Quotation ke Resource (biarkan apa adanya).
+        return new QuotationResource($quotation);
     }
     /**
      * @OA\Delete(
@@ -664,9 +740,9 @@ class QuotationController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        DB::beginTransaction();
-        try {
-            $user = Auth::user();
+        $user = Auth::user();
+
+        DB::transaction(function () use ($id, $user) {
             $quotation = Quotation::notDeleted()->findOrFail($id);
 
             // Soft delete relations first
@@ -676,22 +752,9 @@ class QuotationController extends Controller
             $quotation->deleted_at = Carbon::now();
             $quotation->deleted_by = $user->full_name;
             $quotation->save();
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Quotation deleted successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to delete quotation',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->messageResponse('Quotation deleted successfully');
     }
 
 
@@ -731,37 +794,41 @@ class QuotationController extends Controller
     public function submitForApproval(QuotationApproveRequest $request): JsonResponse
     {
         try {
-            $id = $request->validated('id');                // sudah pasti valid
-
+            $id = $request->validated('id');
             $quotation = Quotation::notDeleted()
                 ->with(['quotationDetails.wage'])
                 ->findOrFail($id);
 
-            $data = $request->validated();                  // ['id', 'is_approved', 'alasan']
+            $data = $request->validated();
+            $user = Auth::user();
 
-            // Service masih menerima 'is_approved' & 'notes', jadi mapping 'alasan' → 'notes'
+            DB::beginTransaction();
+
             $result = $this->submitApproval(
                 $quotation,
                 [
                     'is_approved' => $data['is_approved'],
                     'notes' => $data['alasan'] ?? null,
                 ],
-                Auth::user()
+                $user
             );
 
             if (!$result['success']) {
+                DB::rollBack();
                 return response()->json($result, 400);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => $data['is_approved']
+            DB::commit();
+
+            return $this->successResponse(
+                $result['data'] ?? null,
+                $data['is_approved']
                     ? 'Quotation approved successfully'
-                    : 'Quotation rejected successfully',
-                'data' => $result['data'] ?? null,
-            ]);
+                    : 'Quotation rejected successfully'
+            );
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan sistem',
@@ -845,11 +912,7 @@ class QuotationController extends Controller
             return response()->json($result, 400);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Approval berhasil direset',
-            'data' => $result['data']
-        ]);
+        return $this->successResponse($result['data'], 'Approval berhasil direset');
     }
 
 
@@ -894,13 +957,13 @@ class QuotationController extends Controller
         try {
             // Validasi parameter tipe_quotation
             if (!in_array($tipe_quotation, ['baru', 'revisi', 'rekontrak', 'addendum'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum'
-                ], 400);
+                return $this->errorResponse(
+                    'Parameter tipe_quotation harus diisi dengan nilai: baru, revisi, rekontrak, atau addendum',
+                    400
+                );
             }
 
-            $user = auth()->user();
+            $user = auth::user();
 
             // Base query dengan relasi yang diperlukan
             $query = Leads::select('id', 'nama_perusahaan', 'pic', 'status_leads_id', 'branch_id', 'customer_id')
@@ -959,17 +1022,12 @@ class QuotationController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'message' => "Data leads untuk quotation {$tipe_quotation} berhasil diambil",
-                'data' => $data,
-
-            ]);
+            return $this->successResponse(
+                $data,
+                "Data leads untuk quotation {$tipe_quotation} berhasil diambil"
+            );
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+            return $this->errorResponse('Terjadi kesalahan: ' . $e->getMessage(), 500);
         }
     }
 
@@ -1042,39 +1100,14 @@ class QuotationController extends Controller
      *     )
      * )
      */
-    public function getReferenceQuotations(string $leadsId, Request $request): JsonResponse
+    public function getReferenceQuotations(string $leadsId, QuotationReferenceRequest $request): JsonResponse
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'tipe_quotation' => 'required|in:baru,revisi,rekontrak,addendum'
-            ]);
+        // ✅ 1 query — cukup untuk validasi leads exists
+        Leads::withoutTrashed()->findOrFail($leadsId);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validation error',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+        $quotations = $this->getFilteredQuotations($leadsId, $request->validated('tipe_quotation'));
 
-            // ✅ 1 query — cukup untuk validasi leads exists
-            Leads::withoutTrashed()->findOrFail($leadsId);
-
-            $quotations = $this->getFilteredQuotations($leadsId, $request->tipe_quotation);
-
-            return response()->json([
-                'success' => true,
-                'data' => $quotations,
-                'message' => 'Quotation references retrieved successfully'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve quotation references',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($quotations, 'Quotation references retrieved successfully');
     }
     /**
      * Check if site already exists for this leads (optimized)
@@ -1092,58 +1125,60 @@ class QuotationController extends Controller
     /**
      * Create only new sites (skip existing ones)
      */
-    private function createNewSitesOnly(Quotation $quotation, Request $request, string $createdBy): void
-    {
-        if ($request->jumlah_site == "Multi Site") {
-            foreach ($request->multisite as $key => $value) {
-                // Cek apakah site sudah existing
-                $isExisting = $this->checkSiteExists(
-                    $request->perusahaan_id,
-                    $value,
-                    $request->provinsi_multi[$key],
-                    $request->kota_multi[$key]
-                );
+    // private function createNewSitesOnly(Quotation $quotation, Request $request, string $createdBy): void
+    // {
+    //     if ($request->jumlah_site == "Multi Site") {
+    //         foreach ($request->multisite as $key => $value) {
+    //             // Cek apakah site sudah existing
+    //             $isExisting = $this->checkSiteExists(
+    //                 $request->perusahaan_id,
+    //                 $value,
+    //                 $request->provinsi_multi[$key],
+    //                 $request->kota_multi[$key]
+    //             );
 
-                if (!$isExisting) {
-                    $this->quotationBusinessService->createQuotationSite(
-                        $quotation,
-                        $request,
-                        $key,
-                        true,
-                        $createdBy
-                    );
-                } else {
-                    \Log::info('Skip creating existing site', [
-                        'nama_site' => $value,
-                        'leads_id' => $request->perusahaan_id
-                    ]);
-                }
-            }
-        } else {
-            // Cek apakah site sudah existing
-            $isExisting = $this->checkSiteExists(
-                $request->perusahaan_id,
-                $request->nama_site,
-                $request->provinsi,
-                $request->kota
-            );
+    //             if (!$isExisting) {
+    //                 $this->quotationBusinessService->createQuotationSite(
+    //                     $quotation,
+    //                     $request,
+    //                     $key,
+    //                     true,
+    //                     $createdBy,
+    //                     $user->id
+    //                 );
+    //             } else {
+    //                 \Log::info('Skip creating existing site', [
+    //                     'nama_site' => $value,
+    //                     'leads_id' => $request->perusahaan_id
+    //                 ]);
+    //             }
+    //         }
+    //     } else {
+    //         // Cek apakah site sudah existing
+    //         $isExisting = $this->checkSiteExists(
+    //             $request->perusahaan_id,
+    //             $request->nama_site,
+    //             $request->provinsi,
+    //             $request->kota
+    //         );
 
-            if (!$isExisting) {
-                $this->quotationBusinessService->createQuotationSite(
-                    $quotation,
-                    $request,
-                    null,
-                    false,
-                    $createdBy
-                );
-            } else {
-                \Log::info('Skip creating existing site', [
-                    'nama_site' => $request->nama_site,
-                    'leads_id' => $request->perusahaan_id
-                ]);
-            }
-        }
-    }
+    //         if (!$isExisting) {
+    //             $this->quotationBusinessService->createQuotationSite(
+    //                 $quotation,
+    //                 $request,
+    //                 null,
+    //                 false,
+    //                 $createdBy,
+    //                 $user->id
+    //             );
+    //         } else {
+    //             \Log::info('Skip creating existing site', [
+    //                 'nama_site' => $request->nama_site,
+    //                 'leads_id' => $request->perusahaan_id
+    //             ]);
+    //         }
+    //     }
+    // }
 
     /**
      * Link quotation to existing sites
@@ -1381,7 +1416,7 @@ class QuotationController extends Controller
         bool $isApproved,
         ?string $notes
     ): array {
-        // Panggil fresh() SEKALI saja
+        // Panggil fresh() untuk data terbaru
         $freshQuotation = $quotation->fresh();
 
         $this->sendNotificationToSales($freshQuotation, $user, $isApproved, $notes);
@@ -1391,7 +1426,37 @@ class QuotationController extends Controller
             && $freshQuotation->status_quotation_id === 3
             && $freshQuotation->tipe_quotation === 'addendum'
         ) {
-            app(AddendumService::class)->process($freshQuotation);
+            app(AddendumService::class)->process($freshQuotation, $user->full_name, $user->id);
+        }
+
+        if (
+            $isApproved
+            && $freshQuotation->status_quotation_id === 3
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            Spk::whereHas('spkSites', fn($q) =>
+                $q->where('quotation_id', $freshQuotation->id)
+            )->update(['status_spk_id' => 1]);
+
+            Pks::whereHas('sites', fn($q) =>
+                $q->where('quotation_id', $freshQuotation->id)
+            )->update(['status_pks_id' => 5]);
+        }
+
+        if (
+            !$isApproved
+            && $freshQuotation->status_quotation_id === 8
+            && $freshQuotation->tipe_quotation === 'revisi'
+        ) {
+            $quotationIds = array_filter([$freshQuotation->id, $freshQuotation->quotation_referensi_id]);
+
+            Spk::whereHas('spkSites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_spk_id' => 6]);
+
+            Pks::whereHas('sites', fn($q) =>
+                $q->whereIn('quotation_id', $quotationIds)
+            )->update(['status_pks_id' => 10]);
         }
 
         return ['success' => true, 'data' => $freshQuotation];
@@ -1416,6 +1481,7 @@ class QuotationController extends Controller
             'approval_date' => $now,
             'created_at' => $now,
             'created_by' => $user->full_name,
+            'created_by_user_id' => $user->id,
         ]);
     }
 
@@ -1451,7 +1517,8 @@ class QuotationController extends Controller
             'pesan' => $msg,
             'is_read' => 0,
             'created_at' => Carbon::now(),
-            'created_by' => $approver->full_name
+            'created_by' => $approver->full_name,
+            'created_by_user_id' => $approver->id
         ]);
 
         // $approvalUrl = 'https://caisshelter.pages.dev/quotation/view/' . $quotation->id;
@@ -1494,7 +1561,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 
@@ -1504,7 +1572,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_KEU  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirKeu()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Keuangan', $currentDateTime))
             ->delay(now()->addDay());
@@ -1530,7 +1598,8 @@ class QuotationController extends Controller
                 'pesan' => $msg,
                 'is_read' => 0,
                 'created_at' => $currentDateTime,
-                'created_by' => $creatorName
+                'created_by' => $creatorName,
+                'created_by_user_id' => Auth::id()
             ]);
         }
 
@@ -1539,7 +1608,7 @@ class QuotationController extends Controller
             quotation: $quotation,
             creatorName: $creatorName,
             approvalUrl: $approvalUrl,
-            overrideRecipients: QuotationNotificationService::DIR_SALES  // eksplisit
+            overrideRecipients: QuotationNotificationService::dirSales()
         );
         dispatch(new EscalateQuotationJob($quotation->id, 'Sales', $currentDateTime))
             ->delay(now()->addDay());
@@ -1569,6 +1638,28 @@ class QuotationController extends Controller
         return ['success' => true, 'data' => $quotation->fresh()];
     }
 
+    private function updateRevisionStatuses(Quotation $quotationReferensi): void
+    {
+        $updated = Spk::whereHas('spkSites', fn($q) =>
+            $q->where('quotation_id', $quotationReferensi->id)
+        )->update(['status_spk_id' => 5]);
+
+        Log::info($updated
+            ? 'Revision: SPK status updated to 5'
+            : 'Revision: no SPK found for quotation', [
+            'quotation_id' => $quotationReferensi->id,
+        ]);
+
+        $updated = Pks::whereHas('sites', fn($q) =>
+            $q->where('quotation_id', $quotationReferensi->id)
+        )->update(['status_pks_id' => 8]);
+
+        Log::info($updated
+            ? 'Revision: PKS status updated to 8'
+            : 'Revision: no PKS found for quotation', [
+            'quotation_id' => $quotationReferensi->id,
+        ]);
+    }
 
     public function getFilteredQuotations(string $leadsId, string $tipeQuotation)
     {
@@ -1608,7 +1699,7 @@ class QuotationController extends Controller
 
             case 'revisi':
                 $query->where('leads_id', $leadsId)
-                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 6, 7, 8]);
+                    ->whereIn('status_quotation_id', [2, 3, 4, 5, 7, 8]);
 
                 break;
             case 'addendum':

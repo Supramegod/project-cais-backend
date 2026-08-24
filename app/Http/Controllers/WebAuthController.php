@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\LoginWebRequest;
 use App\Models\RefreshTokens;
 use App\Models\User;
 use App\Models\HrisPersonalAccessToken;
@@ -16,13 +17,8 @@ class WebAuthController extends Controller
     /**
      * Login web (dari form welcome)
      */
-    public function login(Request $request)
+    public function login(LoginWebRequest $request)
     {
-        $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string',
-        ]);
-
         $user = User::checkLogin($request->username, $request->password)->first();
 
         if (!$user) {

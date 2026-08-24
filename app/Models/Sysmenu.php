@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\MenuPermissionService;
 use Carbon\Carbon;
 use DB;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,8 +23,9 @@ class Sysmenu extends Model
         'icon',
         'status',
         'created_by',
+        'created_by_user_id',
         'updated_by',
-        'deleted_by'
+        'deleted_by',
     ];
 
     protected $dates = ['deleted_at'];
@@ -49,8 +51,9 @@ class Sysmenu extends Model
     // Scope untuk menu yang tidak terhapus
     public function scopeActive($query)
     {
-        return $query->whereNull($this->getTable() . '.deleted_at');
+        return $query->whereNull($this->getTable().'.deleted_at');
     }
+
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
@@ -63,18 +66,32 @@ class Sysmenu extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+
     // Ganti scope WithPermissions untuk menggunakan LEFT JOIN
-    public function scopeWithPermissions($query, $roleId)
+    public function scopeWithPermissions($query, $roleId, $userId = null)
     {
-        return $query->leftJoin('sysmenu_role', function ($join) use ($roleId) {
+        $query->leftJoin('sysmenu_role', function ($join) use ($roleId) {
             $join->on('sysmenu_role.sysmenu_id', '=', 'sysmenu.id')
-                ->where('sysmenu_role.role_id', $roleId);
+                ->where('sysmenu_role.role_id', $roleId)
+                ->whereNull('sysmenu_role.user_id');
         });
+
+        if ($userId !== null) {
+            $query->leftJoin('sysmenu_role as sysmenu_role_user', function ($join) use ($roleId, $userId) {
+                $join->on('sysmenu_role_user.sysmenu_id', '=', 'sysmenu.id')
+                    ->where('sysmenu_role_user.role_id', $roleId)
+                    ->where('sysmenu_role_user.user_id', $userId);
+            });
+        }
+
+        return $query;
     }
+
     public function scopeWithGroupInfo($query)
     {
         return $query->leftJoin('sysmenu_group', 'sysmenu_group.id', '=', 'sysmenu.group_id');
     }
+
     // Di dalam Sysmenu.php
     public function scopeOrdered($query)
     {
@@ -90,9 +107,9 @@ class Sysmenu extends Model
     }
 
     // Update scope SelectMenuFields untuk handle null permissions
-    public function scopeSelectMenuFields($query)
+    public function scopeSelectMenuFields($query, bool $withUserOverride = false)
     {
-        return $query->select(
+        $columns = [
             'sysmenu.id',
             'sysmenu.nama',
             'sysmenu.icon',
@@ -101,11 +118,27 @@ class Sysmenu extends Model
             'sysmenu.parent_id',
             'sysmenu.group_id',
             'sysmenu_group.nama as group_name',
-            DB::raw('COALESCE(sysmenu_role.is_view, 0) as is_view'),
-            DB::raw('COALESCE(sysmenu_role.is_add, 0) as is_add'),
-            DB::raw('COALESCE(sysmenu_role.is_edit, 0) as is_edit'),
-            DB::raw('COALESCE(sysmenu_role.is_delete, 0) as is_delete')
-        );
-    }
+        ];
 
+        if ($withUserOverride) {
+            $columns[] = DB::raw('CASE WHEN sysmenu_role_user.id IS NOT NULL THEN 1 ELSE 0 END as has_override');
+        }
+
+        foreach (MenuPermissionService::FIELDS as $field) {
+            if ($withUserOverride) {
+                $columns[] = DB::raw(
+                    'CASE WHEN sysmenu_role_user.id IS NOT NULL'
+                    .' THEN COALESCE(sysmenu_role_user.'.$field.', 0)'
+                    .' ELSE COALESCE(sysmenu_role.'.$field.', 0) END as '.$field
+                );
+                $columns[] = DB::raw('COALESCE(sysmenu_role_user.'.$field.', 0) as override_'.$field);
+
+                continue;
+            }
+
+            $columns[] = DB::raw('COALESCE(sysmenu_role.'.$field.', 0) as '.$field);
+        }
+
+        return $query->select($columns);
+    }
 }

@@ -1,0 +1,176 @@
+{
+  "notes": {
+    "usage": "Ganti semua ID contoh sebelum dipakai manual atau di test.",
+    "source_quotation_endpoint": "/api/pks-wizard/source/quotations/{leadsId}",
+    "source_spk_endpoint": "/api/pks-wizard/source/spk/{leadsId}",
+    "initialize_endpoint": "/api/pks-wizard/initialize/{tipe}",
+    "step_endpoint": "/api/pks-wizard/{pksId}/step/{step}",
+    "preview_endpoint": "/api/pks-wizard/{pksId}/preview-pasal",
+    "preview_update_endpoint": "/api/pks-wizard/{pksId}/preview-pasal/{pasalKey}",
+    "finalize_endpoint": "/api/pks-wizard/{pksId}/finalize",
+    "cancel_endpoint": "/api/pks-wizard/{pksId}"
+  },
+  "source_picker_usage": {
+    "quotation": {
+      "description": "Pakai endpoint source quotations dengan method POST untuk mengambil daftar quotation kandidat per leads sebelum initialize wizard tipe rekontrak atau addendum. Request body bisa berisi spk_ids array untuk mempersempit quotation yang tampil berdasarkan banyak SPK terpilih. Endpoint ini juga mendukung search, search_by, page, dan per_page. Gunakan field id sebagai candidate_quotation_ids[]."
+    },
+    "spk": {
+      "description": "Pakai endpoint source spk untuk mengambil daftar SPK kandidat per leads sebelum initialize wizard tipe baru. Endpoint ini mendukung query search, search_by, page, dan per_page. Gunakan field id sebagai candidate_spk_ids[]."
+    }
+  },
+  "source_quotation_request": {
+    "filter_by_spk_ids": {
+      "spk_ids": [789, 790],
+      "tipe_pks": "rekontrak",
+      "search": "SIG",
+      "search_by": "company_name",
+      "per_page": 10,
+      "page": 1
+    }
+  },
+  "initialize": {
+    "baru": {
+      "leads_id": 123,
+      "company_id": 13,
+      "candidate_spk_ids": [789, 790],
+      "candidate_quotation_ids": [456, 457]
+    },
+    "rekontrak": {
+      "leads_id": 123,
+      "company_id": 13,
+      "candidate_quotation_ids": [456, 457]
+    },
+    "addendum": {
+      "leads_id": 123,
+      "pks_induk_id": 22,
+      "candidate_quotation_ids": [456, 457],
+      "company_id": 13
+    }
+  },
+  "preview_pasal": {
+    "generate_template_preview": {
+      "regenerate": true
+    },
+    "generate_addendum_preview": {
+      "regenerate": true,
+      "additional_articles": [
+        {
+          "pasal": "Addendum 1",
+          "judul": "PENAMBAHAN RUANG LINGKUP",
+          "raw_text": "<p>PIHAK PERTAMA dan PIHAK KEDUA sepakat menambahkan ruang lingkup pekerjaan untuk site baru.</p>"
+        },
+        {
+          "pasal": "Addendum 2",
+          "judul": "PENYESUAIAN NILAI",
+          "raw_text": "<p>Nilai tagihan mengikuti quotation addendum yang disetujui.</p>"
+        }
+      ]
+    },
+    "update_preview_section": {
+      "pasal": "Pasal 1",
+      "judul": "RUANG LINGKUP PERJANJIAN",
+      "raw_text": "<p>Isi pasal hasil edit manual user sebelum finalize.</p>"
+    }
+  },
+  "finalize": {
+    "confirm": {
+      "confirm_finalize": true
+    }
+  },
+  "update_step": {
+    "step_1_source_review": {
+      "mark_as_complete": true,
+      "step_data": {
+        "confirmed": true,
+        "notes": "Source reviewed and accepted"
+      }
+    },
+    "step_2_header": {
+      "mark_as_complete": true,
+      "step_data": {
+        "tanggal_pks": "2026-07-01",
+        "tanggal_awal_kontrak": "2026-07-01",
+        "tanggal_akhir_kontrak": "2027-06-30",
+        "company_id": 13,
+        "salary_rule_id": 1,
+        "rule_thr_id": 2,
+        "kategori_sesuai_hc_id": 1,
+        "loyalty_id": 1
+      }
+    },
+    "step_3_sites_baru": {
+      "mark_as_complete": true,
+      "step_data": {
+        "site_ids": [
+          11,
+          12
+        ],
+        "primary_quotation_id": 456
+      }
+    },
+    "step_3_sites_rekontrak": {
+      "mark_as_complete": true,
+      "step_data": {
+        "quotation_site_ids": [
+          21,
+          22
+        ],
+        "primary_quotation_id": 456
+      }
+    },
+    "step_3_sites_addendum": {
+      "mark_as_complete": true,
+      "step_data": {
+        "skipped": true,
+        "reason": "Addendum does not create new sites"
+      }
+    },
+    "step_4_pic": {
+      "mark_as_complete": true,
+      "step_data": {
+        "pic_1": "Budi Santoso",
+        "jabatan_pic_1": "Procurement Manager",
+        "email_pic_1": "budi@example.com",
+        "telp_pic_1": "081234567890",
+        "pic_2": "Siti Aminah",
+        "jabatan_pic_2": "Finance Supervisor",
+        "email_pic_2": "siti@example.com",
+        "telp_pic_2": "081298765432"
+      }
+    },
+    "step_5_commercial_snapshot": {
+      "mark_as_complete": true,
+      "step_data": {
+        "total_sebelum_pajak": 10000000,
+        "dasar_pengenaan_pajak": 10000000,
+        "ppn": 1100000,
+        "pph": 200000,
+        "total_invoice": 10900000,
+        "persen_mf": 12,
+        "nominal_mf": 1200000,
+        "persen_bpjs_tk": 5.54,
+        "nominal_bpjs_tk": 554000,
+        "persen_bpjs_ks": 4,
+        "nominal_bpjs_ks": 400000,
+        "tgl_kirim_invoice": "25",
+        "jumlah_hari_top": 30,
+        "tipe_hari_top": "calendar",
+        "tgl_gaji": "28"
+      }
+    },
+    "step_6_template_inputs": {
+      "mark_as_complete": true,
+      "step_data": {
+        "regenerate_preview": false,
+        "manual_notes": "Initial template inputs saved, then call preview endpoint"
+      }
+    },
+    "step_7_review": {
+      "mark_as_complete": true,
+      "step_data": {
+        "ready_for_finalize": true,
+        "review_notes": "All current phase-1 steps have been reviewed"
+      }
+    }
+  }
+}

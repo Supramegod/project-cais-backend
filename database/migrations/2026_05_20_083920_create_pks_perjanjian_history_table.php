@@ -8,6 +8,10 @@ class CreatePksPerjanjianHistoryTable extends Migration
 {
     public function up()
     {
+        if (Schema::hasTable('sl_pks_perjanjian_history')) {
+            return;
+        }
+
         Schema::create('sl_pks_perjanjian_history', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('pks_perjanjian_id');

@@ -35,6 +35,7 @@ class Leads extends Model
         'jenis_perusahaan_id',
         'nomor',
         'created_by',
+        'created_by_user_id',
         'updated_by',
         'deleted_by',
         'tgl_leads',
@@ -131,6 +132,11 @@ class Leads extends Model
     {
         return $this->hasMany(Pks::class, 'leads_id');
     }
+
+    public function pksVisitRecords()
+    {
+        return $this->hasMany(PksVisitRecord::class, 'leads_id');
+    }
     /**
      * Relasi ke SPK (Surat Perintah Kerja)
      */
@@ -156,6 +162,14 @@ class Leads extends Model
     public function jabatanPic()
     {
         return $this->belongsTo(JabatanPic::class, 'jabatan');
+    }
+    /**
+     * Relasi ke daftar PIC (multi PIC) leads
+     */
+    public function pics()
+    {
+        return $this->hasMany(LeadsPic::class, 'leads_id')
+            ->whereNull('deleted_at');
     }
     /**
      * Relasi ke LeadsKebutuhan untuk akses tim sales

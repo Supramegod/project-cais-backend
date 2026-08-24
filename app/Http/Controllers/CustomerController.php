@@ -270,7 +270,7 @@ class CustomerController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
@@ -401,10 +401,7 @@ class CustomerController extends Controller
                 ->find($id);
 
             if (!$data) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Customer not found'
-                ], 404);
+                return $this->notFoundResponse('Customer not found');
             }
 
             // Format dates seperti di original controller
@@ -424,20 +421,14 @@ class CustomerController extends Controller
                     return $item;
                 });
 
-            return response()->json([
-                'success' => true,
-                'data' => array_merge([
-                    'customer' => $data,
-                    'activity' => $activity
-                ])
+            return $this->successResponse([
+                'customer' => $data,
+                'activity' => $activity
             ]);
 
         } catch (\Exception $e) {
             \Log::error('Customer API View Error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
+            return $this->serverErrorResponse('Internal server error');
         }
     }
 
@@ -533,14 +524,16 @@ class CustomerController extends Controller
                     'ro' => $lead->ro,
                     'crm' => $lead->crm,
                     'tim_sales' => $lead->timSales->nama ?? null,
-                    'sales' => $lead->timSalesDetail->nama ?? null,
+                    'sales' => $lead->timSalesD->nama ?? null,
                     'tim_sales_id' => $lead->tim_sales_id,
                     'tim_sales_d_id' => $lead->tim_sales_d_id,
                     'status_leads_id' => $lead->status_leads_id,
                     'id' => $lead->id,
                     'tgl_leads' => $lead->tgl_leads,
                     'nama_perusahaan' => $lead->nama_perusahaan,
-                    'kebutuhan' => $lead->kebutuhan->nama ?? null,
+                    // kebutuhan() adalah belongsToMany (Collection) — gabung nama-nama,
+                    // bukan ->nama (yang throw pada Collection).
+                    'kebutuhan' => $lead->kebutuhan->pluck('nama')->implode(', ') ?: null,
                     'pic' => $lead->pic,
                     'no_telp' => $lead->no_telp,
                     'email' => $lead->email,
@@ -553,17 +546,11 @@ class CustomerController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
+            return $this->successResponse($data);
 
         } catch (\Exception $e) {
             \Log::error('Customer API Available Error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error'
-            ], 500);
+            return $this->serverErrorResponse('Internal server error');
         }
     }
 

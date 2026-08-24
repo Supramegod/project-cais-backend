@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SystemAnnouncement\SystemAnnouncementRequest;
 use App\Models\SystemAnnouncement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 
 /**
  * @OA\Tag(
@@ -41,28 +41,17 @@ class SystemAnnouncementController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $query = SystemAnnouncement::query();
+        $query = SystemAnnouncement::query();
 
-            // Optional filter by category
-            if ($request->has('category') && $request->category !== 'Semua' && $request->category !== '') {
-                $query->where('category', $request->category);
-            }
-
-            // Order by latest release date
-            $data = $query->orderBy('release_date', 'desc')->orderBy('created_at', 'desc')->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        // Optional filter by category
+        if ($request->has('category') && $request->category !== 'Semua' && $request->category !== '') {
+            $query->where('category', $request->category);
         }
+
+        // Order by latest release date
+        $data = $query->orderBy('release_date', 'desc')->orderBy('created_at', 'desc')->get();
+
+        return $this->successResponse($data);
     }
 
     /**
@@ -91,51 +80,20 @@ class SystemAnnouncementController extends Controller
      *     )
      * )
      */
-    public function add(Request $request)
+    public function add(SystemAnnouncementRequest $request)
     {
-        try {
-            $validator = Validator::make($request->all(), [
-                'category' => 'required|in:Fitur Baru,Bug Fix,Aturan,Update',
-                'title' => 'required|string|max:255',
-                'version' => 'nullable|string|max:50',
-                'release_date' => 'nullable|date',
-                'description' => 'nullable|string',
-                'details' => 'nullable|string',
-                'is_active' => 'boolean'
-            ]);
+        $announcement = SystemAnnouncement::create([
+            'category' => $request->category,
+            'title' => $request->title,
+            'version' => $request->version,
+            'release_date' => $request->release_date ?? now()->toDateString(),
+            'description' => $request->description,
+            'details' => $request->details,
+            'is_active' => $request->has('is_active') ? $request->is_active : true,
+            'created_by' => Auth::check() ? Auth::id() : null,
+        ]);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $announcement = SystemAnnouncement::create([
-                'category' => $request->category,
-                'title' => $request->title,
-                'version' => $request->version,
-                'release_date' => $request->release_date ?? now()->toDateString(),
-                'description' => $request->description,
-                'details' => $request->details,
-                'is_active' => $request->has('is_active') ? $request->is_active : true,
-                'created_by' => Auth::check() ? Auth::id() : null
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil dibuat',
-                'data' => $announcement
-            ], 201);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->createdResponse($announcement, 'Announcement berhasil dibuat');
     }
 
     /**
@@ -151,28 +109,13 @@ class SystemAnnouncementController extends Controller
      */
     public function view($id)
     {
-        try {
-            $announcement = SystemAnnouncement::find($id);
+        $announcement = SystemAnnouncement::find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan'
-                ], 404);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $announcement
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
         }
+
+        return $this->successResponse($announcement);
     }
 
     /**
@@ -194,59 +137,25 @@ class SystemAnnouncementController extends Controller
      *     @OA\Response(response=200, description="Announcement updated successfully")
      * )
      */
-    public function update(Request $request, $id)
+    public function update(SystemAnnouncementRequest $request, $id)
     {
-        try {
-            $announcement = SystemAnnouncement::find($id);
+        $announcement = SystemAnnouncement::find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'category' => 'required|in:Fitur Baru,Bug Fix,Aturan,Update',
-                'title' => 'required|string|max:255',
-                'version' => 'nullable|string|max:50',
-                'release_date' => 'nullable|date',
-                'description' => 'nullable|string',
-                'details' => 'nullable|string',
-                'is_active' => 'boolean'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $announcement->update([
-                'category' => $request->category,
-                'title' => $request->title,
-                'version' => $request->version,
-                'release_date' => $request->release_date,
-                'description' => $request->description,
-                'details' => $request->details,
-                'is_active' => $request->has('is_active') ? $request->is_active : $announcement->is_active
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil diupdate',
-                'data' => $announcement
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
         }
+
+        $announcement->update([
+            'category' => $request->category,
+            'title' => $request->title,
+            'version' => $request->version,
+            'release_date' => $request->release_date,
+            'description' => $request->description,
+            'details' => $request->details,
+            'is_active' => $request->has('is_active') ? $request->is_active : $announcement->is_active,
+        ]);
+
+        return $this->successResponse($announcement, 'Announcement berhasil diupdate');
     }
 
     /**
@@ -262,29 +171,14 @@ class SystemAnnouncementController extends Controller
      */
     public function delete($id)
     {
-        try {
-            $announcement = SystemAnnouncement::find($id);
+        $announcement = SystemAnnouncement::find($id);
 
-            if (!$announcement) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Announcement tidak ditemukan'
-                ], 404);
-            }
-
-            $announcement->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Announcement berhasil dihapus'
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Internal server error',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$announcement) {
+            return $this->notFoundResponse('Announcement tidak ditemukan');
         }
+
+        $announcement->delete();
+
+        return $this->messageResponse('Announcement berhasil dihapus');
     }
 }

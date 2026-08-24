@@ -19,6 +19,7 @@ class PerusahaanGroup extends Model
         'nama_grup',
         'jumlah_perusahaan',
         'created_by',
+        'created_by_user_id',
         'update_by',
         'deleted_by'
     ];

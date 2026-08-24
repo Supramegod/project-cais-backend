@@ -6,7 +6,7 @@ use App\Models\JabatanPic;
 use App\Models\QuotationManagementFee;
 use App\Models\SalaryRule;
 use App\Models\Umk;
-use App\Services\QuotationService;
+use App\Services\Quotation\QuotationService;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Carbon\Carbon;
 
@@ -253,6 +253,7 @@ class QuotationResource extends JsonResource
             'tgl_quotation' => $this->tgl_quotation,
             'tgl_quotation_formatted' => $this->tgl_quotation ? Carbon::parse($this->tgl_quotation)->isoFormat('D MMMM Y') : null,
             'nama_perusahaan' => $this->nama_perusahaan,
+            'tipe_quotation'=> $this->tipe_quotation,
             'kebutuhan' => $this->kebutuhan,
             'kebutuhan_id' => $this->kebutuhan_id,
             'company' => $this->company,
@@ -373,9 +374,11 @@ class QuotationResource extends JsonResource
             'created_at' => $this->created_at,
             'created_at_formatted' => $this->created_at ? Carbon::parse($this->created_at)->isoFormat('D MMMM Y') : null,
             'created_by' => $this->created_by,
+            'created_by_id' => $this->created_by_user_id,
+            'created_by_role' => $this->whenLoaded('creator', fn() => $this->creator?->role?->name),
+            'created_by_role_id' => $this->whenLoaded('creator', fn() => $this->creator?->cais_role_id),
             'updated_at' => $this->updated_at,
             'deleted_at' => $this->deleted_at,
-
             // Relationships
             'leads' => $this->whenLoaded('leads', function () {
                 return [
@@ -572,6 +575,8 @@ class QuotationResource extends JsonResource
                                 'id' => $tunjangan->id,
                                 'nama_tunjangan' => $tunjangan->nama_tunjangan,
                                 'nominal' => $tunjangan->nominal,
+                                'nominal_coss' => $tunjangan->nominal_coss,
+                                'jenis' => $tunjangan->jenis,
                             ];
                         }) : [],
 
@@ -719,6 +724,7 @@ class QuotationResource extends JsonResource
                             'nama_tunjangan' => $t->nama_tunjangan,
                             'nominal' => $t->nominal,
                             'nominal_coss' => $t->nominal_coss,
+                            'jenis' => $t->jenis,
                         ])->values()->toArray(),
                         'hpp' => [
                             'nominal_upah' => $hppData['gaji_pokok'] ?? 0,

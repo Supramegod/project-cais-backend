@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TimSales\TimSalesRequest;
+use App\Http\Requests\TimSales\TimSalesAddMemberRequest;
+use App\Http\Requests\TimSales\TimSalesSetLeaderRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use App\Models\TimSales;
 use App\Models\TimSalesDetail;
@@ -63,48 +65,35 @@ class TimSalesController extends Controller
      */
     public function list(Request $request)
     {
-        try {
-            $search = $request->get('search');
+        $search = $request->get('search');
 
-            $query = TimSales::with([
-                'branch',
-                'details' => function ($q) {
-                    $q->whereNull('deleted_at');
-                }
-            ]);
-
-            if ($search) {
-                $query->where('nama', 'like', '%' . $search . '%');
+        $query = TimSales::with([
+            'branch',
+            'details' => function ($q) {
+                $q->whereNull('deleted_at');
             }
+        ]);
 
-            // ambil data tanpa paginate
-            $data = $query->get()->transform(function ($item) {
-                return [
-                    'id' => $item->id,
-                    'nama' => $item->nama,
-                    'branch' => $item->branch,
-                    'branch_id' => $item->branch_id,
-                    'jumlah_anggota' => $item->details->count(),
-                    'created_at' => $item->created_at,
-                    'created_by' => $item->created_by,
-                    'updated_at' => $item->updated_at,
-                    'updated_by' => $item->updated_by,
-                ];
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Data tim sales berhasil diambil',
-                'data' => $data
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
+        if ($search) {
+            $query->where('nama', 'like', '%' . $search . '%');
         }
+
+        // ambil data tanpa paginate
+        $data = $query->get()->transform(function ($item) {
+            return [
+                'id' => $item->id,
+                'nama' => $item->nama,
+                'branch' => $item->branch,
+                'branch_id' => $item->branch_id,
+                'jumlah_anggota' => $item->details->count(),
+                'created_at' => $item->created_at,
+                'created_by' => $item->created_by,
+                'updated_at' => $item->updated_at,
+                'updated_by' => $item->updated_by,
+            ];
+        });
+
+        return $this->successResponse($data, 'Data tim sales berhasil diambil');
     }
 
 
@@ -157,22 +146,18 @@ class TimSalesController extends Controller
      */
     public function show($id)
     {
-        try {
-            $timSales = TimSales::with([
-                'branch',
-                'details' => function ($q) {
-                    $q->whereNull('deleted_at');
-                }
-            ])->find($id);
-
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
+        $timSales = TimSales::with([
+            'branch',
+            'details' => function ($q) {
+                $q->whereNull('deleted_at');
             }
+        ])->find($id);
 
-            $data = [
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
+        }
+
+        $data = [
                 'id' => $timSales->id,
                 'nama' => $timSales->nama,
                 'branch' => $timSales->branch,
@@ -193,19 +178,7 @@ class TimSalesController extends Controller
                 })
             ];
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Detail tim sales berhasil diambil',
-                'data' => $data
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($data, 'Detail tim sales berhasil diambil');
     }
 
     /**
@@ -246,65 +219,26 @@ class TimSalesController extends Controller
      *     )
      * )
      */
-    public function store(Request $request)
+    public function store(TimSalesRequest $request)
     {
-        try {
-            DB::beginTransaction();
-
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'branch_id' => 'required|integer|exists:m_branch,id'
-            ], [
-                'required' => ':attribute harus diisi',
-                'string' => ':attribute harus berupa teks',
-                'max' => ':attribute maksimal :max karakter',
-                'integer' => ':attribute harus berupa angka',
-                'exists' => 'Branch tidak ditemukan'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Get branch info
-            $branch = Branch::find($request->branch_id);
-            if (!$branch) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Branch tidak ditemukan'
-                ], 404);
-            }
-
-            $timSales = TimSales::create([
-                'nama' => $request->nama,
-                'branch_id' => $request->branch_id,
-                'branch' => $branch->name,
-                'created_by' => Auth::user()->full_name
-            ]);
-
-            // Load relationship for response
-            $timSales->load('branch');
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tim sales berhasil dibuat',
-                'data' => $timSales
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat menyimpan data',
-                'error' => $e->getMessage()
-            ], 500);
+        // Get branch info
+        $branch = Branch::find($request->branch_id);
+        if (!$branch) {
+            return $this->notFoundResponse('Branch tidak ditemukan');
         }
+
+        $timSales = TimSales::create([
+            'nama' => $request->nama,
+            'branch_id' => $request->branch_id,
+            'branch' => $branch->name,
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id()
+        ]);
+
+        // Load relationship for response
+        $timSales->load('branch');
+
+        return $this->successResponse($timSales, 'Tim sales berhasil dibuat', 201);
     }
 
     /**
@@ -354,70 +288,27 @@ class TimSalesController extends Controller
      *     )
      * )
      */
-    public function update(Request $request, $id)
+    public function update(TimSalesRequest $request, $id)
     {
-        try {
-            DB::beginTransaction();
-
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'nama' => 'required|string|max:255',
-                'branch_id' => 'required|integer|exists:m_branch,id'
-            ], [
-                'required' => ':attribute harus diisi',
-                'string' => ':attribute harus berupa teks',
-                'max' => ':attribute maksimal :max karakter',
-                'integer' => ':attribute harus berupa angka',
-                'exists' => 'Branch tidak ditemukan'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            // Get branch info
-            $branch = Branch::find($request->branch_id);
-            if (!$branch) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Branch tidak ditemukan'
-                ], 404);
-            }
-
-            $timSales->update([
-                'nama' => $request->nama,
-                'branch_id' => $request->branch_id,
-                'branch' => $branch->name,
-                'updated_by' => Auth::user()->full_name
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tim sales berhasil diupdate',
-                'data' => $timSales->fresh(['branch'])
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengupdate data',
-                'error' => $e->getMessage()
-            ], 500);
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
         }
+
+        // Get branch info
+        $branch = Branch::find($request->branch_id);
+        if (!$branch) {
+            return $this->notFoundResponse('Branch tidak ditemukan');
+        }
+
+        $timSales->update([
+            'nama' => $request->nama,
+            'branch_id' => $request->branch_id,
+            'branch' => $branch->name,
+            'updated_by' => Auth::user()->full_name
+        ]);
+
+        return $this->successResponse($timSales->fresh(['branch']), 'Tim sales berhasil diupdate');
     }
 
     /**
@@ -450,49 +341,26 @@ class TimSalesController extends Controller
      */
     public function destroy($id)
     {
-        try {
-            DB::beginTransaction();
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
+        }
 
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
+        DB::transaction(function () use ($timSales) {
             // Update the 'deleted_by' column and then soft delete the TimSales record.
             $timSales->update([
                 'deleted_by' => Auth::user()->full_name
             ]);
             $timSales->delete(); // This performs the soft delete
 
-            // If 'details' (members) also need to be soft deleted, do it here.
-            // Update the 'deleted_by' column for all related details.
+            // Soft delete all related 'details' records too.
             $timSales->details()->update([
                 'deleted_by' => Auth::user()->full_name
             ]);
-
-            // Soft delete all related 'details' records.
-            // Using `TimSales::details()->delete()` directly performs a soft delete
-            // on all related records, assuming the 'details' model is also configured for it.
             $timSales->details()->delete();
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Tim sales berhasil dihapus secara soft delete.'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat menghapus data.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->messageResponse('Tim sales berhasil dihapus secara soft delete.');
     }
 
     /**
@@ -544,46 +412,30 @@ class TimSalesController extends Controller
      */
     public function getMembers($id)
     {
-        try {
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            $members = $timSales->details()->with('user')->get();
-
-            $data = $members->map(function ($member) {
-                return [
-                    'id' => $member->id,
-                    'nama' => $member->nama,
-                    'user_id' => $member->user_id,
-                    'username' => $member->username,
-                    'is_leader' => $member->is_leader,
-                    'created_at' => $member->created_at,
-                    'user_detail' => $member->user ? [
-                        'full_name' => $member->user->full_name,
-                        'email' => $member->user->email,
-                        'cais_role_id' => $member->user->cais_role_id
-                    ] : null
-                ];
-            });
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Anggota tim sales berhasil diambil',
-                'data' => $data
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
         }
+
+        $members = $timSales->details()->with('user')->get();
+
+        $data = $members->map(function ($member) {
+            return [
+                'id' => $member->id,
+                'nama' => $member->nama,
+                'user_id' => $member->user_id,
+                'username' => $member->username,
+                'is_leader' => $member->is_leader,
+                'created_at' => $member->created_at,
+                'user_detail' => $member->user ? [
+                    'full_name' => $member->user->full_name,
+                    'email' => $member->user->email,
+                    'cais_role_id' => $member->user->cais_role_id
+                ] : null
+            ];
+        });
+
+        return $this->successResponse($data, 'Anggota tim sales berhasil diambil');
     }
 
     /**
@@ -637,85 +489,43 @@ class TimSalesController extends Controller
      *     )
      * )
      */
-    public function addMember(Request $request, $id)
+    public function addMember(TimSalesAddMemberRequest $request, $id)
     {
-        try {
-            DB::beginTransaction();
-
-            $validator = Validator::make($request->all(), [
-                'user_id' => 'required|integer|exists:mysqlhris.m_user,id'
-            ], [
-                'required' => ':attribute harus diisi',
-                'integer' => ':attribute harus berupa angka',
-                'exists' => 'User tidak ditemukan'
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            // Check if user already exists in this team
-            $existingMember = $timSales->details()
-                ->where('user_id', $request->user_id)
-                ->first();
-
-            if ($existingMember) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User sudah menjadi anggota tim ini'
-                ], 409);
-            }
-
-            // Get user info
-            $user = User::where('id', $request->user_id)
-                ->where('is_active', 1)
-                ->whereIn('cais_role_id', [29, 31, 32, 33])
-                ->where('branch_id', $timSales->branch_id)
-                ->first();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'User tidak ditemukan atau tidak valid untuk branch ini'
-                ], 404);
-            }
-
-            $member = TimSalesDetail::create([
-                'tim_sales_id' => $id,
-                'nama' => $user->full_name,
-                'user_id' => $request->user_id,
-                'username' => $user->username,
-                'created_by' => Auth::user()->full_name
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Anggota berhasil ditambahkan',
-                'data' => $member->fresh(['user'])
-            ], 201);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat menambah anggota',
-                'error' => $e->getMessage()
-            ], 500);
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
         }
+
+        // Check if user already exists in this team
+        $existingMember = $timSales->details()
+            ->where('user_id', $request->user_id)
+            ->first();
+
+        if ($existingMember) {
+            return $this->errorResponse('User sudah menjadi anggota tim ini', 409);
+        }
+
+        // Get user info
+        $user = User::where('id', $request->user_id)
+            ->where('is_active', 1)
+            ->whereIn('cais_role_id', [29, 31, 32, 33])
+            ->where('branch_id', $timSales->branch_id)
+            ->first();
+
+        if (!$user) {
+            return $this->notFoundResponse('User tidak ditemukan atau tidak valid untuk branch ini');
+        }
+
+        $member = TimSalesDetail::create([
+            'tim_sales_id' => $id,
+            'nama' => $user->full_name,
+            'user_id' => $request->user_id,
+            'username' => $user->username,
+            'created_by' => Auth::user()->full_name,
+            'created_by_user_id' => Auth::id()
+        ]);
+
+        return $this->successResponse($member->fresh(['user']), 'Anggota berhasil ditambahkan', 201);
     }
 
     /**
@@ -755,40 +565,20 @@ class TimSalesController extends Controller
      */
     public function removeMember($id, $memberId)
     {
-        try {
-            DB::beginTransaction();
+        $member = TimSalesDetail::where('id', $memberId)
+            ->where('tim_sales_id', $id)
+            ->first();
 
-            $member = TimSalesDetail::where('id', $memberId)
-                ->where('tim_sales_id', $id)
-                ->first();
-
-            if (!$member) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anggota tidak ditemukan'
-                ], 404);
-            }
-
-            $member->update([
-                'deleted_by' => Auth::user()->full_name
-            ]);
-            $member->delete();
-
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Anggota berhasil dihapus'
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat menghapus anggota',
-                'error' => $e->getMessage()
-            ], 500);
+        if (!$member) {
+            return $this->notFoundResponse('Anggota tidak ditemukan');
         }
+
+        $member->update([
+            'deleted_by' => Auth::user()->full_name
+        ]);
+        $member->delete();
+
+        return $this->messageResponse('Anggota berhasil dihapus');
     }
 
     /**
@@ -837,42 +627,22 @@ class TimSalesController extends Controller
      *     )
      * )
      */
-    public function setLeader(Request $request, $id)
+    public function setLeader(TimSalesSetLeaderRequest $request, $id)
     {
-        try {
-            DB::beginTransaction();
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
+        }
 
-            $validator = Validator::make($request->all(), [
-                'member_id' => 'required|integer'
-            ]);
+        $member = $timSales->details()
+            ->where('id', $request->member_id)
+            ->first();
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Validasi gagal',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
+        if (!$member) {
+            return $this->notFoundResponse('Anggota tidak ditemukan');
+        }
 
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            $member = $timSales->details()
-                ->where('id', $request->member_id)
-                ->first();
-
-            if (!$member) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Anggota tidak ditemukan'
-                ], 404);
-            }
-
+        DB::transaction(function () use ($timSales, $member) {
             // Cek leader lama
             $oldLeader = $timSales->details()->where('is_leader', 1)->first();
             if ($oldLeader && $oldLeader->id !== $member->id) {
@@ -887,23 +657,9 @@ class TimSalesController extends Controller
                 'is_leader' => 1,
                 'updated_by' => Auth::user()->full_name
             ]);
+        });
 
-            DB::commit();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Leader berhasil diset',
-                'data' => $member->fresh()
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollback();
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengatur leader',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return $this->successResponse($member->fresh(), 'Leader berhasil diset');
     }
 
 
@@ -953,45 +709,29 @@ class TimSalesController extends Controller
      */
     public function getAvailableUsers($id)
     {
-        try {
-            $timSales = TimSales::find($id);
-            if (!$timSales) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tim sales tidak ditemukan'
-                ], 404);
-            }
-
-            // Ambil semua user_id yang sudah jadi anggota tim di branch yang sama
-            $existingUserIds = TimSales::where('branch_id', $timSales->branch_id)
-                ->with('details') // pastikan relasi details ada di model TimSales
-                ->get()
-                ->pluck('details.*.user_id') // ambil semua user_id dari details
-                ->flatten()
-                ->unique()
-                ->toArray();
-
-            // Ambil user yang aktif, role sesuai, branch sama, dan
-            $availableUsers = User::where('is_active', 1)
-                ->whereIn('cais_role_id', [29, 31, 32, 33])
-                ->where('branch_id', $timSales->branch_id)
-                ->whereNotIn('id', $existingUserIds)
-                ->select('id', 'full_name', 'username', 'email', 'cais_role_id')
-                ->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Daftar user yang tersedia berhasil diambil',
-                'data' => $availableUsers
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan saat mengambil data',
-                'error' => $e->getMessage()
-            ], 500);
+        $timSales = TimSales::find($id);
+        if (!$timSales) {
+            return $this->notFoundResponse('Tim sales tidak ditemukan');
         }
+
+        // Ambil semua user_id yang sudah jadi anggota tim di branch yang sama
+        $existingUserIds = TimSales::where('branch_id', $timSales->branch_id)
+            ->with('details') // pastikan relasi details ada di model TimSales
+            ->get()
+            ->pluck('details.*.user_id') // ambil semua user_id dari details
+            ->flatten()
+            ->unique()
+            ->toArray();
+
+        // Ambil user yang aktif, role sesuai, branch sama, dan
+        $availableUsers = User::where('is_active', 1)
+            ->whereIn('cais_role_id', [29, 31, 32, 33])
+            ->where('branch_id', $timSales->branch_id)
+            ->whereNotIn('id', $existingUserIds)
+            ->select('id', 'full_name', 'username', 'email', 'cais_role_id')
+            ->get();
+
+        return $this->successResponse($availableUsers, 'Daftar user yang tersedia berhasil diambil');
     }
 
 

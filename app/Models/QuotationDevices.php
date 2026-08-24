@@ -15,6 +15,7 @@ class QuotationDevices extends Model
         'quotation_detail_id',
         'quotation_site_id',
         'quotation_id',
+        'quotation_aplikasi_id',
         'barang_id',
         'jumlah',
         'harga',

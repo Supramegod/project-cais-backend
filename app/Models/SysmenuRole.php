@@ -12,12 +12,13 @@ class SysmenuRole extends Model
     protected $fillable = [
         'sysmenu_id',
         'role_id',
+        'user_id',
         'is_view',
         'is_add',
         'is_edit',
         'is_delete',
         'created_by',
-        'updated_by'
+        'updated_by',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class SysmenuRole extends Model
     {
         return $this->belongsTo(Role::class, 'role_id');
     }
+
     public function getCreatedAtAttribute($value)
     {
         return Carbon::parse($value)->format('d-m-Y');
@@ -49,10 +51,21 @@ class SysmenuRole extends Model
     {
         return Carbon::parse($value)->format('d-m-Y');
     }
+
     // Tambahkan di dalam model SysmenuRole
     public function scopeForRole($query, $roleId)
     {
         return $query->where('role_id', $roleId);
+    }
+
+    public function scopeRoleLevel($query)
+    {
+        return $query->whereNull('user_id');
+    }
+
+    public function scopeForUser($query, $userId)
+    {
+        return $query->where('user_id', $userId);
     }
 
     public function scopeWithViewPermission($query)

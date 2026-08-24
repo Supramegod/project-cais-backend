@@ -17,6 +17,9 @@ class SalesActivity extends Model
     protected $fillable = [
         'leads_id',
         'leads_kebutuhan_id',
+        'quotation_id',
+        'spk_id',
+        'pks_id',
         'tgl_activity',
         'start',
         'end',
@@ -25,7 +28,8 @@ class SalesActivity extends Model
         'jenis_visit',
         'jenis_activity',
         'notulen',
-        'created_by'
+        'created_by',
+        'created_by_user_id'
     ];
 
     /**
@@ -52,13 +56,28 @@ class SalesActivity extends Model
         return $this->hasMany(SalesActivityFile::class, 'activity_sales_id');
     }
 
+    public function quotation()
+    {
+        return $this->belongsTo(Quotation::class, 'quotation_id');
+    }
+
+    public function spk()
+    {
+        return $this->belongsTo(Spk::class, 'spk_id');
+    }
+
+    public function pks()
+    {
+        return $this->belongsTo(Pks::class, 'pks_id');
+    }
+
     /**
      * Jika created_by menyimpan ID User, kamu bisa tambahkan relasi ke User
      */
     public function creator()
     {
         // Sesuaikan dengan model User kamu, biasanya App\Models\User
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(User::class, 'created_by_user_id', 'id');
     }
     public function getCreatedAtAttribute($value)
     {
