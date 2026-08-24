@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Role\RoleShowRequest;
 use App\Http\Requests\Role\RoleUpdatePermissionsRequest;
 use App\Models\Role;
 use App\Models\Sysmenu;
 use App\Models\SysmenuRole;
 use App\Services\MenuPermissionService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -69,6 +69,15 @@ class RoleController extends Controller
      *         @OA\Schema(type="integer")
      *     ),
      *
+     *     @OA\Parameter(
+     *         name="user_id",
+     *         in="query",
+     *         required=false,
+     *         description="Kalau diisi, tiap menu ikut membawa objek `override` berisi nilai khusus user tersebut. User wajib anggota role ini, kalau bukan akan 422.",
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
@@ -116,10 +125,12 @@ class RoleController extends Controller
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Role not found")
      *         )
-     *     )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="user_id tidak dikenal atau bukan anggota role ini")
      * )
      */
-    public function show(Request $request, $id): JsonResponse
+    public function show(RoleShowRequest $request, $id): JsonResponse
     {
         // Ambil role dari connection mysqlhris
         $role = Role::find($id);
