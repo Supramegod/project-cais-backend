@@ -53,8 +53,19 @@ test:
     - docker-php-ext-install gd pdo pdo_mysql zip
     # - pecl install mongodb && docker-php-ext-enable mongodb
     - echo "memory_limit=256M" > /usr/local/etc/php/conf.d/memory-limit.ini
-    - curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
-    - php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    # getcomposer.org is unreachable from this runner (curl 35: connection reset),
+    # so pull the pinned phar from the GitHub release and keep getcomposer.org as fallback.
+    - |
+      set -e
+      COMPOSER_VERSION=2.9.8
+      for url in \
+        "https://github.com/composer/composer/releases/download/${COMPOSER_VERSION}/composer.phar" \
+        "https://getcomposer.org/download/${COMPOSER_VERSION}/composer.phar"; do
+        echo "Fetching composer from ${url}"
+        curl -fsSL --retry 3 --retry-delay 5 -o /usr/local/bin/composer "${url}" && break
+        echo "Failed: ${url}"
+      done
+      chmod +x /usr/local/bin/composer
     - composer --version
     - cp .env.example .env
     - composer install --no-interaction --prefer-dist
