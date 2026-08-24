@@ -59,6 +59,11 @@ class SpkMenuPermissionTest extends TestCase
 
         Cache::flush();
 
+        // Kelas ini menguji gerbangnya sendiri, jadi harus memakai service asli
+        // yang benar-benar membaca `sysmenu_role`, bukan stub permisif dari
+        // Tests\TestCase.
+        $this->useRealMenuPermissions();
+
         $this->actingAs(User::query()->findOrFail(1), 'web');
         $this->withoutMiddleware(CheckTokenExpiry::class);
     }
