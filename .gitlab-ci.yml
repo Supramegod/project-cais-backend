@@ -51,7 +51,7 @@ test:
     - apt-get update && apt-get install -y libpng-dev libjpeg-dev libfreetype6-dev libzip-dev git unzip
     - docker-php-ext-configure gd --with-freetype --with-jpeg
     - docker-php-ext-install gd pdo pdo_mysql zip
-    - pecl install mongodb && docker-php-ext-enable mongodb
+    # - pecl install mongodb && docker-php-ext-enable mongodb
     - echo "memory_limit=256M" > /usr/local/etc/php/conf.d/memory-limit.ini
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - cp .env.example .env
