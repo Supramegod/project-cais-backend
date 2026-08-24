@@ -2,15 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Role\RoleUpdatePermissionsRequest;
 use App\Models\Role;
 use App\Models\Sysmenu;
 use App\Models\SysmenuRole;
 use App\Services\MenuPermissionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+
 /**
  * @OA\Tag(
  *     name="Roles",
@@ -27,13 +28,18 @@ class RoleController extends Controller
      *     tags={"Roles"},
      *     summary="Get all active roles",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="name", type="string", example="Admin"),
      *                     @OA\Property(property="Is_active", type="integer", example=1)
@@ -48,30 +54,36 @@ class RoleController extends Controller
         return $this->successResponse(Role::active()->get());
     }
 
-
     /**
      * @OA\Get(
      *     path="/api/roles/view/{id}",
      *     tags={"Roles"},
      *     summary="Get role by ID with all menu permissions",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer", example=1),
      *                 @OA\Property(property="name", type="string", example="Admin"),
      *                 @OA\Property(property="Is_active", type="integer", example=1),
      *                 @OA\Property(property="menus", type="array",
+     *
      *                     @OA\Items(
+     *
      *                         @OA\Property(property="id", type="integer", example=1),
      *                         @OA\Property(property="name", type="string", example="Dashboard"),
      *                         @OA\Property(property="url", type="string", example="/dashboard"),
@@ -81,7 +93,9 @@ class RoleController extends Controller
      *                         @OA\Property(property="is_edit", type="boolean", example=true),
      *                         @OA\Property(property="is_delete", type="boolean", example=false),
      *                         @OA\Property(property="children", type="array",
+     *
      *                             @OA\Items(
+     *
      *                                 @OA\Property(property="id", type="integer", example=2),
      *                                 @OA\Property(property="name", type="string", example="Sub Menu"),
      *                                 @OA\Property(property="is_view", type="boolean", example=false)
@@ -92,47 +106,51 @@ class RoleController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Not found",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Role not found")
      *         )
      *     )
      * )
      */
-    public function show($id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         // Ambil role dari connection mysqlhris
         $role = Role::find($id);
 
-        if (!$role) {
+        if (! $role) {
             return $this->notFoundResponse('Role not found');
         }
 
+        $userId = $request->integer('user_id') ?: null;
+
         // Ambil semua menu dengan permissions untuk role ini
         $menus = Sysmenu::active()
-            ->withPermissions($id)
+            ->withPermissions($id, $userId)
             ->withGroupInfo()
-            ->selectMenuFields()
+            ->selectMenuFields($userId !== null)
             ->ordered()
             ->get();
 
         // Bangun hierarchical menu structure
-        $menuTree = $this->buildMenuTreeWithPermissions($menus);
+        $menuTree = $this->buildMenuTreeWithPermissions($menus, null, $userId !== null);
 
         // Format response
         $roleData = [
             'id' => $role->id,
             'name' => $role->name,
             'Is_active' => $role->Is_active,
-            'menus' => $menuTree
+            'menus' => $menuTree,
         ];
 
         return $this->successResponse($roleData);
     }
-
 
     /**
      * @OA\Get(
@@ -141,17 +159,24 @@ class RoleController extends Controller
      *     summary="Get menu permissions grouped by menu group for authenticated user",
      *     description="Returns hierarchical menu structure with permissions grouped by menu groups",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="group_id", type="integer", example=1),
      *                     @OA\Property(property="group_name", type="string", example="Main Menu"),
      *                     @OA\Property(property="menus", type="array",
+     *
      *                         @OA\Items(
+     *
      *                             @OA\Property(property="id", type="integer", example=1),
      *                             @OA\Property(property="nama", type="string", example="Dashboard"),
      *                             @OA\Property(property="icon", type="string", example="fa-home"),
@@ -168,18 +193,24 @@ class RoleController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Forbidden",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User role not found")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Internal Server Error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Internal server error")
      *         )
@@ -189,15 +220,15 @@ class RoleController extends Controller
     public function menuPermissions(): JsonResponse
     {
         $user = Auth::user();
-        if (!$user || !$user->cais_role_id) {
+        if (! $user || ! $user->cais_role_id) {
             return $this->errorResponse('User role not found', 403);
         }
 
         // Ambil semua menu aktif dengan LEFT JOIN ke permissions
         $menus = Sysmenu::active()
-            ->withPermissions($user->cais_role_id)
+            ->withPermissions($user->cais_role_id, (int) $user->id)
             ->withGroupInfo()
-            ->selectMenuFields()
+            ->selectMenuFields(true)
             ->ordered()
             ->get();
 
@@ -210,7 +241,7 @@ class RoleController extends Controller
         if ($filteredMenus->isEmpty()) {
             return $this->successResponse([
                 'ungrouped' => [],
-                'grouped' => []
+                'grouped' => [],
             ]);
         }
 
@@ -227,7 +258,7 @@ class RoleController extends Controller
                 $groupId = $menu['group_id'];
                 $groupName = $menu['group_name'] ?? 'Tanpa Nama';
 
-                if (!isset($groupedMenus[$groupId])) {
+                if (! isset($groupedMenus[$groupId])) {
                     $groupedMenus[$groupId] = [
                         'group_id' => $groupId,
                         'group_name' => $groupName,
@@ -246,26 +277,34 @@ class RoleController extends Controller
 
         return $this->successResponse($response);
     }
+
     /**
      * @OA\Post(
      *     path="/api/roles/{id}/update-permissions",
      *     tags={"Roles"},
      *     summary="Update menu permissions (parent updates will cascade to children)",
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"akses"},
+     *
      *             @OA\Property(
      *                 property="akses",
      *                 type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="sysmenu_id", type="integer", example=1),
      *                     @OA\Property(property="field", type="string", example="is_view"),
      *                     @OA\Property(property="value", type="boolean", example=true)
@@ -273,18 +312,24 @@ class RoleController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Permissions updated successfully")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Error",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Failed to update permissions")
      *         )
@@ -294,19 +339,24 @@ class RoleController extends Controller
     public function updatePermissions(RoleUpdatePermissionsRequest $request, $id): JsonResponse
     {
         $permissions = $request->input('akses', []);
+        $userId = $request->input('user_id') !== null ? (int) $request->input('user_id') : null;
 
-        DB::transaction(function () use ($permissions, $id) {
+        DB::transaction(function () use ($permissions, $id, $userId) {
             foreach ($permissions as $permission) {
-                $this->updateOrCreatePermission($id, $permission);
+                $this->updateOrCreatePermission($id, $permission, $userId);
 
                 // Jika yang diupdate adalah menu parent, update juga semua child menus
-                $this->cascadePermissionToChildren($id, $permission);
+                $this->cascadePermissionToChildren($id, $permission, $userId);
             }
         });
 
         // Cache permission dibaca setiap request oleh CheckMenuPermission, jadi
         // harus dibuang begitu datanya berubah.
-        $this->menuPermissions->forget((int) $id);
+        if ($userId === null) {
+            $this->menuPermissions->forget((int) $id);
+        } else {
+            $this->menuPermissions->forgetUser((int) $id, $userId);
+        }
 
         return $this->successResponse(null, 'Permissions updated successfully');
     }
@@ -315,7 +365,7 @@ class RoleController extends Controller
      * Update permission untuk menu parent dan cascade ke semua child menus
      * untuk semua field: is_view, is_add, is_edit, is_delete
      */
-    private function cascadePermissionToChildren($roleId, $parentPermission): void
+    private function cascadePermissionToChildren($roleId, $parentPermission, ?int $userId = null): void
     {
         $parentMenuId = $parentPermission['sysmenu_id'];
         $field = $parentPermission['field'];
@@ -323,18 +373,28 @@ class RoleController extends Controller
 
         $childMenuIds = $this->getAllChildMenuIds($parentMenuId);
 
-        if (!empty($childMenuIds)) {
+        if (! empty($childMenuIds)) {
             // Batch update existing records
             SysmenuRole::where('role_id', $roleId)
                 ->whereIn('sysmenu_id', $childMenuIds)
+                ->when(
+                    $userId === null,
+                    fn ($query) => $query->roleLevel(),
+                    fn ($query) => $query->forUser($userId)
+                )
                 ->update([
                     $field => $value,
-                    'updated_by' => Auth::id()
+                    'updated_by' => Auth::id(),
                 ]);
 
             // Find which child menus don't have permission records yet
             $existingRecords = SysmenuRole::where('role_id', $roleId)
                 ->whereIn('sysmenu_id', $childMenuIds)
+                ->when(
+                    $userId === null,
+                    fn ($query) => $query->roleLevel(),
+                    fn ($query) => $query->forUser($userId)
+                )
                 ->pluck('sysmenu_id')
                 ->toArray();
 
@@ -347,6 +407,7 @@ class RoleController extends Controller
             foreach ($newMenuIds as $menuId) {
                 $batchData[] = [
                     'role_id' => $roleId,
+                    'user_id' => $userId,
                     'sysmenu_id' => $menuId,
                     $field => $value,
                     // Set default values untuk field lainnya
@@ -357,11 +418,11 @@ class RoleController extends Controller
                     'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
                     'created_at' => $currentTime,
-                    'updated_at' => $currentTime
+                    'updated_at' => $currentTime,
                 ];
             }
 
-            if (!empty($batchData)) {
+            if (! empty($batchData)) {
                 SysmenuRole::insert($batchData);
             }
         }
@@ -388,15 +449,20 @@ class RoleController extends Controller
         return $childIds;
     }
 
-    private function updateOrCreatePermission($roleId, $permission): void
+    private function updateOrCreatePermission($roleId, $permission, ?int $userId = null): void
     {
         $record = SysmenuRole::where('role_id', $roleId)
             ->where('sysmenu_id', $permission['sysmenu_id'])
+            ->when(
+                $userId === null,
+                fn ($query) => $query->roleLevel(),
+                fn ($query) => $query->forUser($userId)
+            )
             ->first();
 
         $data = [
             $permission['field'] => $permission['value'],
-            'updated_by' => Auth::id()
+            'updated_by' => Auth::id(),
         ];
 
         if ($record) {
@@ -404,6 +470,7 @@ class RoleController extends Controller
         } else {
             SysmenuRole::create(array_merge($data, [
                 'role_id' => $roleId,
+                'user_id' => $userId,
                 'sysmenu_id' => $permission['sysmenu_id'],
                 'created_by' => Auth::id(),
                 // Set default values untuk field lainnya
@@ -414,19 +481,20 @@ class RoleController extends Controller
             ]));
         }
     }
+
     // ============================ HELPER METHODS ============================
     /**
      * Build hierarchical menu tree with permissions untuk method show()
      */
-    private function buildMenuTreeWithPermissions($menus, $parentId = null)
+    private function buildMenuTreeWithPermissions($menus, $parentId = null, bool $withOverride = false)
     {
         $tree = [];
 
         foreach ($menus as $menu) {
             if ($menu->parent_id == $parentId) {
-                $children = $this->buildMenuTreeWithPermissions($menus, $menu->id);
+                $children = $this->buildMenuTreeWithPermissions($menus, $menu->id, $withOverride);
 
-                $tree[] = [
+                $node = [
                     'id' => $menu->id,
                     'nama' => $menu->nama,
                     'url' => $menu->url,
@@ -438,11 +506,24 @@ class RoleController extends Controller
                     'is_delete' => (bool) $menu->is_delete,
                     'children' => $children,
                 ];
+
+                if ($withOverride) {
+                    $override = [];
+
+                    foreach (MenuPermissionService::FIELDS as $field) {
+                        $override[$field] = (bool) $menu->{'override_'.$field};
+                    }
+
+                    $node['override'] = $override;
+                }
+
+                $tree[] = $node;
             }
         }
 
         return $tree;
     }
+
     private function buildMenuTreeWithGroup($menus, $parentId = null, $parentGroupId = null, $parentGroupName = null)
     {
         $tree = [];

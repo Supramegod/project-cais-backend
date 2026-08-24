@@ -240,6 +240,7 @@ class SpkControllerTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('sysmenu_id');
             $table->unsignedInteger('role_id');
+            $table->unsignedInteger('user_id')->nullable();
             $table->boolean('is_view')->default(false);
             $table->boolean('is_add')->default(false);
             $table->boolean('is_edit')->default(false);

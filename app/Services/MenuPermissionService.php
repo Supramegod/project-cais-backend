@@ -31,6 +31,19 @@ class MenuPermissionService
         return (bool) ($this->forRole($roleId)[$menuId][$field] ?? false);
     }
 
+    public function allowsForUser(?int $userId, ?int $roleId, int $menuId, string $field): bool
+    {
+        if ($this->allows($roleId, $menuId, $field)) {
+            return true;
+        }
+
+        if ($userId === null || $roleId === null) {
+            return false;
+        }
+
+        return (bool) ($this->overridesForUser($roleId, $userId)[$menuId][$field] ?? false);
+    }
+
     /**
      * @return array<int, array<string, bool>>
      */
@@ -43,18 +56,40 @@ class MenuPermissionService
         );
     }
 
+    /**
+     * @return array<int, array<string, bool>>
+     */
+    public function overridesForUser(int $roleId, int $userId): array
+    {
+        return Cache::remember(
+            self::userCacheKey($roleId, $userId),
+            self::CACHE_TTL_SECONDS,
+            fn (): array => $this->loadFromDatabase($roleId, $userId)
+        );
+    }
+
     public function forget(int $roleId): void
     {
         Cache::forget(self::cacheKey($roleId));
     }
 
+    public function forgetUser(int $roleId, int $userId): void
+    {
+        Cache::forget(self::userCacheKey($roleId, $userId));
+    }
+
     /**
      * @return array<int, array<string, bool>>
      */
-    private function loadFromDatabase(int $roleId): array
+    private function loadFromDatabase(int $roleId, ?int $userId = null): array
     {
         return SysmenuRole::query()
             ->forRole($roleId)
+            ->when(
+                $userId === null,
+                fn ($query) => $query->roleLevel(),
+                fn ($query) => $query->forUser($userId)
+            )
             ->get(array_merge(['sysmenu_id'], self::FIELDS))
             ->keyBy('sysmenu_id')
             ->map(function (SysmenuRole $permission): array {
@@ -72,5 +107,10 @@ class MenuPermissionService
     private static function cacheKey(int $roleId): string
     {
         return "menu-perm:role:{$roleId}";
+    }
+
+    private static function userCacheKey(int $roleId, int $userId): string
+    {
+        return "menu-perm:role:{$roleId}:user:{$userId}";
     }
 }

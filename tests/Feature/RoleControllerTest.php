@@ -236,6 +236,256 @@ class RoleControllerTest extends TestCase
             ->assertJsonStructure(['message' => ['akses.0.sysmenu_id']]);
     }
 
+    private function seedPermission(int $sysmenuId, int $roleId, ?int $userId = null, array $flags = []): void
+    {
+        DB::table('sysmenu_role')->insert(array_merge([
+            'sysmenu_id' => $sysmenuId,
+            'role_id' => $roleId,
+            'user_id' => $userId,
+            'is_view' => false,
+            'is_add' => false,
+            'is_edit' => false,
+            'is_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $flags));
+    }
+
+    public function test_update_permissions_dengan_user_id_tidak_menyentuh_baris_role(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => false]);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 1,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 1,
+            'is_view' => 1,
+        ]);
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => null,
+            'sysmenu_id' => 1,
+            'is_view' => 0,
+        ]);
+    }
+
+    public function test_update_permissions_role_level_tidak_menyentuh_baris_override(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, 1, ['is_view' => true]);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_add', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => null,
+            'sysmenu_id' => 1,
+            'is_add' => 1,
+            'is_view' => 0,
+        ]);
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 1,
+            'is_view' => 1,
+            'is_add' => 0,
+        ]);
+    }
+
+    public function test_update_permissions_dengan_user_id_cascade_ke_child_menu(): void
+    {
+        $this->seedMenu(1, 'Parent');
+        $this->seedMenu(2, 'Child', 1);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 1,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 2,
+            'is_view' => 1,
+        ]);
+
+        $this->assertDatabaseMissing('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => null,
+            'sysmenu_id' => 2,
+        ]);
+    }
+
+    public function test_update_permissions_cascade_dengan_user_id_tidak_menyentuh_baris_role_anak(): void
+    {
+        $this->seedMenu(1, 'Parent');
+        $this->seedMenu(2, 'Child', 1);
+        $this->seedPermission(2, 2, null, ['is_view' => false]);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 1,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 2,
+            'is_view' => 1,
+        ]);
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => null,
+            'sysmenu_id' => 2,
+            'is_view' => 0,
+        ]);
+    }
+
+    public function test_menu_permissions_menggabungkan_override_user(): void
+    {
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => false]);
+        $this->seedPermission(1, 2, 1, ['is_view' => true]);
+
+        $this->getJson('/api/roles/permissions')
+            ->assertOk()
+            ->assertJsonPath('data.grouped.0.menus.0.id', 1)
+            ->assertJsonPath('data.grouped.0.menus.0.permissions.view', true);
+    }
+
+    public function test_menu_permissions_tidak_menduplikasi_menu_dengan_override(): void
+    {
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_view' => true]);
+
+        $this->getJson('/api/roles/permissions')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.grouped.0.menus');
+    }
+
+    public function test_menu_permissions_override_milik_user_lain_tidak_bocor(): void
+    {
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => false]);
+        $this->seedPermission(1, 2, 99, ['is_view' => true]);
+
+        $this->getJson('/api/roles/permissions')
+            ->assertOk()
+            ->assertExactJson([
+                'success' => true,
+                'data' => [
+                    'ungrouped' => [],
+                    'grouped' => [],
+                ],
+            ]);
+    }
+
+    public function test_show_dengan_user_id_mengembalikan_hasil_merge_dan_override(): void
+    {
+        $this->seedRole(2, 'Admin');
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_add' => true]);
+
+        $this->getJson('/api/roles/view/2?user_id=1')
+            ->assertOk()
+            ->assertJsonPath('data.menus.0.is_view', true)
+            ->assertJsonPath('data.menus.0.is_add', true)
+            ->assertJsonPath('data.menus.0.override.is_view', false)
+            ->assertJsonPath('data.menus.0.override.is_add', true);
+    }
+
+    public function test_show_tanpa_user_id_tidak_memuat_blok_override(): void
+    {
+        $this->seedRole(2, 'Admin');
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_add' => true]);
+
+        $response = $this->getJson('/api/roles/view/2')->assertOk();
+
+        $this->assertArrayNotHasKey('override', $response->json('data.menus.0'));
+        $response->assertJsonPath('data.menus.0.is_add', false);
+    }
+
+    public function test_update_permissions_field_di_luar_whitelist_ditolak(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_owner', 'value' => true],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['message' => ['akses.0.field']]);
+    }
+
+    public function test_update_permissions_user_id_dari_role_lain_ditolak(): void
+    {
+        DB::table('m_user')->insert([
+            'id' => 3,
+            'username' => 'other',
+            'password' => bcrypt('secret'),
+            'full_name' => 'Other Role',
+            'email' => 'other@example.com',
+            'cais_role_id' => 5,
+            'branch_id' => 1,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->seedMenu(1, 'Dashboard');
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 3,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['message' => ['user_id']]);
+    }
+
+    public function test_update_permissions_user_id_tidak_dikenal_ditolak(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'user_id' => 4321,
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])
+            ->assertStatus(422)
+            ->assertJsonStructure(['message' => ['user_id']]);
+    }
+
     private function rebuildSchema(): void
     {
         Schema::dropIfExists('m_user');
@@ -289,6 +539,7 @@ class RoleControllerTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('sysmenu_id')->nullable();
             $table->unsignedInteger('role_id')->nullable();
+            $table->unsignedInteger('user_id')->nullable();
             $table->boolean('is_view')->default(false);
             $table->boolean('is_add')->default(false);
             $table->boolean('is_edit')->default(false);

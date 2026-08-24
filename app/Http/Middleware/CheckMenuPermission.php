@@ -36,7 +36,14 @@ class CheckMenuPermission
         $user = $request->user();
         $roleId = $user?->cais_role_id;
 
-        if (! $this->permissions->allows($roleId !== null ? (int) $roleId : null, $menuId, $field)) {
+        $allowed = $this->permissions->allowsForUser(
+            $user?->id !== null ? (int) $user->id : null,
+            $roleId !== null ? (int) $roleId : null,
+            $menuId,
+            $field
+        );
+
+        if (! $allowed) {
             Log::warning('Menu permission denied', [
                 'user_id' => $user?->id,
                 'role_id' => $roleId,

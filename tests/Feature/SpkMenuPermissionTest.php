@@ -143,6 +143,64 @@ class SpkMenuPermissionTest extends TestCase
         Cache::flush();
     }
 
+    public function test_override_user_memberi_akses_meski_role_menolak(): void
+    {
+        $this->grant(['is_view' => false]);
+        $this->grantUser(1, ['is_view' => true]);
+
+        $this->getJson('/api/spk/list')->assertOk();
+    }
+
+    public function test_override_tidak_bocor_ke_user_lain_dengan_role_sama(): void
+    {
+        $this->grant(['is_view' => false]);
+        $this->grantUser(1, ['is_view' => true]);
+
+        DB::table('m_user')->insert([
+            'id' => 2,
+            'username' => 'rekan',
+            'password' => bcrypt('secret'),
+            'full_name' => 'Rekan Serole',
+            'email' => 'rekan@example.com',
+            'cais_role_id' => self::ROLE_ID,
+            'branch_id' => 1,
+            'is_active' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->actingAs(User::query()->findOrFail(2), 'web');
+
+        $this->getJson('/api/spk/list')->assertStatus(403);
+    }
+
+    public function test_override_tidak_bisa_mencabut_akses_dari_role(): void
+    {
+        $this->grant(['is_view' => true]);
+        $this->grantUser(1, ['is_view' => false]);
+
+        $this->getJson('/api/spk/list')->assertOk();
+    }
+
+    /**
+     * @param  array<string, bool>  $flags
+     */
+    private function grantUser(int $userId, array $flags, ?int $sysmenuId = null): void
+    {
+        DB::table('sysmenu_role')->insert(array_merge([
+            'sysmenu_id' => $sysmenuId ?? (int) config('menu_permissions.spk'),
+            'role_id' => self::ROLE_ID,
+            'user_id' => $userId,
+            'is_view' => false,
+            'is_add' => false,
+            'is_edit' => false,
+            'is_delete' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $flags));
+
+        Cache::flush();
+    }
+
     private function rebuildSchema(): void
     {
         foreach (['m_user', 'sysmenu_role', 'sl_spk', 'sl_leads', 'm_status_spk'] as $table) {
@@ -166,12 +224,57 @@ class SpkMenuPermissionTest extends TestCase
             $table->increments('id');
             $table->unsignedInteger('sysmenu_id');
             $table->unsignedInteger('role_id');
+            $table->unsignedInteger('user_id')->nullable();
             $table->boolean('is_view')->default(false);
             $table->boolean('is_add')->default(false);
             $table->boolean('is_edit')->default(false);
             $table->boolean('is_delete')->default(false);
             $table->unsignedInteger('created_by')->nullable();
             $table->unsignedInteger('updated_by')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('sl_leads', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('nama_perusahaan')->nullable();
+            $table->string('nomor')->nullable();
+            $table->unsignedInteger('branch_id')->nullable();
+            $table->unsignedInteger('kebutuhan_id')->nullable();
+            $table->unsignedInteger('status_leads_id')->nullable();
+            $table->date('tgl_leads')->nullable();
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
+            $table->string('deleted_by')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('m_status_spk', function (Blueprint $table) {
+            $table->increments('id');
+            $table->string('nama')->nullable();
+            $table->string('kode')->nullable();
+            $table->boolean('is_active')->nullable();
+            $table->string('deleted_by')->nullable();
+            $table->softDeletes();
+            $table->timestamps();
+        });
+
+        Schema::create('sl_spk', function (Blueprint $table) {
+            $table->increments('id');
+            $table->unsignedInteger('leads_id')->nullable();
+            $table->unsignedInteger('quotation_id')->nullable();
+            $table->string('nomor')->nullable();
+            $table->date('tgl_spk')->nullable();
+            $table->string('nama_perusahaan')->nullable();
+            $table->unsignedInteger('tim_sales_id')->nullable();
+            $table->unsignedInteger('tim_sales_d_id')->nullable();
+            $table->string('link_spk_disetujui')->nullable();
+            $table->unsignedInteger('status_spk_id')->nullable();
+            $table->string('created_by')->nullable();
+            $table->unsignedInteger('created_by_user_id')->nullable();
+            $table->string('updated_by')->nullable();
+            $table->string('deleted_by')->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
