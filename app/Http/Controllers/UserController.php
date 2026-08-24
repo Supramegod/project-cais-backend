@@ -48,25 +48,20 @@ class UserController extends Controller
      */
     public function index(UserListRequest $request): JsonResponse
     {
-        $perPage = $request->integer('per_page') ?: self::DEFAULT_PER_PAGE;
-
-        $users = $this->baseQuery($request)->paginate($perPage);
-
-        $users->getCollection()->transform(fn (User $user): array => $this->formatUser($user));
-
-        return $this->paginatedResponse($users, 'Daftar user berhasil diambil');
+        return $this->paginatedLookup($request);
     }
 
     /**
      * @OA\Get(
      *     path="/api/users/by-role/{role_id}",
      *     tags={"Users"},
-     *     summary="Daftar user pada satu role (tanpa paginasi, untuk dropdown)",
+     *     summary="Daftar user pada satu role, berpaginasi",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="role_id", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Parameter(name="is_active", in="query", required=false, description="1 = aktif (default), 0 = nonaktif, all = semua", @OA\Schema(type="string", enum={"0","1","all"}, default="1")),
      *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string", maxLength=100)),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", minimum=1, maximum=100, default=25)),
      *
      *     @OA\Response(
      *         response=200,
@@ -76,7 +71,8 @@ class UserController extends Controller
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Daftar user berhasil diambil"),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="meta", type="object")
      *         )
      *     ),
      *
@@ -85,24 +81,21 @@ class UserController extends Controller
      */
     public function byRole(UserListRequest $request, int $roleId): JsonResponse
     {
-        $users = $this->baseQuery($request, ['role_id' => $roleId])
-            ->get()
-            ->map(fn (User $user): array => $this->formatUser($user))
-            ->all();
-
-        return $this->successResponse($users, 'Daftar user berhasil diambil');
+        return $this->paginatedLookup($request, ['role_id' => $roleId]);
     }
 
     /**
      * @OA\Get(
      *     path="/api/users/by-branch/{branch_id}",
      *     tags={"Users"},
-     *     summary="Daftar user pada satu branch (tanpa paginasi, untuk dropdown)",
+     *     summary="Daftar user pada satu branch, berpaginasi",
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="branch_id", in="path", required=true, @OA\Schema(type="integer")),
      *     @OA\Parameter(name="role_id", in="query", required=false, @OA\Schema(type="integer")),
      *     @OA\Parameter(name="is_active", in="query", required=false, description="1 = aktif (default), 0 = nonaktif, all = semua", @OA\Schema(type="string", enum={"0","1","all"}, default="1")),
+     *     @OA\Parameter(name="search", in="query", required=false, @OA\Schema(type="string", maxLength=100)),
+     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer", minimum=1, maximum=100, default=25)),
      *
      *     @OA\Response(
      *         response=200,
@@ -112,7 +105,8 @@ class UserController extends Controller
      *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Daftar user berhasil diambil"),
-     *             @OA\Property(property="data", type="array", @OA\Items(type="object"))
+     *             @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *             @OA\Property(property="meta", type="object")
      *         )
      *     ),
      *
@@ -121,12 +115,7 @@ class UserController extends Controller
      */
     public function byBranch(UserListRequest $request, int $branchId): JsonResponse
     {
-        $users = $this->baseQuery($request, ['branch_id' => $branchId])
-            ->get()
-            ->map(fn (User $user): array => $this->formatUser($user))
-            ->all();
-
-        return $this->successResponse($users, 'Daftar user berhasil diambil');
+        return $this->paginatedLookup($request, ['branch_id' => $branchId]);
     }
 
     /**
@@ -172,6 +161,25 @@ class UserController extends Controller
         }
 
         return $this->successResponse($this->formatUser($user));
+    }
+
+    /**
+     * Semua endpoint daftar user lewat sini supaya tidak ada satu pun yang bisa
+     * menarik tabel penuh. `m_user` berisi ratusan ribu baris dan satu role saja
+     * (Karyawan) menampung hampir seluruhnya, jadi `->get()` tanpa batas di sini
+     * berarti kehabisan memori, bukan sekadar lambat.
+     *
+     * @param  array{role_id?: int, branch_id?: int}  $overrides  Nilai dari route param; menang atas query string.
+     */
+    private function paginatedLookup(UserListRequest $request, array $overrides = []): JsonResponse
+    {
+        $perPage = $request->integer('per_page') ?: self::DEFAULT_PER_PAGE;
+
+        $users = $this->baseQuery($request, $overrides)->paginate($perPage);
+
+        $users->getCollection()->transform(fn (User $user): array => $this->formatUser($user));
+
+        return $this->paginatedResponse($users, 'Daftar user berhasil diambil');
     }
 
     /**
