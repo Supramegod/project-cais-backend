@@ -2,19 +2,15 @@
 
 namespace App\Http\Controllers;
 
-
-use App\Models\Role;
-use App\Models\SysmenuRole;
-use App\Models\SysmenuGroup;
-use App\Http\Controllers\Controller;
+use App\Http\Requests\Menu\MenuAssignRequest;
+use App\Http\Requests\Menu\MenuGroupStoreRequest;
 use App\Http\Requests\Menu\MenuStoreRequest;
 use App\Http\Requests\Menu\MenuUpdateRequest;
-use App\Http\Requests\Menu\MenuGroupStoreRequest;
-use App\Http\Requests\Menu\MenuAssignRequest;
 use App\Models\Sysmenu;
-use Illuminate\Support\Facades\Auth;
+use App\Models\SysmenuGroup;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -31,13 +27,18 @@ class MenuController extends Controller
      *     summary="Get all menus",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer"),
      *                     @OA\Property(property="nama", type="string"),
      *                     @OA\Property(property="parent_id", type="integer", nullable=true),
@@ -49,6 +50,7 @@ class MenuController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Internal Server Error"
@@ -70,14 +72,14 @@ class MenuController extends Controller
         $buildTree = function ($parentId) use (&$buildTree, $grouped) {
             return ($grouped[$parentId] ?? collect())->map(function ($menu) use (&$buildTree) {
                 return [
-                    'id'         => $menu->id,
-                    'nama'       => $menu->nama,
-                    'url'        => $menu->url,
-                    'icon'       => $menu->icon,
+                    'id' => $menu->id,
+                    'nama' => $menu->nama,
+                    'url' => $menu->url,
+                    'icon' => $menu->icon,
                     'created_at' => $menu->created_at
                         ? Carbon::parse($menu->created_at)->isoFormat('D MMMM Y')
                         : null,
-                    'children'   => $buildTree($menu->id),
+                    'children' => $buildTree($menu->id),
                 ];
             })->values();
         };
@@ -94,16 +96,21 @@ class MenuController extends Controller
      *     summary="Get menu by ID",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="object",
      *                 @OA\Property(property="id", type="integer"),
@@ -114,6 +121,7 @@ class MenuController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Not Found"
@@ -124,7 +132,7 @@ class MenuController extends Controller
     {
         $menu = Sysmenu::active()->find($id);
 
-        if (!$menu) {
+        if (! $menu) {
             return $this->notFoundResponse('Menu not found');
         }
 
@@ -137,20 +145,26 @@ class MenuController extends Controller
      *     summary="Create new menu",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"nama","url"},
+     *
      *             @OA\Property(property="nama", type="string", example="Dashboard", maxLength=100),
      *             @OA\Property(property="parent_id", type="integer", example=null, nullable=true),
      *             @OA\Property(property="url", type="string", example="/dashboard", maxLength=255),
      *             @OA\Property(property="icon", type="string", example="mdi mdi-home", maxLength=100, nullable=true)
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="Created",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Data Berhasil Disimpan"),
      *             @OA\Property(property="data", type="object",
@@ -159,6 +173,7 @@ class MenuController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation Error"
@@ -168,10 +183,10 @@ class MenuController extends Controller
     public function add(MenuStoreRequest $request)
     {
         $menu = Sysmenu::create([
-            'nama'       => $request->nama,
-            'parent_id'  => $request->parent_id,
-            'url'        => $request->url,
-            'icon'       => $request->icon,
+            'nama' => $request->nama,
+            'parent_id' => $request->parent_id,
+            'url' => $request->url,
+            'icon' => $request->icon,
             'created_at' => Carbon::now()->toDateTimeString(),
             'created_by' => Auth::user()->full_name,
             'created_by_user_id' => Auth::id(),
@@ -186,30 +201,39 @@ class MenuController extends Controller
      *     summary="Update menu",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"nama","url"},
+     *
      *             @OA\Property(property="nama", type="string", example="Dashboard Updated", maxLength=100),
      *             @OA\Property(property="url", type="string", example="/dashboard-new", maxLength=255),
      *             @OA\Property(property="icon", type="string", example="mdi mdi-home-outline", maxLength=100, nullable=true),
      *             @OA\Property(property="status", type="string", enum={"alpha", "beta"}, example="alpha", nullable=true)
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Data Berhasil Disimpan")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Not Found"
@@ -220,15 +244,15 @@ class MenuController extends Controller
     {
         $menu = Sysmenu::active()->find($id);
 
-        if (!$menu) {
+        if (! $menu) {
             return $this->notFoundResponse('Menu not found');
         }
 
         $menu->update([
-            'nama'       => $request->nama,
-            'url'        => $request->url,
-            'icon'       => $request->icon,
-            'status'     => $request->filled('status') ? $request->status : null,
+            'nama' => $request->nama,
+            'url' => $request->url,
+            'icon' => $request->icon,
+            'status' => $request->filled('status') ? $request->status : null,
             'updated_at' => Carbon::now()->toDateTimeString(),
             'updated_by' => Auth::user()->full_name,
         ]);
@@ -242,20 +266,26 @@ class MenuController extends Controller
      *     summary="Delete menu",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Data Berhasil Dihapus")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Not Found"
@@ -266,7 +296,7 @@ class MenuController extends Controller
     {
         $menu = Sysmenu::active()->find($id);
 
-        if (!$menu) {
+        if (! $menu) {
             return $this->notFoundResponse('Menu not found');
         }
 
@@ -290,18 +320,25 @@ class MenuController extends Controller
      *     summary="Get all menu groups beserta daftar menu di dalamnya",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", type="array",
+     *
      *                 @OA\Items(
+     *
      *                     @OA\Property(property="id", type="integer"),
      *                     @OA\Property(property="nama", type="string"),
      *                     @OA\Property(property="total_menu", type="integer"),
      *                     @OA\Property(property="menus", type="array",
+     *
      *                         @OA\Items(
+     *
      *                             @OA\Property(property="id", type="integer"),
      *                             @OA\Property(property="nama", type="string"),
      *                             @OA\Property(property="url", type="string"),
@@ -312,6 +349,7 @@ class MenuController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=500,
      *         description="Internal Server Error"
@@ -326,19 +364,19 @@ class MenuController extends Controller
                 ->select('id', 'group_id', 'nama', 'url', 'icon')
                 ->orderBy('id');
         }])
-        ->orderBy('nama')
-        ->get();
+            ->orderBy('nama')
+            ->get();
 
         $data = $groups->map(function ($group) {
             return [
-                'id'          => $group->id,
-                'nama'        => $group->nama,
-                'total_menu'  => $group->sysmenus->count(),
-                'menus'       => $group->sysmenus->map(function ($menu) {
+                'id' => $group->id,
+                'nama' => $group->nama,
+                'total_menu' => $group->sysmenus->count(),
+                'menus' => $group->sysmenus->map(function ($menu) {
                     return [
-                        'id'   => $menu->id,
+                        'id' => $menu->id,
                         'nama' => $menu->nama,
-                        'url'  => $menu->url,
+                        'url' => $menu->url,
                         'icon' => $menu->icon,
                     ];
                 })->values(),
@@ -354,17 +392,23 @@ class MenuController extends Controller
      *     summary="Tambah group menu baru",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"nama"},
+     *
      *             @OA\Property(property="nama", type="string", example="Master Data", maxLength=100)
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="Created",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Grup Berhasil Dibuat"),
      *             @OA\Property(property="data", type="object",
@@ -373,6 +417,7 @@ class MenuController extends Controller
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation Error"
@@ -390,7 +435,7 @@ class MenuController extends Controller
         ]);
 
         return $this->successResponse([
-            'id'   => $group->id,
+            'id' => $group->id,
             'nama' => $group->nama,
         ], 'Grup Berhasil Dibuat', 201);
     }
@@ -402,24 +447,31 @@ class MenuController extends Controller
      *     description="Kirim menu_ids berisi satu ID untuk single, atau lebih dari satu ID untuk multiple assign. Menu yang sudah ada di group lain akan dipindahkan ke group baru.",
      *     tags={"Menu"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"group_id","menu_ids"},
+     *
      *             @OA\Property(property="group_id", type="integer", example=1),
      *             @OA\Property(
      *                 property="menu_ids",
      *                 type="array",
      *                 minItems=1,
      *                 description="Array ID menu, isi satu elemen untuk single assign",
+     *
      *                 @OA\Items(type="integer", example=3)
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Success",
+     *
      *         @OA\JsonContent(
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="3 menu berhasil ditambahkan ke grup"),
      *             @OA\Property(property="data", type="object",
@@ -428,11 +480,13 @@ class MenuController extends Controller
      *                 @OA\Property(property="assigned_count", type="integer", example=3),
      *                 @OA\Property(property="not_found_ids", type="array",
      *                     description="ID menu yang tidak ditemukan / sudah terhapus",
+     *
      *                     @OA\Items(type="integer")
      *                 )
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Group tidak ditemukan"
@@ -465,29 +519,29 @@ class MenuController extends Controller
 
             $assignedCount = 0;
 
-            if (!empty($activeMenuIds)) {
+            if (! empty($activeMenuIds)) {
                 $assignedCount = Sysmenu::whereIn('id', $activeMenuIds)
                     ->update([
-                        'group_id'   => $group->id,
+                        'group_id' => $group->id,
                         'updated_at' => Carbon::now()->toDateTimeString(),
                         'updated_by' => Auth::user()->full_name,
                     ]);
             }
 
             return [
-                'group'          => $group,
+                'group' => $group,
                 'assigned_count' => $assignedCount,
-                'not_found_ids'  => $notFoundIds,
+                'not_found_ids' => $notFoundIds,
             ];
         });
 
         $group = $result['group'];
 
         return $this->successResponse([
-            'group_id'       => $group->id,
-            'group_nama'     => $group->nama,
+            'group_id' => $group->id,
+            'group_nama' => $group->nama,
             'assigned_count' => $result['assigned_count'],
-            'not_found_ids'  => $result['not_found_ids'],
+            'not_found_ids' => $result['not_found_ids'],
         ], "{$result['assigned_count']} menu berhasil ditambahkan ke grup \"{$group->nama}\"");
     }
 
@@ -504,7 +558,7 @@ class MenuController extends Controller
 
         foreach ($childs as $childId) {
             $all[] = $childId;
-            $all   = array_merge($all, $this->getChildId($childId));
+            $all = array_merge($all, $this->getChildId($childId));
         }
 
         return $all;
