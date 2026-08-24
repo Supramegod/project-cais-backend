@@ -243,9 +243,9 @@ class RoleController extends Controller
             ->ordered()
             ->get();
 
-        // Filter: hanya ambil menu yang memiliki is_view = 1 atau belum ada permission record
+        // Fail-closed: menu tanpa permission record sudah bernilai 0 dari query.
         $filteredMenus = $menus->filter(function ($menu) {
-            return $menu->is_view == 1 || is_null($menu->is_view);
+            return $menu->is_view == 1;
         });
 
         // Jika tidak ada menu yang memenuhi kriteria, return empty response
@@ -352,12 +352,21 @@ class RoleController extends Controller
         $permissions = $request->input('akses', []);
         $userId = $request->input('user_id') !== null ? (int) $request->input('user_id') : null;
 
-        DB::transaction(function () use ($permissions, $id, $userId) {
+        $resyncedUserIds = [];
+
+        DB::transaction(function () use ($permissions, $id, $userId, &$resyncedUserIds) {
             foreach ($permissions as $permission) {
                 $this->updateOrCreatePermission($id, $permission, $userId);
 
                 // Jika yang diupdate adalah menu parent, update juga semua child menus
                 $this->cascadePermissionToChildren($id, $permission, $userId);
+
+                if ($userId === null) {
+                    $resyncedUserIds = array_merge(
+                        $resyncedUserIds,
+                        $this->resyncUserOverrides($id, $permission)
+                    );
+                }
             }
         });
 
@@ -365,6 +374,10 @@ class RoleController extends Controller
         // harus dibuang begitu datanya berubah.
         if ($userId === null) {
             $this->menuPermissions->forget((int) $id);
+
+            foreach (array_unique($resyncedUserIds) as $resyncedUserId) {
+                $this->menuPermissions->forgetUser((int) $id, (int) $resyncedUserId);
+            }
         } else {
             $this->menuPermissions->forgetUser((int) $id, $userId);
         }
@@ -414,29 +427,59 @@ class RoleController extends Controller
             // Create new records for menus without permissions
             $batchData = [];
             $currentTime = now();
+            $baseline = $this->baselineFlags($roleId, array_values($newMenuIds), $userId);
 
             foreach ($newMenuIds as $menuId) {
-                $batchData[] = [
+                $flags = $baseline[$menuId];
+                $flags[$field] = $value;
+
+                $batchData[] = array_merge($flags, [
                     'role_id' => $roleId,
                     'user_id' => $userId,
                     'sysmenu_id' => $menuId,
-                    $field => $value,
-                    // Set default values untuk field lainnya
-                    'is_view' => $field === 'is_view' ? $value : false,
-                    'is_add' => $field === 'is_add' ? $value : false,
-                    'is_edit' => $field === 'is_edit' ? $value : false,
-                    'is_delete' => $field === 'is_delete' ? $value : false,
                     'created_by' => Auth::id(),
                     'updated_by' => Auth::id(),
                     'created_at' => $currentTime,
                     'updated_at' => $currentTime,
-                ];
+                ]);
             }
 
             if (! empty($batchData)) {
                 SysmenuRole::insert($batchData);
             }
         }
+    }
+
+    /**
+     * Role adalah default: begitu permission role-level berubah, baris override
+     * user untuk menu yang sama ikut disamakan supaya tidak ada user yang
+     * tertinggal memakai nilai lama.
+     *
+     * @return list<int> user_id yang barisnya ikut berubah
+     */
+    private function resyncUserOverrides($roleId, $permission): array
+    {
+        $menuIds = array_merge(
+            [$permission['sysmenu_id']],
+            $this->getAllChildMenuIds($permission['sysmenu_id'])
+        );
+
+        $query = SysmenuRole::where('role_id', $roleId)
+            ->whereIn('sysmenu_id', $menuIds)
+            ->whereNotNull('user_id');
+
+        $userIds = (clone $query)->distinct()->pluck('user_id')->all();
+
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $query->update([
+            $permission['field'] => $permission['value'],
+            'updated_by' => Auth::id(),
+        ]);
+
+        return array_map('intval', $userIds);
     }
 
     /**
@@ -478,19 +521,56 @@ class RoleController extends Controller
 
         if ($record) {
             $record->update($data);
-        } else {
-            SysmenuRole::create(array_merge($data, [
-                'role_id' => $roleId,
-                'user_id' => $userId,
-                'sysmenu_id' => $permission['sysmenu_id'],
-                'created_by' => Auth::id(),
-                // Set default values untuk field lainnya
-                'is_view' => $permission['field'] === 'is_view' ? $permission['value'] : false,
-                'is_add' => $permission['field'] === 'is_add' ? $permission['value'] : false,
-                'is_edit' => $permission['field'] === 'is_edit' ? $permission['value'] : false,
-                'is_delete' => $permission['field'] === 'is_delete' ? $permission['value'] : false,
-            ]));
+
+            return;
         }
+
+        $flags = $this->baselineFlags($roleId, [$permission['sysmenu_id']], $userId)[$permission['sysmenu_id']];
+        $flags[$permission['field']] = $permission['value'];
+
+        SysmenuRole::create(array_merge($data, $flags, [
+            'role_id' => $roleId,
+            'user_id' => $userId,
+            'sysmenu_id' => $permission['sysmenu_id'],
+            'created_by' => Auth::id(),
+        ]));
+    }
+
+    /**
+     * Nilai awal untuk baris yang baru dibuat.
+     *
+     * Baris user-level meng-override role-level per menu, jadi baris user baru
+     * harus mewarisi nilai role saat ini. Kalau tidak, mengubah satu field
+     * (misal is_add) diam-diam mencabut field lain yang sebelumnya diberikan role.
+     *
+     * @param  list<int>  $menuIds
+     * @return array<int, array<string, bool>>
+     */
+    private function baselineFlags($roleId, array $menuIds, ?int $userId): array
+    {
+        $empty = array_fill_keys(MenuPermissionService::FIELDS, false);
+        $baseline = array_fill_keys($menuIds, $empty);
+
+        if ($userId === null) {
+            return $baseline;
+        }
+
+        $roleLevel = SysmenuRole::where('role_id', $roleId)
+            ->whereIn('sysmenu_id', $menuIds)
+            ->roleLevel()
+            ->get(array_merge(['sysmenu_id'], MenuPermissionService::FIELDS));
+
+        foreach ($roleLevel as $row) {
+            $flags = [];
+
+            foreach (MenuPermissionService::FIELDS as $field) {
+                $flags[$field] = (bool) $row->{$field};
+            }
+
+            $baseline[$row->sysmenu_id] = $flags;
+        }
+
+        return $baseline;
     }
 
     // ============================ HELPER METHODS ============================
@@ -525,6 +605,7 @@ class RoleController extends Controller
                         $override[$field] = (bool) $menu->{'override_'.$field};
                     }
 
+                    $node['has_override'] = (bool) $menu->has_override;
                     $node['override'] = $override;
                 }
 

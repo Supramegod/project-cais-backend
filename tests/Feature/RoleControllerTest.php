@@ -278,7 +278,7 @@ class RoleControllerTest extends TestCase
         ]);
     }
 
-    public function test_update_permissions_role_level_tidak_menyentuh_baris_override(): void
+    public function test_update_permissions_role_level_hanya_menyamakan_field_yang_diubah(): void
     {
         $this->seedMenu(1, 'Dashboard');
         $this->seedPermission(1, 2, 1, ['is_view' => true]);
@@ -302,7 +302,7 @@ class RoleControllerTest extends TestCase
             'user_id' => 1,
             'sysmenu_id' => 1,
             'is_view' => 1,
-            'is_add' => 0,
+            'is_add' => 1,
         ]);
     }
 
@@ -360,7 +360,48 @@ class RoleControllerTest extends TestCase
         ]);
     }
 
-    public function test_menu_permissions_menggabungkan_override_user(): void
+    public function test_update_permissions_role_menyamakan_baris_override_user(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_view' => false, 'is_edit' => true]);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => true],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 1,
+            'is_view' => 1,
+            'is_edit' => 1,
+        ]);
+    }
+
+    public function test_update_permissions_role_juga_menyamakan_override_child_menu(): void
+    {
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedMenu(2, 'Approval', 1);
+        $this->seedPermission(2, 2, 1, ['is_view' => true]);
+
+        $this->postJson('/api/roles/2/update-permissions', [
+            'akses' => [
+                ['sysmenu_id' => 1, 'field' => 'is_view', 'value' => false],
+            ],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('sysmenu_role', [
+            'role_id' => 2,
+            'user_id' => 1,
+            'sysmenu_id' => 2,
+            'is_view' => 0,
+        ]);
+    }
+
+    public function test_menu_permissions_memakai_override_user(): void
     {
         DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
         $this->seedMenu(1, 'Dashboard');
@@ -371,6 +412,39 @@ class RoleControllerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.grouped.0.menus.0.id', 1)
             ->assertJsonPath('data.grouped.0.menus.0.permissions.view', true);
+    }
+
+    public function test_menu_permissions_override_user_mencabut_akses_role(): void
+    {
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true, 'is_edit' => true]);
+        $this->seedPermission(1, 2, 1, ['is_view' => false]);
+
+        $this->getJson('/api/roles/permissions')
+            ->assertOk()
+            ->assertExactJson([
+                'success' => true,
+                'data' => [
+                    'ungrouped' => [],
+                    'grouped' => [],
+                ],
+            ]);
+    }
+
+    public function test_menu_permissions_menu_tanpa_baris_user_tetap_ikut_role(): void
+    {
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedMenu(2, 'Laporan');
+        $this->seedPermission(1, 2, null, ['is_view' => true]);
+        $this->seedPermission(2, 2, null, ['is_view' => true]);
+        $this->seedPermission(1, 2, 1, ['is_view' => false]);
+
+        $this->getJson('/api/roles/permissions')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.grouped.0.menus')
+            ->assertJsonPath('data.grouped.0.menus.0.id', 2);
     }
 
     public function test_menu_permissions_tidak_menduplikasi_menu_dengan_override(): void
@@ -403,7 +477,7 @@ class RoleControllerTest extends TestCase
             ]);
     }
 
-    public function test_show_dengan_user_id_mengembalikan_hasil_merge_dan_override(): void
+    public function test_show_dengan_user_id_mengembalikan_nilai_efektif_dan_override(): void
     {
         $this->seedRole(2, 'Admin');
         DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
@@ -413,10 +487,26 @@ class RoleControllerTest extends TestCase
 
         $this->getJson('/api/roles/view/2?user_id=1')
             ->assertOk()
-            ->assertJsonPath('data.menus.0.is_view', true)
+            ->assertJsonPath('data.menus.0.has_override', true)
+            ->assertJsonPath('data.menus.0.is_view', false)
             ->assertJsonPath('data.menus.0.is_add', true)
             ->assertJsonPath('data.menus.0.override.is_view', false)
             ->assertJsonPath('data.menus.0.override.is_add', true);
+    }
+
+    public function test_show_dengan_user_id_menu_tanpa_baris_user_ikut_role(): void
+    {
+        $this->seedRole(2, 'Admin');
+        DB::table('sysmenu_group')->insert(['id' => 1, 'nama' => 'Main', 'sort_order' => 1]);
+        $this->seedMenu(1, 'Dashboard');
+        $this->seedPermission(1, 2, null, ['is_view' => true, 'is_edit' => true]);
+
+        $this->getJson('/api/roles/view/2?user_id=1')
+            ->assertOk()
+            ->assertJsonPath('data.menus.0.has_override', false)
+            ->assertJsonPath('data.menus.0.is_view', true)
+            ->assertJsonPath('data.menus.0.is_edit', true)
+            ->assertJsonPath('data.menus.0.override.is_view', false);
     }
 
     public function test_show_tanpa_user_id_tidak_memuat_blok_override(): void

@@ -31,17 +31,26 @@ class MenuPermissionService
         return (bool) ($this->forRole($roleId)[$menuId][$field] ?? false);
     }
 
+    /**
+     * Baris user-level meng-override baris role-level per menu: kalau user punya
+     * baris untuk menu tersebut, nilainya dipakai apa adanya (termasuk mencabut
+     * akses). Menu tanpa baris user tetap mengikuti role.
+     */
     public function allowsForUser(?int $userId, ?int $roleId, int $menuId, string $field): bool
     {
-        if ($this->allows($roleId, $menuId, $field)) {
-            return true;
-        }
-
-        if ($userId === null || $roleId === null) {
+        if ($roleId === null) {
             return false;
         }
 
-        return (bool) ($this->overridesForUser($roleId, $userId)[$menuId][$field] ?? false);
+        if ($userId !== null) {
+            $override = $this->overridesForUser($roleId, $userId)[$menuId] ?? null;
+
+            if ($override !== null) {
+                return (bool) $override[$field];
+            }
+        }
+
+        return $this->allows($roleId, $menuId, $field);
     }
 
     /**

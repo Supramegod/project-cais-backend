@@ -120,12 +120,16 @@ class Sysmenu extends Model
             'sysmenu_group.nama as group_name',
         ];
 
+        if ($withUserOverride) {
+            $columns[] = DB::raw('CASE WHEN sysmenu_role_user.id IS NOT NULL THEN 1 ELSE 0 END as has_override');
+        }
+
         foreach (MenuPermissionService::FIELDS as $field) {
             if ($withUserOverride) {
                 $columns[] = DB::raw(
-                    'CASE WHEN COALESCE(sysmenu_role.'.$field.', 0) = 1'
-                    .' OR COALESCE(sysmenu_role_user.'.$field.', 0) = 1'
-                    .' THEN 1 ELSE 0 END as '.$field
+                    'CASE WHEN sysmenu_role_user.id IS NOT NULL'
+                    .' THEN COALESCE(sysmenu_role_user.'.$field.', 0)'
+                    .' ELSE COALESCE(sysmenu_role.'.$field.', 0) END as '.$field
                 );
                 $columns[] = DB::raw('COALESCE(sysmenu_role_user.'.$field.', 0) as override_'.$field);
 

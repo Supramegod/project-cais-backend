@@ -178,10 +178,18 @@ class SpkMenuPermissionTest extends TestCase
         $this->getJson('/api/spk/list')->assertStatus(403);
     }
 
-    public function test_override_tidak_bisa_mencabut_akses_dari_role(): void
+    public function test_override_user_mencabut_akses_yang_diberikan_role(): void
     {
         $this->grant(['is_view' => true]);
         $this->grantUser(1, ['is_view' => false]);
+
+        $this->getJson('/api/spk/list')->assertStatus(403);
+    }
+
+    public function test_menu_tanpa_baris_user_tetap_mengikuti_role(): void
+    {
+        $this->grant(['is_view' => true]);
+        $this->grantUser(1, ['is_view' => false], 99999);
 
         $this->getJson('/api/spk/list')->assertOk();
     }
